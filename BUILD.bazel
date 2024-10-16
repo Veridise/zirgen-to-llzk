@@ -1,0 +1,4 @@
+alias(
+    name = "lit_cfg",
+    actual = "@zirgen//:lit_cfg",
+)
