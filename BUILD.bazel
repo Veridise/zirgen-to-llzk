@@ -2,3 +2,8 @@ alias(
     name = "lit_cfg",
     actual = "@zirgen//:lit_cfg",
 )
+
+alias(
+  name = "zirgen",
+  actual = "@zirgen//zirgen/dsl:zirgen"
+)
