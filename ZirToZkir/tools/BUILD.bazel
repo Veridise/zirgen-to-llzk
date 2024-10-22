@@ -1,0 +1,18 @@
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "zkc-opt",
+    srcs = ["zkc-opt.cpp"],
+    deps = [
+        "@zirgen//zirgen/Dialect/ZHL/IR",
+        # "//ZirToZkir/Dialect/ZMIR/IR",  # Not ready yet
+#        "//zirgen/Dialect/BigInt/Transforms",
+#        "//zirgen/Dialect/ZStruct/Transforms:passes",
+#        "//zirgen/Dialect/Zll/Conversion/ZStructToZll:passes",
+#        "//zirgen/Dialect/Zll/Transforms:passes",
+#        "//zirgen/dsl/passes",
+        "@llvm-project//mlir:MlirOptLib",
+    ],
+)
