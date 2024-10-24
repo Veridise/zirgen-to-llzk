@@ -8,6 +8,7 @@ cc_binary(
     deps = [
       "@zirgen//zirgen/Dialect/ZHL/IR",
       "//ZirToZkir/Dialect/ZMIR/IR",  
+      "//ZirToZkir/Dialect/ZMIR/Transforms:passes",  
       "@llvm-project//mlir:MlirOptLib",
     ],
 )

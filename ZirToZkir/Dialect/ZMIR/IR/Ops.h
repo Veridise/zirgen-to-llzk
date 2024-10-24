@@ -21,6 +21,12 @@
 
 #include <optional>
 
+namespace zkc::Zmir {
+
+/// Tag for ComponentOp build method
+struct IsBuiltIn {};
+
+} // namespace zkc::Zmir
 // Include TableGen'd declarations
 #define GET_OP_CLASSES
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h.inc"

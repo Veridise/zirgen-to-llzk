@@ -9,18 +9,20 @@ class ZmirType<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-// XXX: Probably not necessary
-// def Expr : ZmirType<"Expr", "expr"> {
-//   let summary = "Expression node";
-// }
-
-// TODO: Fill these types with what they need.
 def Val : ZmirType<"Val", "val"> {
   let summary = "value type";
 }
 
 def TypeVar : ZmirType<"TypeVar", "type_var"> {
   let summary = "parametric type linked to a symbol";
+
+  let parameters = (ins "::mlir::FlatSymbolRefAttr":$name);
+  let assemblyFormat = [{ `<` $name `>` }];
+
+  let extraClassDeclaration = [{
+    // Verifies that this type references a valid type parameter, relative to the given `op`.
+    ::mlir::LogicalResult verifySymbol(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);
+  }];
 }
 
 def String : ZmirType<"String", "string"> {
@@ -33,6 +35,25 @@ def Union : ZmirType<"Union", "union"> {
 
 def Component : ZmirType<"Component", "component"> {
   let summary = "component type";
+  let parameters = (ins "::mlir::FlatSymbolRefAttr":$name);
+  let assemblyFormat = [{ `<` $name `>` }];
+
+  let extraClassDeclaration = [{
+
+    /// Gets the `component` op that defines this componnet. Provided `op` is
+    /// used as a starting point for the lookup. Should not be assumed to
+    /// be non-`null` as we don't verify all types during verification.
+    ComponentOp getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);
+  
+    // Verifies that this type references a valid component, relative to the given `op`.
+    ::mlir::LogicalResult verifySymbol(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);
+  }];
+
+  let builders = [
+    TypeBuilder<(ins "::llvm::StringRef":$name), [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)));
+    }]>
+  ];
 }
 
 def Array : ZmirType<"Array", "array"> {
