@@ -1,5 +1,10 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include <llvm/ADT/SmallVector.h>
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/MLIRContext.h>
+#include <mlir/IR/OperationSupport.h>
+#include <mlir/IR/Region.h>
 #include <mlir/Interfaces/FunctionImplementation.h>
 #include <mlir/Support/LogicalResult.h>
 
@@ -22,6 +27,15 @@ ReadFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
 mlir::LogicalResult
 WriteFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
   // TODO
+  return mlir::success();
+}
+
+mlir::LogicalResult GetGlobalOp::inferReturnTypes(
+    mlir::MLIRContext *ctx, std::optional<mlir::Location>,
+    mlir::ValueRange operands, mlir::DictionaryAttr, mlir::OpaqueProperties,
+    mlir::RegionRange, llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+  // TODO
+  inferredReturnTypes.push_back(ValType::get(ctx));
   return mlir::success();
 }
 

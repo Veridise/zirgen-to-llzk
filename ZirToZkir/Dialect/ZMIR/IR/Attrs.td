@@ -1,6 +1,5 @@
 // Copyright 2024 Veridise, Inc.
 
-
 include "mlir/IR/AttrTypeBase.td"
 include "ZirToZkir/Dialect/ZMIR/IR/Dialect.td"
 

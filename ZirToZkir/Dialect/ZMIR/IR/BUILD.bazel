@@ -82,11 +82,13 @@ gentbl_cc_library(
     name = "AttrsIncGen",
     tbl_outs = [
         (
-            ["-gen-attrdef-decls"],
+            ["-gen-attrdef-decls",
+             "-attrdefs-dialect=zmir"],
             "Attrs.h.inc",
         ),
         (
-            ["-gen-attrdef-defs"],
+            ["-gen-attrdef-defs",
+             "-attrdefs-dialect=zmir"],
             "Attrs.cpp.inc",
         ),
     ],

@@ -12,8 +12,7 @@ def ZmirDialect : Dialect {
   let useDefaultTypePrinterParser = 1;
 
   let dependentDialects = [
-    "::mlir::index::IndexDialect",
-    "::mlir::func::FuncDialect",
+    "::mlir::index::IndexDialect", "::mlir::func::FuncDialect",
     "::mlir::scf::SCFDialect"
   ];
 }
