@@ -1,0 +1,8 @@
+py_binary(
+  name = "zklang",
+  srcs = ["zklang.py"],
+  data = [
+    "//ZirToZkir/tools:zkc-opt",
+    "@zirgen//zirgen/dsl:zirgen"
+  ]
+)
