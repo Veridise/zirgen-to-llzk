@@ -6,3 +6,5 @@
 ###############################################################################
 
 module(name = "zir-to-zkir", repo_name = "com_veridise_zir-to-zkir")
+
+bazel_dep(name = "rules_foreign_cc", version = "0.12.0")

@@ -1,0 +1,5 @@
+If:
+  PathMatch: bazel-out/*
+  PathExclude: bazel-out/k8-opt/bin/zkir/*
+Index:
+  Background: Skip

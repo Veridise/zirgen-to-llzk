@@ -1,4 +1,7 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "zirgen/Dialect/ZHL/IR/ZHL.h"
+#include <algorithm>
+#include <iterator>
 #include <llvm/ADT/STLFunctionalExtras.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
@@ -11,6 +14,8 @@ bool isValidZmirType(mlir::Type type) {
   return llvm::isa<TypeVarType>(type) || llvm::isa<StringType>(type) ||
          llvm::isa<UnionType>(type) || llvm::isa<ValType>(type) ||
          llvm::isa<ComponentType>(type) ||
+         llvm::isa<zirgen::Zhl::ExprType>(type) ||
+         llvm::isa<PendingType>(type) ||
          (llvm::isa<ArrayType>(type) &&
           isValidZmirType(llvm::cast<ArrayType>(type).getInnerType()));
 }
@@ -27,8 +32,8 @@ checkValidZmirType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
 }
 
 mlir::LogicalResult
-checkValidSizeAttr(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
-                   mlir::Attribute attr) {
+checkValidConstParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
+                     mlir::Attribute attr) {
   if (!(llvm::isa<mlir::SymbolRefAttr>(attr) ||
         llvm::isa<mlir::IntegerAttr>(attr))) {
     return emitError()
@@ -39,10 +44,54 @@ checkValidSizeAttr(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
 }
 
 mlir::LogicalResult
+checkValidTypeParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
+                    mlir::Attribute attr) {
+  // TODO: Check for types passed as attributes.
+  if (!llvm::isa<mlir::SymbolRefAttr>(attr)) {
+    return emitError() << "expected a symbol but got " << attr;
+  } else {
+    return mlir::success();
+  }
+}
+
+mlir::LogicalResult
+ComponentType::verify(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
+                      ::mlir::FlatSymbolRefAttr name, ::mlir::Type super,
+                      ::llvm::ArrayRef<::mlir::Attribute> typeParams,
+                      ::llvm::ArrayRef<::mlir::Attribute> constParams) {
+  std::vector<mlir::LogicalResult> results;
+  std::transform(typeParams.begin(), typeParams.end(),
+                 std::back_inserter(results), [&](mlir::Attribute attr) {
+                   return checkValidTypeParam(emitError, attr);
+                 });
+  std::transform(constParams.begin(), constParams.end(),
+                 std::back_inserter(results), [&](mlir::Attribute attr) {
+                   return checkValidConstParam(emitError, attr);
+                 });
+  if (super) {
+    results.push_back(checkValidZmirType(emitError, super));
+  }
+
+  if (results.empty())
+    return mlir::success();
+  return mlir::failure(
+      std::any_of(results.begin(), results.end(), mlir::failed));
+}
+
+mlir::Type ComponentType::getSuperType() {
+  if (auto s = getSuper()) {
+    return s;
+  }
+
+  llvm::dbgs() << "Defaulting to " << *this << "!!!\n";
+  return *this;
+}
+
+mlir::LogicalResult
 ArrayType::verify(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
                   mlir::Type elementType, mlir::Attribute size) {
   auto typeRes = checkValidZmirType(emitError, elementType);
-  auto sizeRes = checkValidSizeAttr(emitError, size);
+  auto sizeRes = checkValidConstParam(emitError, size);
 
   return mlir::success(mlir::succeeded(typeRes) && mlir::succeeded(sizeRes));
 }

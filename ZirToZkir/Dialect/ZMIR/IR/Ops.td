@@ -27,43 +27,75 @@ def ComponentOp
       OptionalAttr<FlatSymbolRefArrayAttr>:$type_params);
   let regions = (region SizedRegion<1>:$body);
 
-  let builders =
-      [OpBuilder<(ins "::mlir::StringRef":$name), [{
-      $_state.getOrAddProperties<Properties>().sym_name = $_builder.getStringAttr(name);
-      $_state.addRegion();
-    }]>,
-       OpBuilder<(ins "::mlir::StringRef":$name, "::zkc::Zmir::IsBuiltIn":$tag),
-                 [{
-      $_state.getOrAddProperties<Properties>().sym_name = $_builder.getStringAttr(name);
-      $_state.getOrAddProperties<Properties>().builtin = $_builder.getUnitAttr();
-      $_state.addRegion();
-    }]>,
+  let builders = [OpBuilder<(ins "::mlir::StringRef":$name,
+                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>,
+                  OpBuilder<(ins "::mlir::StringRef":$name,
+                      "::zkc::Zmir::IsBuiltIn":$tag)>,
+                  OpBuilder<(ins "::mlir::StringRef":$name,
+                      "::mlir::ArrayRef<mlir::StringRef>":$type_params,
+                      "::mlir::ArrayRef<mlir::StringRef>":$const_params,
+                      "::zkc::Zmir::IsBuiltIn":$tag)>,
+                  OpBuilder<(ins "::mlir::StringRef":$name,
+                      "::mlir::ArrayRef<mlir::StringRef>":$type_params,
+                      "::mlir::ArrayRef<mlir::StringRef>":$const_params,
+                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>];
 
-       OpBuilder<(ins "::mlir::StringRef":$name,
-                     "::mlir::ArrayRef<mlir::Attribute>":$type_params,
-                     "::mlir::ArrayRef<mlir::Attribute>":$const_params,
-                     "::zkc::Zmir::IsBuiltIn":$tag),
-                 [{
-      $_state.getOrAddProperties<Properties>().sym_name = $_builder.getStringAttr(name);
-      $_state.getOrAddProperties<Properties>().builtin = $_builder.getUnitAttr();
-      if (type_params.size() + const_params.size() > 1) {
-        $_state.getOrAddProperties<Properties>().generic = $_builder.getUnitAttr();
-        $_state.getOrAddProperties<Properties>().type_params = $_builder.getArrayAttr(type_params);
-        $_state.getOrAddProperties<Properties>().const_params = $_builder.getArrayAttr(const_params);
-      }
+  let extraClassDeclaration = [{
+    /// Returns the type of the component.
+    ::mlir::Type getType();
+    ::mlir::Type getSuperType();
 
-      $_state.addRegion();
-    }]>];
+    /// Returns a symbol that points to the body of the component.
+    ::mlir::SymbolRefAttr getBodySym();
+
+    /// Returns the name of the function that represents the body of a component.
+    constexpr std::string_view getBodyFuncName() { return "body"; }
+
+    /// Returns the func operation that represents the body.
+    ::mlir::func::FuncOp getBodyFunc();
+  }];
 
   let assemblyFormat = [{
     $sym_name (`<` $type_params^ `>`)? (`(` $const_params^ `)`)? attr-dict-with-keyword $body
   }];
 }
 
+//===----------------------------------------------------------------------===//
+//  ConstructorRefOp
+//===----------------------------------------------------------------------===//
+
+def ConstructorRefOp : ZmirOp<"constructor", [ConstantLike, Pure]> {
+  let summary = "reference to a component constructor";
+  let description = [{
+    Returns a function value for the constructor function of a component.
+
+    The constructor is referenced by the name of the component, for example:
+
+    ```
+    %0 = zmir.constructor @ExampleComponent : (!zmir.val) -> !zmir.component<@ExampleComponent>
+    %1 = func.call_indirect %0(%2) : !zmir.component<@ExampleComponent>
+    ```
+  }];
+
+  let arguments = (ins FlatSymbolRefAttr:$component);
+  let results = (outs AnyType);
+  let assemblyFormat = "attr-dict $component `:` type(results)";
+
+  let builders = [OpBuilder<(ins "ComponentOp":$comp)>];
+
+  let extraClassDeclaration = [{
+    /// Returns true if can be built with the given value
+    /// and result type.
+    static bool isBuildableWith(mlir::Attribute value, mlir::Type type);
+  }];
+
+  let hasVerifier = 1;
+}
+
 def FieldDefOp
     : ZmirOp<"field", [HasParent<"::zkc::Zmir::ComponentOp">, Symbol]> {
   let summary = "component field definition";
-  let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyZmirType>:$type);
+  let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyType>:$type);
 
   let assemblyFormat = [{
     $sym_name `:` $type attr-dict
@@ -77,8 +109,8 @@ def ReadFieldOp
     Reads the value of a field in a component.
   }];
 
-  let arguments = (ins Component:$component, FlatSymbolRefAttr:$field_name);
-  let results = (outs AnyZmirType:$val);
+  let arguments = (ins AnyType:$component, FlatSymbolRefAttr:$field_name);
+  let results = (outs AnyType:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` attr-dict `:` type($component) `,` type($val) 
@@ -94,14 +126,33 @@ def WriteFieldOp
   }];
 
   let arguments = (ins Component:$component, FlatSymbolRefAttr:$field_name,
-      AnyZmirType:$val);
+      AnyType:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` `=` $val attr-dict `:` type($component) `,` type($val) 
   }];
 }
 
-def GetSelfOp : ZmirOp<"self"> {
+def ReadSuperTransOp : ZmirOp<"read_super_tr"> {
+  let summary =
+      "transitively reads the super field until a primitive value is reached";
+
+  let arguments = (ins Component:$component);
+  let results = (outs AnyType:$val);
+
+  let assemblyFormat =
+      "$component attr-dict `:` type($component) `,` type($val)";
+}
+
+def NopOp : ZmirOp<"nop", [Pure]> {
+
+  let arguments = (ins Variadic<AnyType>:$ins);
+  let results = (outs Variadic<AnyType>:$outs);
+
+  let assemblyFormat = "$ins `:` type($ins) `->` type($outs) attr-dict";
+}
+
+def GetSelfOp : ZmirOp<"self", [Pure]> {
   let summary = "get current component";
   let description = "Returns the current component";
 
@@ -138,7 +189,7 @@ def GetGlobalOp
 def ConstrainOp : ZmirOp<"constrain"> {
   let summary = "emits a constraint";
 
-  let arguments = (ins AnyZmirType:$lhs, AnyZmirType:$rhs);
+  let arguments = (ins AnyType:$lhs, AnyType:$rhs);
 
   let assemblyFormat = [{
   $lhs `=` $rhs attr-dict `:` type($lhs) `,` type($rhs)
@@ -156,8 +207,30 @@ def NewArrayOp
 ]> {
   let summary = "creates a new array with data";
 
-  let arguments = (ins Variadic<AnyZmirType>:$elements);
+  let arguments = (ins Variadic<AnyType>:$elements);
   let results = (outs Array:$result);
+
+  let assemblyFormat = "$elements attr-dict `:` type($result)";
+}
+
+def VarArgsTypeCheckPred : TypesMatchWith<"inner type matches input operands",
+                                          "result", "elements", [{
+  ::llvm::cast<::zkc::Zmir::VarArgsType>($_self).getInner()
+}],
+                                          [{
+  ([](::mlir::Type inner, mlir::OperandRange::type_range elems) {
+    for (auto e : elems) {
+      if (!std::equal_to<>()(inner, e)) return false;
+    }
+    return true;
+  })
+}]>;
+
+def VarArgsOp : ZmirOp<"vargs", [SameTypeOperands, VarArgsTypeCheckPred]> {
+  let summary = "groups variable arguments";
+
+  let arguments = (ins Variadic<AnyType>:$elements);
+  let results = (outs VarArgs:$result);
 
   let assemblyFormat = "$elements attr-dict `:` type($result)";
 }
@@ -173,31 +246,31 @@ def AllocArrayOp : ZmirOp<"alloc_array"> {
 def ReadArrayOp : ZmirOp<"read_array"> {
   let summary = "read data from an array";
 
-  let arguments = (ins Array:$lvalue, Variadic<Val>:$indices);
-  let results = (outs AnyZmirType:$result);
+  let arguments = (ins AnyType:$lvalue, Variadic<AnyType>:$indices);
+  let results = (outs AnyType:$result);
 
   let assemblyFormat = [{
-    $lvalue `[` $indices `]` attr-dict `:` type($lvalue) `,` type($result)
+    $lvalue `[` $indices `]` attr-dict `:` type($lvalue) `[` type($indices) `]` `,` type($result)
   }];
 }
 
 def LitValOp : ZmirOp<"literal"> {
   let summary = "a literal value";
   let arguments = (ins UI64Attr:$value);
-  let results = (outs Val);
+  let results = (outs Val:$val);
 
   let assemblyFormat = [{
-  $value `:` attr-dict
+    $value `:` type($val) attr-dict
   }];
 }
 
 def LitStrOp : ZmirOp<"string"> {
   let summary = "a literal value";
   let arguments = (ins StrAttr:$value);
-  let results = (outs String);
+  let results = (outs String:$val);
 
   let assemblyFormat = [{
-  $value `:` attr-dict
+    $value `:` type($val) attr-dict
   }];
 }
 

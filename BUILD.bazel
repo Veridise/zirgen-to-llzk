@@ -1,3 +1,9 @@
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
 alias(
     name = "lit_cfg",
     actual = "@zirgen//:lit_cfg",
@@ -6,4 +12,14 @@ alias(
 alias(
   name = "zirgen",
   actual = "@zirgen//zirgen/dsl:zirgen"
+)
+
+cmake(
+    name = "zkir",
+    cache_entries = {
+      "BUILD_TESTING": "OFF"
+        # "CMAKE_C_FLAGS": "-fPIC",
+    },
+    lib_source = "@zkir-lib//:all_srcs",
+    out_static_libs = ["libZKIRDialect.a"],
 )

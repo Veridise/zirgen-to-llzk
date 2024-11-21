@@ -1,10 +1,12 @@
 workspace(name = "com_veridise_zir-to-zkir")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 ZIRGEN_COMMIT = "91b3abdb1778f0089f5f07119c5d57b5477d8bcf"
 ZIRGEN_SHA256 = "f7bc4f3dd192247905c7be86bae64fa66b4fcb7812e0a247a79aad46a69c5693"
+ZKIR_COMMIT = "4d2dc1dc61d77620a026b5b67d7a9e527ac8b288"
 
 http_archive(
   name = "zirgen",
@@ -13,6 +15,35 @@ http_archive(
   strip_prefix = "zirgen-" + ZIRGEN_COMMIT,
   urls = ["https://github.com/Veridise/zirgen/archive/{commit}.tar.gz".format(commit = ZIRGEN_COMMIT)]
 )
+
+
+_ALL_CONTENT = """\
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+"""
+
+git_repository(
+  name = "zkir-lib",
+  build_file_content = _ALL_CONTENT,
+  commit = ZKIR_COMMIT,
+  remote = "git@github.com:Veridise/zkir-lib.git"
+)
+
+# http_archive(
+#     name = "rules_foreign_cc",
+#     # TODO: Get the latest sha256 value from a bazel debug message or the latest 
+#     #       release on the releases page: https://github.com/bazelbuild/rules_foreign_cc/releases
+#     #
+#     # sha256 = "...",
+#     strip_prefix = "rules_foreign_cc-51152aac9d6d8b887802a47ec08a1a37ef2c4885",
+#     url = "https://github.com/bazelbuild/rules_foreign_cc/archive/51152aac9d6d8b887802a47ec08a1a37ef2c4885.tar.gz",
+# )
+#
+# load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
+# rules_foreign_cc_dependencies()
 
 # Taken from zirgen's WORKSPACE config
 # Loading from here does not transitively include

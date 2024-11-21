@@ -32,8 +32,8 @@ struct BuildContext {
   /// Creates a component with parameters
   void
   createParametricComponent(mlir::StringRef name,
-                            mlir::ArrayRef<mlir::Attribute> typeParams,
-                            mlir::ArrayRef<mlir::Attribute> constParams,
+                            mlir::ArrayRef<mlir::StringRef> typeParams,
+                            mlir::ArrayRef<mlir::StringRef> constParams,
                             std::function<void(ComponentOp &)> buildComponent) {
     ComponentOp op = builder.create<ComponentOp>(unk, name, typeParams,
                                                  constParams, IsBuiltIn{});
@@ -49,7 +49,12 @@ struct BuildContext {
                    std::function<void(mlir::ValueRange)> buildBody) {
 
     auto funcType = builder.getFunctionType(argTypes, results);
-    auto bodyOp = builder.create<mlir::func::FuncOp>(unk, "body", funcType);
+    std::vector<mlir::NamedAttribute> attrs = {
+        mlir::NamedAttribute(builder.getStringAttr("sym_visibility"),
+                             builder.getStringAttr("nested"))};
+
+    auto bodyOp = builder.create<mlir::func::FuncOp>(unk, op.getBodyFuncName(),
+                                                     funcType, attrs);
     mlir::OpBuilder::InsertionGuard insertionGuard(builder);
     builder.setInsertionPointToStart(bodyOp.addEntryBlock());
     buildBody(bodyOp.getArguments());
@@ -148,10 +153,8 @@ void addNondetReg(BuildContext &ctx) {
       // Reference to self
       auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
       ctx.builder.create<WriteFieldOp>(ctx.unk, self, "reg", args[0]);
-      auto regValue =
-          ctx.builder.create<ReadFieldOp>(ctx.unk, val, self, "reg");
       // Store the result
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", regValue);
+      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", args[0]);
       // Return self
       ctx.builder.create<mlir::func::ReturnOp>(ctx.unk,
                                                mlir::ValueRange({self}));
@@ -182,44 +185,53 @@ void addArrayComponent(BuildContext &ctx) {
       mlir::StringAttr::get(ctx.builder.getContext(), "T"));
   auto sizeVar = mlir::SymbolRefAttr::get(
       mlir::StringAttr::get(ctx.builder.getContext(), "N"));
-  ctx.createParametricComponent(
-      "Array", {symT}, {sizeVar}, [&](ComponentOp &op) {
-        /*op.getTypeParams().push_back(symT);*/
-        /*op.getConstParams().push_back(sizeVar);*/
-        auto componentType = ComponentType::get(
-            ctx.builder.getContext(), op.getSymName(), {symT}, {sizeVar});
-        auto typeVar = TypeVarType::get(ctx.builder.getContext(), symT);
-        auto type = ArrayType::get(ctx.builder.getContext(), typeVar, sizeVar);
-        // Special register where results are stored
-        ctx.builder.create<FieldDefOp>(ctx.unk, "$super", type);
+  ctx.createParametricComponent("Array", {"T"}, {"N"}, [&](ComponentOp &op) {
+    auto componentType = ComponentType::get(ctx.builder.getContext(),
+                                            op.getSymName(), {symT}, {sizeVar});
+    auto typeVar = TypeVarType::get(ctx.builder.getContext(), symT);
+    auto type = ArrayType::get(ctx.builder.getContext(), typeVar, sizeVar);
+    // Special register where results are stored
+    ctx.builder.create<FieldDefOp>(ctx.unk, "$super", type);
 
-        ctx.fillOutBody(
-            op, {type}, {componentType}, [&](mlir::ValueRange args) {
-              // Reference to self
-              auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-              // Store the result
-              ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super",
-                                               args[0]);
-              ctx.builder.create<mlir::func::ReturnOp>(
-                  ctx.unk, mlir::ValueRange({self}));
-            });
-      });
+    ctx.fillOutBody(op, {type}, {componentType}, [&](mlir::ValueRange args) {
+      // Reference to self
+      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
+      // Store the result
+      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", args[0]);
+      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk,
+                                               mlir::ValueRange({self}));
+    });
+  });
 }
 
-void zkc::Zmir::addBuiltins(mlir::OpBuilder &builder) {
+/// Adds the builtin operations that have not been overriden
+/// checkOverride returns true if function has been overriden.
+void zkc::Zmir::addBuiltins(
+    mlir::OpBuilder &builder,
+    std::function<bool(mlir::StringRef)> checkOverride) {
   BuildContext ctx(builder);
-  addInRange(ctx);
-  addComponent(ctx);
-  addNondetReg(ctx);
+  if (!checkOverride("InRange"))
+    addInRange(ctx);
+  if (!checkOverride("Component"))
+    addComponent(ctx);
+  if (!checkOverride("NondetReg"))
+    addNondetReg(ctx);
 
-  addBinOp<BitAndOp>(ctx, "BitAnd");
-  addBinOp<AddOp>(ctx, "Add");
-  addBinOp<SubOp>(ctx, "Sub");
-  addBinOp<MulOp>(ctx, "Mul");
+  if (!checkOverride("BitAnd"))
+    addBinOp<BitAndOp>(ctx, "BitAnd");
+  if (!checkOverride("Add"))
+    addBinOp<AddOp>(ctx, "Add");
+  if (!checkOverride("Sub"))
+    addBinOp<SubOp>(ctx, "Sub");
+  if (!checkOverride("Mul"))
+    addBinOp<MulOp>(ctx, "Mul");
 
-  addUnaryOp<InvOp>(ctx, "Inv");
-  addUnaryOp<IsZeroOp>(ctx, "Isz");
-  addUnaryOp<NegOp>(ctx, "Neg");
+  if (!checkOverride("Inv"))
+    addUnaryOp<InvOp>(ctx, "Inv");
+  if (!checkOverride("Isz"))
+    addUnaryOp<IsZeroOp>(ctx, "Isz");
+  if (!checkOverride("Neg"))
+    addUnaryOp<NegOp>(ctx, "Neg");
 
   addTrivial(ctx, "Val", ValType::get(builder.getContext()));
   addTrivial(ctx, "String", StringType::get(builder.getContext()));

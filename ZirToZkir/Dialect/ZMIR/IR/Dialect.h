@@ -8,6 +8,6 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dialect.h>
 
-#include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h.inc"
+#include "ZirToZkir/Dialect/ZMIR/IR/Dialect.inc.h"
 
 #endif

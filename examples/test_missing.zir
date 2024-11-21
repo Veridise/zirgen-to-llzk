@@ -1,0 +1,12 @@
+component Top(a: Val, b: Val) {
+  x : Val;
+
+  x := a;
+  x := b;
+
+  x = a;
+}
+
+test {
+  t := Top(1, 2);
+}

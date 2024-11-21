@@ -29,14 +29,14 @@ gentbl_cc_library(
                 "-gen-dialect-decls",
                 "-dialect=zmir",
             ],
-            "Dialect.h.inc",
+            "Dialect.inc.h",
         ),
         (
             [
                 "-gen-dialect-defs",
                 "-dialect=zmir",
             ],
-            "Dialect.cpp.inc",
+            "Dialect.inc.cpp",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
@@ -49,11 +49,11 @@ gentbl_cc_library(
     tbl_outs = [
         (
             ["-gen-op-decls"],
-            "Ops.h.inc",
+            "Ops.inc.h",
         ),
         (
             ["-gen-op-defs"],
-            "Ops.cpp.inc",
+            "Ops.inc.cpp",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
@@ -66,11 +66,11 @@ gentbl_cc_library(
     tbl_outs = [
         (
             ["-gen-typedef-decls"],
-            "Types.h.inc",
+            "Types.inc.h",
         ),
         (
             ["-gen-typedef-defs"],
-            "Types.cpp.inc",
+            "Types.inc.cpp",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
@@ -84,12 +84,12 @@ gentbl_cc_library(
         (
             ["-gen-attrdef-decls",
              "-attrdefs-dialect=zmir"],
-            "Attrs.h.inc",
+            "Attrs.inc.h",
         ),
         (
             ["-gen-attrdef-defs",
              "-attrdefs-dialect=zmir"],
-            "Attrs.cpp.inc",
+            "Attrs.inc.cpp",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
@@ -120,5 +120,6 @@ cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IndexDialect",
         "@llvm-project//mlir:SCFDialect",
+        "@zirgen//zirgen/Dialect/ZHL/IR",
     ],
 )

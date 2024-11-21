@@ -1,10 +1,11 @@
 #pragma once
 
-#include "ZirToZkir/Dialect/ZMIR/IR/Attrs.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
-
+#include "ZirToZkir/Dialect/ZMIR/IR/Types.h" // IWYU pragma: keep
+#include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
 #include <mlir/Bytecode/BytecodeOpInterface.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OpDefinition.h>
 #include <mlir/IR/OpImplementation.h>
@@ -15,19 +16,13 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
-#include <llvm/ADT/ArrayRef.h>
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/StringRef.h>
-
-#include <optional>
-
 namespace zkc::Zmir {
 
 /// Tag for ComponentOp build method
 struct IsBuiltIn {};
 
 } // namespace zkc::Zmir
+
 // Include TableGen'd declarations
 #define GET_OP_CLASSES
-#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h.inc"
-#undef GET_OP_CLASSES
+#include "ZirToZkir/Dialect/ZMIR/IR/Ops.inc.h"

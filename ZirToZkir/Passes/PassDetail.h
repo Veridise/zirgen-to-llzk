@@ -2,14 +2,14 @@
 
 #pragma once
 
-#include "mlir/Pass/Pass.h"
-
-#include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h"
-#include "ZirToZkir/Passes/Passes.h"
+#include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h" // IWYU pragma: keep
+#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"     // IWYU pragma: keep
+#include "mlir/Pass/Pass.h"                    // IWYU pragma: keep
+#include "zirgen/Dialect/ZHL/IR/ZHL.h"         // IWYU pragma: keep
 
 namespace zkc {
 
 #define GEN_PASS_CLASSES
-#include "ZirToZkir/Passes/Passes.h.inc"
+#include "ZirToZkir/Passes/Passes.inc.h"
 
 } // namespace zkc

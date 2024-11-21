@@ -1,20 +1,13 @@
 // Copyright 2024 Veridise, Inc.
 
-#include <cassert>
-#include <llvm/Support/Debug.h>
-
+#include "ZirToZkir/Dialect/ZMIR/BuiltIns/BuiltIns.h"
+#include "ZirToZkir/Dialect/ZMIR/Transforms/PassDetail.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
-#include "llvm/ADT/TypeSwitch.h"
-
-#include "ZirToZkir/Dialect/ZMIR/BuiltIns/BuiltIns.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h"
-#include "ZirToZkir/Dialect/ZMIR/Transforms/PassDetail.h"
+#include <cassert>
+#include <llvm/Support/Debug.h>
 
 using namespace mlir;
 
@@ -28,7 +21,18 @@ class InjectBuiltInsPass : public InjectBuiltInsBase<InjectBuiltInsPass> {
     ModuleOp mod = getOperation();
     assert(mod->hasTrait<OpTrait::SymbolTable>());
     OpBuilder builder(mod.getRegion());
-    addBuiltins(builder);
+    addBuiltins(builder, [&](mlir::StringRef name) {
+      return false;
+
+      // The code below doesn't really work and I don't know why
+      auto op = mlir::SymbolTable::lookupSymbolIn(mod.getOperation(), name);
+      if (op != nullptr) {
+        mod->emitError() << "component " << name << " has been overriden";
+      } else {
+        mod->emitError() << "component " << name << " has not been overriden";
+      }
+      return op != nullptr;
+    });
   }
 };
 
