@@ -31,7 +31,7 @@ def TransformComponentDecls
   ];
 }
 
-def ConvertZhlToZmir : Pass<"convert-zhl-to-zmir", "zkc::Zmir::ComponentOp"> {
+def ConvertZhlToZmir : Pass<"zhl-to-zmir", "zkc::Zmir::ComponentOp"> {
   let summary =
       "Converts ZHL operations in the body of a component to ZMIR operations";
   let constructor = "zkc::createConvertZhlToZmirPass()";
@@ -54,15 +54,15 @@ def ZmirPropagateTypes
                            "mlir::index::IndexDialect"];
 }
 */
-/*
-def ConvertZhlToZmir : Pass<"convert-zmir-to-zkir", "zkc::Zmir::ComponentOp"> {
+
+def ConvertZmirToZkir : Pass<"zmir-to-zkir", "zkc::Zmir::SplitComponentOp"> {
   let summary =
-      "Converts ZHL operations in the body of a component to ZMIR operations";
-  let constructor = "zkc::createConvertZhlToZmirPass()";
+      "Converts ZMIR operations in the body of a component to ZKIR operations";
+  let constructor = "zkc::createConvertZmirToZkirPass()";
 
   let dependentDialects = ["zkir::ZKIRDialect", "zkc::Zmir::ZmirDialect",
                            "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
                            "mlir::index::IndexDialect"];
 }
-*/
+
 #endif

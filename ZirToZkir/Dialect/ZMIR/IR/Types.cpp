@@ -14,7 +14,7 @@ bool isValidZmirType(mlir::Type type) {
   return llvm::isa<TypeVarType>(type) || llvm::isa<StringType>(type) ||
          llvm::isa<UnionType>(type) || llvm::isa<ValType>(type) ||
          llvm::isa<ComponentType>(type) ||
-         llvm::isa<zirgen::Zhl::ExprType>(type) ||
+         /*llvm::isa<zirgen::Zhl::ExprType>(type) ||*/
          llvm::isa<PendingType>(type) ||
          (llvm::isa<ArrayType>(type) &&
           isValidZmirType(llvm::cast<ArrayType>(type).getInnerType()));
@@ -56,7 +56,7 @@ checkValidTypeParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
 
 mlir::LogicalResult
 ComponentType::verify(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
-                      ::mlir::FlatSymbolRefAttr name, ::mlir::Type super,
+                      ::mlir::FlatSymbolRefAttr name,
                       ::llvm::ArrayRef<::mlir::Attribute> typeParams,
                       ::llvm::ArrayRef<::mlir::Attribute> constParams) {
   std::vector<mlir::LogicalResult> results;
@@ -68,23 +68,11 @@ ComponentType::verify(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
                  std::back_inserter(results), [&](mlir::Attribute attr) {
                    return checkValidConstParam(emitError, attr);
                  });
-  if (super) {
-    results.push_back(checkValidZmirType(emitError, super));
-  }
 
   if (results.empty())
     return mlir::success();
-  return mlir::failure(
-      std::any_of(results.begin(), results.end(), mlir::failed));
-}
-
-mlir::Type ComponentType::getSuperType() {
-  if (auto s = getSuper()) {
-    return s;
-  }
-
-  llvm::dbgs() << "Defaulting to " << *this << "!!!\n";
-  return *this;
+  return mlir::success(
+      std::all_of(results.begin(), results.end(), mlir::succeeded));
 }
 
 mlir::LogicalResult

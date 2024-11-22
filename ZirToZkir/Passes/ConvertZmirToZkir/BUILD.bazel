@@ -7,8 +7,8 @@ cc_library(
   srcs = [
     "Patterns.cpp",
     "Patterns.h",
-    "ZMIRTypeConverter.h",
-    "ZMIRTypeConverter.cpp",
+    "ZKIRTypeConverter.h",
+    "ZKIRTypeConverter.cpp",
     "Pass.cpp",
     "Helpers.h",
     "Helpers.cpp",

@@ -15,9 +15,7 @@ def InjectBuiltIns : Pass<"inject-builtins", "mlir::ModuleOp"> {
   ];
 }
 
-/*
-def SplitComponentBody
-    : Pass<"split-component-body", "::zkc::Zmir::ComponentOp"> {
+def SplitComponentBody : Pass<"split-component-body", "mlir::ModuleOp"> {
   let summary = "Splits the body function of a component into compute and "
                 "constrain functions in preparation for lowering to ZKIR";
   let constructor = "zkc::Zmir::createSplitComponentBodyPass()";
@@ -25,5 +23,21 @@ def SplitComponentBody
   let dependentDialects = ["::zkc::Zmir::ZmirDialect",
                            "::mlir::func::FuncDialect"];
 }
-*/
+
+class RemoveIllegalOps<string func>
+    : Pass<"remove-illegal-"#!tolower(func)#"-ops", "mlir::func::FuncOp"> {
+
+  let summary =
+      "Removes from the @"#!tolower(func)#" function of a component any ops "
+                                          "that are not allowed";
+  let constructor = "zkc::Zmir::createRemoveIllegal"#func#"OpsPass()";
+
+  let dependentDialects = ["zkc::Zmir::ZmirDialect",
+                           "::mlir::func::FuncDialect"];
+}
+
+def RemoveIllegalComputeOps : RemoveIllegalOps<"Compute"> {}
+
+def RemoveIllegalConstrainOps : RemoveIllegalOps<"Constrain"> {}
+
 #endif

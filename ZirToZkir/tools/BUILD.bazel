@@ -11,6 +11,7 @@ cc_binary(
       "//ZirToZkir/Dialect/ZMIR/Transforms:passes",  
       "//ZirToZkir/Passes:passes",  
       "@llvm-project//mlir:MlirOptLib",
+      "@llvm-project//mlir:ReconcileUnrealizedCasts",
       "//:zkir"
     ],
 )

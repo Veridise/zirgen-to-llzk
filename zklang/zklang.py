@@ -8,7 +8,7 @@ ZKC_OPT = os.path.join(WS, "../ZirToZkir/tools/zkc-opt")
 
 
 class Scope:
-    def __init__(self, name, passes):
+    def __init__(self, name, *passes):
         self.name = name
         self.passes = passes
 
@@ -26,15 +26,25 @@ class Pass:
 
 ZKC_OPT_PIPELINE = Scope(
     "builtin.module",
-    [
-        Pass("strip-tests"),
-        Pass("strip-directives"),
-        Pass("inject-builtins"),
-        Pass("transform-component-decls"),
-        Scope("zmir.component", [Pass("convert-zhl-to-zmir")]),
-        Pass("cse"),
-        # Scope("zmir.component", [Pass("split-component-body")]),
-    ],
+    Pass("strip-tests"),
+    Pass("strip-directives"),
+    Pass("inject-builtins"),
+    Pass("transform-component-decls"),
+    Scope("zmir.component", Pass("zhl-to-zmir")),
+    Pass("cse"),
+    Pass("canonicalize"),
+    # Pass("reconcile-unrealized-casts"),
+    Pass("split-component-body"),
+    Scope(
+        "zmir.split_component",
+        Scope(
+            "func.func",
+            Pass("remove-illegal-compute-ops"),
+            Pass("remove-illegal-constrain-ops"),
+        ),
+    ),
+    Pass("canonicalize"),
+    Scope("zmir.split_component", Pass("zmir-to-zkir")),
 )
 
 
@@ -72,8 +82,12 @@ def main():
             ],
             stdin=zirgen.stdout,
             # stdout=DEVNULL,
-        ) as _:
-            pass
+        ) as opt:
+            opt.wait()
+            if opt.returncode != 0:
+                print("Something went wrong with zkc-opt")
+            else:
+                print("Success!")
 
 
 if __name__ == "__main__":

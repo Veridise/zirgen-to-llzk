@@ -13,7 +13,7 @@ class ZmirType<string name, string typeMnemonic, list<Trait> traits = []>
 def Val : ZmirType<"Val", "val"> { let summary = "value type"; }
 
 def TypeVar : ZmirType<"TypeVar", "tvar"> {
-  let summary = "parametric type linked to a symbol";
+  let summary = "parametric type";
 
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name);
   let assemblyFormat = [{ `<` $name `>` }];
@@ -31,15 +31,13 @@ def Union : ZmirType<"Union", "union"> { let summary = "union type"; }
 def Component : ZmirType<"Component", "component"> {
   let summary = "component type";
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name,
-      OptionalParameter<"::mlir::Type">:$super,
       OptionalArrayRefParameter<"::mlir::Attribute">:$type_params,
       OptionalArrayRefParameter<"::mlir::Attribute">:$const_params);
   let assemblyFormat =
-      [{ `<` $name (`<` $type_params^ `>`)? (`(` $const_params^ `)`)? `>` ( `:` $super^ )? }];
+      [{ `<` $name (`<` $type_params^ `>`)? (`(` $const_params^ `)`)? `>` }];
 
   let extraClassDeclaration = [{
 
-    ::mlir::Type getSuperType();
     /// Gets the `component` op that defines this componnet. Provided `op` is
     /// used as a starting point for the lookup. Should not be assumed to
     /// be non-`null` as we don't verify all types during verification.
@@ -49,25 +47,16 @@ def Component : ZmirType<"Component", "component"> {
     ::mlir::LogicalResult verifySymbol(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);
   }];
 
-  let builders =
-      [TypeBuilder<(ins "::llvm::StringRef":$name, "::mlir::Type":$super,
-                       "::llvm::ArrayRef<::mlir::Attribute>":$type_params,
-                       "::llvm::ArrayRef<::mlir::Attribute>":$const_params),
-                   [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), super, type_params, const_params);
+  let builders = [TypeBuilder<
+                      (ins "::llvm::StringRef":$name,
+                          "::llvm::ArrayRef<::mlir::Attribute>":$type_params,
+                          "::llvm::ArrayRef<::mlir::Attribute>":$const_params),
+                      [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), type_params, const_params);
 }]>,
-       TypeBuilder<(ins "::llvm::StringRef":$name,
-                       "::llvm::ArrayRef<::mlir::Attribute>":$type_params,
-                       "::llvm::ArrayRef<::mlir::Attribute>":$const_params),
-                   [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), nullptr, type_params, const_params);
-}]>,
-       TypeBuilder<(ins "::llvm::StringRef":$name, "::mlir::Type":$super), [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), super, std::nullopt, std::nullopt);
-    }]>,
 
-       TypeBuilder<(ins "::llvm::StringRef":$name), [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), nullptr, std::nullopt, std::nullopt);
+                  TypeBuilder<(ins "::llvm::StringRef":$name), [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), std::nullopt, std::nullopt);
     }]>];
 
   let genVerifyDecl = 1;
@@ -84,10 +73,10 @@ def Array : ZmirType<"Array", "array", []> {
   }];
 }
 
-def Pending : ZmirType<"Pending", "pending"> {}
+def Pending : ZmirType<"Pending", "pending"> { let summary = "pending type"; }
 
 def VarArgs : ZmirType<"VarArgs", "vargs"> {
-  let summary = "represents a variable number of arguments for a function";
+  let summary = "variable number of arguments";
 
   let parameters = (ins "::mlir::Type":$inner);
   let assemblyFormat = "`<` $inner `>`";

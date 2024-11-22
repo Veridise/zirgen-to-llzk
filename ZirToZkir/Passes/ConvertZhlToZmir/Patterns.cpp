@@ -39,6 +39,38 @@ mlir::Value findTypeInUseDefChain(mlir::Value v,
 }
 
 ///////////////////////////////////////////////////////////
+/// Cast folding
+///////////////////////////////////////////////////////////
+
+mlir::LogicalResult FoldUnrealizedCasts::matchAndRewrite(
+    mlir::UnrealizedConversionCastOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+
+  if (op.getInputs().size() != 1 || op.getOutputs().size() != 1)
+    return mlir::failure();
+
+  if (!getTypeConverter()->isLegal(op.getOutputs()[0].getType()))
+    return mlir::failure();
+
+  auto parent = adaptor.getInputs()[0].getDefiningOp();
+  if (!parent)
+    return mlir::failure();
+  auto parentCast = mlir::dyn_cast<mlir::UnrealizedConversionCastOp>(parent);
+  if (!parentCast)
+    return mlir::failure();
+
+  if (parentCast.getInputs().size() != 1 || parentCast.getOutputs().size() != 1)
+    return mlir::failure();
+  if (!getTypeConverter()->isLegal(parentCast.getInputs()[0].getType()))
+    return mlir::failure();
+
+  rewriter.replaceAllUsesWith(op.getOutputs()[0], parentCast.getInputs()[0]);
+  rewriter.eraseOp(op);
+
+  return mlir::success();
+}
+
+///////////////////////////////////////////////////////////
 /// ZhlLiteralLowering
 ///////////////////////////////////////////////////////////
 
@@ -92,7 +124,7 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   }
 
   auto calleeComp =
-      op->getParentOfType<mlir::ModuleOp>().lookupSymbol<Zmir::ComponentOp>(
+      op->getParentOfType<mlir::ModuleOp>().lookupSymbol<Zmir::DefinesBodyFunc>(
           typeNameOp.getNameAttr());
   if (!calleeComp)
     return op->emitError() << "could not find component with name "
@@ -233,8 +265,8 @@ mlir::LogicalResult ZhlDeclarationRemoval::matchAndRewrite(
 /// ZhlDefinitionLowering
 ///////////////////////////////////////////////////////////
 
-void createField(Zmir::ComponentOp comp, mlir::StringRef name, mlir::Type type,
-                 mlir::ConversionPatternRewriter &rewriter,
+void createField(Zmir::ComponentInterface comp, mlir::StringRef name,
+                 mlir::Type type, mlir::ConversionPatternRewriter &rewriter,
                  mlir::Location loc) {
   assert(comp);
 
@@ -286,7 +318,7 @@ mlir::LogicalResult ZhlSuperLowering::matchAndRewrite(
   if (!mlir::isa<mlir::func::FuncOp>(op->getParentOp()))
     return op.emitError(
         "lowering of super ops inside blocks is not defined yet");
-  auto comp = op->getParentOfType<Zmir::ComponentOp>();
+  auto comp = op->getParentOfType<Zmir::ComponentInterface>();
   assert(comp);
   auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
 
@@ -332,7 +364,7 @@ externFuncAttrs(mlir::ConversionPatternRewriter &rewriter) {
 }
 
 mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
-    Zmir::ComponentOp op, llvm::StringRef name, mlir::FunctionType type,
+    Zmir::ComponentInterface op, llvm::StringRef name, mlir::FunctionType type,
     mlir::ConversionPatternRewriter &rewriter, mlir::Location loc) {
   mlir::OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(op.getBodyFunc());

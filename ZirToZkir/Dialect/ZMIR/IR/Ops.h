@@ -25,4 +25,8 @@ struct IsBuiltIn {};
 
 // Include TableGen'd declarations
 #define GET_OP_CLASSES
+#include "ZirToZkir/Dialect/ZMIR/IR/OpInterfaces.inc.h"
+
+// Include TableGen'd declarations
+#define GET_OP_CLASSES
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.inc.h"

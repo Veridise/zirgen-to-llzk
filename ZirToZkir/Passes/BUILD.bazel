@@ -34,7 +34,8 @@ cc_library(
   srcs = [],
   hdrs = ["PassDetail.h"],
   deps = [
-        ":PassesIncGen"
+        ":PassesIncGen",
+        "//:zkir",
   ]
 )
 
@@ -54,7 +55,8 @@ cc_library(
         "@zirgen//zirgen/Dialect/ZHL/IR",
         "//ZirToZkir/Dialect/ZMIR/IR",  
         "//ZirToZkir/Passes/ConvertZhlToZmir",  
-        #"//ZirToZkir/Passes/ConvertZmirToZkir",  
+        "//ZirToZkir/Passes/ConvertZmirToZkir",  
+        "//:zkir",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:IndexDialect",

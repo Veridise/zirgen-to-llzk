@@ -10,6 +10,7 @@ include "mlir/IR/RegionKindInterface.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/CommonAttrConstraints.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "ZirToZkir/Dialect/ZMIR/IR/OpInterfaces.td"
 
 def ReturnsExpr : DeclareOpInterfaceMethods<InferTypeOpInterface>;
 
@@ -18,11 +19,10 @@ class ZmirOp<string mnemonic, list<Trait> traits = []>
 
 class ComponentOpBase<string prefix, string bodyFuncName,
                       string constrainFuncName>
-
-    /*def ComponentOp*/
     : ZmirOp<prefix#"component", [HasParent<"::mlir::ModuleOp">, Symbol,
                                   SymbolTable, IsolatedFromAbove,
-                                  GraphRegionNoTerminator, OpAsmOpInterface]> {
+                                  GraphRegionNoTerminator, OpAsmOpInterface,
+                                  ComponentInterface]> {
   let summary = prefix#"component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
       UnitAttr:$generic, UnitAttr:$builtin,
@@ -49,17 +49,18 @@ class ComponentOpBase<string prefix, string bodyFuncName,
     ::mlir::Type getSuperType();
 
     /// Returns a symbol that points to the body of the component.
-    ::mlir::SymbolRefAttr getBodySym();
+    /*::mlir::SymbolRefAttr getBodySym();*/
+    /*::mlir::SymbolRefAttr getConstrainSym();*/
 
     /// Returns the name of the function that represents the body of a component.
-    constexpr std::string_view getBodyFuncName() { return "}]#bodyFuncName#[{"; }
-    constexpr std::string_view getConstrainFuncName() { return "}]#contrainFuncName#[{"; }
+    static constexpr std::string_view getBodyFuncName() { return "}]#bodyFuncName#[{"; }
+    static constexpr std::string_view getConstrainFuncName() { return "}]#constrainFuncName#[{"; }
 
-    constexpr bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
+    static constexpr bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
 
     /// Returns the func operation that represents the body.
-    ::mlir::func::FuncOp getBodyFunc();
-    ::mlir::func::FuncOp getConstrainFunc();
+    /*::mlir::func::FuncOp getBodyFunc();*/
+    /*::mlir::func::FuncOp getConstrainFunc();*/
   }];
 
   let assemblyFormat = [{
@@ -75,7 +76,7 @@ def SplitComponentOp : ComponentOpBase<"split_", "compute", "constrain"> {}
 //  ConstructorRefOp
 //===----------------------------------------------------------------------===//
 
-def ConstructorRefOp : ZmirOp<"constructor", [ConstantLike, Pure]> {
+def ConstructorRefOp : ZmirOp<"constructor", [Pure]> {
   let summary = "reference to a component constructor";
   let description = [{
     Returns a function value for the constructor function of a component.
@@ -92,7 +93,7 @@ def ConstructorRefOp : ZmirOp<"constructor", [ConstantLike, Pure]> {
   let results = (outs AnyType);
   let assemblyFormat = "attr-dict $component `:` type(results)";
 
-  let builders = [OpBuilder<(ins "ComponentOp":$comp)>];
+  let builders = [OpBuilder<(ins "DefinesBodyFunc":$comp)>];
 
   let extraClassDeclaration = [{
     /// Returns true if can be built with the given value
@@ -103,8 +104,9 @@ def ConstructorRefOp : ZmirOp<"constructor", [ConstantLike, Pure]> {
   let hasVerifier = 1;
 }
 
-def FieldDefOp
-    : ZmirOp<"field", [HasParent<"::zkc::Zmir::ComponentOp">, Symbol]> {
+def FieldDefOp : ZmirOp<"field", [HasParent<"::zkc::Zmir::ComponentOp, "
+                                            "::zkc::Zmir::SplitComponentOp">,
+                                  Symbol]> {
   let summary = "component field definition";
   let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyType>:$type);
 

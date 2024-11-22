@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h" // IWYU pragma: keep
+#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"     // IWYU pragma: keep
 #include "mlir/Pass/Pass.h"                    // IWYU pragma: keep
 
 namespace zkc::Zmir {
