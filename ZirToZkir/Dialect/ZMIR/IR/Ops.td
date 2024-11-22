@@ -15,12 +15,16 @@ def ReturnsExpr : DeclareOpInterfaceMethods<InferTypeOpInterface>;
 
 class ZmirOp<string mnemonic, list<Trait> traits = []>
     : Op<ZmirDialect, mnemonic, traits> {}
-
+/*
+class ComponentOpBase<string prefix, string bodyFuncName,
+                      string constrainFuncName>
+  */
 def ComponentOp
-    : ZmirOp<"component", [HasParent<"::mlir::ModuleOp">, Symbol, SymbolTable,
-                           IsolatedFromAbove, GraphRegionNoTerminator,
-                           OpAsmOpInterface]> {
-  let summary = "component declaration";
+    : ZmirOp</*prefix#*/ "component", [HasParent<"::mlir::ModuleOp">, Symbol,
+                                       SymbolTable, IsolatedFromAbove,
+                                       GraphRegionNoTerminator,
+                                       OpAsmOpInterface]> {
+  let summary = /*prefix#*/ "component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
       UnitAttr:$generic, UnitAttr:$builtin,
       OptionalAttr<FlatSymbolRefArrayAttr>:$const_params,
@@ -50,15 +54,23 @@ def ComponentOp
 
     /// Returns the name of the function that represents the body of a component.
     constexpr std::string_view getBodyFuncName() { return "body"; }
+    constexpr std::string_view getConstrainFuncName() { return "body"; }
+
+    constexpr bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
 
     /// Returns the func operation that represents the body.
     ::mlir::func::FuncOp getBodyFunc();
+    ::mlir::func::FuncOp getConstrainFunc();
   }];
 
   let assemblyFormat = [{
     $sym_name (`<` $type_params^ `>`)? (`(` $const_params^ `)`)? attr-dict-with-keyword $body
   }];
 }
+
+// def ComponentOp : ComponentOpBase<"", "body", "body"> {}
+
+// def SplitComponentOp : ComponentOpBase<"split_", "compute", "constrain"> {}
 
 //===----------------------------------------------------------------------===//
 //  ConstructorRefOp
@@ -189,7 +201,7 @@ def GetGlobalOp
 def ConstrainOp : ZmirOp<"constrain"> {
   let summary = "emits a constraint";
 
-  let arguments = (ins AnyType:$lhs, AnyType:$rhs);
+  let arguments = (ins Val:$lhs, Val:$rhs);
 
   let assemblyFormat = [{
   $lhs `=` $rhs attr-dict `:` type($lhs) `,` type($rhs)

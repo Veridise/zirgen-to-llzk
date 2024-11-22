@@ -32,16 +32,34 @@ void ConvertZhlToZmirPass::runOnOperation() {
   Zmir::ZMIRTypeConverter typeConverter;
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
-  patterns.add<ZhlLiteralLowering, ZhlLiteralStrLowering, ZhlParameterLowering,
-               ZhlConstructLowering, ZhlDefineLowering, ZhlConstrainLowering,
-               ZhlSuperLowering, ZhlGlobalRemoval, ZhlDeclarationRemoval,
-               ZhlExternLowering, ZhlSubscriptLowering, ZhlLookupLowering,
-               ZhlArrayLowering>(typeConverter, ctx);
+
+  // clang-format off
+    //ZhlLiteralLowering, 
+    //ZhlLiteralStrLowering, 
+    //ZhlDefineLowering, 
+    //ZhlConstrainLowering,
+    //ZhlSuperLowering, 
+    //ZhlGlobalRemoval, 
+    //ZhlDeclarationRemoval,
+    //ZhlExternLowering, 
+    //ZhlSubscriptLowering, 
+    //ZhlLookupLowering,
+    //ZhlArrayLowering
+    //ZhlConstructLowering
+  //
+  patterns.add<ZhlLiteralLowering, ZhlDefineLowering, ZhlConstructLowering, ZhlConstrainLowering, ZhlSuperLowering>
+    (typeConverter, ctx);
+  // clang-format on
+
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
+  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
+                         zirgen::Zhl::ZhlDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
-  target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
+  // target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
+  target.addIllegalOp<zirgen::Zhl::DefinitionOp, zirgen::Zhl::ConstructOp,
+                      zirgen::Zhl::LiteralOp, zirgen::Zhl::ConstraintOp,
+                      zirgen::Zhl::SuperOp>();
 
   // Call partialTransformation
   if (mlir::failed(
@@ -60,12 +78,17 @@ void TransformComponentDeclsPass::runOnOperation() {
   // Init patterns for this transformation
   Zmir::ZMIRTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);
-  patterns.add<ZhlCompToZmirCompPattern>(typeConverter, ctx);
+  patterns
+      .add<ZhlCompToZmirCompPattern, ZhlParameterLowering, ZhlExternLowering>(
+          typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
-  target.addIllegalOp<zirgen::Zhl::ComponentOp>();
+  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
+                         zirgen::Zhl::ZhlDialect>();
+  target.addLegalOp<mlir::UnrealizedConversionCastOp>();
+  target.addIllegalOp<zirgen::Zhl::ComponentOp, zirgen::Zhl::ConstructorParamOp,
+                      zirgen::Zhl::ExternOp>();
 
   // Call partialTransformation
   if (mlir::failed(

@@ -33,6 +33,7 @@ ZKC_OPT_PIPELINE = Scope(
         Pass("transform-component-decls"),
         Scope("zmir.component", [Pass("convert-zhl-to-zmir")]),
         Pass("cse"),
+        # Scope("zmir.component", [Pass("split-component-body")]),
     ],
 )
 

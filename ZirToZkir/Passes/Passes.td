@@ -41,4 +41,28 @@ def ConvertZhlToZmir : Pass<"convert-zhl-to-zmir", "zkc::Zmir::ComponentOp"> {
                            "mlir::index::IndexDialect"];
 }
 
+// Move this one to Dialect/ZMIR/Transforms if we end up keeping it
+/*
+def ZmirPropagateTypes
+    : Pass<"zmir-propagate-types", "zkc::Zmir::ComponentOp"> {
+  let summary = "Infers the type of the pending types and fixes "
+                "overapproximations caused by the lowering step";
+  let constructor = "zkc::createZmirPropagateTypesPass()";
+
+  let dependentDialects = ["zkc::Zmir::ZmirDialect", "mlir::func::FuncDialect",
+                           "mlir::scf::SCFDialect",
+                           "mlir::index::IndexDialect"];
+}
+*/
+/*
+def ConvertZhlToZmir : Pass<"convert-zmir-to-zkir", "zkc::Zmir::ComponentOp"> {
+  let summary =
+      "Converts ZHL operations in the body of a component to ZMIR operations";
+  let constructor = "zkc::createConvertZhlToZmirPass()";
+
+  let dependentDialects = ["zkir::ZKIRDialect", "zkc::Zmir::ZmirDialect",
+                           "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
+                           "mlir::index::IndexDialect"];
+}
+*/
 #endif

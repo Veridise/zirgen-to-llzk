@@ -4,6 +4,9 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
+#include <mlir/IR/Location.h>
+#include <mlir/IR/ValueRange.h>
+#include <mlir/Support/LLVM.h>
 
 namespace zkc {
 
@@ -54,6 +57,13 @@ public:
                   mlir::ConversionPatternRewriter &) const override;
 
 private:
+  void prepareArguments(mlir::ValueRange, mlir::ArrayRef<mlir::Type>,
+                        mlir::Location, mlir::ConversionPatternRewriter &,
+                        std::vector<mlir::Value> &) const;
+
+  mlir::Value prepareArgument(mlir::Value, mlir::Type, mlir::Location,
+                              mlir::ConversionPatternRewriter &) const;
+
   mlir::FailureOr<mlir::Type> getTypeFromName(mlir::StringRef) const;
 };
 

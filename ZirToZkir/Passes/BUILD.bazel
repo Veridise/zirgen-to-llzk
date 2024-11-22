@@ -43,6 +43,7 @@ cc_library(
     srcs = [
       "StripTests.cpp",
       "StripDirectives.cpp",
+      #"ZmirPropagateTypes.cpp"
     ],
     hdrs = [
         "Passes.h",
@@ -53,9 +54,11 @@ cc_library(
         "@zirgen//zirgen/Dialect/ZHL/IR",
         "//ZirToZkir/Dialect/ZMIR/IR",  
         "//ZirToZkir/Passes/ConvertZhlToZmir",  
+        #"//ZirToZkir/Passes/ConvertZmirToZkir",  
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:IndexDialect",
-        "@llvm-project//mlir:Transforms"
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:Analysis"
     ],
 )

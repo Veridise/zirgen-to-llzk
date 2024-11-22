@@ -33,7 +33,8 @@ cc_library(
     name = "passes",
     srcs = [
         "InjectBuiltIns.cpp",
-        "PassDetail.h"
+        "PassDetail.h",
+        #"SplitComponentBody.cpp"
     ],
     hdrs = [
         "Passes.h",

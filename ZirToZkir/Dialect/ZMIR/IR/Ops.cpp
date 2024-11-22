@@ -77,7 +77,6 @@ void ComponentOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 }
 
 mlir::Type ComponentOp::getType() {
-  llvm::dbgs() << "Type requested!!\n";
   if (getTypeParams().has_value() && getConstParams().has_value()) {
     auto typeParams = *getTypeParams();
     auto constParams = *getConstParams();

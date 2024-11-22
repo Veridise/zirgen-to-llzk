@@ -3,12 +3,40 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
 #include "ZirToZkir/Passes/ConvertZhlToZmir/Helpers.h"
+#include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <functional>
+#include <iterator>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/IR/Location.h>
+#include <mlir/Support/LLVM.h>
+#include <vector>
 
 using namespace zirgen;
 using namespace zkc;
+
+/// Climbs the use def chain until it finds a
+/// value that is not defined by an unrealized cast
+/// and that is a legal type. Returns that type.
+/// If that doesn't happen returns the initial type.
+mlir::Value findTypeInUseDefChain(mlir::Value v,
+                                  const mlir::TypeConverter *converter) {
+  mlir::Value cur = v;
+  while (cur.getDefiningOp() &&
+         mlir::isa<mlir::UnrealizedConversionCastOp>(cur.getDefiningOp())) {
+    auto ops = cur.getDefiningOp()->getOperands();
+    if (ops.size() != 1)
+      return v; // Give up if multiple operands
+    cur = ops[0];
+  }
+
+  llvm::dbgs() << "Found " << cur << "\n";
+  if (converter->isLegal(cur.getType()))
+    return cur;
+  return v;
+}
 
 ///////////////////////////////////////////////////////////
 /// ZhlLiteralLowering
@@ -43,8 +71,10 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
     mlir::ConversionPatternRewriter &rewriter) const {
   auto body = op->getParentOfType<mlir::func::FuncOp>();
   mlir::BlockArgument arg = body.getArgument(adaptor.getIndex());
+  auto conv = getTypeConverter()->materializeSourceConversion(
+      rewriter, op.getLoc(), Zhl::ExprType::get(getContext()), {arg});
 
-  rewriter.replaceAllUsesWith(op, arg);
+  rewriter.replaceAllUsesWith(op, conv);
   rewriter.eraseOp(op);
   return mlir::success();
 }
@@ -68,41 +98,80 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     return op->emitError() << "could not find component with name "
                            << typeNameOp.getNameAttr();
 
-  auto funcPtr =
-      rewriter.create<Zmir::ConstructorRefOp>(op.getLoc(), calleeComp);
   auto constructorTypes =
       calleeComp.getBodyFunc().getFunctionType().getInputs();
-  if (!constructorTypes.empty()) {
-    if (mlir::isa<Zmir::VarArgsType>(constructorTypes.back())) {
-      auto rem = adaptor.getArgs().size() - constructorTypes.size();
-      auto splitPoint = adaptor.getArgs().begin() + rem;
+  {
+    bool isVariadic = !constructorTypes.empty() &&
+                      mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
+    // Depending if it's variadic or not the message changes a bit.
+    std::string expectingNArgsMsg =
+        isVariadic ? " was expecting at least " : " was expecting ";
 
-      std::vector<mlir::Value> normalArgs(adaptor.getArgs().begin(),
-                                          splitPoint);
-      llvm::dbgs() << "args = " << adaptor.getArgs().size() << "\n";
-      llvm::dbgs() << "types = " << constructorTypes.size() << "\n";
-      llvm::dbgs() << "normalArgs = " << normalArgs.size() << "\n";
-      mlir::ValueRange varArgs(
-          llvm::iterator_range(splitPoint, adaptor.getArgs().end()));
-      llvm::dbgs() << "varArgs = " << varArgs.size() << "\n";
-      auto va = rewriter.create<Zmir::VarArgsOp>(
-          op.getLoc(), constructorTypes.back(), varArgs);
-      llvm::dbgs() << "va = " << va << "\n";
-      normalArgs.push_back(va);
-      llvm::dbgs() << "normalArgs (after) = " << normalArgs.size() << "\n";
-
-      rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, funcPtr,
-                                                              normalArgs);
-
-    } else {
-      rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(
-          op, funcPtr, adaptor.getArgs());
+    if (adaptor.getArgs().size() < constructorTypes.size() ||
+        (!isVariadic && adaptor.getArgs().size() > constructorTypes.size())) {
+      return op->emitOpError()
+          .append("incorrect number of arguments for component ",
+                  typeNameOp.getNameAttr(), expectingNArgsMsg,
+                  constructorTypes.size(), " arguments and got ",
+                  adaptor.getArgs().size())
+          .attachNote(calleeComp.getLoc())
+          .append("component declared here");
     }
-  } else {
-    rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, funcPtr,
-                                                            mlir::ValueRange());
   }
+
+  std::vector<mlir::Value> preparedArguments;
+  prepareArguments(adaptor.getArgs(), constructorTypes, op->getLoc(), rewriter,
+                   preparedArguments);
+
+  auto funcPtr =
+      rewriter.create<Zmir::ConstructorRefOp>(op.getLoc(), calleeComp);
+  rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, funcPtr,
+                                                          preparedArguments);
   return mlir::success();
+}
+
+void ZhlConstructLowering::prepareArguments(
+    mlir::ValueRange args, mlir::ArrayRef<mlir::Type> constructorTypes,
+    mlir::Location loc, mlir::ConversionPatternRewriter &rewriter,
+    std::vector<mlir::Value> &preparedArgs) const {
+  bool isVariadic = !constructorTypes.empty() &&
+                    mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
+
+  preparedArgs.clear();
+
+  auto argsEnd = isVariadic
+                     ? args.begin() + (args.size() - constructorTypes.size())
+                     : args.end();
+  std::transform(args.begin(), argsEnd, constructorTypes.begin(),
+                 std::back_inserter(preparedArgs),
+                 [&](mlir::Value v, mlir::Type t) {
+                   return prepareArgument(v, t, loc, rewriter);
+                 });
+  if (isVariadic) {
+    std::vector<mlir::Value> vargs;
+    auto varType = mlir::dyn_cast<Zmir::VarArgsType>(constructorTypes.back());
+    assert(varType && "expecting a var args type");
+
+    std::transform(
+        argsEnd, args.end(), std::back_inserter(vargs), [&](mlir::Value v) {
+          return prepareArgument(v, varType.getInner(), loc, rewriter);
+        });
+
+    auto va =
+        rewriter.create<Zmir::VarArgsOp>(loc, constructorTypes.back(), vargs);
+    preparedArgs.push_back(va);
+  }
+
+  assert(preparedArgs.size() == constructorTypes.size() &&
+         "incorrect number of arguments");
+}
+
+mlir::Value ZhlConstructLowering::prepareArgument(
+    mlir::Value arg, mlir::Type expectedType, mlir::Location loc,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  llvm::dbgs() << "arg (inside)" << arg << "\n";
+  return getTypeConverter()->materializeTargetConversion(rewriter, loc,
+                                                         expectedType, arg);
 }
 
 mlir::FailureOr<mlir::Type>
@@ -120,8 +189,13 @@ ZhlConstructLowering::getTypeFromName(mlir::StringRef name) const {
 mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     Zhl::ConstraintOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
-  rewriter.replaceOpWithNewOp<Zmir::ConstrainOp>(op, adaptor.getLhs(),
-                                                 adaptor.getRhs());
+  auto lhs = getTypeConverter()->materializeTargetConversion(
+      rewriter, op->getLoc(), Zmir::ValType::get(getContext()),
+      {adaptor.getLhs()});
+  auto rhs = getTypeConverter()->materializeTargetConversion(
+      rewriter, op->getLoc(), Zmir::ValType::get(getContext()),
+      {adaptor.getRhs()});
+  rewriter.replaceOpWithNewOp<Zmir::ConstrainOp>(op, lhs, rhs);
   return mlir::success();
 }
 
@@ -159,18 +233,15 @@ mlir::LogicalResult ZhlDeclarationRemoval::matchAndRewrite(
 /// ZhlDefinitionLowering
 ///////////////////////////////////////////////////////////
 
-mlir::LogicalResult createField(Zmir::ComponentOp comp, mlir::StringRef name,
-                                mlir::Type type,
-                                mlir::ConversionPatternRewriter &rewriter,
-                                mlir::Location loc) {
-  if (!comp)
-    return mlir::failure();
+void createField(Zmir::ComponentOp comp, mlir::StringRef name, mlir::Type type,
+                 mlir::ConversionPatternRewriter &rewriter,
+                 mlir::Location loc) {
+  assert(comp);
 
   mlir::OpBuilder::InsertionGuard guard(rewriter);
 
   rewriter.setInsertionPointToStart(&comp.getRegion().front());
   rewriter.create<Zmir::FieldDefOp>(loc, name, type);
-  return mlir::success();
 }
 
 mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
@@ -181,19 +252,16 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
   if (!declr)
     return op.emitError("definition does not depend on a declaration");
   auto name = declr.getMemberAttr();
-  // XXX: Do I need to put a pending type here?
-  auto type = adaptor.getDefinition().getType();
+
+  auto value =
+      findTypeInUseDefChain(adaptor.getDefinition(), getTypeConverter());
 
   auto comp = op->getParentOfType<Zmir::ComponentOp>();
-  if (!comp)
-    return mlir::failure();
-  auto fieldResult = createField(comp, name, type, rewriter, declr.getLoc());
-  if (mlir::failed(fieldResult))
-    return mlir::failure();
+  assert(comp);
+  createField(comp, name, value.getType(), rewriter, declr.getLoc());
 
   auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
-  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, name,
-                                                  adaptor.getDefinition());
+  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, name, value);
   return mlir::success();
 }
 
@@ -219,22 +287,28 @@ mlir::LogicalResult ZhlSuperLowering::matchAndRewrite(
     return op.emitError(
         "lowering of super ops inside blocks is not defined yet");
   auto comp = op->getParentOfType<Zmir::ComponentOp>();
-  if (!comp)
-    return mlir::failure();
+  assert(comp);
+  auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
+
   auto deducedType =
       deduceTypeOfKnownExtern(comp.getName(), rewriter.getContext());
-  auto type = mlir::succeeded(deducedType)
-                  ? *deducedType
-                  : Zmir::PendingType::get(rewriter.getContext());
 
-  llvm::dbgs() << "Type for $super type is " << type << " from "
-               << adaptor.getValue() << "\n";
-  auto fieldResult = createField(comp, "$super", type, rewriter, op.getLoc());
-  if (mlir::failed(fieldResult))
-    return mlir::failure();
-  auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
-  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super",
-                                                  adaptor.getValue());
+  mlir::Type type;
+  mlir::Value value;
+  if (mlir::succeeded(deducedType)) {
+    type = *deducedType;
+    value = getTypeConverter()->materializeTargetConversion(
+        rewriter, op->getLoc(), type, adaptor.getValue());
+    auto v = findTypeInUseDefChain(value, getTypeConverter());
+    if (v.getType() == type)
+      value = v;
+  } else {
+    value = findTypeInUseDefChain(adaptor.getValue(), getTypeConverter());
+    type = value.getType();
+  }
+
+  createField(comp, "$super", type, rewriter, op.getLoc());
+  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", value);
 
   // Find the prologue and join it to the current block
   auto *prologue = &comp.getBodyFunc().getRegion().back();
@@ -274,8 +348,17 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
   auto comp = op->getParentOfType<Zmir::ComponentOp>();
   if (!comp)
     return mlir::failure();
+
+  /*auto args = adaptor.getArgs();*/
+  std::vector<mlir::Value> args;
+  std::transform(adaptor.getArgs().begin(), adaptor.getArgs().end(),
+                 std::back_inserter(args), [&](mlir::Value v) {
+                   return findTypeInUseDefChain(v, getTypeConverter());
+                 });
+
   std::vector<mlir::Type> argTypes;
-  for (auto arg : adaptor.getArgs()) {
+  for (auto arg : args) {
+    llvm::dbgs() << "arg = " << arg << "\n";
     argTypes.push_back(arg.getType());
   }
 
@@ -292,8 +375,8 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
   if (mlir::failed(externDeclrResult))
     return mlir::failure();
 
-  rewriter.replaceOpWithNewOp<mlir::func::CallOp>(
-      op, *externDeclrResult, mlir::ValueRange(adaptor.getArgs()));
+  rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, *externDeclrResult,
+                                                  mlir::ValueRange(args));
 
   return mlir::success();
 }
