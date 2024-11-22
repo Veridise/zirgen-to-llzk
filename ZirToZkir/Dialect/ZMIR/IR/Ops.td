@@ -15,16 +15,15 @@ def ReturnsExpr : DeclareOpInterfaceMethods<InferTypeOpInterface>;
 
 class ZmirOp<string mnemonic, list<Trait> traits = []>
     : Op<ZmirDialect, mnemonic, traits> {}
-/*
+
 class ComponentOpBase<string prefix, string bodyFuncName,
                       string constrainFuncName>
-  */
-def ComponentOp
-    : ZmirOp</*prefix#*/ "component", [HasParent<"::mlir::ModuleOp">, Symbol,
-                                       SymbolTable, IsolatedFromAbove,
-                                       GraphRegionNoTerminator,
-                                       OpAsmOpInterface]> {
-  let summary = /*prefix#*/ "component declaration";
+
+    /*def ComponentOp*/
+    : ZmirOp<prefix#"component", [HasParent<"::mlir::ModuleOp">, Symbol,
+                                  SymbolTable, IsolatedFromAbove,
+                                  GraphRegionNoTerminator, OpAsmOpInterface]> {
+  let summary = prefix#"component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
       UnitAttr:$generic, UnitAttr:$builtin,
       OptionalAttr<FlatSymbolRefArrayAttr>:$const_params,
@@ -53,8 +52,8 @@ def ComponentOp
     ::mlir::SymbolRefAttr getBodySym();
 
     /// Returns the name of the function that represents the body of a component.
-    constexpr std::string_view getBodyFuncName() { return "body"; }
-    constexpr std::string_view getConstrainFuncName() { return "body"; }
+    constexpr std::string_view getBodyFuncName() { return "}]#bodyFuncName#[{"; }
+    constexpr std::string_view getConstrainFuncName() { return "}]#contrainFuncName#[{"; }
 
     constexpr bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
 
@@ -68,9 +67,9 @@ def ComponentOp
   }];
 }
 
-// def ComponentOp : ComponentOpBase<"", "body", "body"> {}
+def ComponentOp : ComponentOpBase<"", "body", "body"> {}
 
-// def SplitComponentOp : ComponentOpBase<"split_", "compute", "constrain"> {}
+def SplitComponentOp : ComponentOpBase<"split_", "compute", "constrain"> {}
 
 //===----------------------------------------------------------------------===//
 //  ConstructorRefOp
