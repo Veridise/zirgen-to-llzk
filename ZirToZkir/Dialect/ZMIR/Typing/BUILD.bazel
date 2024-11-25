@@ -1,24 +1,20 @@
+
 package(
     default_visibility = ["//visibility:public"],
 )
 
 cc_library(
-  name = "ConvertZhlToZmir",
+  name = "ZMIRTypeConverter",
   srcs = [
-    "Patterns.cpp",
-    "Patterns.h",
-    "Pass.cpp",
-    "Helpers.h",
-    "Helpers.cpp",
+    "ZMIRTypeConverter.cpp",
   ],
   hdrs = [
-    "Pass.h"
+    "ZMIRTypeConverter.h",
   ],
   deps = [
         "@zirgen//zirgen/Dialect/ZHL/IR",
         "//ZirToZkir/Dialect/ZMIR/IR",  
-        "//ZirToZkir/Dialect/ZMIR/Typing:ZMIRTypeConverter",  
-        "//ZirToZkir/Passes:PassDetail",
+        "//ZirToZkir/Passes:PassDetail",  
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:IndexDialect",

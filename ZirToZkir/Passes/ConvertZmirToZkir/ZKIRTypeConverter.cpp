@@ -20,11 +20,22 @@ unrealizedCastMaterialization(mlir::OpBuilder &builder, mlir::Type type,
 zkir::ZKIRTypeConverter::ZKIRTypeConverter() {
   addConversion([](mlir::Type t) { return t; });
 
+  // ZMIR Pending types MUST be illegal at this point but I don't have a
+  // solid way to get rid of them so for now I'm defaulting them to FeltType.
+  addConversion(
+      [](Zmir::PendingType t) { return zkir::FeltType::get(t.getContext()); });
   addConversion(
       [](Zmir::ValType t) { return zkir::FeltType::get(t.getContext()); });
 
   addConversion([](Zmir::ComponentType t) {
     return zkir::StructType::get(t.getContext(), t.getName());
+  });
+
+  addConversion(
+      [](Zmir::StringType t) { return zkir::StringType::get(t.getContext()); });
+
+  addConversion([&](Zmir::VarArgsType t) {
+    return zkir::VarArgsType::get(t.getContext(), convertType(t.getInner()));
   });
 
   addSourceMaterialization(unrealizedCastMaterialization);

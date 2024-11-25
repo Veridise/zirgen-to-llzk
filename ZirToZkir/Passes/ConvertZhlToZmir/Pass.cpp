@@ -2,9 +2,9 @@
 
 #include "Pass.h"
 #include "Patterns.h"
-#include "ZMIRTypeConverter.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
+#include "ZirToZkir/Dialect/ZMIR/Typing/ZMIRTypeConverter.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"

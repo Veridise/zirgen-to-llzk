@@ -19,4 +19,9 @@ class ConvertZmirToZkirPass
   void runOnOperation() override;
 };
 
+class ConvertZmirComponentsToZkirPass
+    : public ConvertZmirComponentsToZkirBase<ConvertZmirComponentsToZkirPass> {
+  void runOnOperation() override;
+};
+
 } // namespace zkc

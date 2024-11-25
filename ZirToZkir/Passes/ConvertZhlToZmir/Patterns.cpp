@@ -1,7 +1,7 @@
 #include "Patterns.h"
-#include "ZMIRTypeConverter.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "ZirToZkir/Dialect/ZMIR/Typing/ZMIRTypeConverter.h"
 #include "ZirToZkir/Passes/ConvertZhlToZmir/Helpers.h"
 #include <algorithm>
 #include <cassert>
@@ -261,6 +261,21 @@ mlir::LogicalResult ZhlDeclarationRemoval::matchAndRewrite(
   return mlir::success();
 }
 
+/// Tries to get an operation from the value written into the field.
+/// If it is then adds an attribute into the operation with the name of the
+/// field.
+/// FIXME: This is a hacky solution to a problem that probably needs some static
+/// analysis
+void maybeAnnotateConstructorCallWithField(Zmir::WriteFieldOp op,
+                                           mlir::Value value) {
+  auto valueOp = value.getDefiningOp();
+  if (!valueOp)
+    return; // The value doesn't come from an op
+
+  valueOp->setAttr("writes_into",
+                   mlir::StringAttr::get(op.getContext(), op.getFieldName()));
+}
+
 ///////////////////////////////////////////////////////////
 /// ZhlDefinitionLowering
 ///////////////////////////////////////////////////////////
@@ -293,7 +308,9 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
   createField(comp, name, value.getType(), rewriter, declr.getLoc());
 
   auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
-  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, name, value);
+  auto writeOp =
+      rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, name, value);
+  maybeAnnotateConstructorCallWithField(writeOp, value);
   return mlir::success();
 }
 
@@ -340,7 +357,9 @@ mlir::LogicalResult ZhlSuperLowering::matchAndRewrite(
   }
 
   createField(comp, "$super", type, rewriter, op.getLoc());
-  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", value);
+  auto writeOp = rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(
+      op, self, "$super", value);
+  maybeAnnotateConstructorCallWithField(writeOp, value);
 
   // Find the prologue and join it to the current block
   auto *prologue = &comp.getBodyFunc().getRegion().back();

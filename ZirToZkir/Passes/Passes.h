@@ -6,6 +6,8 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
+#include "zkir/Dialect/ZKIR/IR/Dialect.h"
+#include "zkir/Dialect/ZKIR/IR/Ops.h"
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 
 namespace zkc {
@@ -18,7 +20,8 @@ OpPass<mlir::ModuleOp> createStripTestsPass();
 OpPass<mlir::ModuleOp> createTransformComponentDeclsPass();
 OpPass<mlir::ModuleOp> createStripDirectivesPass();
 OpPass<Zmir::ComponentOp> createConvertZhlToZmirPass();
-OpPass<Zmir::SplitComponentOp> createConvertZmirToZkirPass();
+OpPass<zkir::StructDefOp> createConvertZmirToZkirPass();
+OpPass<mlir::ModuleOp> createConvertZmirComponentsToZkirPass();
 // OpPass<Zmir::ComponentOp> createZmirPropagateTypesPass();
 
 // Generate the code for registering passes.

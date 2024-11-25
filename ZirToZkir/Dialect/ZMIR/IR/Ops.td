@@ -47,6 +47,7 @@ class ComponentOpBase<string prefix, string bodyFuncName,
     /// Returns the type of the component.
     ::mlir::Type getType();
     ::mlir::Type getSuperType();
+    ::mlir::FailureOr<::mlir::Type> lookupFieldType(mlir::SymbolRefAttr);
 
     /// Returns a symbol that points to the body of the component.
     /*::mlir::SymbolRefAttr getBodySym();*/

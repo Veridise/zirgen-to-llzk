@@ -6,6 +6,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinTypes.h>
+#include <unordered_set>
 
 using namespace zkc::Zmir;
 
@@ -69,18 +70,16 @@ void addBinOp(BuildContext &ctx, mlir::StringRef name) {
     auto val = ValType::get(ctx.builder.getContext());
     // Special register where results are stored
     ctx.builder.create<FieldDefOp>(ctx.unk, "$super", val);
-    ctx.fillOutBody(
-        op, {val, val}, {componentType}, [&](mlir::ValueRange args) {
-          // Reference to self
-          auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-          // Do the computation
-          auto op = ctx.builder.create<OpTy>(ctx.unk, args[0], args[1]);
-          // Store the result
-          ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", op);
-          // Return self
-          ctx.builder.create<mlir::func::ReturnOp>(ctx.unk,
-                                                   mlir::ValueRange({self}));
-        });
+    ctx.fillOutBody(op, {val, val}, {val}, [&](mlir::ValueRange args) {
+      // Reference to self
+      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
+      // Do the computation
+      auto op = ctx.builder.create<OpTy>(ctx.unk, args[0], args[1]);
+      // Store the result
+      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", op);
+      // Return self
+      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({op}));
+    });
   });
 }
 
@@ -92,7 +91,7 @@ void addUnaryOp(BuildContext &ctx, mlir::StringRef name) {
     auto val = ValType::get(ctx.builder.getContext());
     // Special register where results are stored
     ctx.builder.create<FieldDefOp>(ctx.unk, "$super", val);
-    ctx.fillOutBody(op, {val}, {componentType}, [&](mlir::ValueRange args) {
+    ctx.fillOutBody(op, {val}, {val}, [&](mlir::ValueRange args) {
       // Reference to self
       auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
       // Do the computation
@@ -100,8 +99,7 @@ void addUnaryOp(BuildContext &ctx, mlir::StringRef name) {
       // Store the result
       ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", op);
       // Return self
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk,
-                                               mlir::ValueRange({self}));
+      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({op}));
     });
   });
 }
@@ -234,9 +232,9 @@ void zkc::Zmir::addBuiltins(
     addUnaryOp<NegOp>(ctx, "Neg");
 
   addTrivial(ctx, "Val", ValType::get(builder.getContext()));
-  addTrivial(ctx, "String", StringType::get(builder.getContext()));
+  // addTrivial(ctx, "String", StringType::get(builder.getContext()));
   /// The type 'Type' should also have a trivial constructor
   /// but how to handle this type at this level of abstraction
   /// is TBD.
-  addArrayComponent(ctx);
+  // addArrayComponent(ctx);
 }

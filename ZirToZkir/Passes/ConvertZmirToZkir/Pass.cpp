@@ -6,6 +6,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "zkir/Dialect/ZKIR/IR/Dialect.h"
+#include "zkir/Dialect/ZKIR/IR/Ops.h"
+#include "zkir/Dialect/ZKIR/Util/SymbolHelper.h"
 #include <cassert>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
@@ -21,7 +23,7 @@ using namespace zkc::Zmir;
 namespace zkc {
 
 void ConvertZmirToZkirPass::runOnOperation() {
-  Zmir::SplitComponentOp op = getOperation();
+  auto op = getOperation();
 
   mlir::MLIRContext *ctx = op->getContext();
   zkir::ZKIRTypeConverter typeConverter;
@@ -44,9 +46,47 @@ void ConvertZmirToZkirPass::runOnOperation() {
     signalPassFailure();
 }
 
-std::unique_ptr<OperationPass<Zmir::SplitComponentOp>>
+std::unique_ptr<OperationPass<zkir::StructDefOp>>
 createConvertZmirToZkirPass() {
   return std::make_unique<ConvertZmirToZkirPass>();
+}
+
+void ConvertZmirComponentsToZkirPass::runOnOperation() {
+  auto op = getOperation();
+  op->setAttr(zkir::LANG_ATTR_NAME, mlir::UnitAttr::get(&getContext()));
+
+  mlir::MLIRContext *ctx = op->getContext();
+  zkir::ZKIRTypeConverter typeConverter;
+  // Init patterns for this transformation
+  mlir::RewritePatternSet patterns(ctx);
+
+  patterns
+      .add<ComponentLowering, FieldDefOpLowering, FuncOpLowering,
+           ReturnOpLowering, CallOpLowering, CallIndirectOpLoweringInCompute,
+           CallIndirectOpLoweringInConstrain, WriteFieldOpLowering,
+           RemoveConstructorRefOp, LowerBitAnd, LowerAdd, LowerSub, LowerMul,
+           LowerInv, LowerNeg, LowerConstrainOp, LowerReadFieldOp>(
+          typeConverter, ctx);
+
+  // Set conversion target
+  mlir::ConversionTarget target(*ctx);
+  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
+                         zkir::ZKIRDialect>();
+  target.addLegalOp<mlir::UnrealizedConversionCastOp>();
+
+  target.addIllegalOp<ComponentOp, SplitComponentOp, FieldDefOp, func::FuncOp,
+                      func::ReturnOp, func::CallOp, func::CallIndirectOp,
+                      WriteFieldOp, ConstructorRefOp, BitAndOp, AddOp, SubOp,
+                      MulOp, InvOp, NegOp, ReadFieldOp, ConstrainOp>();
+  // Call partialTransformation
+  if (mlir::failed(
+          mlir::applyPartialConversion(op, target, std::move(patterns))))
+    signalPassFailure();
+}
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createConvertZmirComponentsToZkirPass() {
+  return std::make_unique<ConvertZmirComponentsToZkirPass>();
 }
 
 } // namespace zkc

@@ -64,7 +64,7 @@ public:
 
   LogicalResult
   matchAndRewrite(Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const {
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return mlir::success();
   }
@@ -77,7 +77,7 @@ public:
 
   LogicalResult
   matchAndRewrite(Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const {
+                  ConversionPatternRewriter &rewriter) const override {
     auto body = op->template getParentOfType<mlir::func::FuncOp>();
     mlir::BlockArgument arg = body.getArgument(ArgIdx);
 
@@ -92,10 +92,35 @@ class ReplaceConstructWithRead
 public:
   using OpConversionPattern<func::CallIndirectOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(func::CallIndirectOp op, OpAdaptor adaptor,
-                                ConversionPatternRewriter &rewriter) const {
+  LogicalResult
+  matchAndRewrite(func::CallIndirectOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
 
     return mlir::failure();
+  }
+};
+
+class ReplaceWriteFieldWithRead : public OpConversionPattern<WriteFieldOp> {
+public:
+  using OpConversionPattern<WriteFieldOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(WriteFieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    OpBuilder::InsertionGuard guard(rewriter);
+    if (auto valOp = adaptor.getVal().getDefiningOp()) {
+      llvm::dbgs() << *valOp << "\n";
+      rewriter.setInsertionPoint(valOp);
+    }
+    auto read = rewriter.create<Zmir::ReadFieldOp>(
+        op.getLoc(), op.getVal().getType(), adaptor.getComponent(),
+        adaptor.getFieldNameAttr());
+    rewriter.eraseOp(op);
+    rewriter.replaceUsesWithIf(adaptor.getVal(), read, [](auto &operand) {
+      // Replace anything but write ops since we want to get rid of them
+      return !mlir::isa<WriteFieldOp>(operand.getOwner());
+    });
+    return mlir::success();
   }
 };
 
@@ -134,13 +159,15 @@ class RemoveIllegalConstrainOpsPass
 
   void setLegality(ConversionTarget &target) override {
     // And there's probably more
-    target.addIllegalOp<WriteFieldOp, GetSelfOp>();
-    /*target.addIllegalOp<func::CallIndirectOp>();*/
+    target.addIllegalOp<WriteFieldOp, GetSelfOp, BitAndOp, InvOp>();
+    target.addIllegalOp<func::CallIndirectOp>();
   }
 
   void addPatterns(RewritePatternSet &patterns) override {
-    patterns.add<ReplaceConstructWithRead, RemoveOp<WriteFieldOp>,
-                 ReplaceUsesWithArg<GetSelfOp, 0>>(&getContext());
+    patterns
+        .add<ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
+             RemoveOp<func::CallIndirectOp>, ReplaceUsesWithArg<GetSelfOp, 0>>(
+            &getContext());
   }
 };
 

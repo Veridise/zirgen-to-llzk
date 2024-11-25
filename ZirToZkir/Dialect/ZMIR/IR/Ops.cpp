@@ -1,5 +1,6 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "zkir/Dialect/ZKIR/IR/Ops.h"
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
@@ -186,61 +187,30 @@ mlir::Type SplitComponentOp::getSuperType() {
   return fieldDef.getType();
 }
 
-#if 0
-inline mlir::SymbolRefAttr makeCompFuncSymbol(mlir::MLIRContext *ctx,
-                                              mlir::StringAttr parent,
-                                              std::string_view name) {
-  mlir::OpBuilder builder(ctx);
-  return mlir::SymbolRefAttr::get(
-      parent, {mlir::SymbolRefAttr::get(builder.getStringAttr(name))});
+mlir::FailureOr<::mlir::Type>
+ComponentOp::lookupFieldType(mlir::SymbolRefAttr fieldName) {
+  mlir::LogicalResult result = mlir::failure();
+  for (auto field : getOps<Zmir::FieldDefOp>()) {
+    if (field.getNameAttr() == fieldName)
+      return field.getType();
+  }
+
+  return result;
 }
 
-inline mlir::func::FuncOp getCompFunc(mlir::Operation *op,
-                                      std::string_view name) {
-  mlir::OpBuilder builder(op->getContext());
-  return mlir::SymbolTable::lookupNearestSymbolFrom<mlir::func::FuncOp>(
-      op, builder.getStringAttr(name));
+mlir::FailureOr<::mlir::Type>
+SplitComponentOp::lookupFieldType(mlir::SymbolRefAttr fieldName) {
+  mlir::LogicalResult result = mlir::failure();
+  for (auto field : getOps<Zmir::FieldDefOp>()) {
+    if (field.getNameAttr() == fieldName)
+      return field.getType();
+  }
+
+  return result;
 }
-
-// FIXME: It will be way more clean to have a common class for both types of
-// components instead of this macro mess. I just can't remember how to do that
-// with tablegen right now.
-#define bodyFuncSym(T)                                                         \
-  mlir::SymbolRefAttr T::getBodySym() {                                        \
-    return makeCompFuncSymbol(getContext(), getSymNameAttr(),                  \
-                              getBodyFuncName());                              \
-  }
-#define constrainFuncSym(T)                                                    \
-  mlir::SymbolRefAttr T::getConstrainSym() {                                   \
-    return makeCompFuncSymbol(getContext(), getSymNameAttr(),                  \
-                              getConstrainFuncName());                         \
-  }
-
-#define bodyFunc(T)                                                            \
-  mlir::func::FuncOp T::getBodyFunc() {                                        \
-    return getCompFunc(getOperation(), getBodyFuncName());                     \
-  }
-#define constrainFunc(T)                                                       \
-  mlir::func::FuncOp T::getConstrainFunc() {                                   \
-    return getCompFunc(getOperation(), getConstrainFuncName());                \
-  }
-
-#define compFuncs(T)                                                           \
-  bodyFuncSym(T) bodyFunc(T) constrainFuncSym(T) constrainFunc(T)
-// clang-format off
-compFuncs(ComponentOp) 
-compFuncs(SplitComponentOp)
-// clang-forman on
-#undef bodyFuncSym
-#undef constrainFuncSym
-#undef bodyFunc
-#undef constrainFuncSym
-#undef compFuncs
-
-#endif
 
 void ConstructorRefOp::build(mlir::OpBuilder &builder,
-                                 mlir::OperationState &state, DefinesBodyFunc op) {
+                             mlir::OperationState &state, DefinesBodyFunc op) {
   state.getOrAddProperties<Properties>().component =
       mlir::SymbolRefAttr::get(op.getNameAttr());
   state.addTypes({op.getBodyFunc().getFunctionType()});
@@ -249,14 +219,20 @@ void ConstructorRefOp::build(mlir::OpBuilder &builder,
 mlir::LogicalResult ConstructorRefOp::verify() {
   mlir::StringRef compName = getComponent();
   mlir::Type type = getType();
+  auto mod = (*this)->getParentOfType<mlir::ModuleOp>();
 
   // Try to find the referenced component.
-  auto comp =
-      (*this)->getParentOfType<mlir::ModuleOp>().lookupSymbol<ComponentInterface>(
-          compName);
-  if (!comp)
+  auto comp = mod.lookupSymbol<ComponentInterface>(compName);
+  if (!comp) {
+    // The constructor reference could be temporarly pointing
+    // to a zkir struct. Assume it is correct if that's the case.
+    auto structComp = mod.lookupSymbol<zkir::StructDefOp>(compName);
+    if (structComp)
+      return mlir::success();
+
     return emitOpError() << "reference to undefined component '" << compName
                          << "'";
+  }
 
   // Check that the referenced component's constructor has the correct type.
   if (comp.getBodyFunc().getFunctionType() != type)

@@ -35,13 +35,16 @@ cc_library(
         "InjectBuiltIns.cpp",
         "PassDetail.h",
         "SplitComponentBody.cpp",
-        "RemoveIllegalOps.cpp"
+        "RemoveIllegalOps.cpp",
+        "LowerBuiltIns.cpp",
+        "RemoveBuiltIns.cpp"
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
         ":PassesIncGen",
+        "//ZirToZkir/Dialect/ZMIR/Typing:ZMIRTypeConverter",  
         "@zirgen//zirgen/Dialect/ZHL/IR",
         "@llvm-project//mlir:Transforms",
         "//ZirToZkir/Dialect/ZMIR/BuiltIns",  

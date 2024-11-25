@@ -140,5 +140,6 @@ cc_library(
         "@llvm-project//mlir:IndexDialect",
         "@llvm-project//mlir:SCFDialect",
         "@zirgen//zirgen/Dialect/ZHL/IR",
+        "//:zkir"
     ],
 )

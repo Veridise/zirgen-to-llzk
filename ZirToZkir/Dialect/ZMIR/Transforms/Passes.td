@@ -15,6 +15,22 @@ def InjectBuiltIns : Pass<"inject-builtins", "mlir::ModuleOp"> {
   ];
 }
 
+def LowerBuiltIns : Pass<"lower-builtins", "mlir::func::FuncOp"> {
+  let summary = "transforms calls to builtin components to 'native' ops";
+  let constructor = "zkc::Zmir::createLowerBuiltInsPass()";
+
+  let dependentDialects = ["::zkc::Zmir::ZmirDialect",
+                           "::mlir::func::FuncDialect"];
+}
+
+def RemoveBuiltIns : Pass<"remove-builtins", "mlir::ModuleOp"> {
+  let summary = "removes the builtin component definitions that can be lowered";
+  let constructor = "zkc::Zmir::createRemoveBuiltInsPass()";
+
+  let dependentDialects = ["::zkc::Zmir::ZmirDialect",
+                           "::mlir::func::FuncDialect"];
+}
+
 def SplitComponentBody : Pass<"split-component-body", "mlir::ModuleOp"> {
   let summary = "Splits the body function of a component into compute and "
                 "constrain functions in preparation for lowering to ZKIR";

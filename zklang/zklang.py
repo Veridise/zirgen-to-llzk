@@ -33,7 +33,8 @@ ZKC_OPT_PIPELINE = Scope(
     Scope("zmir.component", Pass("zhl-to-zmir")),
     Pass("cse"),
     Pass("canonicalize"),
-    # Pass("reconcile-unrealized-casts"),
+    Scope("zmir.component", Scope("func.func", Pass("lower-builtins"))),
+    Pass("remove-builtins"),
     Pass("split-component-body"),
     Scope(
         "zmir.split_component",
@@ -43,8 +44,11 @@ ZKC_OPT_PIPELINE = Scope(
             Pass("remove-illegal-constrain-ops"),
         ),
     ),
+    Pass("cse"),
     Pass("canonicalize"),
-    Scope("zmir.split_component", Pass("zmir-to-zkir")),
+    Pass("zmir-components-to-zkir"),
+    Scope("zkir.struct", Pass("zmir-to-zkir")),
+    # Pass("reconcile-unrealized-casts"),
 )
 
 

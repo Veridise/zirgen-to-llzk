@@ -55,10 +55,20 @@ def ZmirPropagateTypes
 }
 */
 
-def ConvertZmirToZkir : Pass<"zmir-to-zkir", "zkc::Zmir::SplitComponentOp"> {
+def ConvertZmirToZkir : Pass<"zmir-to-zkir", "zkir::StructDefOp"> {
   let summary =
       "Converts ZMIR operations in the body of a component to ZKIR operations";
   let constructor = "zkc::createConvertZmirToZkirPass()";
+
+  let dependentDialects = ["zkir::ZKIRDialect", "zkc::Zmir::ZmirDialect",
+                           "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
+                           "mlir::index::IndexDialect"];
+}
+
+def ConvertZmirComponentsToZkir
+    : Pass<"zmir-components-to-zkir", "mlir::ModuleOp"> {
+  let summary = "Converts ZMIR component operations to ZKIR operations";
+  let constructor = "zkc::createConvertZmirComponentsToZkirPass()";
 
   let dependentDialects = ["zkir::ZKIRDialect", "zkc::Zmir::ZmirDialect",
                            "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
