@@ -20,27 +20,41 @@ using namespace mlir;
 
 namespace zkc::Zmir {
 
-mlir::FailureOr<std::string> getCallIndirectName(func::CallIndirectOp op) {
-
+mlir::FailureOr<Zmir::ConstructorRefOp>
+getConstructorRef(func::CallIndirectOp op) {
   auto constrRef =
       mlir::dyn_cast<Zmir::ConstructorRefOp>(op.getCallee().getDefiningOp());
   if (!constrRef)
     return mlir::failure();
-  return constrRef.getComponent().str();
+  return constrRef;
+}
+
+mlir::FailureOr<std::string> getCallIndirectName(func::CallIndirectOp op) {
+  auto constrRef = getConstructorRef(op);
+  if (mlir::failed(constrRef))
+    return mlir::failure();
+  return constrRef->getComponent().str();
 }
 
 bool isLegalCallIndirect(func::CallIndirectOp op) {
-  // Get a component type as the only result. Anything else we don't care about
   auto name = getCallIndirectName(op);
   if (mlir::failed(name))
     return true;
+  auto ref = getConstructorRef(op);
+  if (mlir::failed(ref))
+    return true;
+  auto found = BuiltInComponentNames.find(*name) != BuiltInComponentNames.end();
+  auto markedBuiltin = ref->getBuiltin();
   // Is the constructor call from a component that is built-in?
-  return BuiltInComponentNames.find(*name) == BuiltInComponentNames.end();
+  return !(found && markedBuiltin);
 }
 
 bool isLegalConstructRefOp(ConstructorRefOp op) {
-  return BuiltInComponentNames.find(op.getComponent().str()) ==
-         BuiltInComponentNames.end();
+  auto found = BuiltInComponentNames.find(op.getComponent().str()) !=
+               BuiltInComponentNames.end();
+  auto markedBuiltin = op.getBuiltin();
+
+  return !(found && markedBuiltin);
 }
 
 template <typename NewOp, const char *Name>

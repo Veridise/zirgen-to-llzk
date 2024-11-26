@@ -1,4 +1,5 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include <algorithm>
 #include <iterator>
@@ -13,9 +14,9 @@ namespace zkc::Zmir {
 bool isValidZmirType(mlir::Type type) {
   return llvm::isa<TypeVarType>(type) || llvm::isa<StringType>(type) ||
          llvm::isa<UnionType>(type) || llvm::isa<ValType>(type) ||
-         llvm::isa<ComponentType>(type) ||
-         /*llvm::isa<zirgen::Zhl::ExprType>(type) ||*/
-         llvm::isa<PendingType>(type) ||
+         llvm::isa<ComponentType>(type) || llvm::isa<PendingType>(type) ||
+         (llvm::isa<VarArgsType>(type) &&
+          isValidZmirType(llvm::cast<VarArgsType>(type).getInner())) ||
          (llvm::isa<ArrayType>(type) &&
           isValidZmirType(llvm::cast<ArrayType>(type).getInnerType()));
 }
@@ -73,6 +74,16 @@ ComponentType::verify(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
     return mlir::success();
   return mlir::success(
       std::all_of(results.begin(), results.end(), mlir::succeeded));
+}
+
+ComponentInterface
+ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable,
+                             ::mlir::Operation *op) {
+  auto comp = symbolTable.lookupNearestSymbolFrom(op, getName());
+  if (!comp)
+    return nullptr;
+
+  return mlir::dyn_cast<ComponentInterface>(comp);
 }
 
 mlir::LogicalResult

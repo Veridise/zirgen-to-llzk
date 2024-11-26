@@ -242,3 +242,21 @@ mlir::LogicalResult Zmir::LowerConstrainOp::matchAndRewrite(
                                                     adaptor.getRhs());
   return mlir::success();
 }
+
+mlir::LogicalResult Zmir::LowerInRangeOp::matchAndRewrite(
+    Zmir::InRangeOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  auto le = rewriter.create<zkir::CmpOp>(
+      op.getLoc(),
+      zkir::FeltCmpPredicateAttr::get(getContext(), zkir::FeltCmpPredicate::LE),
+      adaptor.getLow(), adaptor.getMid());
+  auto lt = rewriter.create<zkir::CmpOp>(
+      op.getLoc(),
+      zkir::FeltCmpPredicateAttr::get(getContext(), zkir::FeltCmpPredicate::LT),
+      adaptor.getMid(), adaptor.getHigh());
+  auto mul = rewriter.create<mlir::arith::MulIOp>(op.getLoc(), le, lt);
+  auto conv = rewriter.create<zkir::FeltFromIntOp>(op.getLoc(), mul);
+  rewriter.replaceOp(op, conv);
+
+  return mlir::success();
+}

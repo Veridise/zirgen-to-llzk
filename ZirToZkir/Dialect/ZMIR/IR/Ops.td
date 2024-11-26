@@ -47,21 +47,13 @@ class ComponentOpBase<string prefix, string bodyFuncName,
     /// Returns the type of the component.
     ::mlir::Type getType();
     ::mlir::Type getSuperType();
-    ::mlir::FailureOr<::mlir::Type> lookupFieldType(mlir::SymbolRefAttr);
-
-    /// Returns a symbol that points to the body of the component.
-    /*::mlir::SymbolRefAttr getBodySym();*/
-    /*::mlir::SymbolRefAttr getConstrainSym();*/
+    ::mlir::FailureOr<::mlir::Type> lookupFieldType(mlir::FlatSymbolRefAttr);
 
     /// Returns the name of the function that represents the body of a component.
     static constexpr std::string_view getBodyFuncName() { return "}]#bodyFuncName#[{"; }
     static constexpr std::string_view getConstrainFuncName() { return "}]#constrainFuncName#[{"; }
 
     static constexpr bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
-
-    /// Returns the func operation that represents the body.
-    /*::mlir::func::FuncOp getBodyFunc();*/
-    /*::mlir::func::FuncOp getConstrainFunc();*/
   }];
 
   let assemblyFormat = [{
@@ -90,11 +82,11 @@ def ConstructorRefOp : ZmirOp<"constructor", [Pure]> {
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$component);
-  let results = (outs AnyType);
+  let arguments = (ins FlatSymbolRefAttr:$component, UnitAttr:$builtin);
+  let results = (outs FunctionType);
   let assemblyFormat = "attr-dict $component `:` type(results)";
 
-  let builders = [OpBuilder<(ins "DefinesBodyFunc":$comp)>];
+  let builders = [OpBuilder<(ins "ComponentInterface":$comp)>];
 
   let extraClassDeclaration = [{
     /// Returns true if can be built with the given value
@@ -109,7 +101,7 @@ def FieldDefOp : ZmirOp<"field", [HasParent<"::zkc::Zmir::ComponentOp, "
                                             "::zkc::Zmir::SplitComponentOp">,
                                   Symbol]> {
   let summary = "component field definition";
-  let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyType>:$type);
+  let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyZmirType>:$type);
 
   let assemblyFormat = [{
     $sym_name `:` $type attr-dict
@@ -123,8 +115,9 @@ def ReadFieldOp
     Reads the value of a field in a component.
   }];
 
-  let arguments = (ins AnyType:$component, FlatSymbolRefAttr:$field_name);
-  let results = (outs AnyType:$val);
+  let arguments = (ins PendingOf<Component>:$component,
+      FlatSymbolRefAttr:$field_name);
+  let results = (outs AnyZmirType:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` attr-dict `:` type($component) `,` type($val) 
@@ -140,7 +133,7 @@ def WriteFieldOp
   }];
 
   let arguments = (ins Component:$component, FlatSymbolRefAttr:$field_name,
-      AnyType:$val);
+      AnyZmirType:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` `=` $val attr-dict `:` type($component) `,` type($val) 
@@ -152,7 +145,7 @@ def ReadSuperTransOp : ZmirOp<"read_super_tr"> {
       "transitively reads the super field until a primitive value is reached";
 
   let arguments = (ins Component:$component);
-  let results = (outs AnyType:$val);
+  let results = (outs AnyNonPendingZmirType:$val);
 
   let assemblyFormat =
       "$component attr-dict `:` type($component) `,` type($val)";
@@ -160,8 +153,8 @@ def ReadSuperTransOp : ZmirOp<"read_super_tr"> {
 
 def NopOp : ZmirOp<"nop", [Pure]> {
 
-  let arguments = (ins Variadic<AnyType>:$ins);
-  let results = (outs Variadic<AnyType>:$outs);
+  let arguments = (ins Variadic<AnyZmirType>:$ins);
+  let results = (outs Variadic<AnyZmirType>:$outs);
 
   let assemblyFormat = "$ins `:` type($ins) `->` type($outs) attr-dict";
 }
@@ -221,7 +214,7 @@ def NewArrayOp
 ]> {
   let summary = "creates a new array with data";
 
-  let arguments = (ins Variadic<AnyType>:$elements);
+  let arguments = (ins Variadic<AnyNonPendingZmirType>:$elements);
   let results = (outs Array:$result);
 
   let assemblyFormat = "$elements attr-dict `:` type($result)";
@@ -243,7 +236,7 @@ def VarArgsTypeCheckPred : TypesMatchWith<"inner type matches input operands",
 def VarArgsOp : ZmirOp<"vargs", [SameTypeOperands, VarArgsTypeCheckPred]> {
   let summary = "groups variable arguments";
 
-  let arguments = (ins Variadic<AnyType>:$elements);
+  let arguments = (ins Variadic<AnyNonPendingZmirType>:$elements);
   let results = (outs VarArgs:$result);
 
   let assemblyFormat = "$elements attr-dict `:` type($result)";
@@ -260,8 +253,8 @@ def AllocArrayOp : ZmirOp<"alloc_array"> {
 def ReadArrayOp : ZmirOp<"read_array"> {
   let summary = "read data from an array";
 
-  let arguments = (ins AnyType:$lvalue, Variadic<AnyType>:$indices);
-  let results = (outs AnyType:$result);
+  let arguments = (ins Array:$lvalue, Variadic<AnyType>:$indices);
+  let results = (outs AnyNonPendingZmirType:$result);
 
   let assemblyFormat = [{
     $lvalue `[` $indices `]` attr-dict `:` type($lvalue) `[` type($indices) `]` `,` type($result)

@@ -3,6 +3,7 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include <mlir/IR/BuiltinOps.h>
+#include <optional>
 
 using namespace zkc::Zmir;
 using namespace zkc;
@@ -12,11 +13,6 @@ ZMIRTypeConverter::ZMIRTypeConverter() {
   addConversion([](mlir::Type t) { return t; });
   addConversion(
       [](Zhl::ExprType t) { return Zmir::PendingType::get(t.getContext()); });
-  /*addConversion(*/
-  /*    [](Zhl::ExprType t) { return Zmir::StringType::get(t.getContext());
-   * });*/
-  /*addConversion(*/
-  /*    [](Zhl::ExprType t) { return Zmir::ValType::get(t.getContext()); });*/
 
   addSourceMaterialization(
       [](mlir::OpBuilder &builder, Zhl::ExprType type, mlir::ValueRange inputs,
@@ -26,28 +22,20 @@ ZMIRTypeConverter::ZMIRTypeConverter() {
             .getResult(0);
       });
   addTargetMaterialization(
-      [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
-         mlir::Location loc) -> std::optional<mlir::Value> {
+      [&](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
+          mlir::Location loc) -> std::optional<mlir::Value> {
+        if (inputs.size() != 1)
+          return std::nullopt;
+
+        // Try to find a previous value in the use-def chain that is valid.
+        auto value = findTypeInUseDefChain(inputs[0], type);
+        if (mlir::succeeded(value))
+          return *value;
+        // Otherwise materialize a conversion
         return builder
             .create<mlir::UnrealizedConversionCastOp>(loc, type, inputs)
             .getResult(0);
       });
-#if 0
-  addTargetMaterialization(
-      [](mlir::OpBuilder &builder, Zmir::PendingType type,
-         mlir::ValueRange inputs,
-         mlir::Location loc) -> std::optional<mlir::Value> {
-        assert(inputs.size() == 1);
-
-        if (auto compTyp =
-                mlir::dyn_cast<Zmir::ComponentType>(inputs[0].getType())) {
-          if (compTyp.getName().getValue() != "Component")
-            return builder.create<Zmir::ReadSuperTransOp>(
-                loc, Zmir::PendingType::get(builder.getContext()), inputs[0]);
-        }
-        return inputs[0];
-      });
-#endif
   addTargetMaterialization(
       [](mlir::OpBuilder &builder, Zmir::ValType type, mlir::ValueRange inputs,
          mlir::Location loc) -> std::optional<mlir::Value> {
@@ -67,22 +55,6 @@ ZMIRTypeConverter::ZMIRTypeConverter() {
             .create<mlir::UnrealizedConversionCastOp>(loc, type, inputs)
             .getResult(0);
       });
-#if 0
-  addArgumentMaterialization(
-      [](mlir::OpBuilder &builder, Zmir::PendingType type,
-         mlir::ValueRange inputs,
-         mlir::Location loc) -> std::optional<mlir::Value> {
-        assert(inputs.size() == 1);
-
-        if (auto compTyp =
-                mlir::dyn_cast<Zmir::ComponentType>(inputs[0].getType())) {
-          if (compTyp.getName().getValue() != "Component")
-            return builder.create<Zmir::ReadSuperTransOp>(
-                loc, Zmir::PendingType::get(builder.getContext()), inputs[0]);
-        }
-        return std::nullopt;
-      });
-#endif
   addArgumentMaterialization(
       [](mlir::OpBuilder &builder, Zmir::ValType type, mlir::ValueRange inputs,
          mlir::Location loc) -> std::optional<mlir::Value> {
@@ -95,4 +67,35 @@ ZMIRTypeConverter::ZMIRTypeConverter() {
 
         return std::nullopt;
       });
+}
+
+/// Climbs the use def chain until it finds a
+/// value that is not defined by an unrealized cast
+/// and that is of the target type. Returns that type.
+/// If that doesn't happen returns the initial type.
+mlir::FailureOr<mlir::Value>
+ZMIRTypeConverter::findTypeInUseDefChain(mlir::Value v, mlir::Type targetType) {
+  mlir::Value cur = v;
+  std::vector<mlir::Value> acc;
+  while (cur.getDefiningOp() &&
+         mlir::isa<mlir::UnrealizedConversionCastOp>(cur.getDefiningOp())) {
+    auto ops = cur.getDefiningOp()->getOperands();
+    if (ops.size() != 1) {
+      return mlir::failure(); // Give up if multiple operands
+    }
+    cur = ops[0];
+    // Accumulate the valid values
+    if (cur.getType() == targetType) {
+      acc.push_back(cur);
+    }
+  }
+
+  // Returns the highest value to propiciate as must dead-code as possible for
+  // later.
+  if (!acc.empty())
+    return acc.back();
+  /*if (cur.getType() == targetType) {*/
+  /*  return cur;*/
+  /*}*/
+  return mlir::failure();
 }

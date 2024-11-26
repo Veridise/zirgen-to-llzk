@@ -58,7 +58,9 @@ def ComponentInterface
                        "::mlir::Type", "getSuperType", (ins)>,
        InterfaceMethod<"Looks up the type of a field inside the component",
                        "::mlir::FailureOr<::mlir::Type>", "lookupFieldType",
-                       (ins "::mlir::SymbolRefAttr":$field)>,
+                       (ins "::mlir::FlatSymbolRefAttr":$field)>,
+       InterfaceMethod<"Returns wether the component is a builtin or not",
+                       "bool", "getBuiltin", (ins)>,
        InterfaceMethod<
            "Returns the region where the component elements are defined",
            "::mlir::Region &", "getRegion", (ins)>,

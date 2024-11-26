@@ -187,32 +187,35 @@ mlir::Type SplitComponentOp::getSuperType() {
   return fieldDef.getType();
 }
 
-mlir::FailureOr<::mlir::Type>
-ComponentOp::lookupFieldType(mlir::SymbolRefAttr fieldName) {
-  mlir::LogicalResult result = mlir::failure();
-  for (auto field : getOps<Zmir::FieldDefOp>()) {
-    if (field.getNameAttr() == fieldName)
-      return field.getType();
-  }
+inline mlir::FailureOr<mlir::Type>
+lookupFieldTypeCommon(mlir::FlatSymbolRefAttr fieldName, mlir::Operation *op) {
 
-  return result;
+  auto fieldOp =
+      mlir::SymbolTable::lookupNearestSymbolFrom<FieldDefOp>(op, fieldName);
+  if (!fieldOp)
+    return mlir::failure();
+
+  return fieldOp.getType();
 }
 
 mlir::FailureOr<::mlir::Type>
-SplitComponentOp::lookupFieldType(mlir::SymbolRefAttr fieldName) {
-  mlir::LogicalResult result = mlir::failure();
-  for (auto field : getOps<Zmir::FieldDefOp>()) {
-    if (field.getNameAttr() == fieldName)
-      return field.getType();
-  }
+ComponentOp::lookupFieldType(mlir::FlatSymbolRefAttr fieldName) {
+  return lookupFieldTypeCommon(fieldName, getOperation());
+}
 
-  return result;
+mlir::FailureOr<::mlir::Type>
+SplitComponentOp::lookupFieldType(mlir::FlatSymbolRefAttr fieldName) {
+  return lookupFieldTypeCommon(fieldName, getOperation());
 }
 
 void ConstructorRefOp::build(mlir::OpBuilder &builder,
-                             mlir::OperationState &state, DefinesBodyFunc op) {
+                             mlir::OperationState &state,
+                             ComponentInterface op) {
   state.getOrAddProperties<Properties>().component =
       mlir::SymbolRefAttr::get(op.getNameAttr());
+  if (op.getBuiltin())
+    state.getOrAddProperties<Properties>().builtin =
+        mlir::UnitAttr::get(builder.getContext());
   state.addTypes({op.getBodyFunc().getFunctionType()});
 }
 

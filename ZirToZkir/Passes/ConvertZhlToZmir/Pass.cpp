@@ -35,7 +35,8 @@ void ConvertZhlToZmirPass::runOnOperation() {
 
   patterns.add<ZhlLiteralLowering, ZhlDefineLowering, ZhlConstructLowering,
                ZhlConstrainLowering, ZhlSuperLowering, ZhlGlobalRemoval,
-               ZhlDeclarationRemoval>(typeConverter, ctx);
+               ZhlDeclarationRemoval, ZhlLookupLowering, ZhlExternLowering>(
+      typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
@@ -46,11 +47,11 @@ void ConvertZhlToZmirPass::runOnOperation() {
   target.addIllegalOp<zirgen::Zhl::DefinitionOp, zirgen::Zhl::ConstructOp,
                       zirgen::Zhl::LiteralOp, zirgen::Zhl::ConstraintOp,
                       zirgen::Zhl::SuperOp, zirgen::Zhl::GlobalOp,
-                      zirgen::Zhl::DeclarationOp>();
+                      zirgen::Zhl::DeclarationOp, zirgen::Zhl::LookupOp,
+                      zirgen::Zhl::ExternOp>();
 
   // Call partialTransformation
-  if (mlir::failed(
-          mlir::applyPartialConversion(op, target, std::move(patterns))))
+  if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))))
     signalPassFailure();
 }
 
@@ -65,17 +66,16 @@ void TransformComponentDeclsPass::runOnOperation() {
   // Init patterns for this transformation
   Zmir::ZMIRTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);
-  patterns
-      .add<ZhlCompToZmirCompPattern, ZhlParameterLowering, ZhlExternLowering>(
-          typeConverter, ctx);
+  patterns.add<ZhlCompToZmirCompPattern, ZhlParameterLowering>(typeConverter,
+                                                               ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
                          zirgen::Zhl::ZhlDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
-  target.addIllegalOp<zirgen::Zhl::ComponentOp, zirgen::Zhl::ConstructorParamOp,
-                      zirgen::Zhl::ExternOp>();
+  target.addIllegalOp<zirgen::Zhl::ComponentOp,
+                      zirgen::Zhl::ConstructorParamOp>();
 
   // Call partialTransformation
   if (mlir::failed(

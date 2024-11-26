@@ -70,8 +70,6 @@ LogicalResult PendingSymbolRenames::applyPendingRenames() {
                    // No need to rename if they are already equal
                    if (assigned == desired)
                      return mlir::success();
-                   llvm::dbgs() << "Attempting to rename " << assigned << " to "
-                                << desired << "\n";
 
                    return st.rename(op, desired);
                  });

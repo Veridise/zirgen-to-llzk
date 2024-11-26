@@ -37,7 +37,9 @@ cc_library(
         "SplitComponentBody.cpp",
         "RemoveIllegalOps.cpp",
         "LowerBuiltIns.cpp",
-        "RemoveBuiltIns.cpp"
+        "RemoveBuiltIns.cpp",
+        "InsertTemporaries.cpp",
+        "LegalizeTypes.cpp"
     ],
     hdrs = [
         "Passes.h",
@@ -50,5 +52,6 @@ cc_library(
         "//ZirToZkir/Dialect/ZMIR/BuiltIns",  
         "//ZirToZkir/Dialect/ZMIR/IR",  
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:Analysis"
     ],
 )

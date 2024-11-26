@@ -9,6 +9,7 @@ public:
   ZMIRTypeConverter();
 
 private:
+  mlir::FailureOr<mlir::Value> findTypeInUseDefChain(mlir::Value, mlir::Type);
 };
 
 } // namespace zkc::Zmir

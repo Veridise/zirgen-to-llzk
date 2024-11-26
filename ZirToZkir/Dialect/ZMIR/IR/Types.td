@@ -41,7 +41,7 @@ def Component : ZmirType<"Component", "component"> {
     /// Gets the `component` op that defines this componnet. Provided `op` is
     /// used as a starting point for the lookup. Should not be assumed to
     /// be non-`null` as we don't verify all types during verification.
-    /*ComponentOp getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);*/
+    ::zkc::Zmir::ComponentInterface getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);
   
     // Verifies that this type references a valid component, relative to the given `op`.
     ::mlir::LogicalResult verifySymbol(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);
@@ -82,6 +82,12 @@ def VarArgs : ZmirType<"VarArgs", "vargs"> {
   let assemblyFormat = "`<` $inner `>`";
 }
 
+def AnyNonPendingZmirType
+    : AnyTypeOf<[Val, TypeVar, String, Union, Component, Array, VarArgs],
+                "type that can participate in ZMIR components">;
 def AnyZmirType
-    : AnyTypeOf<[Val, TypeVar, String, Union, Component, Array, Pending],
-                "A type that can participate in ZMIR components">;
+    : AnyTypeOf<
+          [AnyNonPendingZmirType, Pending],
+          "potentially unknown type that can participate in ZMIR components">;
+
+class PendingOf<Type type> : AnyTypeOf<[type, Pending]>;

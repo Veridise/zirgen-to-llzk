@@ -17,6 +17,8 @@ OpPass<mlir::ModuleOp> createSplitComponentBodyPass();
 OpPass<mlir::func::FuncOp> createLowerBuiltInsPass();
 OpPass<mlir::func::FuncOp> createRemoveIllegalComputeOpsPass();
 OpPass<mlir::func::FuncOp> createRemoveIllegalConstrainOpsPass();
+OpPass<ComponentOp> createInsertTemporariesPass();
+OpPass<ComponentOp> createLegalizeTypesPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

@@ -109,8 +109,10 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     OpBuilder::InsertionGuard guard(rewriter);
     if (auto valOp = adaptor.getVal().getDefiningOp()) {
-      llvm::dbgs() << *valOp << "\n";
       rewriter.setInsertionPoint(valOp);
+    } else {
+      rewriter.setInsertionPointToStart(
+          &(op->getParentOfType<mlir::func::FuncOp>().getBody().front()));
     }
     auto read = rewriter.create<Zmir::ReadFieldOp>(
         op.getLoc(), op.getVal().getType(), adaptor.getComponent(),
@@ -118,7 +120,10 @@ public:
     rewriter.eraseOp(op);
     rewriter.replaceUsesWithIf(adaptor.getVal(), read, [](auto &operand) {
       // Replace anything but write ops since we want to get rid of them
-      return !mlir::isa<WriteFieldOp>(operand.getOwner());
+      auto isWriteOp = mlir::isa<WriteFieldOp>(operand.getOwner());
+      // FIXME: We still have problems with dominance here. Figure it out later.
+
+      return !isWriteOp;
     });
     return mlir::success();
   }

@@ -65,19 +65,20 @@ void ConvertZmirComponentsToZkirPass::runOnOperation() {
            ReturnOpLowering, CallOpLowering, CallIndirectOpLoweringInCompute,
            CallIndirectOpLoweringInConstrain, WriteFieldOpLowering,
            RemoveConstructorRefOp, LowerBitAnd, LowerAdd, LowerSub, LowerMul,
-           LowerInv, LowerNeg, LowerConstrainOp, LowerReadFieldOp>(
-          typeConverter, ctx);
+           LowerInv, LowerNeg, LowerConstrainOp, LowerReadFieldOp,
+           LowerInRangeOp>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                         zkir::ZKIRDialect>();
+                         zkir::ZKIRDialect, mlir::arith::ArithDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
 
-  target.addIllegalOp<ComponentOp, SplitComponentOp, FieldDefOp, func::FuncOp,
-                      func::ReturnOp, func::CallOp, func::CallIndirectOp,
-                      WriteFieldOp, ConstructorRefOp, BitAndOp, AddOp, SubOp,
-                      MulOp, InvOp, NegOp, ReadFieldOp, ConstrainOp>();
+  target
+      .addIllegalOp<ComponentOp, SplitComponentOp, FieldDefOp, func::FuncOp,
+                    func::ReturnOp, func::CallOp, func::CallIndirectOp,
+                    WriteFieldOp, ConstructorRefOp, BitAndOp, AddOp, SubOp,
+                    MulOp, InvOp, NegOp, ReadFieldOp, ConstrainOp, InRangeOp>();
   // Call partialTransformation
   if (mlir::failed(
           mlir::applyPartialConversion(op, target, std::move(patterns))))

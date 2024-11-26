@@ -68,8 +68,10 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
 
     // Return types may change so we need to adjust the return ops
     target.addDynamicallyLegalOp<Zmir::ComponentOp>([](Zmir::ComponentOp op) {
-      return BuiltInComponentNames.find(op.getName().str()) ==
-             BuiltInComponentNames.end();
+      auto found = BuiltInComponentNames.find(op.getName().str()) !=
+                   BuiltInComponentNames.end();
+      auto markedBuiltIn = op.getBuiltin();
+      return !(found && markedBuiltIn);
     });
 
     // Call partialTransformation

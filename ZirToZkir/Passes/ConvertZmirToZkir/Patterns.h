@@ -162,4 +162,13 @@ public:
                   mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerInRangeOp : public mlir::OpConversionPattern<InRangeOp> {
+public:
+  using mlir::OpConversionPattern<InRangeOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(InRangeOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
 } // namespace zkc::Zmir

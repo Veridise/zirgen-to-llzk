@@ -27,15 +27,28 @@ mlir::Value findTypeInUseDefChain(mlir::Value v,
   while (cur.getDefiningOp() &&
          mlir::isa<mlir::UnrealizedConversionCastOp>(cur.getDefiningOp())) {
     auto ops = cur.getDefiningOp()->getOperands();
-    if (ops.size() != 1)
+    if (ops.size() != 1) {
       return v; // Give up if multiple operands
+    }
     cur = ops[0];
   }
 
-  llvm::dbgs() << "Found " << cur << "\n";
-  if (converter->isLegal(cur.getType()))
+  if (Zmir::isValidZmirType(cur.getType()) &&
+      converter->isLegal(cur.getType())) {
     return cur;
+  }
   return v;
+}
+
+mlir::ValueRange findTypesInUseDefChain(mlir::ValueRange r,
+                                        const mlir::TypeConverter *converter) {
+  llvm::SmallVector<mlir::Value> results;
+
+  std::transform(
+      r.begin(), r.end(), std::back_inserter(results),
+      [&](mlir::Value v) { return findTypeInUseDefChain(v, converter); });
+
+  return results;
 }
 
 ///////////////////////////////////////////////////////////
@@ -124,8 +137,8 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   }
 
   auto calleeComp =
-      op->getParentOfType<mlir::ModuleOp>().lookupSymbol<Zmir::DefinesBodyFunc>(
-          typeNameOp.getNameAttr());
+      op->getParentOfType<mlir::ModuleOp>()
+          .lookupSymbol<Zmir::ComponentInterface>(typeNameOp.getNameAttr());
   if (!calleeComp)
     return op->emitError() << "could not find component with name "
                            << typeNameOp.getNameAttr();
@@ -201,7 +214,6 @@ void ZhlConstructLowering::prepareArguments(
 mlir::Value ZhlConstructLowering::prepareArgument(
     mlir::Value arg, mlir::Type expectedType, mlir::Location loc,
     mlir::ConversionPatternRewriter &rewriter) const {
-  llvm::dbgs() << "arg (inside)" << arg << "\n";
   return getTypeConverter()->materializeTargetConversion(rewriter, loc,
                                                          expectedType, arg);
 }
@@ -392,6 +404,55 @@ mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
   return rewriter.create<mlir::func::FuncOp>(loc, name, type, attrs);
 }
 
+inline mlir::FailureOr<mlir::Type> lookupComponentNameIn(mlir::Operation *op,
+                                                         mlir::StringRef name) {
+  assert(op && "expected a non null operation");
+  auto sym = mlir::SymbolTable::lookupNearestSymbolFrom(
+      op, mlir::StringAttr::get(op->getContext(), name));
+  if (!sym)
+    return mlir::failure();
+  if (auto comp = mlir::dyn_cast<Zmir::ComponentOp>(sym)) {
+    return comp.getType();
+  }
+  return mlir::failure();
+  ;
+}
+
+inline mlir::FailureOr<mlir::Type> getTypeFromName(Zhl::GlobalOp typeNameOp) {
+  auto name = typeNameOp.getName();
+  if (name == "Val") {
+    return Zmir::ValType::get(typeNameOp.getContext());
+  } else if (name == "String") {
+    return Zmir::StringType::get(typeNameOp.getContext());
+  } else {
+    auto lookupFromOp = lookupComponentNameIn(typeNameOp, name);
+    if (mlir::succeeded(lookupFromOp))
+      return lookupFromOp;
+
+    auto lookupFromMod = lookupComponentNameIn(
+        typeNameOp->getParentOfType<mlir::ModuleOp>(), name);
+    if (mlir::succeeded(lookupFromMod))
+      return lookupFromMod;
+
+    return typeNameOp.emitError() << "unrecognized type " << name;
+  }
+}
+
+inline mlir::FailureOr<mlir::Type>
+getExternRetType(Zhl::ExternOp op, mlir::ConversionPatternRewriter &rewriter) {
+
+  auto deducedType =
+      deduceTypeOfKnownExtern(op.getName(), rewriter.getContext());
+  if (mlir::succeeded(deducedType))
+    return deducedType;
+
+  auto expr = mlir::dyn_cast<Zhl::GlobalOp>(op.getReturnType().getDefiningOp());
+  if (!expr)
+    return mlir::failure();
+
+  return getTypeFromName(expr);
+}
+
 mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
     Zhl::ExternOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
@@ -400,7 +461,6 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
   if (!comp)
     return mlir::failure();
 
-  /*auto args = adaptor.getArgs();*/
   std::vector<mlir::Value> args;
   std::transform(adaptor.getArgs().begin(), adaptor.getArgs().end(),
                  std::back_inserter(args), [&](mlir::Value v) {
@@ -409,16 +469,12 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
 
   std::vector<mlir::Type> argTypes;
   for (auto arg : args) {
-    llvm::dbgs() << "arg = " << arg << "\n";
     argTypes.push_back(arg.getType());
   }
-
-  auto deducedType =
-      deduceTypeOfKnownExtern(op.getName(), rewriter.getContext());
-  auto retType = mlir::succeeded(deducedType)
-                     ? *deducedType
-                     : Zmir::PendingType::get(rewriter.getContext());
-  auto funcType = rewriter.getFunctionType(argTypes, {retType});
+  auto retType = getExternRetType(op, rewriter);
+  if (mlir::failed(retType))
+    return mlir::failure();
+  auto funcType = rewriter.getFunctionType(argTypes, {*retType});
   std::string externName(op.getName().str());
   externName += "$$extern";
   auto externDeclrResult =
@@ -439,9 +495,22 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
 mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     Zhl::LookupOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
-  rewriter.replaceOpWithNewOp<Zmir::ReadFieldOp>(
-      op, adaptor.getComponent().getType(), adaptor.getComponent(),
-      adaptor.getMember());
+  auto comp = findTypeInUseDefChain(adaptor.getComponent(), getTypeConverter());
+  auto compType = mlir::dyn_cast<Zmir::ComponentType>(comp.getType());
+  assert(compType && "expected a component type");
+  auto mod = op->getParentOfType<mlir::ModuleOp>();
+  assert(mod && "expected a module as one of the parents of the op");
+  mlir::SymbolTableCollection st;
+  auto compOp = compType.getDefinition(st, mod);
+  auto t = compOp.lookupFieldType(
+      mlir::SymbolRefAttr::get(rewriter.getStringAttr(adaptor.getMember())));
+  if (mlir::failed(t))
+    return op->emitError() << "field '" << adaptor.getMember()
+                           << "' not found for component '" << compOp.getName()
+                           << "'";
+
+  rewriter.replaceOpWithNewOp<Zmir::ReadFieldOp>(op, *t, comp,
+                                                 adaptor.getMember());
   return mlir::success();
 }
 
@@ -558,28 +627,28 @@ private:
 
   mlir::MLIRContext *getContext() { return rewriter.getContext(); }
 
-  mlir::FailureOr<mlir::Type> getTypeFromName(Zhl::GlobalOp typeNameOp) {
-    auto name = typeNameOp.getName();
-    // Simple algorithm for now
-    if (name == "Val") {
-      return Zmir::ValType::get(getContext());
-    } else if (name == "String") {
-      return Zmir::StringType::get(getContext());
-    } else {
-      auto sym = mlir::SymbolTable::lookupNearestSymbolFrom(
-          typeNameOp.getOperation(), rewriter.getStringAttr(name));
-      if (sym != nullptr) {
-        auto op = mlir::cast<Zmir::ComponentOp>(sym);
-        if (!op) {
-          return typeNameOp.emitError()
-                 << "type " << name << " is not a component";
-        }
-        return op.getType();
-      }
-
-      return typeNameOp.emitError() << "unrecognized type " << name;
-    }
-  }
+  /*mlir::FailureOr<mlir::Type> getTypeFromName(Zhl::GlobalOp typeNameOp) {*/
+  /*  auto name = typeNameOp.getName();*/
+  /*  // Simple algorithm for now*/
+  /*  if (name == "Val") {*/
+  /*    return Zmir::ValType::get(getContext());*/
+  /*  } else if (name == "String") {*/
+  /*    return Zmir::StringType::get(getContext());*/
+  /*  } else {*/
+  /*    auto sym = mlir::SymbolTable::lookupNearestSymbolFrom(*/
+  /*        typeNameOp.getOperation(), rewriter.getStringAttr(name));*/
+  /*    if (sym != nullptr) {*/
+  /*      auto op = mlir::cast<Zmir::ComponentOp>(sym);*/
+  /*      if (!op) {*/
+  /*        return typeNameOp.emitError()*/
+  /*               << "type " << name << " is not a component";*/
+  /*      }*/
+  /*      return op.getType();*/
+  /*    }*/
+  /**/
+  /*    return typeNameOp.emitError() << "unrecognized type " << name;*/
+  /*  }*/
+  /*}*/
 
   zkc::Zmir::ComponentOp createComponent() {
     auto maybeBuiltin = mlir::SymbolTable::lookupSymbolIn(

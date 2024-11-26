@@ -126,7 +126,8 @@ cc_library(
         "Dialect.h",
         "Attrs.h",
         "Ops.h",
-        "Types.h"
+        "Types.h",
+        "OpInterfaces.h"
     ],
     deps = [
         ":AttrsIncGen",
