@@ -88,14 +88,20 @@ mlir::LogicalResult Zmir::FieldDefOpLowering::matchAndRewrite(
 
 /// Inspired by FuncOp::cloneInto
 void cloneAttrsIntoZkirFunc(mlir::func::FuncOp src, zkir::FuncOp dest) {
-  // Add the attributes of this function to dest.
+  // Add the attributes of this function to dest (except visibility unless is
+  // extern).
   llvm::MapVector<mlir::StringAttr, mlir::Attribute> newAttrMap;
   for (const auto &attr : dest->getAttrs()) {
     newAttrMap.insert({attr.getName(), attr.getValue()});
   }
   for (const auto &attr : src->getAttrs()) {
+    /*if (attr.getName() == "sym_visibility")*/
+    /*  continue;*/
     newAttrMap.insert({attr.getName(), attr.getValue()});
   }
+
+  if (!newAttrMap.contains(mlir::StringAttr::get(src.getContext(), "extern")))
+    newAttrMap.erase(mlir::StringAttr::get(src.getContext(), "sym_visibility"));
 
   auto newAttrs = llvm::to_vector(llvm::map_range(
       newAttrMap, [](std::pair<mlir::StringAttr, mlir::Attribute> attrPair) {
@@ -168,7 +174,7 @@ mlir::LogicalResult Zmir::CallIndirectOpLoweringInCompute::matchAndRewrite(
   auto sym = mlir::SymbolRefAttr::get(
       comp.getAttr(), {mlir::SymbolRefAttr::get(parent.getNameAttr())});
 
-  llvm::SmallVector<mlir ::Type> types;
+  llvm::SmallVector<mlir::Type> types;
   auto convRes = getTypeConverter()->convertTypes(op.getResultTypes(), types);
   if (mlir::failed(convRes))
     return op->emitError("failed to transform zmir types into zkir types");
@@ -207,6 +213,16 @@ mlir::LogicalResult Zmir::CallIndirectOpLoweringInConstrain::matchAndRewrite(
       op.getLoc(), getTypeConverter()->convertType(compType),
       parent.getArgument(0), field);
   rewriter.replaceOp(op, fread);
+
+  auto comp = callee.getComponentAttr();
+  auto sym = mlir::SymbolRefAttr::get(
+      comp.getAttr(), {mlir::SymbolRefAttr::get(parent.getNameAttr())});
+
+  std::vector<mlir::Value> args;
+  args.push_back(fread);
+  args.insert(args.end(), adaptor.getOperands().begin() + 1,
+              adaptor.getOperands().end());
+  rewriter.create<zkir::CallOp>(op.getLoc(), sym, mlir::TypeRange(), args);
 
   return mlir::success();
 }

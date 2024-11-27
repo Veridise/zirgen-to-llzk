@@ -45,6 +45,11 @@ def Component : ZmirType<"Component", "component"> {
   
     // Verifies that this type references a valid component, relative to the given `op`.
     ::mlir::LogicalResult verifySymbol(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op);
+
+    /// Returns wether the component associated to this type is the root 'Component'
+    bool isRoot() const { return getName().getValue() == "Component"; }
+
+    static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "Component"); }
   }];
 
   let builders = [TypeBuilder<

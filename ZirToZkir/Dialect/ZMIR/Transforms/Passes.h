@@ -19,6 +19,7 @@ OpPass<mlir::func::FuncOp> createRemoveIllegalComputeOpsPass();
 OpPass<mlir::func::FuncOp> createRemoveIllegalConstrainOpsPass();
 OpPass<ComponentOp> createInsertTemporariesPass();
 OpPass<ComponentOp> createLegalizeTypesPass();
+OpPass<ComponentOp> createExpandSuperCoercionPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

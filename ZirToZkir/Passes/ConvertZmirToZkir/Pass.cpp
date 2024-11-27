@@ -53,7 +53,9 @@ createConvertZmirToZkirPass() {
 
 void ConvertZmirComponentsToZkirPass::runOnOperation() {
   auto op = getOperation();
-  op->setAttr(zkir::LANG_ATTR_NAME, mlir::UnitAttr::get(&getContext()));
+  op->setAttr(zkir::LANG_ATTR_NAME,
+              mlir::StringAttr::get(&getContext(),
+                                    zkir::ZKIRDialect::getDialectNamespace()));
 
   mlir::MLIRContext *ctx = op->getContext();
   zkir::ZKIRTypeConverter typeConverter;

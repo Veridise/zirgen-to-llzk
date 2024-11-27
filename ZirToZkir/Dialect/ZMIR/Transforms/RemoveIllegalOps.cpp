@@ -107,7 +107,19 @@ public:
   LogicalResult
   matchAndRewrite(WriteFieldOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    insertReadToReplaceUses(op, adaptor, rewriter);
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+
+  void insertReadToReplaceUses(WriteFieldOp op, OpAdaptor adaptor,
+                               ConversionPatternRewriter &rewriter) const {
+
     OpBuilder::InsertionGuard guard(rewriter);
+    /// Only insert the read op if the value is primitive
+    if (mlir::isa<ComponentType>(op.getVal().getType()))
+      return;
+
     if (auto valOp = adaptor.getVal().getDefiningOp()) {
       rewriter.setInsertionPoint(valOp);
     } else {
@@ -117,15 +129,12 @@ public:
     auto read = rewriter.create<Zmir::ReadFieldOp>(
         op.getLoc(), op.getVal().getType(), adaptor.getComponent(),
         adaptor.getFieldNameAttr());
-    rewriter.eraseOp(op);
     rewriter.replaceUsesWithIf(adaptor.getVal(), read, [](auto &operand) {
       // Replace anything but write ops since we want to get rid of them
-      auto isWriteOp = mlir::isa<WriteFieldOp>(operand.getOwner());
-      // FIXME: We still have problems with dominance here. Figure it out later.
-
-      return !isWriteOp;
+      // and changing these ops causes recursion problems with the pattern
+      // matcher.
+      return !mlir::isa<WriteFieldOp>(operand.getOwner());
     });
-    return mlir::success();
   }
 };
 
@@ -165,14 +174,12 @@ class RemoveIllegalConstrainOpsPass
   void setLegality(ConversionTarget &target) override {
     // And there's probably more
     target.addIllegalOp<WriteFieldOp, GetSelfOp, BitAndOp, InvOp>();
-    target.addIllegalOp<func::CallIndirectOp>();
+    /*target.addIllegalOp<func::CallIndirectOp>();*/
   }
 
   void addPatterns(RewritePatternSet &patterns) override {
-    patterns
-        .add<ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
-             RemoveOp<func::CallIndirectOp>, ReplaceUsesWithArg<GetSelfOp, 0>>(
-            &getContext());
+    patterns.add<ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
+                 ReplaceUsesWithArg<GetSelfOp, 0>>(&getContext());
   }
 };
 

@@ -151,40 +151,23 @@ mlir::Type SplitComponentOp::getType() {
   }
 }
 
-mlir::Type ComponentOp::getSuperType() {
-  // Special case for the root component
-  if (getSymName() == "Component")
-    return ComponentType::get(getContext(), getSymName());
-
-  mlir::SymbolTable st(this->getOperation());
-  auto *op = st.lookup("$super");
-  // If $super could not be found default to pending
-  if (!op)
-    return Zmir::PendingType::get(getContext());
-
-  auto fieldDef = mlir::dyn_cast<Zmir::FieldDefOp>(op);
-  assert(fieldDef &&
-         "expecting a field definition op to be tied to the $super symbol");
-
-  return fieldDef.getType();
+template <typename CompOp>
+mlir::FailureOr<mlir::Type> getSuperTypeCommon(CompOp &op) {
+  if (op.isRoot()) {
+    if (auto comp = mlir::dyn_cast<zkc::Zmir::ComponentType>(op.getType()))
+      return comp;
+    else
+      return mlir::failure();
+  }
+  return op.lookupFieldType(op.getSuperFieldName());
 }
 
-mlir::Type SplitComponentOp::getSuperType() {
-  // Special case for the root component
-  if (getSymName() == "Component")
-    return ComponentType::get(getContext(), getSymName());
+mlir::FailureOr<mlir::Type> ComponentOp::getSuperType() {
+  return getSuperTypeCommon(*this);
+}
 
-  mlir::SymbolTable st(this->getOperation());
-  auto *op = st.lookup("$super");
-  // If $super could not be found default to pending
-  if (!op)
-    return Zmir::PendingType::get(getContext());
-
-  auto fieldDef = mlir::dyn_cast<Zmir::FieldDefOp>(op);
-  assert(fieldDef &&
-         "expecting a field definition op to be tied to the $super symbol");
-
-  return fieldDef.getType();
+mlir::FailureOr<mlir::Type> SplitComponentOp::getSuperType() {
+  return getSuperTypeCommon(*this);
 }
 
 inline mlir::FailureOr<mlir::Type>

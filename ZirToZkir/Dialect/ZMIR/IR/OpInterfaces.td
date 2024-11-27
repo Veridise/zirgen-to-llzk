@@ -54,19 +54,29 @@ def ComponentInterface
   let methods =
       [InterfaceMethod<"Returns the type of the component", "::mlir::Type",
                        "getType", (ins)>,
-       InterfaceMethod<"Returns the type of the super component",
-                       "::mlir::Type", "getSuperType", (ins)>,
+       InterfaceMethod<"Returns the super type of the component",
+                       "::mlir::FailureOr<::mlir::Type>", "getSuperType",
+                       (ins)>,
        InterfaceMethod<"Looks up the type of a field inside the component",
                        "::mlir::FailureOr<::mlir::Type>", "lookupFieldType",
                        (ins "::mlir::FlatSymbolRefAttr":$field)>,
        InterfaceMethod<"Returns wether the component is a builtin or not",
                        "bool", "getBuiltin", (ins)>,
+       InterfaceMethod<"Returns wether the component is the root 'Component'",
+                       "bool", "isRoot", (ins)>,
        InterfaceMethod<
            "Returns the region where the component elements are defined",
            "::mlir::Region &", "getRegion", (ins)>,
        InterfaceMethod<
            "Returns whether the component has an unified body and constrains",
-           "bool", "hasUnifiedBody", (ins)>];
+           "bool", "hasUnifiedBody", (ins)>,
+       InterfaceMethod<
+           "Returns the name of the field that represents the super component",
+           "mlir::FlatSymbolRefAttr", "getSuperFieldName", (ins)>];
+
+  let extraSharedClassDeclaration = [{
+
+  }];
 }
 
 #endif // ZKIR_OP_INTERFACES

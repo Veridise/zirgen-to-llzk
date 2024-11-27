@@ -42,6 +42,7 @@ ZKC_OPT_PIPELINE = Scope(
         Pass("insert-temporaries"),
         Scope("func.func", Pass("lower-builtins")),
         Pass("legalize-types"),
+        Pass("super-coercion"),
     ),
     Pass("remove-builtins"),
     Pass("split-component-body"),

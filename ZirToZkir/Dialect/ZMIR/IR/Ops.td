@@ -46,7 +46,7 @@ class ComponentOpBase<string prefix, string bodyFuncName,
   let extraClassDeclaration = [{
     /// Returns the type of the component.
     ::mlir::Type getType();
-    ::mlir::Type getSuperType();
+    ::mlir::FailureOr<::mlir::Type> getSuperType();
     ::mlir::FailureOr<::mlir::Type> lookupFieldType(mlir::FlatSymbolRefAttr);
 
     /// Returns the name of the function that represents the body of a component.
@@ -54,6 +54,10 @@ class ComponentOpBase<string prefix, string bodyFuncName,
     static constexpr std::string_view getConstrainFuncName() { return "}]#constrainFuncName#[{"; }
 
     static constexpr bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
+
+    mlir::FlatSymbolRefAttr getSuperFieldName() { return mlir::FlatSymbolRefAttr::get(mlir::StringAttr::get(getContext(), "$super")); }
+
+    bool isRoot() { return getSymName() == "Component"; }
   }];
 
   let assemblyFormat = [{
