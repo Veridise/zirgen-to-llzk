@@ -144,6 +144,15 @@ using LowerInv = LowerArithBuiltIns<Zmir::InvOp, zkir::InvFeltOp>;
 // TODO LowerIsz
 using LowerNeg = LowerArithBuiltIns<Zmir::NegOp, zkir::NegFeltOp>;
 
+class LowerIsz : public mlir::OpConversionPattern<IsZeroOp> {
+public:
+  using mlir::OpConversionPattern<IsZeroOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(IsZeroOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
 class LowerReadFieldOp : public mlir::OpConversionPattern<ReadFieldOp> {
 public:
   using mlir::OpConversionPattern<ReadFieldOp>::OpConversionPattern;
@@ -168,6 +177,24 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(InRangeOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerNewArrayOp : public mlir::OpConversionPattern<NewArrayOp> {
+public:
+  using mlir::OpConversionPattern<NewArrayOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(NewArrayOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerReadArrayOp : public mlir::OpConversionPattern<ReadArrayOp> {
+public:
+  using mlir::OpConversionPattern<ReadArrayOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(ReadArrayOp, OpAdaptor,
                   mlir::ConversionPatternRewriter &) const override;
 };
 

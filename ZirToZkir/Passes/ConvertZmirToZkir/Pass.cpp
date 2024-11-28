@@ -30,19 +30,24 @@ void ConvertZmirToZkirPass::runOnOperation() {
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 
-  patterns.add<LitValOpLowering, GetSelfOpLowering>(typeConverter, ctx);
+  patterns
+      .add<LitValOpLowering, GetSelfOpLowering, LowerBitAnd, LowerAdd, LowerSub,
+           LowerMul, LowerInv, LowerIsz, LowerNeg, LowerConstrainOp,
+           LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp>(
+          typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                         zkir::ZKIRDialect>();
+  target.addLegalDialect<zkir::ZKIRDialect, mlir::arith::ArithDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
+  target.addIllegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
 
-  target.addIllegalOp<LitValOp, GetSelfOp>();
+  target.addIllegalOp<LitValOp, GetSelfOp, BitAndOp, AddOp, SubOp, MulOp, InvOp,
+                      IsZeroOp, NegOp, ReadFieldOp, ConstrainOp, InRangeOp,
+                      NewArrayOp, ReadArrayOp>();
 
   // Call partialTransformation
-  if (mlir::failed(
-          mlir::applyPartialConversion(op, target, std::move(patterns))))
+  if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))))
     signalPassFailure();
 }
 
@@ -66,9 +71,7 @@ void ConvertZmirComponentsToZkirPass::runOnOperation() {
       .add<ComponentLowering, FieldDefOpLowering, FuncOpLowering,
            ReturnOpLowering, CallOpLowering, CallIndirectOpLoweringInCompute,
            CallIndirectOpLoweringInConstrain, WriteFieldOpLowering,
-           RemoveConstructorRefOp, LowerBitAnd, LowerAdd, LowerSub, LowerMul,
-           LowerInv, LowerNeg, LowerConstrainOp, LowerReadFieldOp,
-           LowerInRangeOp>(typeConverter, ctx);
+           RemoveConstructorRefOp>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
@@ -76,11 +79,9 @@ void ConvertZmirComponentsToZkirPass::runOnOperation() {
                          zkir::ZKIRDialect, mlir::arith::ArithDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
 
-  target
-      .addIllegalOp<ComponentOp, SplitComponentOp, FieldDefOp, func::FuncOp,
-                    func::ReturnOp, func::CallOp, func::CallIndirectOp,
-                    WriteFieldOp, ConstructorRefOp, BitAndOp, AddOp, SubOp,
-                    MulOp, InvOp, NegOp, ReadFieldOp, ConstrainOp, InRangeOp>();
+  target.addIllegalOp<ComponentOp, SplitComponentOp, FieldDefOp, func::FuncOp,
+                      func::ReturnOp, func::CallOp, func::CallIndirectOp,
+                      WriteFieldOp, ConstructorRefOp>();
   // Call partialTransformation
   if (mlir::failed(
           mlir::applyPartialConversion(op, target, std::move(patterns))))

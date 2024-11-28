@@ -35,8 +35,8 @@ void ConvertZhlToZmirPass::runOnOperation() {
 
   patterns.add<ZhlLiteralLowering, ZhlDefineLowering, ZhlConstructLowering,
                ZhlConstrainLowering, ZhlSuperLowering, ZhlGlobalRemoval,
-               ZhlDeclarationRemoval, ZhlLookupLowering, ZhlExternLowering>(
-      typeConverter, ctx);
+               ZhlDeclarationRemoval, ZhlLookupLowering, ZhlExternLowering,
+               ZhlArrayLowering, ZhlSubscriptLowering>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
@@ -44,11 +44,11 @@ void ConvertZhlToZmirPass::runOnOperation() {
                          zirgen::Zhl::ZhlDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
 
-  target.addIllegalOp<zirgen::Zhl::DefinitionOp, zirgen::Zhl::ConstructOp,
-                      zirgen::Zhl::LiteralOp, zirgen::Zhl::ConstraintOp,
-                      zirgen::Zhl::SuperOp, zirgen::Zhl::GlobalOp,
-                      zirgen::Zhl::DeclarationOp, zirgen::Zhl::LookupOp,
-                      zirgen::Zhl::ExternOp>();
+  target.addIllegalOp<
+      zirgen::Zhl::DefinitionOp, zirgen::Zhl::ConstructOp,
+      zirgen::Zhl::LiteralOp, zirgen::Zhl::ConstraintOp, zirgen::Zhl::SuperOp,
+      zirgen::Zhl::GlobalOp, zirgen::Zhl::DeclarationOp, zirgen::Zhl::LookupOp,
+      zirgen::Zhl::ExternOp, zirgen::Zhl::ArrayOp, zirgen::Zhl::SubscriptOp>();
 
   // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))))

@@ -40,15 +40,12 @@ mlir::Value findTypeInUseDefChain(mlir::Value v,
   return v;
 }
 
-mlir::ValueRange findTypesInUseDefChain(mlir::ValueRange r,
-                                        const mlir::TypeConverter *converter) {
-  llvm::SmallVector<mlir::Value> results;
-
+void findTypesInUseDefChain(mlir::ValueRange r,
+                            const mlir::TypeConverter *converter,
+                            llvm::SmallVector<mlir::Value> &results) {
   std::transform(
       r.begin(), r.end(), std::back_inserter(results),
       [&](mlir::Value v) { return findTypeInUseDefChain(v, converter); });
-
-  return results;
 }
 
 ///////////////////////////////////////////////////////////
@@ -521,9 +518,15 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
 mlir::LogicalResult ZhlSubscriptLowering::matchAndRewrite(
     Zhl::SubscriptOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
-  rewriter.replaceOpWithNewOp<Zmir::ReadArrayOp>(
-      op, adaptor.getArray().getType(), adaptor.getArray(),
-      adaptor.getElement());
+  auto arr = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());
+  auto elem = findTypeInUseDefChain(adaptor.getElement(), getTypeConverter());
+  if (auto arrType = mlir::dyn_cast<Zmir::ArrayType>(arr.getType())) {
+    rewriter.replaceOpWithNewOp<Zmir::ReadArrayOp>(op, arrType.getInnerType(),
+                                                   arr, elem);
+  } else {
+    rewriter.replaceOpWithNewOp<Zmir::ReadArrayOp>(op, arr.getType(), arr,
+                                                   elem);
+  }
   return mlir::success();
 }
 
@@ -541,12 +544,14 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
                                  rewriter.getIndexAttr(0)));
     return mlir::success();
   }
+
+  llvm::SmallVector<mlir::Value> args;
+  findTypesInUseDefChain(adaptor.getElements(), getTypeConverter(), args);
   rewriter.replaceOpWithNewOp<Zmir::NewArrayOp>(
       op,
-      Zmir::ArrayType::get(rewriter.getContext(),
-                           adaptor.getElements().getType().front(),
+      Zmir::ArrayType::get(rewriter.getContext(), args.front().getType(),
                            rewriter.getIndexAttr(adaptor.getElements().size())),
-      adaptor.getElements());
+      args);
   return mlir::success();
 }
 

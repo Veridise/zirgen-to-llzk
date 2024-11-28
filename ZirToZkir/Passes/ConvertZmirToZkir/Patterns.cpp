@@ -51,7 +51,6 @@ mlir::LogicalResult Zmir::ComponentLowering::matchAndRewrite(
       op, op.getNameAttr(),
       op.getConstParams().has_value() ? *op.getConstParams()
                                       : rewriter.getArrayAttr({}));
-  mlir::ModuleOp mod = op->getParentOfType<mlir::ModuleOp>();
   {
     mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
     auto *block = rewriter.createBlock(&newOp.getRegion());
@@ -274,5 +273,42 @@ mlir::LogicalResult Zmir::LowerInRangeOp::matchAndRewrite(
   auto conv = rewriter.create<zkir::FeltFromIntOp>(op.getLoc(), mul);
   rewriter.replaceOp(op, conv);
 
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerNewArrayOp::matchAndRewrite(
+    Zmir::NewArrayOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  rewriter.replaceOpWithNewOp<zkir::CreateArrayOp>(
+      op, getTypeConverter()->convertType(op.getType()), adaptor.getElements());
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerReadArrayOp::matchAndRewrite(
+    Zmir::ReadArrayOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  llvm::SmallVector<mlir::Value> toIndexOps;
+  std::transform(adaptor.getIndices().begin(), adaptor.getIndices().end(),
+                 std::back_inserter(toIndexOps), [&](mlir::Value index) {
+                   return rewriter.create<zkir::FeltToIndexOp>(op.getLoc(),
+                                                               index);
+                 });
+  rewriter.replaceOpWithNewOp<zkir::ReadArrayOp>(
+      op, getTypeConverter()->convertType(op.getType()), adaptor.getLvalue(),
+      toIndexOps);
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerIsz::matchAndRewrite(
+    Zmir::IsZeroOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  auto zero = rewriter.create<zkir::FeltConstantOp>(
+      op.getLoc(),
+      zkir::FeltConstAttr::get(getContext(), mlir::APInt::getZero(1)));
+  auto cmpOp = rewriter.create<zkir::CmpOp>(
+      op.getLoc(),
+      zkir::FeltCmpPredicateAttr::get(getContext(), zkir::FeltCmpPredicate::EQ),
+      adaptor.getIn(), zero);
+  rewriter.replaceOpWithNewOp<zkir::FeltFromIntOp>(op, cmpOp);
   return mlir::success();
 }

@@ -218,7 +218,7 @@ def NewArrayOp
 ]> {
   let summary = "creates a new array with data";
 
-  let arguments = (ins Variadic<AnyNonPendingZmirType>:$elements);
+  let arguments = (ins Variadic<AnyZmirType>:$elements);
   let results = (outs Array:$result);
 
   let assemblyFormat = "$elements attr-dict `:` type($result)";
@@ -257,8 +257,8 @@ def AllocArrayOp : ZmirOp<"alloc_array"> {
 def ReadArrayOp : ZmirOp<"read_array"> {
   let summary = "read data from an array";
 
-  let arguments = (ins Array:$lvalue, Variadic<AnyType>:$indices);
-  let results = (outs AnyNonPendingZmirType:$result);
+  let arguments = (ins PendingOf<Array>:$lvalue, Variadic<AnyType>:$indices);
+  let results = (outs AnyZmirType:$result);
 
   let assemblyFormat = [{
     $lvalue `[` $indices `]` attr-dict `:` type($lvalue) `[` type($indices) `]` `,` type($result)

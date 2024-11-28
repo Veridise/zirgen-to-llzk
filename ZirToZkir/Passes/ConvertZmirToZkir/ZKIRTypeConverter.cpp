@@ -31,6 +31,11 @@ zkir::ZKIRTypeConverter::ZKIRTypeConverter() {
     return zkir::StructType::get(t.getContext(), t.getName());
   });
 
+  addConversion([&](Zmir::ArrayType t) {
+    return zkir::ArrayType::get(t.getContext(), convertType(t.getInnerType()),
+                                {t.getSizeInt()});
+  });
+
   addConversion(
       [](Zmir::StringType t) { return zkir::StringType::get(t.getContext()); });
 
