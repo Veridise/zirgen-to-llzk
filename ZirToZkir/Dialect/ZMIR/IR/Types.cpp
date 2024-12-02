@@ -9,6 +9,8 @@
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
 
+#include "ZirToZkir/Dialect/ZMIR/IR/TypeInterfaces.inc.cpp"
+
 namespace zkc::Zmir {
 
 bool isValidZmirType(mlir::Type type) {
@@ -86,21 +88,32 @@ ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable,
   return mlir::dyn_cast<ComponentInterface>(comp);
 }
 
-mlir::LogicalResult
-ArrayType::verify(llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
-                  mlir::Type elementType, mlir::Attribute size) {
+mlir::LogicalResult BoundedArrayType::verify(
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
+    mlir::Type elementType, mlir::Attribute size) {
   auto typeRes = checkValidZmirType(emitError, elementType);
   auto sizeRes = checkValidConstParam(emitError, size);
 
   return mlir::success(mlir::succeeded(typeRes) && mlir::succeeded(sizeRes));
 }
 
-uint64_t ArrayType::getSizeInt() {
+int64_t BoundedArrayType::getSizeInt() {
   if (llvm::isa<mlir::IntegerAttr>(getSize())) {
     mlir::IntegerAttr i = llvm::cast<mlir::IntegerAttr>(getSize());
     return i.getValue().getZExtValue();
   }
   return 0;
+}
+
+mlir::LogicalResult UnboundedArrayType::verify(
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Type type) {
+  return checkValidZmirType(emitError, type);
+}
+
+mlir::Attribute UnboundedArrayType::getSize() {
+  return mlir::IntegerAttr::get(
+      mlir::IntegerType::get(getContext(), 64, mlir::IntegerType::Signed),
+      getSizeInt());
 }
 
 } // namespace zkc::Zmir

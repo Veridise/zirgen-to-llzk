@@ -187,7 +187,8 @@ void addArrayComponent(BuildContext &ctx) {
     auto componentType = ComponentType::get(ctx.builder.getContext(),
                                             op.getSymName(), {symT}, {sizeVar});
     auto typeVar = TypeVarType::get(ctx.builder.getContext(), symT);
-    auto type = ArrayType::get(ctx.builder.getContext(), typeVar, sizeVar);
+    auto type =
+        BoundedArrayType::get(ctx.builder.getContext(), typeVar, sizeVar);
     // Special register where results are stored
     ctx.builder.create<FieldDefOp>(ctx.unk, "$super", type);
 

@@ -2,32 +2,60 @@ import argparse
 import os
 import shlex
 import sys
-from subprocess import PIPE, Popen
-from typing import Optional
+from subprocess import DEVNULL, PIPE, Popen
+from typing import Optional, Protocol
 
 WS = os.path.dirname(__file__)
 ZIRGEN = os.path.join(WS, "../external/zirgen/zirgen/dsl/zirgen")
 ZKC_OPT = os.path.join(WS, "../ZirToZkir/tools/zkc-opt")
 
 
-class Pipeline: ...
+class Pipeline(Protocol):
+    def stop_at(self, name: str): ...
+
+    def is_stop_point(self) -> bool: ...
 
 
 class Scope(Pipeline):
-    def __init__(self, name, *passes):
+    def __init__(self, name: str, *passes):
         self.name = name
-        self.passes = passes
+        self.all_passes = passes
+        self.stop_point = None
+
+    @property
+    def passes(self):
+        if self.stop_point is None:
+            yield from self.all_passes
+        for p in self.all_passes:
+            yield p
+            if p.is_stop_point():
+                break
 
     def __str__(self) -> str:
         return f"{self.name}({','.join(str(p) for p in self.passes)})"
 
+    def stop_at(self, name: str):
+        self.stop_point = name
+        for p in self.all_passes:
+            p.stop_at(name)
+
+    def is_stop_point(self) -> bool:
+        return any(p.is_stop_point() for p in self.all_passes)
+
 
 class Pass(Pipeline):
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
+        self.stop_point = None
 
     def __str__(self) -> str:
         return self.name
+
+    def stop_at(self, name: str):
+        self.stop_point = name
+
+    def is_stop_point(self) -> bool:
+        return self.name == self.stop_point
 
 
 ZKC_OPT_PIPELINE = Scope(
@@ -35,10 +63,11 @@ ZKC_OPT_PIPELINE = Scope(
     Pass("strip-tests"),
     Pass("strip-directives"),
     Pass("inject-builtins"),
-    Pass("transform-component-decls"),
+    Pass("zhl-components-to-zmir"),
     Scope(
         "zmir.component",
         Pass("zhl-to-zmir"),
+        Pass("zhl-to-scf"),
         Pass("insert-temporaries"),
         Scope("func.func", Pass("lower-builtins")),
         Pass("legalize-types"),
@@ -74,9 +103,14 @@ class ZkcOpt:
         self.debug_only = None
         self.additional_args = None
         self.output_filename = None
+        self.dump_pipeline = False
 
     def set_pipeline(self, pipeline: Pipeline):
         self.pipeline = pipeline
+        return self
+
+    def set_dump_pipeline(self, dump: bool):
+        self.dump_pipeline = dump
         return self
 
     def dump_ir(self, dump, as_tree=False):
@@ -110,6 +144,9 @@ class ZkcOpt:
     def run(self, input):
         assert self.pipeline is not None
         cmd = [ZKC_OPT, f"--pass-pipeline={self.pipeline}"]
+        if self.dump_pipeline:
+            cmd.append("--dump-pass-pipeline")
+            return Popen(cmd, stdin=DEVNULL)
         if self.dump_ir_after_failure:
             cmd.append("--mlir-print-ir-after-failure")
             if self.dump_ir_as_tree:
@@ -171,12 +208,14 @@ def main():
     parser.add_argument("filename")
     parser.add_argument("-o", "--output")
     parser.add_argument("--dump", action="store_true")
+    parser.add_argument("--dump-pipeline", action="store_true")
     parser.add_argument("--dump-as-tree", action="store_true")
     parser.add_argument("--enable-threading", action="store_true")
     parser.add_argument("--debug-dialect-conversion", action="store_true")
     parser.add_argument("--zirgen-args")
     parser.add_argument("--zkc-opt-args")
     parser.add_argument("--zkc-opt-help", action="store_true")
+    parser.add_argument("--stop-at")
     args = parser.parse_args()
     basedir = os.path.dirname(args.filename)
 
@@ -184,6 +223,9 @@ def main():
         with Popen([ZKC_OPT, "--help"]) as opt:
             opt.wait()
             return
+
+    if args.stop_at:
+        ZKC_OPT_PIPELINE.stop_at(args.stop_at)
 
     extra_zirgen_args = shlex.split(args.zirgen_args) if args.zirgen_args else []
 
@@ -200,6 +242,7 @@ def main():
             ZkcOpt()
             .set_pipeline(ZKC_OPT_PIPELINE)
             .dump_ir(args.dump)
+            .set_dump_pipeline(args.dump_pipeline)
             .dump_as_tree(args.dump_as_tree)
             .set_disable_threading(not args.enable_threading)
             .set_additional_args(args.zkc_opt_args)

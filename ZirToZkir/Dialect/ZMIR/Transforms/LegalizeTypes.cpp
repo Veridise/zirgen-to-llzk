@@ -15,6 +15,7 @@
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/Pass/Pass.h>
+#include <utility>
 
 using namespace mlir;
 
@@ -124,17 +125,146 @@ public:
   }
 };
 
+class UpdateFieldType : public OpConversionPattern<FieldDefOp> {
+public:
+  template <typename... Args>
+  UpdateFieldType(ComponentOp component, SymbolTableCollection &st,
+                  Operation *stRoot, Args &&...args)
+      : OpConversionPattern<FieldDefOp>(std::forward<Args>(args)...), st(st),
+        stRoot(stRoot), component(component) {}
+
+  LogicalResult
+  matchAndRewrite(FieldDefOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type> types;
+    collectWriteTypes(op.getName(), types);
+
+    // FIXME: It would be more correct to select the least general type
+    // But it is easier with the current implementation to default to either a
+    // primitive or the root component.
+    if (types.empty())
+      return failure();
+
+    auto type = selectType(types.front());
+    if (failed(type))
+      return op.emitOpError()
+             << "could not obtain a type for field '" << op.getName() << "'";
+
+    rewriter.replaceOpWithNewOp<FieldDefOp>(op, adaptor.getSymNameAttr(),
+                                            TypeAttr::get(*type));
+
+    return success();
+  }
+
+private:
+  FailureOr<Type> selectType(Type type) const {
+    if (auto compType = mlir::dyn_cast<ComponentType>(type)) {
+      if (compType.isRoot())
+        return compType;
+      auto comp = compType.getDefinition(st, stRoot);
+      auto t = comp.getSuperType();
+      if (failed(t))
+        return t;
+      return selectType(*t);
+    }
+
+    return type;
+  }
+
+  func::FuncOp getBody() const {
+    // Interface methods cannot be made const so I have to resort to this
+    return const_cast<ComponentOp *>(&component)->getBodyFunc();
+  }
+
+  void collectWriteTypes(StringRef fieldName, SmallVector<Type> &types) const {
+    getBody().walk([&](WriteFieldOp write) {
+      if (write.getFieldName() == fieldName)
+        types.push_back(
+            findTypeInUseDefChain(write.getVal(), getTypeConverter())
+                .getType());
+    });
+  }
+
+  SymbolTableCollection &st;
+  Operation *stRoot;
+  ComponentOp component;
+};
+
+class LegalizeExecuteRegionOp
+    : public OpConversionPattern<scf::ExecuteRegionOp> {
+public:
+  using OpConversionPattern<scf::ExecuteRegionOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::ExecuteRegionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (op.getResults().size() != 1)
+      return failure();
+    SmallVector<Type> types;
+    op.walk([&](scf::YieldOp yield) {
+      assert(yield.getResults().size() == 1);
+      types.push_back(
+          findTypeInUseDefChain(yield.getResults().front(), getTypeConverter())
+              .getType());
+    });
+
+    for (auto t : types) {
+      llvm::dbgs() << "Type: " << t << "\n";
+    }
+
+    assert(!types.empty());
+    rewriter.modifyOpInPlace(op,
+                             [&]() { op.getResult(0).setType(types.front()); });
+    /*auto newExec = rewriter.replaceOpWithNewOp<scf::ExecuteRegionOp>(op,
+     * types);*/
+    /*rewriter.inlineRegionBefore(op.getRegion(), newExec.getRegion(),*/
+    /*                            newExec.getRegion().end());*/
+
+    /*llvm::dbgs() << newExec << "\n";*/
+    return success();
+  }
+};
+
+class LegalizeWriteArrayOp : public OpConversionPattern<WriteArrayOp> {
+public:
+  using OpConversionPattern<WriteArrayOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(WriteArrayOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto arr = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());
+    auto arrType = dyn_cast<ArrayType>(arr.getType());
+    assert(arrType);
+
+    auto cast = rewriter.create<UnrealizedConversionCastOp>(
+        op.getLoc(), TypeRange(arrType.getInnerType()),
+        ValueRange(adaptor.getValue()));
+    rewriter.replaceOpWithNewOp<WriteArrayOp>(op, arr, adaptor.getIndices(),
+                                              cast.getResult(0));
+    return success();
+  }
+};
+
 class LegalizeTypesPass : public LegalizeTypesBase<LegalizeTypesPass> {
 
   void runOnOperation() override {
-
+    SymbolTableCollection st;
     auto op = getOperation();
 
     ZMIRTypeConverter typeConverter;
     mlir::MLIRContext *ctx = op->getContext();
     mlir::RewritePatternSet patterns(ctx);
 
-    patterns.add<FoldUnrealizedCasts>(typeConverter, ctx);
+    auto mod = op->getParentOfType<ModuleOp>();
+    if (!mod) {
+      op.emitOpError("could not obtain the module from the component");
+      signalPassFailure();
+      return;
+    }
+    patterns.add<UpdateFieldType>(op, st, mod.getOperation(), typeConverter,
+                                  ctx);
+    patterns.add<FoldUnrealizedCasts, LegalizeExecuteRegionOp,
+                 LegalizeWriteArrayOp>(typeConverter, ctx);
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
@@ -194,8 +324,10 @@ class LegalizeTypesPass : public LegalizeTypesBase<LegalizeTypesPass> {
     };
     target.addDynamicallyLegalOp<mlir::UnrealizedConversionCastOp>(
         legalIfNoPendingTypes);
-    target.addDynamicallyLegalDialect<ZmirDialect, mlir::func::FuncDialect>(
-        legalIfNoPendingTypes);
+    target.addDynamicallyLegalDialect<ZmirDialect, mlir::func::FuncDialect,
+                                      scf::SCFDialect>(legalIfNoPendingTypes);
+    target.addLegalDialect<index::IndexDialect>(); // These will never hold a
+                                                   // pending type
 
     // Call partialTransformation
     if (mlir::failed(

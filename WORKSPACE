@@ -6,7 +6,7 @@ load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 ZIRGEN_COMMIT = "91b3abdb1778f0089f5f07119c5d57b5477d8bcf"
 ZIRGEN_SHA256 = "f7bc4f3dd192247905c7be86bae64fa66b4fcb7812e0a247a79aad46a69c5693"
-ZKIR_COMMIT = "72643a475f5609a56fe2c06b63ba7f74a6f3ae30"
+ZKIR_COMMIT = "68f9042191035b5d564eb6504d190ebd142726ad"
 
 http_archive(
   name = "zirgen",

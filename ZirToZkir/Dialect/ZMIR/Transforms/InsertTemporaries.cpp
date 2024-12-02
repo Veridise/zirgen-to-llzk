@@ -54,12 +54,30 @@ class InsertTemporariesPass
     op->setAttr("writes_into", name.getAttr());
   }
 
-  void runOnOperation() override {
-    auto op = getOperation();
+  template <typename Arr>
+  void createTempFieldWrite(Arr op, mlir::OpBuilder &builder) {
 
+    builder.setInsertionPointAfter(op);
+    auto name =
+        createTempField(op->getLoc(), op.getResult().getType(), builder);
+    auto self =
+        builder.create<GetSelfOp>(op.getLoc(), getOperation().getType());
+    builder.create<WriteFieldOp>(op->getLoc(), self, name, op);
+  }
+
+  void runOnOperation() override {
     mlir::OpBuilder builder(&getContext());
-    op.walk([&](mlir::func::CallIndirectOp constructorCall) {
+
+    getOperation().walk([&](mlir::func::CallIndirectOp constructorCall) {
       createTempFieldWrite(constructorCall, builder);
+    });
+
+    getOperation().walk([&](Zmir::AllocArrayOp alloc) {
+      createTempFieldWrite(alloc, builder);
+    });
+
+    getOperation().walk([&](Zmir::NewArrayOp newArr) {
+      createTempFieldWrite(newArr, builder);
     });
   }
 };

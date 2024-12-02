@@ -33,18 +33,22 @@ void ConvertZmirToZkirPass::runOnOperation() {
   patterns
       .add<LitValOpLowering, GetSelfOpLowering, LowerBitAnd, LowerAdd, LowerSub,
            LowerMul, LowerInv, LowerIsz, LowerNeg, LowerConstrainOp,
-           LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp>(
+           LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp,
+           LowerAllocArrayOp, LowerArrayLengthOp, LowerIndexToValOp,
+           LowerValToIndexOp, LowerWriteArrayOp, WriteFieldOpLowering>(
           typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<zkir::ZKIRDialect, mlir::arith::ArithDialect>();
+  target.addLegalDialect<zkir::ZKIRDialect, mlir::arith::ArithDialect,
+                         index::IndexDialect, scf::SCFDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
   target.addIllegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
 
   target.addIllegalOp<LitValOp, GetSelfOp, BitAndOp, AddOp, SubOp, MulOp, InvOp,
                       IsZeroOp, NegOp, ReadFieldOp, ConstrainOp, InRangeOp,
-                      NewArrayOp, ReadArrayOp>();
+                      NewArrayOp, ReadArrayOp, AllocArrayOp, GetArrayLenOp,
+                      IndexToValOp, ValToIndexOp, WriteArrayOp, WriteFieldOp>();
 
   // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))))
@@ -76,15 +80,15 @@ void ConvertZmirComponentsToZkirPass::runOnOperation() {
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                         zkir::ZKIRDialect, mlir::arith::ArithDialect>();
-  target.addLegalOp<mlir::UnrealizedConversionCastOp>();
+                         zkir::ZKIRDialect, mlir::arith::ArithDialect,
+                         index::IndexDialect, scf::SCFDialect>();
+  target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
   target.addIllegalOp<ComponentOp, SplitComponentOp, FieldDefOp, func::FuncOp,
                       func::ReturnOp, func::CallOp, func::CallIndirectOp,
                       WriteFieldOp, ConstructorRefOp>();
   // Call partialTransformation
-  if (mlir::failed(
-          mlir::applyPartialConversion(op, target, std::move(patterns))))
+  if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))))
     signalPassFailure();
 }
 

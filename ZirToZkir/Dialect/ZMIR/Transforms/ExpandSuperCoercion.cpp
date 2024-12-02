@@ -220,7 +220,8 @@ class ExpandSuperCoercionPass
     target.addLegalOp<mlir::ModuleOp>();
     target.addDynamicallyLegalOp<mlir::UnrealizedConversionCastOp>(
         doesntHaveForcedConversion);
-    target.addLegalDialect<ZmirDialect, mlir::func::FuncDialect>();
+    target.addLegalDialect<ZmirDialect, mlir::func::FuncDialect,
+                           index::IndexDialect, scf::SCFDialect>();
 
     // Call partialTransformation
     if (mlir::failed(

@@ -3,6 +3,7 @@
 include "mlir/IR/AttrTypeBase.td"
 include "ZirToZkir/Dialect/ZMIR/IR/Dialect.td"
 include "ZirToZkir/Dialect/ZMIR/IR/Attrs.td"
+include "ZirToZkir/Dialect/ZMIR/IR/TypeInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class ZmirType<string name, string typeMnemonic, list<Trait> traits = []>
@@ -67,14 +68,26 @@ def Component : ZmirType<"Component", "component"> {
   let genVerifyDecl = 1;
 }
 
-def Array : ZmirType<"Array", "array", []> {
+def BoundedArray : ZmirType<"BoundedArray", "array", [Array]> {
   let summary = "array type";
   let parameters = (ins "::mlir::Type":$inner_type, "::mlir::Attribute":$size);
   let assemblyFormat = [{ `<` $inner_type `,` $size `>`}];
   let genVerifyDecl = 1;
 
   let extraClassDeclaration = [{
-    uint64_t getSizeInt();
+    int64_t getSizeInt();
+  }];
+}
+
+def UnboundedArray : ZmirType<"UnboundedArray", "uarray", [Array]> {
+  let summary = "unbounded array type";
+  let parameters = (ins "::mlir::Type":$inner_type);
+  let assemblyFormat = "`<` $inner_type `>`";
+  let genVerifyDecl = 1;
+
+  let extraClassDeclaration = [{
+    int64_t getSizeInt() { return -1; }
+    mlir::Attribute getSize();
   }];
 }
 

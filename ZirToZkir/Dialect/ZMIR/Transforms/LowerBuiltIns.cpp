@@ -121,7 +121,8 @@ class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
-    target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
+    target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
+                           mlir::index::IndexDialect, mlir::scf::SCFDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
     target.addDynamicallyLegalOp<func::CallIndirectOp>(isLegalCallIndirect);

@@ -14,6 +14,8 @@ bool isValidZmirType(mlir::Type);
 
 }
 
+#include "ZirToZkir/Dialect/ZMIR/IR/TypeInterfaces.inc.h"
+
 // forward-declare ops
 #define GET_OP_FWD_DEFINES
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.inc.h"

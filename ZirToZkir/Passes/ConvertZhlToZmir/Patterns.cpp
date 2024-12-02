@@ -10,43 +10,15 @@
 #include <functional>
 #include <iterator>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/Index/IR/IndexAttrs.h>
+#include <mlir/Dialect/Index/IR/IndexOps.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
 #include <vector>
 
 using namespace zirgen;
 using namespace zkc;
-
-/// Climbs the use def chain until it finds a
-/// value that is not defined by an unrealized cast
-/// and that is a legal type. Returns that type.
-/// If that doesn't happen returns the initial type.
-mlir::Value findTypeInUseDefChain(mlir::Value v,
-                                  const mlir::TypeConverter *converter) {
-  mlir::Value cur = v;
-  while (cur.getDefiningOp() &&
-         mlir::isa<mlir::UnrealizedConversionCastOp>(cur.getDefiningOp())) {
-    auto ops = cur.getDefiningOp()->getOperands();
-    if (ops.size() != 1) {
-      return v; // Give up if multiple operands
-    }
-    cur = ops[0];
-  }
-
-  if (Zmir::isValidZmirType(cur.getType()) &&
-      converter->isLegal(cur.getType())) {
-    return cur;
-  }
-  return v;
-}
-
-void findTypesInUseDefChain(mlir::ValueRange r,
-                            const mlir::TypeConverter *converter,
-                            llvm::SmallVector<mlir::Value> &results) {
-  std::transform(
-      r.begin(), r.end(), std::back_inserter(results),
-      [&](mlir::Value v) { return findTypeInUseDefChain(v, converter); });
-}
 
 ///////////////////////////////////////////////////////////
 /// Cast folding
@@ -338,7 +310,7 @@ mlir::FailureOr<mlir::Type> deduceTypeOfKnownExtern(mlir::StringRef name,
   return mlir::failure();
 }
 
-mlir::LogicalResult ZhlSuperLowering::matchAndRewrite(
+mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
     zirgen::Zhl::SuperOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
   if (!mlir::isa<mlir::func::FuncOp>(op->getParentOp()))
@@ -539,9 +511,9 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
     mlir::ConversionPatternRewriter &rewriter) const {
   if (adaptor.getElements().empty()) {
     rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(
-        op, Zmir::ArrayType::get(rewriter.getContext(),
-                                 Zmir::PendingType::get(rewriter.getContext()),
-                                 rewriter.getIndexAttr(0)));
+        op, Zmir::UnboundedArrayType::get(
+                rewriter.getContext(),
+                Zmir::PendingType::get(rewriter.getContext())));
     return mlir::success();
   }
 
@@ -549,8 +521,9 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   findTypesInUseDefChain(adaptor.getElements(), getTypeConverter(), args);
   rewriter.replaceOpWithNewOp<Zmir::NewArrayOp>(
       op,
-      Zmir::ArrayType::get(rewriter.getContext(), args.front().getType(),
-                           rewriter.getIndexAttr(adaptor.getElements().size())),
+      Zmir::BoundedArrayType::get(
+          rewriter.getContext(), args.front().getType(),
+          rewriter.getIndexAttr(adaptor.getElements().size())),
       args);
   return mlir::success();
 }
@@ -709,12 +682,12 @@ private:
     auto &entryBlock = bodyOp.front();
     entryBlock.addArguments(argTypes, arity.locs);
 
-    // Fill out prologue
-    auto *prologue = bodyOp.addBlock();
-    fillPrologue(prologue, newOp, rewriter);
+    // Fill out epilogue
+    auto *epilogue = bodyOp.addBlock();
+    fillEpilogue(epilogue, newOp, rewriter);
   }
 
-  void fillPrologue(mlir::Block *block, zkc::Zmir::ComponentOp newOp,
+  void fillEpilogue(mlir::Block *block, zkc::Zmir::ComponentOp newOp,
                     mlir::ConversionPatternRewriter &rewriter) {
     mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
     rewriter.setInsertionPointToEnd(block);
@@ -735,4 +708,152 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     mlir::ConversionPatternRewriter &rewriter) const {
   ZhlCompToZmirCompPatternImpl impl(op, adaptor, rewriter);
   return impl.matchAndRewrite();
+}
+
+///////////////////////////////////////////////////////////
+/// ZhlRangeOpLowering
+///////////////////////////////////////////////////////////
+
+mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
+    Zhl::RangeOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  // Allocate an unbounded array of vals
+  auto arrAlloc = rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(
+      op,
+      Zmir::UnboundedArrayType::get(rewriter.getContext(),
+                                    Zmir::ValType::get(rewriter.getContext())));
+  // Create a for loop op using the operands as bounds
+  auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
+  auto start = rewriter.create<Zmir::ValToIndexOp>(
+      op.getStart().getLoc(),
+      findTypeInUseDefChain(adaptor.getStart(), getTypeConverter()));
+  auto end = rewriter.create<Zmir::ValToIndexOp>(
+      op.getEnd().getLoc(),
+      findTypeInUseDefChain(adaptor.getEnd(), getTypeConverter()));
+  rewriter.create<mlir::scf::ForOp>(
+      op.getLoc(), start, end, one, mlir::ValueRange(),
+      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv,
+          mlir::ValueRange) {
+        auto conv = builder.create<Zmir::IndexToValOp>(loc, iv);
+        builder.create<Zmir::WriteArrayOp>(loc, arrAlloc, iv, conv);
+        builder.create<mlir::scf::YieldOp>(loc);
+      });
+
+  return mlir::success();
+}
+
+///////////////////////////////////////////////////////////
+/// ZhlRangeOpLowering
+///////////////////////////////////////////////////////////
+
+inline mlir::Type tryGetArrayInnerType(mlir::Type type) {
+  if (auto a = mlir::dyn_cast<Zmir::ArrayType>(type))
+    return a.getInnerType();
+  return Zmir::PendingType::get(type.getContext());
+}
+
+inline Zmir::ArrayType
+resultArrayType(mlir::Type inner, int64_t size, mlir::MLIRContext *ctx,
+                mlir::ConversionPatternRewriter &rewriter) {
+  if (size >= 0)
+    return Zmir::BoundedArrayType::get(ctx, inner, rewriter.getIndexAttr(size));
+  return Zmir::UnboundedArrayType::get(ctx, inner);
+}
+
+mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
+    Zhl::MapOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  auto arrValue = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());
+  if (!(mlir::isa<Zmir::ArrayType>(arrValue.getType()) ||
+        mlir::isa<Zmir::PendingType>(arrValue.getType())))
+    return op.emitOpError()
+        .append("was expecting an array type but got ", arrValue.getType())
+        .attachNote(arrValue.getLoc())
+        .append("defined here");
+
+  int64_t size = -1;
+  if (auto a = mlir::dyn_cast<Zmir::BoundedArrayType>(arrValue.getType()))
+    size = a.getSizeInt();
+  auto inner = tryGetArrayInnerType(arrValue.getType());
+  auto finalType = resultArrayType(inner, size, getContext(), rewriter);
+
+  auto arrAlloc = rewriter.create<Zmir::AllocArrayOp>(op.getLoc(), finalType);
+  auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
+  auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
+  auto len = (size >= 0)
+                 ? rewriter.create<mlir::index::ConstantOp>(op.getLoc(), size)
+                 : rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), arrValue);
+
+  auto loop = rewriter.create<mlir::scf::ForOp>(
+      op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
+      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv,
+          mlir::ValueRange args) {
+        auto itVal = builder.create<Zmir::ReadArrayOp>(loc, inner, arrValue,
+                                                       mlir::ValueRange(iv));
+        auto itValCast = builder.create<mlir::UnrealizedConversionCastOp>(
+            loc, mlir::TypeRange(Zhl::ExprType::get(getContext())),
+            mlir::ValueRange(itVal));
+        auto loopPrologue = builder.getInsertionBlock();
+
+        rewriter.inlineBlockBefore(&op.getRegion().front(), loopPrologue,
+                                   loopPrologue->end(),
+                                   mlir::ValueRange(itValCast.getResult(0)));
+      });
+
+  rewriter.replaceOp(op, arrAlloc);
+  loop->setAttr("original_op", rewriter.getStringAttr("map"));
+
+  return mlir::success();
+}
+
+mlir::LogicalResult ZhlBlockLowering::matchAndRewrite(
+    Zhl::BlockOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  mlir::SmallVector<mlir::Type> types;
+  auto convRes = getTypeConverter()->convertTypes(op->getResultTypes(), types);
+  if (mlir::failed(convRes))
+    return op->emitError("failed to convert types from zhl to zmir");
+  auto exec =
+      rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, types);
+  rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(),
+                              exec.getRegion().end());
+  return mlir::success();
+}
+
+mlir::LogicalResult ZhlSuperLoweringInMap::matchAndRewrite(
+    Zhl::SuperOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  auto parent = op->getParentOp();
+  if (!parent || !mlir::isa<mlir::scf::ForOp>(parent))
+    return mlir::failure();
+
+  auto loopOp = mlir::cast<mlir::scf::ForOp>(parent);
+  auto loopOriginalOp = loopOp->getAttr("original_op");
+  if (!loopOriginalOp || loopOriginalOp != rewriter.getStringAttr("map"))
+    return mlir::failure();
+
+  auto iv = loopOp.getInductionVar();
+  auto arr = loopOp.getRegionIterArgs().front();
+
+  rewriter.create<Zmir::WriteArrayOp>(op.getLoc(), arr, iv, adaptor.getValue());
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op,
+                                                  loopOp.getRegionIterArgs());
+
+  return mlir::success();
+}
+
+mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
+    Zhl::SuperOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  auto parent = op->getParentOp();
+  if (!parent || !mlir::isa<mlir::scf::ExecuteRegionOp>(parent))
+    return mlir::failure();
+
+  auto regionOp = mlir::cast<mlir::scf::ExecuteRegionOp>(parent);
+  auto value = findTypeInUseDefChain(adaptor.getValue(), getTypeConverter());
+  auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(
+      op.getLoc(), regionOp.getResultTypes(), mlir::ValueRange(value));
+
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, cast.getResults());
+  return mlir::success();
 }

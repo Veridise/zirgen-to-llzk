@@ -9,6 +9,33 @@ using namespace zkc::Zmir;
 using namespace zkc;
 using namespace zirgen;
 
+mlir::Value findTypeInUseDefChain(mlir::Value v,
+                                  const mlir::TypeConverter *converter) {
+  mlir::Value cur = v;
+  while (cur.getDefiningOp() &&
+         mlir::isa<mlir::UnrealizedConversionCastOp>(cur.getDefiningOp())) {
+    auto ops = cur.getDefiningOp()->getOperands();
+    if (ops.size() != 1) {
+      return v; // Give up if multiple operands
+    }
+    cur = ops[0];
+  }
+
+  if (Zmir::isValidZmirType(cur.getType()) &&
+      converter->isLegal(cur.getType())) {
+    return cur;
+  }
+  return v;
+}
+
+void findTypesInUseDefChain(mlir::ValueRange r,
+                            const mlir::TypeConverter *converter,
+                            llvm::SmallVector<mlir::Value> &results) {
+  std::transform(
+      r.begin(), r.end(), std::back_inserter(results),
+      [&](mlir::Value v) { return findTypeInUseDefChain(v, converter); });
+}
+
 ZMIRTypeConverter::ZMIRTypeConverter() {
   addConversion([](mlir::Type t) { return t; });
   addConversion(

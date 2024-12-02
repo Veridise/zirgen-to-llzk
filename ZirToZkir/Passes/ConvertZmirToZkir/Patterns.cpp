@@ -189,7 +189,7 @@ mlir::LogicalResult Zmir::CallIndirectOpLoweringInConstrain::matchAndRewrite(
     mlir::ConversionPatternRewriter &rewriter) const {
   auto parent = op->getParentOfType<zkir::FuncOp>();
   if (!parent || parent.getName() != "constrain")
-    return mlir::failure(); // Don't operate on non compute calls
+    return mlir::failure(); // Don't operate on non constrain calls
 
   if (!op->hasAttr("writes_into"))
     return mlir::failure();
@@ -288,11 +288,15 @@ mlir::LogicalResult Zmir::LowerReadArrayOp::matchAndRewrite(
     Zmir::ReadArrayOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
   llvm::SmallVector<mlir::Value> toIndexOps;
-  std::transform(adaptor.getIndices().begin(), adaptor.getIndices().end(),
-                 std::back_inserter(toIndexOps), [&](mlir::Value index) {
-                   return rewriter.create<zkir::FeltToIndexOp>(op.getLoc(),
-                                                               index);
-                 });
+  std::transform(
+      adaptor.getIndices().begin(), adaptor.getIndices().end(),
+      std::back_inserter(toIndexOps),
+      [&](mlir::Value index) -> mlir::TypedValue<mlir::IndexType> {
+        if (mlir::isa<mlir::IndexType>(index.getType()))
+          return mlir::cast<mlir::TypedValue<mlir::IndexType>>(index);
+        return rewriter.create<zkir::FeltToIndexOp>(op.getLoc(), index)
+            .getResult();
+      });
   rewriter.replaceOpWithNewOp<zkir::ReadArrayOp>(
       op, getTypeConverter()->convertType(op.getType()), adaptor.getLvalue(),
       toIndexOps);
@@ -304,11 +308,59 @@ mlir::LogicalResult Zmir::LowerIsz::matchAndRewrite(
     mlir::ConversionPatternRewriter &rewriter) const {
   auto zero = rewriter.create<zkir::FeltConstantOp>(
       op.getLoc(),
-      zkir::FeltConstAttr::get(getContext(), mlir::APInt::getZero(1)));
+      zkir::FeltConstAttr::get(getContext(), mlir::APInt::getZero(64)));
   auto cmpOp = rewriter.create<zkir::CmpOp>(
       op.getLoc(),
       zkir::FeltCmpPredicateAttr::get(getContext(), zkir::FeltCmpPredicate::EQ),
       adaptor.getIn(), zero);
   rewriter.replaceOpWithNewOp<zkir::FeltFromIntOp>(op, cmpOp);
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerAllocArrayOp::matchAndRewrite(
+    Zmir::AllocArrayOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  rewriter.replaceOpWithNewOp<zkir::AllocateArrayOp>(
+      op, getTypeConverter()->convertType(op.getType()));
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerArrayLengthOp::matchAndRewrite(
+    Zmir::GetArrayLenOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  rewriter.replaceOpWithNewOp<zkir::ArrayLengthOp>(op, adaptor.getArray(),
+                                                   rewriter.getIndexAttr(0));
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerIndexToValOp::matchAndRewrite(
+    Zmir::IndexToValOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  rewriter.replaceOpWithNewOp<zkir::FeltFromIndexOp>(op, adaptor.getIndex());
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerValToIndexOp::matchAndRewrite(
+    Zmir::ValToIndexOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  if (mlir::isa<mlir::IndexType>(adaptor.getVal().getType())) {
+    rewriter.replaceAllUsesWith(op, adaptor.getVal());
+    rewriter.eraseOp(op);
+  } else {
+    rewriter.replaceOpWithNewOp<zkir::FeltToIndexOp>(op, adaptor.getVal());
+  }
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::LowerWriteArrayOp::matchAndRewrite(
+    Zmir::WriteArrayOp op, OpAdaptor adaptor,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  rewriter.replaceOpWithNewOp<zkir::WriteArrayOp>(
+      op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue());
+
   return mlir::success();
 }

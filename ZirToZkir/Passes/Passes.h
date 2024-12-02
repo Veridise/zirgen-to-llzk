@@ -20,9 +20,9 @@ OpPass<mlir::ModuleOp> createStripTestsPass();
 OpPass<mlir::ModuleOp> createTransformComponentDeclsPass();
 OpPass<mlir::ModuleOp> createStripDirectivesPass();
 OpPass<Zmir::ComponentOp> createConvertZhlToZmirPass();
+OpPass<Zmir::ComponentOp> createConvertZhlToScfPass();
 OpPass<zkir::StructDefOp> createConvertZmirToZkirPass();
 OpPass<mlir::ModuleOp> createConvertZmirComponentsToZkirPass();
-// OpPass<Zmir::ComponentOp> createZmirPropagateTypesPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

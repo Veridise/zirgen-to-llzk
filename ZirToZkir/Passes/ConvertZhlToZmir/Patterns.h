@@ -124,7 +124,27 @@ public:
 };
 
 /// Lowers `zhl.super` to ZMIR field operations
-class ZhlSuperLowering
+class ZhlSuperLoweringInFunc
+    : public mlir::OpConversionPattern<zirgen::Zhl::SuperOp> {
+public:
+  using OpConversionPattern<zirgen::Zhl::SuperOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::SuperOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class ZhlSuperLoweringInMap
+    : public mlir::OpConversionPattern<zirgen::Zhl::SuperOp> {
+public:
+  using OpConversionPattern<zirgen::Zhl::SuperOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::SuperOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class ZhlSuperLoweringInBlock
     : public mlir::OpConversionPattern<zirgen::Zhl::SuperOp> {
 public:
   using OpConversionPattern<zirgen::Zhl::SuperOp>::OpConversionPattern;
@@ -187,6 +207,35 @@ public:
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::ComponentOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override;
+};
+
+class ZhlRangeOpLowering
+    : public mlir::OpConversionPattern<zirgen::Zhl::RangeOp> {
+public:
+  using OpConversionPattern<zirgen::Zhl::RangeOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::RangeOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class ZhlMapLowering : public mlir::OpConversionPattern<zirgen::Zhl::MapOp> {
+public:
+  using OpConversionPattern<zirgen::Zhl::MapOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::MapOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class ZhlBlockLowering
+    : public mlir::OpConversionPattern<zirgen::Zhl::BlockOp> {
+public:
+  using OpConversionPattern<zirgen::Zhl::BlockOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::BlockOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
 };
 
 } // namespace zkc

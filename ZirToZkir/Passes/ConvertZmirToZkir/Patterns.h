@@ -198,4 +198,49 @@ public:
                   mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerAllocArrayOp : public mlir::OpConversionPattern<AllocArrayOp> {
+public:
+  using mlir::OpConversionPattern<AllocArrayOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(AllocArrayOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerIndexToValOp : public mlir::OpConversionPattern<IndexToValOp> {
+public:
+  using mlir::OpConversionPattern<IndexToValOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(IndexToValOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerValToIndexOp : public mlir::OpConversionPattern<ValToIndexOp> {
+public:
+  using mlir::OpConversionPattern<ValToIndexOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(ValToIndexOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerArrayLengthOp : public mlir::OpConversionPattern<GetArrayLenOp> {
+public:
+  using mlir::OpConversionPattern<GetArrayLenOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(GetArrayLenOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerWriteArrayOp : public mlir::OpConversionPattern<WriteArrayOp> {
+public:
+  using mlir::OpConversionPattern<WriteArrayOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(WriteArrayOp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &) const override;
+};
+
 } // namespace zkc::Zmir

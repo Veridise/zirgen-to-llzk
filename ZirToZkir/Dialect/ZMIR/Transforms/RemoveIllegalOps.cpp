@@ -33,7 +33,8 @@ class RemoveIllegalOpsCommon : public Base {
     // Set conversion target
     mlir::ConversionTarget target(Base::getContext());
     target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                           zirgen::Zhl::ZhlDialect>();
+                           zirgen::Zhl::ZhlDialect, mlir::index::IndexDialect,
+                           mlir::scf::SCFDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp>();
     setLegality(target);
 
@@ -138,6 +139,18 @@ public:
   }
 };
 
+class ReplaceWriteArrayWithRead : public OpConversionPattern<WriteArrayOp> {
+public:
+  using OpConversionPattern<WriteArrayOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(WriteArrayOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    return success();
+  }
+};
+
 class RemoveIllegalComputeOpsPass
     : public RemoveIllegalOpsCommon<
           RemoveIllegalComputeOpsPass,
@@ -173,13 +186,15 @@ class RemoveIllegalConstrainOpsPass
 
   void setLegality(ConversionTarget &target) override {
     // And there's probably more
-    target.addIllegalOp<WriteFieldOp, GetSelfOp, BitAndOp, InvOp>();
+    target.addIllegalOp<WriteFieldOp, GetSelfOp, BitAndOp, InvOp, WriteArrayOp,
+                        AllocArrayOp, NewArrayOp>();
     /*target.addIllegalOp<func::CallIndirectOp>();*/
   }
 
   void addPatterns(RewritePatternSet &patterns) override {
     patterns.add<ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
-                 ReplaceUsesWithArg<GetSelfOp, 0>>(&getContext());
+                 ReplaceUsesWithArg<GetSelfOp, 0>, RemoveOp<WriteArrayOp>,
+                 RemoveOp<AllocArrayOp>, RemoveOp<NewArrayOp>>(&getContext());
   }
 };
 

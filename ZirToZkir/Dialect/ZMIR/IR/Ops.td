@@ -50,10 +50,10 @@ class ComponentOpBase<string prefix, string bodyFuncName,
     ::mlir::FailureOr<::mlir::Type> lookupFieldType(mlir::FlatSymbolRefAttr);
 
     /// Returns the name of the function that represents the body of a component.
-    static constexpr std::string_view getBodyFuncName() { return "}]#bodyFuncName#[{"; }
-    static constexpr std::string_view getConstrainFuncName() { return "}]#constrainFuncName#[{"; }
+    std::string_view getBodyFuncName() { return "}]#bodyFuncName#[{"; }
+    std::string_view getConstrainFuncName() { return "}]#constrainFuncName#[{"; }
 
-    static constexpr bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
+    bool hasUnifiedBody() { return getBodyFuncName() == getConstrainFuncName(); }
 
     mlir::FlatSymbolRefAttr getSuperFieldName() { return mlir::FlatSymbolRefAttr::get(mlir::StringAttr::get(getContext(), "$super")); }
 
@@ -263,6 +263,37 @@ def ReadArrayOp : ZmirOp<"read_array"> {
   let assemblyFormat = [{
     $lvalue `[` $indices `]` attr-dict `:` type($lvalue) `[` type($indices) `]` `,` type($result)
   }];
+}
+
+def WriteArrayOp : ZmirOp<"write_array"> {
+  let summary = "write data into an array";
+
+  let arguments = (ins Array:$array, Variadic<AnyType>:$indices,
+      AnyZmirType:$value);
+  let assemblyFormat = [{
+    $array `[` $indices `]` `=` $value attr-dict `:` type($array) `[` type($indices) `]` `,` type($value)
+  }];
+}
+
+def GetArrayLenOp : ZmirOp<"array_len"> {
+  let summary = "returns the length of an array";
+
+  let arguments = (ins Array:$array);
+  let results = (outs Index:$length);
+}
+
+def ValToIndexOp : ZmirOp<"toindex"> {
+  let summary = "convert val to index";
+
+  let arguments = (ins PendingOf<Val>:$val);
+  let results = (outs Index:$result);
+}
+
+def IndexToValOp : ZmirOp<"fromindex"> {
+  let summary = "convert index to val";
+
+  let arguments = (ins Index:$index);
+  let results = (outs Val:$result);
 }
 
 def LitValOp : ZmirOp<"literal"> {

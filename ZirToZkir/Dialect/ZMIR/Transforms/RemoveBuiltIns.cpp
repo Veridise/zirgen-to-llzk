@@ -63,7 +63,8 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
-    target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
+    target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
+                           index::IndexDialect, scf::SCFDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
     // Return types may change so we need to adjust the return ops

@@ -11,7 +11,8 @@ td_library(
       "Dialect.td",
       "Ops.td",
       "Types.td",
-      "OpInterfaces.td"
+      "OpInterfaces.td",
+      "TypeInterfaces.td"
     ],
     deps = [
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
@@ -79,6 +80,24 @@ gentbl_cc_library(
   deps = [":TdFiles"],
 )
 
+
+gentbl_cc_library(
+  name = "TypeInterfacesIncGen",
+  tbl_outs = [
+    (
+      ["--gen-type-interface-decls"],
+      "TypeInterfaces.inc.h"
+    ),
+    (
+      ["--gen-type-interface-defs"],
+      "TypeInterfaces.inc.cpp"
+    )
+  ],
+  tblgen = "@llvm-project//mlir:mlir-tblgen",
+  td_file = ":TypeInterfaces.td",
+  deps = [":TdFiles"],
+)
+
 gentbl_cc_library(
     name = "TypesIncGen",
     tbl_outs = [
@@ -135,6 +154,7 @@ cc_library(
         ":OpsIncGen",
         ":TypesIncGen",
         ":OpInterfacesIncGen",
+        ":TypeInterfacesIncGen",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:FuncDialect",
