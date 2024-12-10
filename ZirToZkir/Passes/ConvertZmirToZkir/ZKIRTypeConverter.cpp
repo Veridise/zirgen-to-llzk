@@ -8,13 +8,12 @@
 using namespace zkc::Zmir;
 using namespace zkc;
 
-std::optional<mlir::Value>
-unrealizedCastMaterialization(mlir::OpBuilder &builder, mlir::Type type,
-                              mlir::ValueRange inputs, mlir::Location loc) {
+std::optional<mlir::Value> unrealizedCastMaterialization(
+    mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs, mlir::Location loc
+) {
 
   assert(inputs.size() == 1);
-  return builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs)
-      .getResult(0);
+  return builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs).getResult(0);
 }
 
 zkir::ZKIRTypeConverter::ZKIRTypeConverter() {
@@ -22,22 +21,18 @@ zkir::ZKIRTypeConverter::ZKIRTypeConverter() {
 
   // ZMIR Pending types MUST be illegal at this point but I don't have a
   // solid way to get rid of them so for now I'm defaulting them to FeltType.
-  addConversion(
-      [](Zmir::PendingType t) { return zkir::FeltType::get(t.getContext()); });
-  addConversion(
-      [](Zmir::ValType t) { return zkir::FeltType::get(t.getContext()); });
+  addConversion([](Zmir::PendingType t) { return zkir::FeltType::get(t.getContext()); });
+  addConversion([](Zmir::ValType t) { return zkir::FeltType::get(t.getContext()); });
 
   addConversion([](Zmir::ComponentType t) {
     return zkir::StructType::get(t.getContext(), t.getName());
   });
 
   addConversion([&](Zmir::ArrayType t) {
-    return zkir::ArrayType::get(t.getContext(), convertType(t.getInnerType()),
-                                {t.getSizeInt()});
+    return zkir::ArrayType::get(t.getContext(), convertType(t.getInnerType()), {t.getSizeInt()});
   });
 
-  addConversion(
-      [](Zmir::StringType t) { return zkir::StringType::get(t.getContext()); });
+  addConversion([](Zmir::StringType t) { return zkir::StringType::get(t.getContext()); });
 
   addConversion([&](Zmir::VarArgsType t) {
     return zkir::VarArgsType::get(t.getContext(), convertType(t.getInner()));

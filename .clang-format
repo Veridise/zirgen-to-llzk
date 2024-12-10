@@ -1,0 +1,17 @@
+---
+# Formatter for .td files
+Language: TableGen
+BasedOnStyle: LLVM
+IndentWidth: 2
+---
+# Formatter for .h, .cpp, etc.
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 100
+LambdaBodyIndentation: OuterScope
+AlignAfterOpenBracket: BlockIndent
+InsertBraces: true
+---
+Language: Json
+DisableFormat: true

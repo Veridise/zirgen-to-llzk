@@ -20,20 +20,20 @@ using namespace mlir;
 
 namespace zkc::Zmir {
 
-template <const char *Name>
-class RemoveBuiltIn : public OpConversionPattern<Zmir::ComponentOp> {
+template <const char *Name> class RemoveBuiltIn : public OpConversionPattern<Zmir::ComponentOp> {
 public:
   using OpConversionPattern<Zmir::ComponentOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      Zmir::ComponentOp op,
-      typename OpConversionPattern<Zmir::ComponentOp>::OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+      Zmir::ComponentOp op, typename OpConversionPattern<Zmir::ComponentOp>::OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter
+  ) const override {
     auto name = op.getName();
 
     // If it's not the one we are looking for just reject the match
-    if (name != Name)
+    if (name != Name) {
       return mlir::failure();
+    }
 
     rewriter.eraseOp(op);
     return mlir::success();
@@ -58,27 +58,28 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
     mlir::MLIRContext *ctx = op->getContext();
     mlir::RewritePatternSet patterns(ctx);
 
-    patterns.add<BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern,
-                 IszPattern, NegPattern>(typeConverter, ctx);
+    patterns
+        .add<BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern, IszPattern, NegPattern>(
+            typeConverter, ctx
+        );
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
-    target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                           index::IndexDialect, scf::SCFDialect>();
+    target.addLegalDialect<
+        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
     // Return types may change so we need to adjust the return ops
     target.addDynamicallyLegalOp<Zmir::ComponentOp>([](Zmir::ComponentOp op) {
-      auto found = BuiltInComponentNames.find(op.getName().str()) !=
-                   BuiltInComponentNames.end();
+      auto found = BuiltInComponentNames.find(op.getName().str()) != BuiltInComponentNames.end();
       auto markedBuiltIn = op.getBuiltin();
       return !(found && markedBuiltIn);
     });
 
     // Call partialTransformation
-    if (mlir::failed(
-            mlir::applyFullConversion(op, target, std::move(patterns))))
+    if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
       signalPassFailure();
+    }
   }
 };
 

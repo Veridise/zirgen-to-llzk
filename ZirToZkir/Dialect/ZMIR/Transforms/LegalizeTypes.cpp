@@ -27,10 +27,12 @@ struct DeducedType {
   mlir::Type type;
 
   static DeducedType join(const DeducedType &lhs, const DeducedType &rhs) {
-    if (lhs.isPendingType())
+    if (lhs.isPendingType()) {
       return rhs;
-    if (rhs.isPendingType())
+    }
+    if (rhs.isPendingType()) {
       return lhs;
+    }
     return lhs; // TODO
   }
 
@@ -44,15 +46,14 @@ private:
 
 using TypeLattice = dataflow::Lattice<DeducedType>;
 
-class TypePropAnalysis
-    : public dataflow::SparseForwardDataFlowAnalysis<TypeLattice> {
+class TypePropAnalysis : public dataflow::SparseForwardDataFlowAnalysis<TypeLattice> {
 
 public:
-  using dataflow::SparseForwardDataFlowAnalysis<
-      TypeLattice>::SparseForwardDataFlowAnalysis;
+  using dataflow::SparseForwardDataFlowAnalysis<TypeLattice>::SparseForwardDataFlowAnalysis;
 
-  void visitOperation(Operation *op, ArrayRef<const TypeLattice *> operands,
-                      ArrayRef<TypeLattice *> results) override {}
+  void visitOperation(
+      Operation *op, ArrayRef<const TypeLattice *> operands, ArrayRef<TypeLattice *> results
+  ) override {}
 
   /// Sets the initial value for a program point.
   void setToEntryState(TypeLattice *lattice) override {}
@@ -61,8 +62,7 @@ public:
 class TypePropAnalysisDriver {
 public:
   explicit TypePropAnalysisDriver(mlir::Operation *op)
-      : cfg(), solver(cfg), analysis(solver.load<TypePropAnalysis>()),
-        result(mlir::failure()) {
+      : cfg(), solver(cfg), analysis(solver.load<TypePropAnalysis>()), result(mlir::failure()) {
     /*cfg.setInterprocedural(true);*/
 
     result = solver.initializeAndRun(op);
@@ -91,18 +91,18 @@ private:
   LogicalResult result;
 };
 
-class FoldUnrealizedCasts
-    : public OpConversionPattern<mlir::UnrealizedConversionCastOp> {
+class FoldUnrealizedCasts : public OpConversionPattern<mlir::UnrealizedConversionCastOp> {
 public:
-  using OpConversionPattern<
-      mlir::UnrealizedConversionCastOp>::OpConversionPattern;
+  using OpConversionPattern<mlir::UnrealizedConversionCastOp>::OpConversionPattern;
 
-  mlir::LogicalResult
-  matchAndRewrite(mlir::UnrealizedConversionCastOp op, OpAdaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
+  mlir::LogicalResult matchAndRewrite(
+      mlir::UnrealizedConversionCastOp op, OpAdaptor adaptor,
+      mlir::ConversionPatternRewriter &rewriter
+  ) const override {
     auto val = findValidValue(op.getOperands());
-    if (mlir::failed(val))
+    if (mlir::failed(val)) {
       return mlir::failure();
+    }
 
     rewriter.replaceAllUsesWith(op.getResults(), *val);
     rewriter.eraseOp(op);
@@ -111,16 +111,19 @@ public:
   }
 
   FailureOr<mlir::ValueRange> findValidValue(ValueRange v) const {
-    if (v.size() != 1)
+    if (v.size() != 1) {
       return mlir::failure();
+    }
 
     auto t = v[0].getType();
-    if (isValidZmirType(t) && !mlir::isa<PendingType>(t))
+    if (isValidZmirType(t) && !mlir::isa<PendingType>(t)) {
       return v;
+    }
 
     auto op = v[0].getDefiningOp();
-    if (op)
+    if (op) {
       return findValidValue(op->getOperands());
+    }
     return mlir::failure();
   }
 };
@@ -128,30 +131,31 @@ public:
 class UpdateFieldType : public OpConversionPattern<FieldDefOp> {
 public:
   template <typename... Args>
-  UpdateFieldType(ComponentOp component, SymbolTableCollection &st,
-                  Operation *stRoot, Args &&...args)
-      : OpConversionPattern<FieldDefOp>(std::forward<Args>(args)...), st(st),
-        stRoot(stRoot), component(component) {}
+  UpdateFieldType(
+      ComponentOp component, SymbolTableCollection &st, Operation *stRoot, Args &&...args
+  )
+      : OpConversionPattern<FieldDefOp>(std::forward<Args>(args)...), st(st), stRoot(stRoot),
+        component(component) {}
 
-  LogicalResult
-  matchAndRewrite(FieldDefOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(
+      FieldDefOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+  ) const override {
     SmallVector<Type> types;
     collectWriteTypes(op.getName(), types);
 
     // FIXME: It would be more correct to select the least general type
     // But it is easier with the current implementation to default to either a
     // primitive or the root component.
-    if (types.empty())
+    if (types.empty()) {
       return failure();
+    }
 
     auto type = selectType(types.front());
-    if (failed(type))
-      return op.emitOpError()
-             << "could not obtain a type for field '" << op.getName() << "'";
+    if (failed(type)) {
+      return op.emitOpError() << "could not obtain a type for field '" << op.getName() << "'";
+    }
 
-    rewriter.replaceOpWithNewOp<FieldDefOp>(op, adaptor.getSymNameAttr(),
-                                            TypeAttr::get(*type));
+    rewriter.replaceOpWithNewOp<FieldDefOp>(op, adaptor.getSymNameAttr(), TypeAttr::get(*type));
 
     return success();
   }
@@ -159,12 +163,14 @@ public:
 private:
   FailureOr<Type> selectType(Type type) const {
     if (auto compType = mlir::dyn_cast<ComponentType>(type)) {
-      if (compType.isRoot())
+      if (compType.isRoot()) {
         return compType;
+      }
       auto comp = compType.getDefinition(st, stRoot);
       auto t = comp.getSuperType();
-      if (failed(t))
+      if (failed(t)) {
         return t;
+      }
       return selectType(*t);
     }
 
@@ -178,10 +184,9 @@ private:
 
   void collectWriteTypes(StringRef fieldName, SmallVector<Type> &types) const {
     getBody().walk([&](WriteFieldOp write) {
-      if (write.getFieldName() == fieldName)
-        types.push_back(
-            findTypeInUseDefChain(write.getVal(), getTypeConverter())
-                .getType());
+      if (write.getFieldName() == fieldName) {
+        types.push_back(findTypeInUseDefChain(write.getVal(), getTypeConverter()).getType());
+      }
     });
   }
 
@@ -190,22 +195,22 @@ private:
   ComponentOp component;
 };
 
-class LegalizeExecuteRegionOp
-    : public OpConversionPattern<scf::ExecuteRegionOp> {
+class LegalizeExecuteRegionOp : public OpConversionPattern<scf::ExecuteRegionOp> {
 public:
   using OpConversionPattern<scf::ExecuteRegionOp>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(scf::ExecuteRegionOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (op.getResults().size() != 1)
+  LogicalResult matchAndRewrite(
+      scf::ExecuteRegionOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+  ) const override {
+    if (op.getResults().size() != 1) {
       return failure();
+    }
     SmallVector<Type> types;
     op.walk([&](scf::YieldOp yield) {
       assert(yield.getResults().size() == 1);
       types.push_back(
-          findTypeInUseDefChain(yield.getResults().front(), getTypeConverter())
-              .getType());
+          findTypeInUseDefChain(yield.getResults().front(), getTypeConverter()).getType()
+      );
     });
 
     for (auto t : types) {
@@ -213,8 +218,7 @@ public:
     }
 
     assert(!types.empty());
-    rewriter.modifyOpInPlace(op,
-                             [&]() { op.getResult(0).setType(types.front()); });
+    rewriter.modifyOpInPlace(op, [&]() { op.getResult(0).setType(types.front()); });
     /*auto newExec = rewriter.replaceOpWithNewOp<scf::ExecuteRegionOp>(op,
      * types);*/
     /*rewriter.inlineRegionBefore(op.getRegion(), newExec.getRegion(),*/
@@ -229,18 +233,17 @@ class LegalizeWriteArrayOp : public OpConversionPattern<WriteArrayOp> {
 public:
   using OpConversionPattern<WriteArrayOp>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(WriteArrayOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(
+      WriteArrayOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+  ) const override {
     auto arr = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());
     auto arrType = dyn_cast<ArrayType>(arr.getType());
     assert(arrType);
 
     auto cast = rewriter.create<UnrealizedConversionCastOp>(
-        op.getLoc(), TypeRange(arrType.getInnerType()),
-        ValueRange(adaptor.getValue()));
-    rewriter.replaceOpWithNewOp<WriteArrayOp>(op, arr, adaptor.getIndices(),
-                                              cast.getResult(0));
+        op.getLoc(), TypeRange(arrType.getInnerType()), ValueRange(adaptor.getValue())
+    );
+    rewriter.replaceOpWithNewOp<WriteArrayOp>(op, arr, adaptor.getIndices(), cast.getResult(0));
     return success();
   }
 };
@@ -261,10 +264,10 @@ class LegalizeTypesPass : public LegalizeTypesBase<LegalizeTypesPass> {
       signalPassFailure();
       return;
     }
-    patterns.add<UpdateFieldType>(op, st, mod.getOperation(), typeConverter,
-                                  ctx);
-    patterns.add<FoldUnrealizedCasts, LegalizeExecuteRegionOp,
-                 LegalizeWriteArrayOp>(typeConverter, ctx);
+    patterns.add<UpdateFieldType>(op, st, mod.getOperation(), typeConverter, ctx);
+    patterns.add<FoldUnrealizedCasts, LegalizeExecuteRegionOp, LegalizeWriteArrayOp>(
+        typeConverter, ctx
+    );
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
@@ -276,63 +279,64 @@ class LegalizeTypesPass : public LegalizeTypesBase<LegalizeTypesPass> {
       auto attrs = op->getAttrs();
 
       std::function<bool(Type)> hasPendingTypes = [&](Type t) {
-        if (mlir::isa<PendingType>(t))
+        if (mlir::isa<PendingType>(t)) {
           return true;
+        }
 
         if (auto funcType = mlir::dyn_cast<FunctionType>(t)) {
           auto res = funcType.getResults();
-          auto outputsHavePendingTypes =
-              std::any_of(res.begin(), res.end(), hasPendingTypes);
+          auto outputsHavePendingTypes = std::any_of(res.begin(), res.end(), hasPendingTypes);
           auto ins = funcType.getInputs();
-          auto inputsHavePendingTypes =
-              std::any_of(ins.begin(), ins.end(), hasPendingTypes);
+          auto inputsHavePendingTypes = std::any_of(ins.begin(), ins.end(), hasPendingTypes);
           return outputsHavePendingTypes || inputsHavePendingTypes;
         }
 
-        if (auto varsArgs = mlir::dyn_cast<VarArgsType>(t))
+        if (auto varsArgs = mlir::dyn_cast<VarArgsType>(t)) {
           return hasPendingTypes(varsArgs.getInner());
+        }
 
-        if (auto array = mlir::dyn_cast<ArrayType>(t))
+        if (auto array = mlir::dyn_cast<ArrayType>(t)) {
           return hasPendingTypes(array.getInnerType());
+        }
 
         return false;
       };
 
       auto resultsHavePendingType =
           std::any_of(resultTypes.begin(), resultTypes.end(), hasPendingTypes);
-      auto operandsHavePendingType = std::any_of(
-          operandTypes.begin(), operandTypes.end(), hasPendingTypes);
-      auto regionsHavePendingType =
-          std::any_of(regions.begin(), regions.end(), [&](auto &region) {
-            return std::any_of(region.begin(), region.end(), [&](Block &block) {
-              auto args = block.getArgumentTypes();
-              return std::any_of(args.begin(), args.end(), hasPendingTypes);
-            });
-          });
+      auto operandsHavePendingType =
+          std::any_of(operandTypes.begin(), operandTypes.end(), hasPendingTypes);
+      auto regionsHavePendingType = std::any_of(regions.begin(), regions.end(), [&](auto &region) {
+        return std::any_of(region.begin(), region.end(), [&](Block &block) {
+          auto args = block.getArgumentTypes();
+          return std::any_of(args.begin(), args.end(), hasPendingTypes);
+        });
+      });
 
-      auto attrsHavePendingType =
-          std::any_of(attrs.begin(), attrs.end(), [&](NamedAttribute attr) {
-            auto attrVal = attr.getValue();
-            if (auto typeAttr = mlir::dyn_cast<TypeAttr>(attrVal)) {
-              return hasPendingTypes(typeAttr.getValue());
-            }
-            return false;
-          });
+      auto attrsHavePendingType = std::any_of(attrs.begin(), attrs.end(), [&](NamedAttribute attr) {
+        auto attrVal = attr.getValue();
+        if (auto typeAttr = mlir::dyn_cast<TypeAttr>(attrVal)) {
+          return hasPendingTypes(typeAttr.getValue());
+        }
+        return false;
+      });
 
-      return !(operandsHavePendingType || resultsHavePendingType ||
-               regionsHavePendingType || attrsHavePendingType);
+      return !(
+          operandsHavePendingType || resultsHavePendingType || regionsHavePendingType ||
+          attrsHavePendingType
+      );
     };
-    target.addDynamicallyLegalOp<mlir::UnrealizedConversionCastOp>(
-        legalIfNoPendingTypes);
-    target.addDynamicallyLegalDialect<ZmirDialect, mlir::func::FuncDialect,
-                                      scf::SCFDialect>(legalIfNoPendingTypes);
+    target.addDynamicallyLegalOp<mlir::UnrealizedConversionCastOp>(legalIfNoPendingTypes);
+    target.addDynamicallyLegalDialect<ZmirDialect, mlir::func::FuncDialect, scf::SCFDialect>(
+        legalIfNoPendingTypes
+    );
     target.addLegalDialect<index::IndexDialect>(); // These will never hold a
                                                    // pending type
 
     // Call partialTransformation
-    if (mlir::failed(
-            mlir::applyFullConversion(op, target, std::move(patterns))))
+    if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
       signalPassFailure();
+    }
   }
 };
 

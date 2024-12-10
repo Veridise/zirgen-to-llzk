@@ -24,106 +24,99 @@
 
 namespace zkc::Zmir {
 
-void ComponentOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                        llvm::StringRef name, IsBuiltIn) {
+void ComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name, IsBuiltIn
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().builtin = builder.getUnitAttr();
   state.addRegion();
 }
 
-void SplitComponentOp::build(mlir::OpBuilder &builder,
-                             mlir::OperationState &state, llvm::StringRef name,
-                             IsBuiltIn) {
+void SplitComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name, IsBuiltIn
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().builtin = builder.getUnitAttr();
   state.addRegion();
 }
 
-mlir::ArrayAttr fillParams(mlir::OpBuilder &builder,
-                           mlir::OperationState &state,
-                           mlir::ArrayRef<mlir::StringRef> params) {
+mlir::ArrayAttr fillParams(
+    mlir::OpBuilder &builder, mlir::OperationState &state, mlir::ArrayRef<mlir::StringRef> params
+) {
   std::vector<mlir::Attribute> symbols;
-  std::transform(params.begin(), params.end(), std::back_inserter(symbols),
-                 [&](mlir::StringRef s) {
-                   return mlir::SymbolRefAttr::get(
-                       mlir::StringAttr::get(builder.getContext(), s));
-                 });
+  std::transform(params.begin(), params.end(), std::back_inserter(symbols), [&](mlir::StringRef s) {
+    return mlir::SymbolRefAttr::get(mlir::StringAttr::get(builder.getContext(), s));
+  });
   return builder.getArrayAttr(symbols);
 }
 
-void ComponentOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                        llvm::StringRef name,
-                        mlir::ArrayRef<mlir::StringRef> typeParams,
-                        mlir::ArrayRef<mlir::StringRef> constParams,
-                        IsBuiltIn) {
+void ComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
+    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
+    IsBuiltIn
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().builtin = builder.getUnitAttr();
   if (typeParams.size() + constParams.size() > 1) {
     state.getOrAddProperties<Properties>().generic = builder.getUnitAttr();
-    state.getOrAddProperties<Properties>().type_params =
-        fillParams(builder, state, typeParams);
-    state.getOrAddProperties<Properties>().const_params =
-        fillParams(builder, state, constParams);
+    state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
+    state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
   }
   state.addRegion();
 }
 
-void SplitComponentOp::build(mlir::OpBuilder &builder,
-                             mlir::OperationState &state, llvm::StringRef name,
-                             mlir::ArrayRef<mlir::StringRef> typeParams,
-                             mlir::ArrayRef<mlir::StringRef> constParams,
-                             IsBuiltIn) {
+void SplitComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
+    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
+    IsBuiltIn
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().builtin = builder.getUnitAttr();
   if (typeParams.size() + constParams.size() > 1) {
     state.getOrAddProperties<Properties>().generic = builder.getUnitAttr();
-    state.getOrAddProperties<Properties>().type_params =
-        fillParams(builder, state, typeParams);
-    state.getOrAddProperties<Properties>().const_params =
-        fillParams(builder, state, constParams);
+    state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
+    state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
   }
   state.addRegion();
 }
 
-void ComponentOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                        llvm::StringRef name,
-                        mlir::ArrayRef<mlir::StringRef> typeParams,
-                        mlir::ArrayRef<mlir::StringRef> constParams,
-                        llvm::ArrayRef<mlir::NamedAttribute> attrs) {
+void ComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
+    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
+    llvm::ArrayRef<mlir::NamedAttribute> attrs
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
-  state.getOrAddProperties<Properties>().type_params =
-      fillParams(builder, state, typeParams);
-  state.getOrAddProperties<Properties>().const_params =
-      fillParams(builder, state, constParams);
+  state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
+  state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
   state.addAttributes(attrs);
   state.addRegion();
 }
 
-void SplitComponentOp::build(mlir::OpBuilder &builder,
-                             mlir::OperationState &state, llvm::StringRef name,
-                             mlir::ArrayRef<mlir::StringRef> typeParams,
-                             mlir::ArrayRef<mlir::StringRef> constParams,
-                             llvm::ArrayRef<mlir::NamedAttribute> attrs) {
+void SplitComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
+    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
+    llvm::ArrayRef<mlir::NamedAttribute> attrs
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
-  state.getOrAddProperties<Properties>().type_params =
-      fillParams(builder, state, typeParams);
-  state.getOrAddProperties<Properties>().const_params =
-      fillParams(builder, state, constParams);
+  state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
+  state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
   state.addAttributes(attrs);
   state.addRegion();
 }
 
-void ComponentOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                        llvm::StringRef name,
-                        llvm::ArrayRef<mlir::NamedAttribute> attrs) {
+void ComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
+    llvm::ArrayRef<mlir::NamedAttribute> attrs
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.addAttributes(attrs);
   state.addRegion();
 }
 
-void SplitComponentOp::build(mlir::OpBuilder &builder,
-                             mlir::OperationState &state, llvm::StringRef name,
-                             llvm::ArrayRef<mlir::NamedAttribute> attrs) {
+void SplitComponentOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
+    llvm::ArrayRef<mlir::NamedAttribute> attrs
+) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.addAttributes(attrs);
   state.addRegion();
@@ -133,8 +126,9 @@ mlir::Type ComponentOp::getType() {
   if (getTypeParams().has_value() && getConstParams().has_value()) {
     auto typeParams = *getTypeParams();
     auto constParams = *getConstParams();
-    return ComponentType::get(getContext(), getSymName(), typeParams.getValue(),
-                              constParams.getValue());
+    return ComponentType::get(
+        getContext(), getSymName(), typeParams.getValue(), constParams.getValue()
+    );
   } else {
     return ComponentType::get(getContext(), getSymName());
   }
@@ -144,61 +138,55 @@ mlir::Type SplitComponentOp::getType() {
   if (getTypeParams().has_value() && getConstParams().has_value()) {
     auto typeParams = *getTypeParams();
     auto constParams = *getConstParams();
-    return ComponentType::get(getContext(), getSymName(), typeParams.getValue(),
-                              constParams.getValue());
+    return ComponentType::get(
+        getContext(), getSymName(), typeParams.getValue(), constParams.getValue()
+    );
   } else {
     return ComponentType::get(getContext(), getSymName());
   }
 }
 
-template <typename CompOp>
-mlir::FailureOr<mlir::Type> getSuperTypeCommon(CompOp &op) {
+template <typename CompOp> mlir::FailureOr<mlir::Type> getSuperTypeCommon(CompOp &op) {
   if (op.isRoot()) {
-    if (auto comp = mlir::dyn_cast<zkc::Zmir::ComponentType>(op.getType()))
+    if (auto comp = mlir::dyn_cast<zkc::Zmir::ComponentType>(op.getType())) {
       return comp;
-    else
+    } else {
       return mlir::failure();
+    }
   }
   return op.lookupFieldType(op.getSuperFieldName());
 }
 
-mlir::FailureOr<mlir::Type> ComponentOp::getSuperType() {
-  return getSuperTypeCommon(*this);
-}
+mlir::FailureOr<mlir::Type> ComponentOp::getSuperType() { return getSuperTypeCommon(*this); }
 
-mlir::FailureOr<mlir::Type> SplitComponentOp::getSuperType() {
-  return getSuperTypeCommon(*this);
-}
+mlir::FailureOr<mlir::Type> SplitComponentOp::getSuperType() { return getSuperTypeCommon(*this); }
 
 inline mlir::FailureOr<mlir::Type>
 lookupFieldTypeCommon(mlir::FlatSymbolRefAttr fieldName, mlir::Operation *op) {
 
-  auto fieldOp =
-      mlir::SymbolTable::lookupNearestSymbolFrom<FieldDefOp>(op, fieldName);
-  if (!fieldOp)
+  auto fieldOp = mlir::SymbolTable::lookupNearestSymbolFrom<FieldDefOp>(op, fieldName);
+  if (!fieldOp) {
     return mlir::failure();
+  }
 
   return fieldOp.getType();
 }
 
-mlir::FailureOr<::mlir::Type>
-ComponentOp::lookupFieldType(mlir::FlatSymbolRefAttr fieldName) {
+mlir::FailureOr<::mlir::Type> ComponentOp::lookupFieldType(mlir::FlatSymbolRefAttr fieldName) {
   return lookupFieldTypeCommon(fieldName, getOperation());
 }
 
-mlir::FailureOr<::mlir::Type>
-SplitComponentOp::lookupFieldType(mlir::FlatSymbolRefAttr fieldName) {
+mlir::FailureOr<::mlir::Type> SplitComponentOp::lookupFieldType(mlir::FlatSymbolRefAttr fieldName) {
   return lookupFieldTypeCommon(fieldName, getOperation());
 }
 
-void ConstructorRefOp::build(mlir::OpBuilder &builder,
-                             mlir::OperationState &state,
-                             ComponentInterface op) {
-  state.getOrAddProperties<Properties>().component =
-      mlir::SymbolRefAttr::get(op.getNameAttr());
-  if (op.getBuiltin())
-    state.getOrAddProperties<Properties>().builtin =
-        mlir::UnitAttr::get(builder.getContext());
+void ConstructorRefOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op
+) {
+  state.getOrAddProperties<Properties>().component = mlir::SymbolRefAttr::get(op.getNameAttr());
+  if (op.getBuiltin()) {
+    state.getOrAddProperties<Properties>().builtin = mlir::UnitAttr::get(builder.getContext());
+  }
   state.addTypes({op.getBodyFunc().getFunctionType()});
 }
 
@@ -213,41 +201,40 @@ mlir::LogicalResult ConstructorRefOp::verify() {
     // The constructor reference could be temporarly pointing
     // to a zkir struct. Assume it is correct if that's the case.
     auto structComp = mod.lookupSymbol<zkir::StructDefOp>(compName);
-    if (structComp)
+    if (structComp) {
       return mlir::success();
+    }
 
-    return emitOpError() << "reference to undefined component '" << compName
-                         << "'";
+    return emitOpError() << "reference to undefined component '" << compName << "'";
   }
 
   // Check that the referenced component's constructor has the correct type.
-  if (comp.getBodyFunc().getFunctionType() != type)
+  if (comp.getBodyFunc().getFunctionType() != type) {
     return emitOpError("reference to constructor with mismatched type");
+  }
 
   return mlir::success();
 }
 
 bool ConstructorRefOp::isBuildableWith(mlir::Attribute value, mlir::Type type) {
-  return llvm::isa<mlir::FlatSymbolRefAttr>(value) &&
-         llvm::isa<mlir::FunctionType>(type);
+  return llvm::isa<mlir::FlatSymbolRefAttr>(value) && llvm::isa<mlir::FunctionType>(type);
 }
 
-mlir::LogicalResult
-ReadFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
+mlir::LogicalResult ReadFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
   // TODO
   return mlir::success();
 }
 
-mlir::LogicalResult
-WriteFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
+mlir::LogicalResult WriteFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
   // TODO
   return mlir::success();
 }
 
 mlir::LogicalResult GetGlobalOp::inferReturnTypes(
-    mlir::MLIRContext *ctx, std::optional<mlir::Location>,
-    mlir::ValueRange operands, mlir::DictionaryAttr, mlir::OpaqueProperties,
-    mlir::RegionRange, llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+    mlir::MLIRContext *ctx, std::optional<mlir::Location>, mlir::ValueRange operands,
+    mlir::DictionaryAttr, mlir::OpaqueProperties, mlir::RegionRange,
+    llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
+) {
   // TODO
   inferredReturnTypes.push_back(ValType::get(ctx));
   return mlir::success();

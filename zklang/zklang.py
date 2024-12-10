@@ -167,15 +167,19 @@ class ZkcOpt:
 GREEN = "\033[32m"
 RED = "\033[31m"
 RESET = "\033[0m"
+OK = "\033[32m[+]\033[0m"
+
+
+def in_tty(kwargs):
+    return (kwargs["file"] if "file" in kwargs else sys.stdout).isatty()
 
 
 def color_msg(color, *args, **kwargs):
-    in_tty = (kwargs["file"] if "file" in kwargs else sys.stdout).isatty()
     msg = []
-    if in_tty:
+    if in_tty(kwargs):
         msg.append(color)
     msg += args
-    if in_tty:
+    if in_tty(kwargs):
         msg.append(RESET)
     print(*msg, **kwargs)
 
@@ -188,9 +192,21 @@ def failure(*args, **kwargs):
     color_msg(RED, *args, **kwargs)
 
 
+def ok(*args, **kwargs):
+    if in_tty(kwargs):
+        hdr = OK
+    else:
+        hdr = "[+]"
+    print(hdr, *args, **kwargs)
+
+
+def dbg(*args, **kwargs):
+    print("[D]", *args, **kwargs)
+
+
 def print_zirgen_failure(zirgen):
     print_kwargs = {"file": sys.stderr}
-    failure(f"zirgen failed ({zirgen.returncode}):", **print_kwargs)
+    failure(f"zirgen failed with error code {zirgen.returncode}:", **print_kwargs)
     print(zirgen.stderr.read().decode("utf8"), **print_kwargs)
 
     print("=========== Stdout (last 10 lines) ===========", **print_kwargs)
@@ -229,15 +245,26 @@ def main():
 
     extra_zirgen_args = shlex.split(args.zirgen_args) if args.zirgen_args else []
 
+    ok(f"Generating ZHL with zirgen for {args.filename}...", file=sys.stderr)
+    zirgen_cmd = [
+        ZIRGEN,
+        "--emit=zhl",
+        "-I",
+        basedir,
+        *extra_zirgen_args,
+        args.filename,
+    ]
+    dbg("zirgen command:", *zirgen_cmd, file=sys.stderr)
     with Popen(
-        [ZIRGEN, "--emit=zhl", "-I", basedir, *extra_zirgen_args, args.filename],
+        zirgen_cmd,
         stdout=PIPE,
         stderr=PIPE,
     ) as zirgen:
-        zirgen.wait()
-        if zirgen.returncode != 0:
+        dbg("Waiting for zirgen to finish...", file=sys.stderr)
+        zirgen.poll()
+        if zirgen.returncode is not None and zirgen.returncode != 0:
             print_zirgen_failure(zirgen)
-            return
+            sys.exit(zirgen.returncode)
         tool = (
             ZkcOpt()
             .set_pipeline(ZKC_OPT_PIPELINE)
@@ -251,10 +278,12 @@ def main():
             tool.debug_dialect_conversion()
         if args.output:
             tool.set_output(args.output)
+        ok(f"Generating LLZK with zkc-opt for {args.filename}...", file=sys.stderr)
         with tool.run(zirgen.stdout) as opt:
             opt.wait()
             if opt.returncode != 0:
                 failure("Something went wrong with zkc-opt", file=sys.stderr)
+                sys.exit(opt.returncode)
             else:
                 success("Success!", file=sys.stderr)
                 if args.output:

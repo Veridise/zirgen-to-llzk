@@ -34,31 +34,31 @@ void ConvertZhlToZmirPass::runOnOperation() {
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 
-  patterns.add<ZhlLiteralLowering, ZhlDefineLowering, ZhlConstructLowering,
-               ZhlConstrainLowering, ZhlSuperLoweringInFunc, ZhlGlobalRemoval,
-               ZhlDeclarationRemoval, ZhlLookupLowering, ZhlExternLowering,
-               ZhlArrayLowering, ZhlSubscriptLowering>(typeConverter, ctx);
+  patterns.add<
+      ZhlLiteralLowering, ZhlDefineLowering, ZhlConstructLowering, ZhlConstrainLowering,
+      ZhlSuperLoweringInFunc, ZhlGlobalRemoval, ZhlDeclarationRemoval, ZhlLookupLowering,
+      ZhlExternLowering, ZhlArrayLowering, ZhlSubscriptLowering>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                         zirgen::Zhl::ZhlDialect>();
+  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect>(
+  );
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
 
-  target.addIllegalOp<zirgen::Zhl::DefinitionOp, zirgen::Zhl::ConstructOp,
-                      zirgen::Zhl::LiteralOp, zirgen::Zhl::ConstraintOp,
-                      zirgen::Zhl::GlobalOp, zirgen::Zhl::DeclarationOp,
-                      zirgen::Zhl::LookupOp, zirgen::Zhl::ExternOp,
-                      zirgen::Zhl::ArrayOp, zirgen::Zhl::SubscriptOp>();
-  target.addDynamicallyLegalOp<zirgen::Zhl::SuperOp>(
-      [](zirgen::Zhl::SuperOp op) {
-        // Only super ops whose parent is a FuncOp are illegal at this point
-        return !mlir::isa<mlir::func::FuncOp>(op->getParentOp());
-      });
+  target.addIllegalOp<
+      zirgen::Zhl::DefinitionOp, zirgen::Zhl::ConstructOp, zirgen::Zhl::LiteralOp,
+      zirgen::Zhl::ConstraintOp, zirgen::Zhl::GlobalOp, zirgen::Zhl::DeclarationOp,
+      zirgen::Zhl::LookupOp, zirgen::Zhl::ExternOp, zirgen::Zhl::ArrayOp, zirgen::Zhl::SubscriptOp>(
+  );
+  target.addDynamicallyLegalOp<zirgen::Zhl::SuperOp>([](zirgen::Zhl::SuperOp op) {
+    // Only super ops whose parent is a FuncOp are illegal at this point
+    return !mlir::isa<mlir::func::FuncOp>(op->getParentOp());
+  });
 
   // Call partialTransformation
-  if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))))
+  if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();
+  }
 }
 
 std::unique_ptr<OperationPass<Zmir::ComponentOp>> createConvertZhlToZmirPass() {
@@ -72,21 +72,19 @@ void TransformComponentDeclsPass::runOnOperation() {
   // Init patterns for this transformation
   Zmir::ZMIRTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);
-  patterns.add<ZhlCompToZmirCompPattern, ZhlParameterLowering>(typeConverter,
-                                                               ctx);
+  patterns.add<ZhlCompToZmirCompPattern, ZhlParameterLowering>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                         zirgen::Zhl::ZhlDialect>();
+  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect>(
+  );
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
-  target.addIllegalOp<zirgen::Zhl::ComponentOp,
-                      zirgen::Zhl::ConstructorParamOp>();
+  target.addIllegalOp<zirgen::Zhl::ComponentOp, zirgen::Zhl::ConstructorParamOp>();
 
   // Call partialTransformation
-  if (mlir::failed(
-          mlir::applyPartialConversion(module, target, std::move(patterns))))
+  if (mlir::failed(mlir::applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
+  }
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createTransformComponentDeclsPass() {
@@ -105,22 +103,24 @@ void ConvertZhlToScfPass::runOnOperation() {
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 
-  patterns.add<ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap,
-               ZhlSuperLoweringInBlock, ZhlBlockLowering>(typeConverter, ctx);
+  patterns.add<
+      ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlSuperLoweringInBlock,
+      ZhlBlockLowering>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                         mlir::scf::SCFDialect, mlir::index::IndexDialect,
-                         zirgen::Zhl::ZhlDialect>();
+  target.addLegalDialect<
+      zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, mlir::scf::SCFDialect,
+      mlir::index::IndexDialect, zirgen::Zhl::ZhlDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
 
-  target.addIllegalOp<zirgen::Zhl::RangeOp, zirgen::Zhl::MapOp,
-                      zirgen::Zhl::SuperOp, zirgen::Zhl::BlockOp>();
+  target.addIllegalOp<
+      zirgen::Zhl::RangeOp, zirgen::Zhl::MapOp, zirgen::Zhl::SuperOp, zirgen::Zhl::BlockOp>();
 
   // Call partialTransformation
-  if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))))
+  if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();
+  }
 }
 
 std::unique_ptr<OperationPass<Zmir::ComponentOp>> createConvertZhlToScfPass() {

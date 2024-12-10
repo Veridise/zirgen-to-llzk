@@ -17,8 +17,7 @@ public:
   using OpConversionPattern<Zmir::LitValOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Zmir::LitValOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(Zmir::LitValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 /// Converts self into a struct allocation
@@ -27,8 +26,7 @@ public:
   using OpConversionPattern<Zmir::GetSelfOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Zmir::GetSelfOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(Zmir::GetSelfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class ComponentLowering : public mlir::OpConversionPattern<SplitComponentOp> {
@@ -36,8 +34,7 @@ public:
   using OpConversionPattern<SplitComponentOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(SplitComponentOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(SplitComponentOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class FieldDefOpLowering : public mlir::OpConversionPattern<FieldDefOp> {
@@ -45,8 +42,7 @@ public:
   using OpConversionPattern<FieldDefOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(FieldDefOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(FieldDefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class FuncOpLowering : public mlir::OpConversionPattern<mlir::func::FuncOp> {
@@ -54,18 +50,16 @@ public:
   using OpConversionPattern<mlir::func::FuncOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::FuncOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(mlir::func::FuncOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
-class ReturnOpLowering
-    : public mlir::OpConversionPattern<mlir::func::ReturnOp> {
+class ReturnOpLowering : public mlir::OpConversionPattern<mlir::func::ReturnOp> {
 public:
   using OpConversionPattern<mlir::func::ReturnOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::ReturnOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(mlir::func::ReturnOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
 };
 
 class CallOpLowering : public mlir::OpConversionPattern<mlir::func::CallOp> {
@@ -74,8 +68,7 @@ public:
   using OpConversionPattern<mlir::func::CallOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(mlir::func::CallOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class CallIndirectOpLoweringInCompute
@@ -85,8 +78,8 @@ public:
   using OpConversionPattern<mlir::func::CallIndirectOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
 };
 
 class CallIndirectOpLoweringInConstrain
@@ -96,30 +89,27 @@ public:
   using OpConversionPattern<mlir::func::CallIndirectOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
 };
 
-class WriteFieldOpLowering
-    : public mlir::OpConversionPattern<Zmir::WriteFieldOp> {
+class WriteFieldOpLowering : public mlir::OpConversionPattern<Zmir::WriteFieldOp> {
 
 public:
   using OpConversionPattern<Zmir::WriteFieldOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Zmir::WriteFieldOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(Zmir::WriteFieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
-class RemoveConstructorRefOp
-    : public mlir::OpConversionPattern<Zmir::ConstructorRefOp> {
+class RemoveConstructorRefOp : public mlir::OpConversionPattern<Zmir::ConstructorRefOp> {
 
 public:
   using OpConversionPattern<Zmir::ConstructorRefOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Zmir::ConstructorRefOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(Zmir::ConstructorRefOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
 };
 
 template <typename FromOp, typename ToOp>
@@ -127,10 +117,10 @@ class LowerArithBuiltIns : public mlir::OpConversionPattern<FromOp> {
 public:
   using mlir::OpConversionPattern<FromOp>::OpConversionPattern;
 
-  mlir::LogicalResult
-  matchAndRewrite(FromOp op,
-                  typename mlir::OpConversionPattern<FromOp>::OpAdaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
+  mlir::LogicalResult matchAndRewrite(
+      FromOp op, typename mlir::OpConversionPattern<FromOp>::OpAdaptor adaptor,
+      mlir::ConversionPatternRewriter &rewriter
+  ) const override {
     rewriter.replaceOpWithNewOp<ToOp>(op, adaptor.getOperands());
     return mlir::success();
   }
@@ -149,8 +139,7 @@ public:
   using mlir::OpConversionPattern<IsZeroOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(IsZeroOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(IsZeroOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerReadFieldOp : public mlir::OpConversionPattern<ReadFieldOp> {
@@ -158,8 +147,7 @@ public:
   using mlir::OpConversionPattern<ReadFieldOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(ReadFieldOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(ReadFieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerConstrainOp : public mlir::OpConversionPattern<ConstrainOp> {
@@ -167,8 +155,7 @@ public:
   using mlir::OpConversionPattern<ConstrainOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(ConstrainOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(ConstrainOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerInRangeOp : public mlir::OpConversionPattern<InRangeOp> {
@@ -176,8 +163,7 @@ public:
   using mlir::OpConversionPattern<InRangeOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(InRangeOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(InRangeOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerNewArrayOp : public mlir::OpConversionPattern<NewArrayOp> {
@@ -185,8 +171,7 @@ public:
   using mlir::OpConversionPattern<NewArrayOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(NewArrayOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(NewArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerReadArrayOp : public mlir::OpConversionPattern<ReadArrayOp> {
@@ -194,8 +179,7 @@ public:
   using mlir::OpConversionPattern<ReadArrayOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(ReadArrayOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(ReadArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerAllocArrayOp : public mlir::OpConversionPattern<AllocArrayOp> {
@@ -203,8 +187,7 @@ public:
   using mlir::OpConversionPattern<AllocArrayOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(AllocArrayOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(AllocArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerIndexToValOp : public mlir::OpConversionPattern<IndexToValOp> {
@@ -212,8 +195,7 @@ public:
   using mlir::OpConversionPattern<IndexToValOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(IndexToValOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(IndexToValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerValToIndexOp : public mlir::OpConversionPattern<ValToIndexOp> {
@@ -221,8 +203,7 @@ public:
   using mlir::OpConversionPattern<ValToIndexOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(ValToIndexOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(ValToIndexOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerArrayLengthOp : public mlir::OpConversionPattern<GetArrayLenOp> {
@@ -230,8 +211,7 @@ public:
   using mlir::OpConversionPattern<GetArrayLenOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(GetArrayLenOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(GetArrayLenOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerWriteArrayOp : public mlir::OpConversionPattern<WriteArrayOp> {
@@ -239,8 +219,7 @@ public:
   using mlir::OpConversionPattern<WriteArrayOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(WriteArrayOp, OpAdaptor,
-                  mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(WriteArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 } // namespace zkc::Zmir

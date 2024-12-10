@@ -21,15 +21,18 @@ class StripTestsPass : public StripTestsBase<StripTestsPass> {
     DenseSet<Operation *> toErase;
     for (auto &op : getOperation().getOps()) {
       auto compOp = llvm::dyn_cast<zirgen::Zhl::ComponentOp>(op);
-      if (!compOp)
+      if (!compOp) {
         continue;
+      }
       auto symName = compOp.getName();
-      if (symName.starts_with("test$") || symName.contains("$test"))
+      if (symName.starts_with("test$") || symName.contains("$test")) {
         toErase.insert(&op);
+      }
     }
 
-    for (auto op : toErase)
+    for (auto op : toErase) {
       op->erase();
+    }
   }
 };
 

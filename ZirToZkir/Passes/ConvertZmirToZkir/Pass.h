@@ -14,8 +14,7 @@
 
 namespace zkc {
 
-class ConvertZmirToZkirPass
-    : public ConvertZmirToZkirBase<ConvertZmirToZkirPass> {
+class ConvertZmirToZkirPass : public ConvertZmirToZkirBase<ConvertZmirToZkirPass> {
   void runOnOperation() override;
 };
 

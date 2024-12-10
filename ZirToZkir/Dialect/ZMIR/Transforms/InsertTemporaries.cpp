@@ -23,11 +23,10 @@ using namespace mlir;
 namespace zkc::Zmir {
 
 namespace {
-class InsertTemporariesPass
-    : public InsertTemporariesBase<InsertTemporariesPass> {
+class InsertTemporariesPass : public InsertTemporariesBase<InsertTemporariesPass> {
 
-  mlir::FlatSymbolRefAttr createTempField(mlir::Location loc, mlir::Type type,
-                                          mlir::OpBuilder &builder) {
+  mlir::FlatSymbolRefAttr
+  createTempField(mlir::Location loc, mlir::Type type, mlir::OpBuilder &builder) {
     auto op = getOperation();
     mlir::SymbolTable st(op);
     auto desiredName = mlir::StringAttr::get(&getContext(), "$temp");
@@ -37,31 +36,28 @@ class InsertTemporariesPass
     return mlir::FlatSymbolRefAttr::get(&getContext(), st.insert(fieldDef));
   }
 
-  void createTempFieldWrite(mlir::func::CallIndirectOp op,
-                            mlir::OpBuilder &builder) {
+  void createTempFieldWrite(mlir::func::CallIndirectOp op, mlir::OpBuilder &builder) {
     // We are interested on the ones that we could not annotate
-    if (op->hasAttr("writes_into"))
+    if (op->hasAttr("writes_into")) {
       return;
+    }
     auto results = op.getResultTypes();
-    if (results.size() != 1)
+    if (results.size() != 1) {
       return;
+    }
     auto name = createTempField(op->getLoc(), results[0], builder);
     builder.setInsertionPointAfter(op);
-    auto self =
-        builder.create<GetSelfOp>(op.getLoc(), getOperation().getType());
+    auto self = builder.create<GetSelfOp>(op.getLoc(), getOperation().getType());
     builder.create<WriteFieldOp>(op->getLoc(), self, name, op.getResult(0));
 
     op->setAttr("writes_into", name.getAttr());
   }
 
-  template <typename Arr>
-  void createTempFieldWrite(Arr op, mlir::OpBuilder &builder) {
+  template <typename Arr> void createTempFieldWrite(Arr op, mlir::OpBuilder &builder) {
 
     builder.setInsertionPointAfter(op);
-    auto name =
-        createTempField(op->getLoc(), op.getResult().getType(), builder);
-    auto self =
-        builder.create<GetSelfOp>(op.getLoc(), getOperation().getType());
+    auto name = createTempField(op->getLoc(), op.getResult().getType(), builder);
+    auto self = builder.create<GetSelfOp>(op.getLoc(), getOperation().getType());
     builder.create<WriteFieldOp>(op->getLoc(), self, name, op);
   }
 
@@ -72,13 +68,9 @@ class InsertTemporariesPass
       createTempFieldWrite(constructorCall, builder);
     });
 
-    getOperation().walk([&](Zmir::AllocArrayOp alloc) {
-      createTempFieldWrite(alloc, builder);
-    });
+    getOperation().walk([&](Zmir::AllocArrayOp alloc) { createTempFieldWrite(alloc, builder); });
 
-    getOperation().walk([&](Zmir::NewArrayOp newArr) {
-      createTempFieldWrite(newArr, builder);
-    });
+    getOperation().walk([&](Zmir::NewArrayOp newArr) { createTempFieldWrite(newArr, builder); });
   }
 };
 

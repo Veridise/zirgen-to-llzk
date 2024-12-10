@@ -16,9 +16,10 @@ ComponentArity zkc::getComponentConstructorArity(zirgen::Zhl::ComponentOp op) {
   }
 
   // The iterator will be sorted since it's a `std::map`.
-  std::transform(locsByIndex.begin(), locsByIndex.end(),
-                 std::back_inserter(arity.locs),
-                 [](auto &pair) { return pair.second; });
+  std::transform(
+      locsByIndex.begin(), locsByIndex.end(), std::back_inserter(arity.locs),
+      [](auto &pair) { return pair.second; }
+  );
 
   return arity;
 }

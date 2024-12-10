@@ -9,8 +9,8 @@ namespace zkc::Zmir {
 void addBuiltins(mlir::OpBuilder &, std::function<bool(mlir::StringRef)>);
 mlir::Operation *getBuiltInOp(mlir::StringRef);
 
-static const std::unordered_set<std::string> BuiltInComponentNames = {
-    "BitAnd", "Add", "Sub", "Mul", "Inv", "Isz", "Neg"};
+static const std::unordered_set<std::string> BuiltInComponentNames = {"BitAnd", "Add", "Sub", "Mul",
+                                                                      "Inv",    "Isz", "Neg"};
 
 static const char BitAndStr[] = "BitAnd";
 static const char AddStr[] = "Add";

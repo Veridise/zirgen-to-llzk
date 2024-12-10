@@ -22,6 +22,5 @@ int main(int argc, char **argv) {
   registry.insert<zkc::Zmir::ZmirDialect>();
   registry.insert<zirgen::Zhl::ZhlDialect>();
   registry.insert<zkir::ZKIRDialect>();
-  return failed(mlir::MlirOptMain(
-      argc, argv, "ZIR to ZKIR transformation pipeline\n", registry));
+  return failed(mlir::MlirOptMain(argc, argv, "ZIR to ZKIR transformation pipeline\n", registry));
 }

@@ -19,34 +19,33 @@ namespace zkc::Zmir {
 
 namespace {
 
-template <typename Impl, typename Base>
-class RemoveIllegalOpsCommon : public Base {
+template <typename Impl, typename Base> class RemoveIllegalOpsCommon : public Base {
 
   void runOnOperation() override {
     // Skip if we are not in the interesting function
-    if (!inTargetFunction())
+    if (!inTargetFunction()) {
       return;
+    }
 
     mlir::RewritePatternSet patterns(&Base::getContext());
     addPatterns(patterns);
 
     // Set conversion target
     mlir::ConversionTarget target(Base::getContext());
-    target.addLegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect,
-                           zirgen::Zhl::ZhlDialect, mlir::index::IndexDialect,
-                           mlir::scf::SCFDialect>();
+    target.addLegalDialect<
+        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect,
+        mlir::index::IndexDialect, mlir::scf::SCFDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp>();
     setLegality(target);
 
-    if (failed(applyPartialConversion(Base::getOperation(), target,
-                                      std::move(patterns))))
+    if (failed(applyPartialConversion(Base::getOperation(), target, std::move(patterns)))) {
       Base::signalPassFailure();
+    }
   }
 
 protected:
   ComponentInterface getDeclaringComponent() {
-    return mlir::dyn_cast<ComponentInterface>(
-        Base::getOperation()->getParentOp());
+    return mlir::dyn_cast<ComponentInterface>(Base::getOperation()->getParentOp());
   }
 
   /// Checks if the function is the one that needs to be transformed
@@ -63,22 +62,23 @@ template <typename Op> class RemoveOp : public OpConversionPattern<Op> {
 public:
   using OpConversionPattern<Op>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(
+      Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter
+  ) const override {
     rewriter.eraseOp(op);
     return mlir::success();
   }
 };
 
-template <typename Op, int ArgIdx>
-class ReplaceUsesWithArg : public OpConversionPattern<Op> {
+template <typename Op, int ArgIdx> class ReplaceUsesWithArg : public OpConversionPattern<Op> {
 public:
   using OpConversionPattern<Op>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(
+      Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter
+  ) const override {
     auto body = op->template getParentOfType<mlir::func::FuncOp>();
     mlir::BlockArgument arg = body.getArgument(ArgIdx);
 
@@ -88,14 +88,13 @@ public:
   }
 };
 
-class ReplaceConstructWithRead
-    : public OpConversionPattern<func::CallIndirectOp> {
+class ReplaceConstructWithRead : public OpConversionPattern<func::CallIndirectOp> {
 public:
   using OpConversionPattern<func::CallIndirectOp>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(func::CallIndirectOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(
+      func::CallIndirectOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+  ) const override {
 
     return mlir::failure();
   }
@@ -105,31 +104,33 @@ class ReplaceWriteFieldWithRead : public OpConversionPattern<WriteFieldOp> {
 public:
   using OpConversionPattern<WriteFieldOp>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(WriteFieldOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(
+      WriteFieldOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+  ) const override {
     insertReadToReplaceUses(op, adaptor, rewriter);
     rewriter.eraseOp(op);
     return mlir::success();
   }
 
-  void insertReadToReplaceUses(WriteFieldOp op, OpAdaptor adaptor,
-                               ConversionPatternRewriter &rewriter) const {
+  void insertReadToReplaceUses(
+      WriteFieldOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+  ) const {
 
     OpBuilder::InsertionGuard guard(rewriter);
     /// Only insert the read op if the value is primitive
-    if (mlir::isa<ComponentType>(op.getVal().getType()))
+    if (mlir::isa<ComponentType>(op.getVal().getType())) {
       return;
+    }
 
     if (auto valOp = adaptor.getVal().getDefiningOp()) {
       rewriter.setInsertionPoint(valOp);
     } else {
-      rewriter.setInsertionPointToStart(
-          &(op->getParentOfType<mlir::func::FuncOp>().getBody().front()));
+      rewriter.setInsertionPointToStart(&(op->getParentOfType<mlir::func::FuncOp>().getBody().front(
+      )));
     }
     auto read = rewriter.create<Zmir::ReadFieldOp>(
-        op.getLoc(), op.getVal().getType(), adaptor.getComponent(),
-        adaptor.getFieldNameAttr());
+        op.getLoc(), op.getVal().getType(), adaptor.getComponent(), adaptor.getFieldNameAttr()
+    );
     rewriter.replaceUsesWithIf(adaptor.getVal(), read, [](auto &operand) {
       // Replace anything but write ops since we want to get rid of them
       // and changing these ops causes recursion problems with the pattern
@@ -143,9 +144,9 @@ class ReplaceWriteArrayWithRead : public OpConversionPattern<WriteArrayOp> {
 public:
   using OpConversionPattern<WriteArrayOp>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(WriteArrayOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(
+      WriteArrayOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+  ) const override {
 
     return success();
   }
@@ -153,19 +154,17 @@ public:
 
 class RemoveIllegalComputeOpsPass
     : public RemoveIllegalOpsCommon<
-          RemoveIllegalComputeOpsPass,
-          RemoveIllegalComputeOpsBase<RemoveIllegalComputeOpsPass>> {
+          RemoveIllegalComputeOpsPass, RemoveIllegalComputeOpsBase<RemoveIllegalComputeOpsPass>> {
 
   bool inTargetFunction() override {
     auto comp = getDeclaringComponent();
-    if (!comp || comp.hasUnifiedBody())
+    if (!comp || comp.hasUnifiedBody()) {
       return false;
+    }
     return getOperation() == comp.getBodyFunc();
   }
 
-  void setLegality(ConversionTarget &target) override {
-    target.addIllegalOp<ConstrainOp>();
-  }
+  void setLegality(ConversionTarget &target) override { target.addIllegalOp<ConstrainOp>(); }
 
   void addPatterns(RewritePatternSet &patterns) override {
     patterns.add<RemoveOp<ConstrainOp>>(&getContext());
@@ -179,34 +178,34 @@ class RemoveIllegalConstrainOpsPass
 
   bool inTargetFunction() override {
     auto comp = getDeclaringComponent();
-    if (!comp || comp.hasUnifiedBody())
+    if (!comp || comp.hasUnifiedBody()) {
       return false;
+    }
     return getOperation() == comp.getConstrainFunc();
   }
 
   void setLegality(ConversionTarget &target) override {
     // And there's probably more
-    target.addIllegalOp<WriteFieldOp, GetSelfOp, BitAndOp, InvOp, WriteArrayOp,
-                        AllocArrayOp, NewArrayOp>();
+    target.addIllegalOp<
+        WriteFieldOp, GetSelfOp, BitAndOp, InvOp, WriteArrayOp, AllocArrayOp, NewArrayOp>();
     /*target.addIllegalOp<func::CallIndirectOp>();*/
   }
 
   void addPatterns(RewritePatternSet &patterns) override {
-    patterns.add<ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
-                 ReplaceUsesWithArg<GetSelfOp, 0>, RemoveOp<WriteArrayOp>,
-                 RemoveOp<AllocArrayOp>, RemoveOp<NewArrayOp>>(&getContext());
+    patterns.add<
+        ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
+        ReplaceUsesWithArg<GetSelfOp, 0>, RemoveOp<WriteArrayOp>, RemoveOp<AllocArrayOp>,
+        RemoveOp<NewArrayOp>>(&getContext());
   }
 };
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createRemoveIllegalComputeOpsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createRemoveIllegalComputeOpsPass() {
   return std::make_unique<RemoveIllegalComputeOpsPass>();
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createRemoveIllegalConstrainOpsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createRemoveIllegalConstrainOpsPass() {
   return std::make_unique<RemoveIllegalConstrainOpsPass>();
 }
 
