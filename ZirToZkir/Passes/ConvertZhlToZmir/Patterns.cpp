@@ -399,7 +399,7 @@ inline mlir::FailureOr<mlir::Type> getTypeFromName(Zhl::GlobalOp typeNameOp) {
       return lookupFromMod;
     }
 
-    return typeNameOp.emitError() << "unrecognized type " << name;
+    return typeNameOp.emitError() << "type " << name << " not found";
   }
 }
 
@@ -604,29 +604,6 @@ private:
   }
 
   mlir::MLIRContext *getContext() { return rewriter.getContext(); }
-
-  /*mlir::FailureOr<mlir::Type> getTypeFromName(Zhl::GlobalOp typeNameOp) {*/
-  /*  auto name = typeNameOp.getName();*/
-  /*  // Simple algorithm for now*/
-  /*  if (name == "Val") {*/
-  /*    return Zmir::ValType::get(getContext());*/
-  /*  } else if (name == "String") {*/
-  /*    return Zmir::StringType::get(getContext());*/
-  /*  } else {*/
-  /*    auto sym = mlir::SymbolTable::lookupNearestSymbolFrom(*/
-  /*        typeNameOp.getOperation(), rewriter.getStringAttr(name));*/
-  /*    if (sym != nullptr) {*/
-  /*      auto op = mlir::cast<Zmir::ComponentOp>(sym);*/
-  /*      if (!op) {*/
-  /*        return typeNameOp.emitError()*/
-  /*               << "type " << name << " is not a component";*/
-  /*      }*/
-  /*      return op.getType();*/
-  /*    }*/
-  /**/
-  /*    return typeNameOp.emitError() << "unrecognized type " << name;*/
-  /*  }*/
-  /*}*/
 
   zkc::Zmir::ComponentOp createComponent() {
     auto maybeBuiltin = mlir::SymbolTable::lookupSymbolIn(

@@ -232,6 +232,7 @@ def main():
     parser.add_argument("--zkc-opt-args")
     parser.add_argument("--zkc-opt-help", action="store_true")
     parser.add_argument("--stop-at")
+    parser.add_argument("--pipeline")
     args = parser.parse_args()
     basedir = os.path.dirname(args.filename)
 
@@ -242,6 +243,10 @@ def main():
 
     if args.stop_at:
         ZKC_OPT_PIPELINE.stop_at(args.stop_at)
+
+    selected_pipeline = ZKC_OPT_PIPELINE
+    if args.pipeline:
+        selected_pipeline = args.pipeline
 
     extra_zirgen_args = shlex.split(args.zirgen_args) if args.zirgen_args else []
 
@@ -267,7 +272,7 @@ def main():
             sys.exit(zirgen.returncode)
         tool = (
             ZkcOpt()
-            .set_pipeline(ZKC_OPT_PIPELINE)
+            .set_pipeline(selected_pipeline)
             .dump_ir(args.dump)
             .set_dump_pipeline(args.dump_pipeline)
             .dump_as_tree(args.dump_as_tree)

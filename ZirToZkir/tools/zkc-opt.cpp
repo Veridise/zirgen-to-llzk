@@ -1,3 +1,4 @@
+#include "ZirToZkir/Dialect/ZHL/Typing/Passes.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h"
 #include "ZirToZkir/Dialect/ZMIR/Transforms/Passes.h"
 #include "ZirToZkir/Passes/Passes.h"
@@ -18,6 +19,7 @@ int main(int argc, char **argv) {
   });
   zkc::registerPasses();
   zkc::Zmir::registerPasses();
+  zhl::registerPasses();
 
   registry.insert<zkc::Zmir::ZmirDialect>();
   registry.insert<zirgen::Zhl::ZhlDialect>();

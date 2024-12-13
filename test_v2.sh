@@ -37,8 +37,8 @@ function build_zir {
   stderr=$DEST/$name.stderr
   errcode=$DEST/$name.errcode
   echo "[=] Building $name..."
-  bazel run $BAZELFLAGS //zklang:zklang -- -o $mlir_out $zir $ZKLANG_FLAGS > $stdout 2> $stderr &
-  tail -F $stderr --pid=$!
+  bazel run $BAZELFLAGS //zklang:zklang -- -o $mlir_out $zir $ZKLANG_FLAGS > $stdout 2> $stderr #&
+  # tail -F $stderr --pid=$!
   echo $? > $errcode
   echo " ============= $name =============="
   echo -n "Return code: "

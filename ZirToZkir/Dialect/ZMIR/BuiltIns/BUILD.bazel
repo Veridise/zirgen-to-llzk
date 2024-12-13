@@ -12,6 +12,7 @@ cc_library(
       "BuiltIns.h"
     ],
     deps = [
-      "//ZirToZkir/Dialect/ZMIR/IR",  
+      "//ZirToZkir/Dialect/ZMIR/IR", 
+      "//ZirToZkir/Dialect/ZHL/Typing:TypeBindings"
     ],
 )

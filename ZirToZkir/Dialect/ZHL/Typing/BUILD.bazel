@@ -1,0 +1,67 @@
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "TypeBindings",
+    srcs = [
+      "TypeBindings.cpp"
+    ],
+    hdrs = [
+      "TypeBindings.h"
+    ],
+    deps = [
+      "@llvm-project//llvm:Support",
+      # "//ZirToZkir/Dialect/ZMIR/IR",  
+    ],
+)
+
+
+td_library(
+    name = "PassesTdFiles",
+    srcs = ["Passes.td"],
+    deps = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:RewritePassBaseTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["-gen-pass-decls"],
+            "Passes.inc.h",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = ":Passes.td",
+    deps = [
+        ":PassesTdFiles",
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+cc_library(
+    name = "passes",
+    srcs = [
+        "PassDetail.h",
+      "PrintTypeBindings.cpp"
+    ],
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+      ":TypeBindings",
+        ":PassesIncGen",
+        "//ZirToZkir/Dialect/ZMIR/Typing:ZMIRTypeConverter",  
+        "@zirgen//zirgen/Dialect/ZHL/IR",
+        "@llvm-project//mlir:Transforms",
+        "//ZirToZkir/Dialect/ZMIR/BuiltIns",  
+        "//ZirToZkir/Dialect/ZMIR/IR",  
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:Analysis"
+    ],
+)

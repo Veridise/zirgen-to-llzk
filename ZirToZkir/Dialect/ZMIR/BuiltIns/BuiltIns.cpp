@@ -1,6 +1,7 @@
 #include "BuiltIns.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include <functional>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
@@ -184,49 +185,37 @@ void addArrayComponent(BuildContext &ctx) {
   });
 }
 
+void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
+  auto Val = bindings.Create("Val", bindings.Component());
+  bindings.Create("String", bindings.Component());
+
+  bindings.Create("NondetReg", Val);
+  bindings.Create("InRange", Val);
+  bindings.Create("BitAnd", Val);
+  bindings.Create("Add", Val);
+  bindings.Create("Sub", Val);
+  bindings.Create("Mul", Val);
+  bindings.Create("Inv", Val);
+  bindings.Create("Isz", Val);
+  bindings.Create("Neg", Val);
+  bindings.Create("Array", bindings.Component());
+}
+
 /// Adds the builtin operations that have not been overriden
-/// checkOverride returns true if function has been overriden.
-void zkc::Zmir::addBuiltins(
-    mlir::OpBuilder &builder, std::function<bool(mlir::StringRef)> checkOverride
-) {
+void zkc::Zmir::addBuiltins(mlir::OpBuilder &builder) {
   BuildContext ctx(builder);
-  if (!checkOverride("InRange")) {
-    addInRange(ctx);
-  }
-  if (!checkOverride("Component")) {
-    addComponent(ctx);
-  }
-  if (!checkOverride("NondetReg")) {
-    addNondetReg(ctx);
-  }
-
-  if (!checkOverride("BitAnd")) {
-    addBinOp<BitAndOp>(ctx, "BitAnd");
-  }
-  if (!checkOverride("Add")) {
-    addBinOp<AddOp>(ctx, "Add");
-  }
-  if (!checkOverride("Sub")) {
-    addBinOp<SubOp>(ctx, "Sub");
-  }
-  if (!checkOverride("Mul")) {
-    addBinOp<MulOp>(ctx, "Mul");
-  }
-
-  if (!checkOverride("Inv")) {
-    addUnaryOp<InvOp>(ctx, "Inv");
-  }
-  if (!checkOverride("Isz")) {
-    addUnaryOp<IsZeroOp>(ctx, "Isz");
-  }
-  if (!checkOverride("Neg")) {
-    addUnaryOp<NegOp>(ctx, "Neg");
-  }
-
+  addComponent(ctx);
   addTrivial(ctx, "Val", ValType::get(builder.getContext()));
-  // addTrivial(ctx, "String", StringType::get(builder.getContext()));
-  /// The type 'Type' should also have a trivial constructor
-  /// but how to handle this type at this level of abstraction
-  /// is TBD.
-  // addArrayComponent(ctx);
+  addTrivial(ctx, "String", StringType::get(builder.getContext()));
+
+  addNondetReg(ctx);
+  addInRange(ctx);
+  addBinOp<BitAndOp>(ctx, "BitAnd");
+  addBinOp<AddOp>(ctx, "Add");
+  addBinOp<SubOp>(ctx, "Sub");
+  addBinOp<MulOp>(ctx, "Mul");
+  addUnaryOp<InvOp>(ctx, "Inv");
+  addUnaryOp<IsZeroOp>(ctx, "Isz");
+  addUnaryOp<NegOp>(ctx, "Neg");
+  addArrayComponent(ctx);
 }

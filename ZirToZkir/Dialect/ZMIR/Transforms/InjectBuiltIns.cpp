@@ -21,18 +21,7 @@ class InjectBuiltInsPass : public InjectBuiltInsBase<InjectBuiltInsPass> {
     ModuleOp mod = getOperation();
     assert(mod->hasTrait<OpTrait::SymbolTable>());
     OpBuilder builder(mod.getRegion());
-    addBuiltins(builder, [&](mlir::StringRef name) {
-      return false;
-
-      // The code below doesn't really work and I don't know why
-      auto op = mlir::SymbolTable::lookupSymbolIn(mod.getOperation(), name);
-      if (op != nullptr) {
-        mod->emitError() << "component " << name << " has been overriden";
-      } else {
-        mod->emitError() << "component " << name << " has not been overriden";
-      }
-      return op != nullptr;
-    });
+    addBuiltins(builder);
   }
 };
 

@@ -1,0 +1,18 @@
+component Head<T: Type, N: Val>(arr: Array<T, N>) {
+  arr[0]
+}
+
+component A<N: Val>() {
+  Head<Val, 3>([N,N+1,N+2])
+}
+
+component B() {
+  Head<A<1>, 2>([A<1>(), A<1>()])
+}
+
+component Top() {
+  a := A<1>();
+  b := B();
+
+  a = b;
+}

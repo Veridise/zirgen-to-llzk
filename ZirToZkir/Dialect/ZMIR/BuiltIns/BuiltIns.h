@@ -1,12 +1,14 @@
 #pragma once
 
+#include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
 #include <mlir/IR/Builders.h>
 #include <unordered_set>
 
 namespace zkc::Zmir {
 
+void addBuiltinBindings(zhl::TypeBindings &);
 // Add builtin components using the given builder
-void addBuiltins(mlir::OpBuilder &, std::function<bool(mlir::StringRef)>);
+void addBuiltins(mlir::OpBuilder &);
 mlir::Operation *getBuiltInOp(mlir::StringRef);
 
 static const std::unordered_set<std::string> BuiltInComponentNames = {"BitAnd", "Add", "Sub", "Mul",
