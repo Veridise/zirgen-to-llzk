@@ -11,6 +11,7 @@ component B() {
 }
 
 component Top() {
+  r := Reg(1);
   a := A<1>();
   b := B();
 

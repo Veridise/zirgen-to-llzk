@@ -188,6 +188,7 @@ void addArrayComponent(BuildContext &ctx) {
 void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
   auto Val = bindings.Create("Val", bindings.Component());
   bindings.Create("String", bindings.Component());
+  bindings.Create("Type", bindings.Component());
 
   bindings.Create("NondetReg", Val);
   bindings.Create("InRange", Val);
