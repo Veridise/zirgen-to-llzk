@@ -11,9 +11,12 @@ component B() {
 }
 
 component Top() {
-  r := Reg(1);
+  r := { Reg(1) };
   a := A<1>();
   b := B();
 
   a = b;
+
+  x := [0, 1] -> (Reg(3),4);
+
 }

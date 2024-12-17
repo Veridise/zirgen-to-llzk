@@ -186,9 +186,9 @@ void addArrayComponent(BuildContext &ctx) {
 }
 
 void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
-  auto Val = bindings.Create("Val", bindings.Component());
+  auto &Val = bindings.Create("Val", bindings.Component());
   bindings.Create("String", bindings.Component());
-  bindings.Create("Type", bindings.Component());
+  auto &Type = bindings.Create("Type", bindings.Component());
 
   bindings.Create("NondetReg", Val);
   bindings.Create("InRange", Val);
@@ -199,7 +199,10 @@ void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
   bindings.Create("Inv", Val);
   bindings.Create("Isz", Val);
   bindings.Create("Neg", Val);
-  bindings.Create("Array", bindings.Component());
+  zhl::ParamsMap arrayGenericParams;
+  arrayGenericParams[{"T", 0}] = Type;
+  arrayGenericParams[{"N", 1}] = Val;
+  bindings.Create("Array", bindings.Component(), arrayGenericParams);
 }
 
 /// Adds the builtin operations that have not been overriden

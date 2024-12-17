@@ -18,6 +18,26 @@ cc_library(
     ],
 )
 
+cc_library(
+  name = "ZhlTypeSystem",
+  srcs = [
+    "Rules.cpp",
+    "OpBindings.cpp",
+    "Typing.cpp",
+    "Scope.cpp"
+  ],
+  hdrs = [
+    "Scope.h",
+    "Typing.h",
+    "OpBindings.h",
+    "Rules.h"
+  ],
+  deps = [
+    ":TypeBindings",
+    "@zirgen//zirgen/Dialect/ZHL/IR",
+  ]
+)
+
 
 td_library(
     name = "PassesTdFiles",
@@ -48,7 +68,7 @@ cc_library(
     name = "passes",
     srcs = [
         "PassDetail.h",
-      "PrintTypeBindings.cpp"
+      "PrintTypeBindings.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -56,6 +76,7 @@ cc_library(
     deps = [
       ":TypeBindings",
         ":PassesIncGen",
+        ":ZhlTypeSystem",
         "//ZirToZkir/Dialect/ZMIR/Typing:ZMIRTypeConverter",  
         "@zirgen//zirgen/Dialect/ZHL/IR",
         "@llvm-project//mlir:Transforms",

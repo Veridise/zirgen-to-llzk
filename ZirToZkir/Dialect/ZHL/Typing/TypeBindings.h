@@ -1,8 +1,13 @@
 #pragma once
 
+#include "mlir/IR/Diagnostics.h"
 #include "llvm/ADT/StringRef.h"
+#include <deque>
 #include <functional>
+#include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
+#include <map>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <string_view>
 #include <unordered_map>
@@ -84,94 +89,140 @@ public:
 #endif
 
 const std::string BOTTOM = "!";
+const std::string CONST = "$";
+
+class TypeBinding;
+
+using ParamsMap = std::map<std::pair<std::string_view, uint64_t>, TypeBinding>;
+using MembersMap = std::map<std::string_view, std::optional<TypeBinding>>;
+
+class Params {
+public:
+  using ParamsList = std::vector<TypeBinding>;
+  using ParamNames = std::vector<std::string>;
+
+  Params();
+  Params(ParamsMap map);
+  size_t size() const;
+
+  operator ParamsMap() const;
+
+  std::string_view getName(size_t i) const;
+
+  TypeBinding getParam(size_t i) const;
+
+  void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
+
+  void printParams(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
+
+private:
+  template <typename Elt>
+  void print(
+      const std::vector<Elt> &lst, llvm::raw_ostream &os, std::function<void(const Elt &)> handler,
+      char header, char footer
+  ) const {
+    if (params.size() == 0) {
+      return; // Don't print anything if there aren't any parameters
+    }
+
+    os << header;
+    size_t c = 1;
+    for (auto &e : lst) {
+      handler(e);
+      if (c < lst.size()) {
+        os << ",";
+      }
+      c++;
+    }
+    os << footer;
+  }
+
+  ParamsList params;
+  ParamNames names;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type);
 
 /// Binding to a ZIR type
 class TypeBinding {
 public:
   /// Returns the name of the type.
-  std::string_view getName() const { return name; }
+  std::string_view getName() const;
 
-  void print(llvm::raw_ostream &os) const {
-    os << name;
-    if (variadic) {
-      os << "...";
-    }
-  }
+  void print(llvm::raw_ostream &os) const;
 
   /// Returns true if the instance is a subtype of the argument
-  mlir::LogicalResult subtypeOf(const TypeBinding &other) const {
-    if (name == BOTTOM) {
-      return mlir::success();
-    }
-    // TODO: Proper equality function
-    if (getName() == other.getName()) {
-      return mlir::success();
-    }
-
-    if (superType != nullptr) {
-      return superType->subtypeOf(other);
-    }
-    return mlir::failure();
-  }
+  mlir::LogicalResult subtypeOf(const TypeBinding &other) const;
 
   /// Returns the closest common supertype between the instance and the argument
-  TypeBinding commonSupertypeWith(const TypeBinding &other) const {
-    if (mlir::succeeded(subtypeOf(other))) {
-      return other;
-    }
-    if (mlir::succeeded(other.subtypeOf(*this))) {
-      return *this;
-    }
+  TypeBinding commonSupertypeWith(const TypeBinding &other) const;
 
-    // TODO: Proper algorithm
-    return TypeBinding();
-  }
+  bool isBottom() const;
+  bool isTypeMarker() const;
+  bool isVal() const;
+  bool isArray() const;
+  bool isConst() const;
 
-  bool isBottom() const { return name == BOTTOM; }
+  mlir::FailureOr<TypeBinding> getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError
+  ) const;
 
   // Creates an MLIR Type from the binding
   // mlir::Type materialize();
-  // Attempts to create an specialized version of the type using the provided parameters.
-  // mlir::FailureOr<TypeBinding> specialize(/*std::map<string, GenericParam>*/);
 
-  TypeBinding() : name("Component"), superType(nullptr) {}
-  TypeBinding(llvm::StringRef name, const TypeBinding &superType)
-      : name(name), superType(&superType) {}
+  /// Attempts to create an specialized version of the type using the provided parameters.
+  mlir::FailureOr<TypeBinding> specialize(
+      std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params
+  ) const;
 
-  static TypeBinding WrapVariadic(const TypeBinding &t) {
-    TypeBinding w = t;
-    w.variadic = true;
-    return w;
-  }
+  TypeBinding();
+  TypeBinding(llvm::StringRef name, const TypeBinding &superType);
+  TypeBinding(llvm::StringRef name, const TypeBinding &superType, ParamsMap t_genericParams);
+  TypeBinding(
+      llvm::StringRef name, const TypeBinding &superType, ParamsMap t_genericParams,
+      ParamsMap t_constructorParams, MembersMap members
+  );
+  TypeBinding(uint64_t value, const TypeBindings &bindings);
+
+  static TypeBinding WrapVariadic(const TypeBinding &t);
+
+  friend TypeBindings;
 
 private:
+  using ParamsList = std::vector<TypeBinding>;
+  using ParamNames = std::vector<std::string>;
+
   bool variadic = false;
+  bool specialized = false;
   llvm::StringRef name;
+  std::optional<uint64_t> constVal;
   const TypeBinding *superType;
+  MembersMap members;
+  Params genericParams;
+  Params constructorParams;
 };
 
 class TypeBindings {
 public:
-  const TypeBinding &Component() { return bindings["Component"]; }
-  const TypeBinding &Component() const { return bindings.at("Component"); }
-  const TypeBinding &Bottom() const { return bottom; }
-  [[nodiscard]] bool Exists(std::string_view name) const {
-    return bindings.find(name) != bindings.end();
-  }
+  const TypeBinding &Component();
+  const TypeBinding &Component() const;
+  const TypeBinding &Bottom() const;
+  TypeBinding Const(uint64_t value) const;
+  TypeBinding UnkConst() const;
+  TypeBinding Array(TypeBinding type, uint64_t size) const;
 
-  const TypeBinding &Create(std::string_view name, const TypeBinding &superType) {
+  TypeBinding UnkArray(TypeBinding type) const;
+
+  [[nodiscard]] bool Exists(std::string_view name) const;
+
+  template <typename... Args> const TypeBinding &Create(std::string_view name, Args &&...args) {
     assert(bindings.find(name) == bindings.end() && "double binding write");
-    bindings[name] = TypeBinding(name, superType);
+    bindings[name] = TypeBinding(name, std::forward<Args>(args)...);
     return bindings[name];
   }
 
-  [[nodiscard]] const TypeBinding &Get(std::string_view name) const { return bindings.at(name); }
-  [[nodiscard]] mlir::FailureOr<TypeBinding> MaybeGet(std::string_view name) const {
-    if (Exists(name)) {
-      return Get(name);
-    }
-    return mlir::failure();
-  }
+  [[nodiscard]] const TypeBinding &Get(std::string_view name) const;
+  [[nodiscard]] mlir::FailureOr<TypeBinding> MaybeGet(std::string_view name) const;
+  [[nodiscard]] const TypeBinding &Manage(const TypeBinding &);
 
 private:
   inline const TypeBinding &
@@ -183,6 +234,7 @@ private:
   }
 
   std::unordered_map<std::string_view, TypeBinding> bindings;
+  std::deque<TypeBinding> managedBindings;
   TypeBinding bottom = TypeBinding(BOTTOM, Component());
 };
 
