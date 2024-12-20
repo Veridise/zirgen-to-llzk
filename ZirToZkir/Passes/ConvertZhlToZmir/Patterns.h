@@ -1,14 +1,39 @@
 #pragma once
 
-#include "Helpers.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
+#include "ZirToZkir/Dialect/ZHL/Typing/Analysis.h"
+#include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
 
 namespace zkc {
+
+template <typename Op> class ZhlOpLoweringPattern : public mlir::OpConversionPattern<Op> {
+public:
+  template <typename... Args>
+  ZhlOpLoweringPattern(zhl::ZIRTypeAnalysis &typeAnalysis, Args &&...args)
+      : mlir::OpConversionPattern<Op>(std::forward<Args>(args)...), typeAnalysis(&typeAnalysis) {}
+
+  mlir::FailureOr<zhl::TypeBinding> getType(mlir::Operation *op) const {
+    return typeAnalysis->getType(op);
+  }
+
+  mlir::FailureOr<zhl::TypeBinding> getType(Op op) const { return typeAnalysis->getType(op); }
+
+  mlir::FailureOr<zhl::TypeBinding> getType(mlir::Value value) const {
+    return typeAnalysis->getType(value);
+  }
+
+  mlir::FailureOr<zhl::TypeBinding> getType(mlir::StringRef name) const {
+    return typeAnalysis->getType(name);
+  }
+
+private:
+  const zhl::ZIRTypeAnalysis *typeAnalysis;
+};
 
 /// Lowers literal Vals
 class ZhlLiteralLowering : public mlir::OpConversionPattern<zirgen::Zhl::LiteralOp> {
@@ -42,9 +67,9 @@ public:
 
 /// Converts `zhl.parameter` op uses to the corresponding argument of the body
 /// and updates the type of the argument.
-class ZhlParameterLowering : public mlir::OpConversionPattern<zirgen::Zhl::ConstructorParamOp> {
+class ZhlParameterLowering : public ZhlOpLoweringPattern<zirgen::Zhl::ConstructorParamOp> {
 public:
-  using OpConversionPattern<zirgen::Zhl::ConstructorParamOp>::OpConversionPattern;
+  using ZhlOpLoweringPattern<zirgen::Zhl::ConstructorParamOp>::ZhlOpLoweringPattern;
 
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::ConstructorParamOp, OpAdaptor, mlir::ConversionPatternRewriter &)
@@ -181,9 +206,9 @@ public:
       const override;
 };
 
-class ZhlCompToZmirCompPattern : public mlir::OpConversionPattern<zirgen::Zhl::ComponentOp> {
+class ZhlCompToZmirCompPattern : public ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp> {
 public:
-  using OpConversionPattern<zirgen::Zhl::ComponentOp>::OpConversionPattern;
+  using ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp>::ZhlOpLoweringPattern;
 
   mlir::LogicalResult matchAndRewrite(
       zirgen::Zhl::ComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter

@@ -32,9 +32,8 @@ checkValidZmirType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mli
   }
 }
 
-mlir::LogicalResult checkValidConstParam(
-    llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Attribute attr
-) {
+mlir::LogicalResult
+checkValidParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Attribute attr) {
   if (!(llvm::isa<mlir::SymbolRefAttr>(attr) || llvm::isa<mlir::IntegerAttr>(attr))) {
     return emitError() << "expected either a symbol or a literal integer but got " << attr;
   } else {
@@ -55,16 +54,12 @@ mlir::LogicalResult checkValidTypeParam(
 
 mlir::LogicalResult ComponentType::verify(
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError, ::mlir::FlatSymbolRefAttr name,
-    ::llvm::ArrayRef<::mlir::Attribute> typeParams, ::llvm::ArrayRef<::mlir::Attribute> constParams
+    ::llvm::ArrayRef<::mlir::Attribute> params
 ) {
   std::vector<mlir::LogicalResult> results;
   std::transform(
-      typeParams.begin(), typeParams.end(), std::back_inserter(results),
-      [&](mlir::Attribute attr) { return checkValidTypeParam(emitError, attr); }
-  );
-  std::transform(
-      constParams.begin(), constParams.end(), std::back_inserter(results),
-      [&](mlir::Attribute attr) { return checkValidConstParam(emitError, attr); }
+      params.begin(), params.end(), std::back_inserter(results),
+      [&](mlir::Attribute attr) { return checkValidParam(emitError, attr); }
   );
 
   if (results.empty()) {
@@ -88,7 +83,7 @@ mlir::LogicalResult BoundedArrayType::verify(
     mlir::Attribute size
 ) {
   auto typeRes = checkValidZmirType(emitError, elementType);
-  auto sizeRes = checkValidConstParam(emitError, size);
+  auto sizeRes = checkValidParam(emitError, size);
 
   return mlir::success(mlir::succeeded(typeRes) && mlir::succeeded(sizeRes));
 }

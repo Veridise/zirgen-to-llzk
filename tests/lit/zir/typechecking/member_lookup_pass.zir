@@ -1,0 +1,11 @@
+// RUN: zklang %s --pipeline='builtin.module(zhl-print-type-bindings)' 2>&1 | FileCheck %s
+// CHECK: Success!
+
+component A() {
+  x := Reg(1);
+}
+
+component Top() {
+  a := A();
+  a.x = 1;
+}

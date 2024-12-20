@@ -32,10 +32,8 @@ def Union : ZmirType<"Union", "union"> { let summary = "union type"; }
 def Component : ZmirType<"Component", "component"> {
   let summary = "component type";
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name,
-      OptionalArrayRefParameter<"::mlir::Attribute">:$type_params,
-      OptionalArrayRefParameter<"::mlir::Attribute">:$const_params);
-  let assemblyFormat =
-      [{ `<` $name (`<` $type_params^ `>`)? (`(` $const_params^ `)`)? `>` }];
+      OptionalArrayRefParameter<"::mlir::Attribute">:$params);
+  let assemblyFormat = [{ `<` $name (`<` $params^ `>`)?  `>` }];
 
   let extraClassDeclaration = [{
 
@@ -55,14 +53,13 @@ def Component : ZmirType<"Component", "component"> {
 
   let builders = [TypeBuilder<
                       (ins "::llvm::StringRef":$name,
-                          "::llvm::ArrayRef<::mlir::Attribute>":$type_params,
-                          "::llvm::ArrayRef<::mlir::Attribute>":$const_params),
+                          "::llvm::ArrayRef<::mlir::Attribute>":$params),
                       [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), type_params, const_params);
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), params);
 }]>,
 
                   TypeBuilder<(ins "::llvm::StringRef":$name), [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), std::nullopt, std::nullopt);
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), std::nullopt);
     }]>];
 
   let genVerifyDecl = 1;

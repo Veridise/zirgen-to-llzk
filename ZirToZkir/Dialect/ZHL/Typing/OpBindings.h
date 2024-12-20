@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
+#include "TypeBindings.h"
 #include <llvm/Support/Debug.h>
 #include <mlir/IR/Operation.h>
 #include <mlir/IR/Value.h>

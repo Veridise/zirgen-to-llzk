@@ -7,6 +7,8 @@
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
 #include <map>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <string_view>
@@ -111,9 +113,16 @@ public:
 
   TypeBinding getParam(size_t i) const;
 
+  mlir::ArrayRef<std::string> getNames() const;
+
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
 
   void printParams(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
+
+  ParamsList::iterator begin();
+  ParamsList::const_iterator begin() const;
+  ParamsList::iterator end();
+  ParamsList::const_iterator end() const;
 
 private:
   template <typename Elt>
@@ -146,6 +155,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type);
 /// Binding to a ZIR type
 class TypeBinding {
 public:
+  using ParamsList = std::vector<TypeBinding>;
+  using ParamNames = std::vector<std::string>;
   /// Returns the name of the type.
   std::string_view getName() const;
 
@@ -162,6 +173,13 @@ public:
   bool isVal() const;
   bool isArray() const;
   bool isConst() const;
+  bool isGeneric() const;
+  /// Returns true if the type is not generic or has an specialization of its generic parameters
+  bool isSpecialized() const;
+
+  mlir::ArrayRef<std::string> getGenericParamNames() const;
+  std::vector<mlir::Location> getConstructorParamLocations() const;
+  const Params &getConstructorParams() const;
 
   mlir::FailureOr<TypeBinding> getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError
   ) const;
@@ -174,26 +192,35 @@ public:
       std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params
   ) const;
 
-  TypeBinding();
-  TypeBinding(llvm::StringRef name, const TypeBinding &superType);
-  TypeBinding(llvm::StringRef name, const TypeBinding &superType, ParamsMap t_genericParams);
+  mlir::FailureOr<TypeBinding>
+      getMember(mlir::StringRef, std::function<mlir::InFlightDiagnostic()>) const;
+
+  TypeBinding(const TypeBinding &) = default;
+  TypeBinding(TypeBinding &&) = default;
+  TypeBinding &operator=(const TypeBinding &) = default;
+  TypeBinding &operator=(TypeBinding &&) = default;
+  TypeBinding(mlir::Location);
+  TypeBinding(llvm::StringRef name, mlir::Location loc, const TypeBinding &superType);
   TypeBinding(
-      llvm::StringRef name, const TypeBinding &superType, ParamsMap t_genericParams,
-      ParamsMap t_constructorParams, MembersMap members
+      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
+      ParamsMap t_genericParams
   );
-  TypeBinding(uint64_t value, const TypeBindings &bindings);
+  TypeBinding(
+      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
+      ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members
+  );
+  TypeBinding(uint64_t value, mlir::Location loc, const TypeBindings &bindings);
+  TypeBinding WithUpdatedLocation(mlir::Location loc) const;
 
   static TypeBinding WrapVariadic(const TypeBinding &t);
 
   friend TypeBindings;
 
 private:
-  using ParamsList = std::vector<TypeBinding>;
-  using ParamNames = std::vector<std::string>;
-
   bool variadic = false;
   bool specialized = false;
   llvm::StringRef name;
+  mlir::Location loc;
   std::optional<uint64_t> constVal;
   const TypeBinding *superType;
   MembersMap members;
@@ -203,21 +230,32 @@ private:
 
 class TypeBindings {
 public:
+  explicit TypeBindings(mlir::OpBuilder &);
+
   const TypeBinding &Component();
   const TypeBinding &Component() const;
   const TypeBinding &Bottom() const;
+  TypeBinding Const(uint64_t value, mlir::Location loc) const;
+  TypeBinding UnkConst(mlir::Location loc) const;
+  TypeBinding Array(TypeBinding type, uint64_t size, mlir::Location loc) const;
+  TypeBinding UnkArray(TypeBinding type, mlir::Location loc) const;
+
   TypeBinding Const(uint64_t value) const;
   TypeBinding UnkConst() const;
   TypeBinding Array(TypeBinding type, uint64_t size) const;
-
   TypeBinding UnkArray(TypeBinding type) const;
 
   [[nodiscard]] bool Exists(std::string_view name) const;
 
-  template <typename... Args> const TypeBinding &Create(std::string_view name, Args &&...args) {
+  template <typename... Args>
+  const TypeBinding &Create(std::string_view name, mlir::Location loc, Args &&...args) {
     assert(bindings.find(name) == bindings.end() && "double binding write");
-    bindings[name] = TypeBinding(name, std::forward<Args>(args)...);
-    return bindings[name];
+    bindings.emplace(name, TypeBinding(name, loc, std::forward<Args>(args)...));
+    return bindings.at(name);
+  }
+
+  template <typename... Args> const TypeBinding &Create(std::string_view name, Args &&...args) {
+    return Create(name, unk, std::forward<Args>(args)...);
   }
 
   [[nodiscard]] const TypeBinding &Get(std::string_view name) const;
@@ -225,17 +263,10 @@ public:
   [[nodiscard]] const TypeBinding &Manage(const TypeBinding &);
 
 private:
-  inline const TypeBinding &
-  GetOrCreate(llvm::StringRef name, std::function<TypeBinding()> factory) {
-    if (bindings.find(name) == bindings.end()) {
-      bindings[name] = factory();
-    }
-    return bindings[name];
-  }
-
+  mlir::Location unk;
   std::unordered_map<std::string_view, TypeBinding> bindings;
   std::deque<TypeBinding> managedBindings;
-  TypeBinding bottom = TypeBinding(BOTTOM, Component());
+  TypeBinding bottom;
 };
 
 } // namespace zhl

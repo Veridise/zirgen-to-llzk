@@ -11,7 +11,8 @@ ComponentScope::ComponentScope(ComponentOp component, TypeBindings &bindings)
 ComponentScope::~ComponentScope() {
   assert(succeeded(superType));
   bindings->Create(
-      component.getName(), bindings->Manage(*superType), genericParams, constructorParams, members
+      component.getName(), component.getLoc(), bindings->Manage(*superType), genericParams,
+      constructorParams, members
   );
 }
 

@@ -217,4 +217,13 @@ public:
       const override;
 };
 
+class LookupTypeRule : public OpTypingRule<zirgen::Zhl::LookupOp> {
+public:
+  using OpTypingRule<zirgen::Zhl::LookupOp>::OpTypingRule;
+
+  mlir::FailureOr<TypeBinding>
+  typeCheck(zirgen::Zhl::LookupOp, mlir::ArrayRef<TypeBinding>, Scope &, mlir::ArrayRef<const Scope *>)
+      const override;
+};
+
 } // namespace zhl

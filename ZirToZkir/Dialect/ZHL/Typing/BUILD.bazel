@@ -24,17 +24,20 @@ cc_library(
     "Rules.cpp",
     "OpBindings.cpp",
     "Typing.cpp",
-    "Scope.cpp"
+    "Scope.cpp",
+    "Analysis.cpp"
   ],
   hdrs = [
     "Scope.h",
     "Typing.h",
     "OpBindings.h",
-    "Rules.h"
+    "Rules.h",
+    "Analysis.h"
   ],
   deps = [
     ":TypeBindings",
     "@zirgen//zirgen/Dialect/ZHL/IR",
+    "//ZirToZkir/Dialect/ZMIR/BuiltIns",  
   ]
 )
 
@@ -80,7 +83,6 @@ cc_library(
         "//ZirToZkir/Dialect/ZMIR/Typing:ZMIRTypeConverter",  
         "@zirgen//zirgen/Dialect/ZHL/IR",
         "@llvm-project//mlir:Transforms",
-        "//ZirToZkir/Dialect/ZMIR/BuiltIns",  
         "//ZirToZkir/Dialect/ZMIR/IR",  
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:Analysis"

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "OpBindings.h"
+#include "Scope.h"
 #include "TypeBindings.h"
-#include "ZirToZkir/Dialect/ZHL/Typing/OpBindings.h"
-#include "ZirToZkir/Dialect/ZHL/Typing/Scope.h"
 
 namespace zhl {
 
@@ -105,7 +105,7 @@ private:
   std::vector<std::unique_ptr<TypingRule>> rules;
 };
 
-std::unique_ptr<OpBindings>
+std::unique_ptr<ZhlOpBindings>
 typeCheck(mlir::Operation *, TypeBindings &, const FrozenTypingRuleSet &);
 FrozenTypingRuleSet zhlTypingRules(const TypeBindings &);
 

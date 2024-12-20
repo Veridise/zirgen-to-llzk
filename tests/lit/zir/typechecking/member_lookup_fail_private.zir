@@ -1,0 +1,10 @@
+
+
+component A() {
+  _x := Reg(1);
+}
+
+component Top() {
+  a := A();
+  a._x = 1;
+}

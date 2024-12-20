@@ -1,5 +1,6 @@
 // Copyright 2024 Veridise, Inc.
 
+#include "Analysis.h"
 #include "OpBindings.h"
 #include "Scope.h"
 #include "Typing.h"
@@ -24,14 +25,16 @@ namespace {
 class PrintTypeBindingsPass : public PrintTypeBindingsBase<PrintTypeBindingsPass> {
 
   void runOnOperation() override {
-    ModuleOp mod = getOperation();
+    /*ModuleOp mod = getOperation();*/
 
-    TypeBindings bindings;
-    zkc::Zmir::addBuiltinBindings(bindings);
+    /*TypeBindings bindings;*/
+    /*zkc::Zmir::addBuiltinBindings(bindings);*/
 
-    auto result = typeCheck(mod, bindings, zhlTypingRules(bindings));
-    result->dump();
-    if (mlir::failed(*result)) {
+    /*auto result = typeCheck(mod, bindings, zhlTypingRules(bindings));*/
+    auto &analysis = getAnalysis<ZIRTypeAnalysis>();
+
+    analysis.dump();
+    if (mlir::failed(analysis)) {
       signalPassFailure();
     }
   }

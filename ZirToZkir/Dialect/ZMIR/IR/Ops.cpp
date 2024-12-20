@@ -52,54 +52,46 @@ mlir::ArrayAttr fillParams(
 
 void ComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
-    IsBuiltIn
+    mlir::ArrayRef<mlir::StringRef> params, IsBuiltIn
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().builtin = builder.getUnitAttr();
-  if (typeParams.size() + constParams.size() > 1) {
+  if (params.size() > 1) {
     state.getOrAddProperties<Properties>().generic = builder.getUnitAttr();
-    state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
-    state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
+    state.getOrAddProperties<Properties>().params = fillParams(builder, state, params);
   }
   state.addRegion();
 }
 
 void SplitComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
-    IsBuiltIn
+    mlir::ArrayRef<mlir::StringRef> params, IsBuiltIn
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().builtin = builder.getUnitAttr();
-  if (typeParams.size() + constParams.size() > 1) {
+  if (params.size() > 1) {
     state.getOrAddProperties<Properties>().generic = builder.getUnitAttr();
-    state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
-    state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
+    state.getOrAddProperties<Properties>().params = fillParams(builder, state, params);
   }
   state.addRegion();
 }
 
 void ComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
-    llvm::ArrayRef<mlir::NamedAttribute> attrs
+    mlir::ArrayRef<mlir::StringRef> typeParams, llvm::ArrayRef<mlir::NamedAttribute> attrs
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
-  state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
-  state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
+  state.getOrAddProperties<Properties>().params = fillParams(builder, state, typeParams);
   state.addAttributes(attrs);
   state.addRegion();
 }
 
 void SplitComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    mlir::ArrayRef<mlir::StringRef> typeParams, mlir::ArrayRef<mlir::StringRef> constParams,
-    llvm::ArrayRef<mlir::NamedAttribute> attrs
+    mlir::ArrayRef<mlir::StringRef> params, llvm::ArrayRef<mlir::NamedAttribute> attrs
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
-  state.getOrAddProperties<Properties>().type_params = fillParams(builder, state, typeParams);
-  state.getOrAddProperties<Properties>().const_params = fillParams(builder, state, constParams);
+  state.getOrAddProperties<Properties>().params = fillParams(builder, state, params);
   state.addAttributes(attrs);
   state.addRegion();
 }
@@ -123,24 +115,18 @@ void SplitComponentOp::build(
 }
 
 mlir::Type ComponentOp::getType() {
-  if (getTypeParams().has_value() && getConstParams().has_value()) {
-    auto typeParams = *getTypeParams();
-    auto constParams = *getConstParams();
-    return ComponentType::get(
-        getContext(), getSymName(), typeParams.getValue(), constParams.getValue()
-    );
+  if (getParams().has_value()) {
+    auto params = *getParams();
+    return ComponentType::get(getContext(), getSymName(), params.getValue());
   } else {
     return ComponentType::get(getContext(), getSymName());
   }
 }
 
 mlir::Type SplitComponentOp::getType() {
-  if (getTypeParams().has_value() && getConstParams().has_value()) {
-    auto typeParams = *getTypeParams();
-    auto constParams = *getConstParams();
-    return ComponentType::get(
-        getContext(), getSymName(), typeParams.getValue(), constParams.getValue()
-    );
+  if (getParams().has_value()) {
+    auto params = *getParams();
+    return ComponentType::get(getContext(), getSymName(), params.getValue());
   } else {
     return ComponentType::get(getContext(), getSymName());
   }

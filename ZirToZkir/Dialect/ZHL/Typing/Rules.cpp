@@ -28,11 +28,13 @@ mlir::FailureOr<TypeBinding> GlobalTypingRule::
 mlir::FailureOr<TypeBinding> ParameterTypingRule::
     typeCheck(zirgen::Zhl::ConstructorParamOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  // TODO: Annotation of the component being analyzed with the parameter name and index
   if (operands.empty()) {
     return mlir::failure();
   }
-  return op.getVariadic() ? TypeBinding::WrapVariadic(operands[0]) : operands[0];
+  auto arg = (op.getVariadic() ? TypeBinding::WrapVariadic(operands[0]) : operands[0])
+                 .WithUpdatedLocation(op.getLoc());
+  scope.declareConstructorParam(op.getName(), op.getIndex(), arg);
+  return arg;
 }
 mlir::FailureOr<TypeBinding> ExternTypingRule::
     typeCheck(zirgen::Zhl::ExternOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
@@ -273,6 +275,18 @@ FailureOr<std::vector<TypeBinding>> MapTypeRule::bindRegionArguments(
   }
 
   return std::vector({*innerType});
+}
+
+FailureOr<TypeBinding> LookupTypeRule::
+    typeCheck(LookupOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *>)
+        const {
+  // Get the type of the component argument
+  if (operands.empty()) {
+    return failure();
+  }
+  auto &comp = operands[0];
+
+  return comp.getMember(op.getMember(), [&]() { return op->emitError(); });
 }
 
 } // namespace zhl

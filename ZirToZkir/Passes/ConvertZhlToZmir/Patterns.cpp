@@ -1,6 +1,8 @@
 #include "Patterns.h"
+#include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "ZirToZkir/Dialect/ZMIR/Typing/Materialize.h"
 #include "ZirToZkir/Dialect/ZMIR/Typing/ZMIRTypeConverter.h"
 #include "ZirToZkir/Passes/ConvertZhlToZmir/Helpers.h"
 #include <algorithm>
@@ -15,10 +17,12 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
 #include <vector>
 
 using namespace zirgen;
 using namespace zkc;
+using namespace zhl;
 
 ///////////////////////////////////////////////////////////
 /// Cast folding
@@ -534,28 +538,39 @@ class ZhlCompToZmirCompPatternImpl {
 public:
   using OpAdaptor = zirgen::Zhl::ComponentOp::Adaptor;
   ZhlCompToZmirCompPatternImpl(
-      zirgen::Zhl::ComponentOp prev, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+      zirgen::Zhl::ComponentOp prev, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter,
+      const ZhlCompToZmirCompPattern &pattern
   )
-      : prev(prev), adaptor(adaptor), rewriter(rewriter) {}
+      : prev(prev), adaptor(adaptor), rewriter(rewriter), pattern(pattern) {}
 
   mlir::LogicalResult matchAndRewrite() {
-    auto newCompOp = createComponent();
+    auto name = pattern.getType(prev.getName());
+    if (mlir::failed(name)) {
+      return prev->emitOpError() << "could not be lowered because its type could not be infered";
+    }
+    llvm::dbgs() << "Component type:\n   ";
+    name->print(llvm::dbgs());
+    llvm::dbgs() << "\n";
+
+    auto newCompOp = createComponent(*name);
     mlir::OpBuilder::InsertionGuard compInsertionGuard(rewriter);
     auto *block = rewriter.createBlock(&newCompOp.getRegion());
     rewriter.setInsertionPointToStart(block);
 
-    auto types = deduceConstructorArgTypes();
-    if (mlir::failed(types)) {
-      return mlir::failure();
-    }
-
-    auto arity = getComponentConstructorArity(prev);
-    if (types->size() != arity.paramCount) {
-      return prev->emitError() << "Inconsistent parameter detection result. Type detection "
-                               << types->size() << ", arity detection " << arity.paramCount;
-    }
-
-    createComponentBody(newCompOp, arity, *types);
+    /*auto types = deduceConstructorArgTypes();*/
+    /*if (mlir::failed(types)) {*/
+    /*  return mlir::failure();*/
+    /*}*/
+    /**/
+    /*auto arity = getComponentConstructorArity(prev);*/
+    /*if (types->size() != arity.paramCount) {*/
+    /*  return prev->emitError() << "Inconsistent parameter detection result. Type detection "*/
+    /*                           << types->size() << ", arity detection " << arity.paramCount;*/
+    /*}*/
+    auto funcType = Zmir::materializeTypeBindingConstructor(rewriter, *name);
+    assert(funcType);
+    auto locs = name->getConstructorParamLocations();
+    createComponentBody(newCompOp, locs, funcType);
     rewriter.replaceOp(prev.getOperation(), newCompOp.getOperation());
     return mlir::success();
   }
@@ -605,21 +620,30 @@ private:
 
   mlir::MLIRContext *getContext() { return rewriter.getContext(); }
 
-  zkc::Zmir::ComponentOp createComponent() {
+  void maybeOverwriteBuiltin() {
     auto maybeBuiltin = mlir::SymbolTable::lookupSymbolIn(
         prev->getParentOfType<mlir::ModuleOp>().getOperation(), prev.getName()
     );
     if (maybeBuiltin) {
       rewriter.eraseOp(maybeBuiltin);
     }
+  }
+
+  zkc::Zmir::ComponentOp createComponent(const TypeBinding &binding) {
+    maybeOverwriteBuiltin();
 
     auto attrs = prev->getAttrs();
 
+    assert(prev.getGeneric() == binding.isGeneric());
     if (prev.getGeneric()) {
       std::vector<mlir::StringRef> typeParams;
-      std::vector<mlir::StringRef> constParams;
+      auto genericNames = binding.getGenericParamNames();
+      std::transform(
+          genericNames.begin(), genericNames.end(), std::back_inserter(typeParams),
+          [](auto &s) { return s; }
+      );
       return rewriter.create<zkc::Zmir::ComponentOp>(
-          prev.getLoc(), prev.getName(), typeParams, constParams, attrs
+          prev.getLoc(), prev.getName(), typeParams, attrs
       );
     } else {
       return rewriter.create<zkc::Zmir::ComponentOp>(prev.getLoc(), prev.getName(), attrs);
@@ -648,11 +672,12 @@ private:
   }
 
   void createComponentBody(
-      zkc::Zmir::ComponentOp newOp, ComponentArity &arity, std::map<uint32_t, mlir::Type> types
+      zkc::Zmir::ComponentOp newOp, mlir::ArrayRef<mlir::Location> argLocs,
+      mlir::FunctionType funcType
   ) {
-    auto argTypes = getArgTypes(arity, types);
-    mlir::Type compType = newOp.getType();
-    auto funcType = rewriter.getFunctionType(argTypes, {compType});
+    /*auto argTypes = getArgTypes(arity, types);*/
+    /*mlir::Type compType = newOp.getType();*/
+    /*auto funcType = rewriter.getFunctionType(argTypes, {compType});*/
     auto attrs = funcBodyAttrs();
 
     auto bodyOp = rewriter.create<mlir::func::FuncOp>(
@@ -662,7 +687,7 @@ private:
 
     // Create arguments for the entry block (aka region arguments)
     auto &entryBlock = bodyOp.front();
-    entryBlock.addArguments(argTypes, arity.locs);
+    entryBlock.addArguments(funcType.getInputs(), argLocs);
 
     // Fill out epilogue
     auto *epilogue = bodyOp.addBlock();
@@ -684,12 +709,13 @@ private:
   zirgen::Zhl::ComponentOp prev;
   OpAdaptor adaptor;
   mlir::ConversionPatternRewriter &rewriter;
+  const ZhlCompToZmirCompPattern &pattern;
 };
 
 mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     zirgen::Zhl::ComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  ZhlCompToZmirCompPatternImpl impl(op, adaptor, rewriter);
+  ZhlCompToZmirCompPatternImpl impl(op, adaptor, rewriter, *this);
   return impl.matchAndRewrite();
 }
 

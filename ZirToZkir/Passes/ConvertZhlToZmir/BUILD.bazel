@@ -22,6 +22,7 @@ cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:IndexDialect",
-        "@llvm-project//mlir:Transforms"
+        "@llvm-project//mlir:Transforms",
+        "//ZirToZkir/Dialect/ZHL/Typing:ZhlTypeSystem"
   ]
 )

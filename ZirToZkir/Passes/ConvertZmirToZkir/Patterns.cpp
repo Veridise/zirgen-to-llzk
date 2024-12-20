@@ -48,8 +48,7 @@ mlir::LogicalResult Zmir::ComponentLowering::matchAndRewrite(
 ) const {
   // TODO type parameters
   auto newOp = rewriter.replaceOpWithNewOp<zkir::StructDefOp>(
-      op, op.getNameAttr(),
-      op.getConstParams().has_value() ? *op.getConstParams() : rewriter.getArrayAttr({})
+      op, op.getNameAttr(), op.getParams().has_value() ? *op.getParams() : rewriter.getArrayAttr({})
   );
   {
     mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);

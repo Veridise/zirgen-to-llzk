@@ -151,7 +151,7 @@ FailureOr<std::vector<TypeBinding>> getOperandTypes(
   return operandBindings;
 }
 
-std::unique_ptr<OpBindings>
+std::unique_ptr<ZhlOpBindings>
 typeCheck(Operation *root, TypeBindings &typeBindings, const FrozenTypingRuleSet &rules) {
   SymbolTable st(root);
   std::unique_ptr<ZhlOpBindings> bindings = std::make_unique<ZhlOpBindings>();
@@ -166,7 +166,7 @@ FrozenTypingRuleSet zhlTypingRules(const TypeBindings &bindings) {
       GetGlobalTypingRule, ConstructTypingRule, ExternTypingRule, DeclareTypingRule,
       SubscriptTypeRule, SpecializeTypeRule, ConstrainTypeRule, DefineTypeRule, ArrayTypeRule,
       BlockTypeRule, ReduceTypeRule, RangeTypeRule, BackTypeRule, GenericParamTypeRule, MapTypeRule,
-      SwitchTypeRule, ConstructGlobalTypeRule>(bindings);
+      LookupTypeRule, SwitchTypeRule, ConstructGlobalTypeRule>(bindings);
 
   return rules;
 }

@@ -26,8 +26,7 @@ class ComponentOpBase<string prefix, string bodyFuncName,
   let summary = prefix#"component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
       UnitAttr:$generic, UnitAttr:$builtin,
-      OptionalAttr<FlatSymbolRefArrayAttr>:$const_params,
-      OptionalAttr<FlatSymbolRefArrayAttr>:$type_params);
+      OptionalAttr<FlatSymbolRefArrayAttr>:$params);
   let regions = (region SizedRegion<1>:$body);
 
   let builders = [OpBuilder<(ins "::mlir::StringRef":$name,
@@ -35,12 +34,10 @@ class ComponentOpBase<string prefix, string bodyFuncName,
                   OpBuilder<(ins "::mlir::StringRef":$name,
                       "::zkc::Zmir::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
-                      "::mlir::ArrayRef<mlir::StringRef>":$type_params,
-                      "::mlir::ArrayRef<mlir::StringRef>":$const_params,
+                      "::mlir::ArrayRef<mlir::StringRef>":$params,
                       "::zkc::Zmir::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
-                      "::mlir::ArrayRef<mlir::StringRef>":$type_params,
-                      "::mlir::ArrayRef<mlir::StringRef>":$const_params,
+                      "::mlir::ArrayRef<mlir::StringRef>":$params,
                       "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>];
 
   let extraClassDeclaration = [{
@@ -61,7 +58,7 @@ class ComponentOpBase<string prefix, string bodyFuncName,
   }];
 
   let assemblyFormat = [{
-    $sym_name (`<` $type_params^ `>`)? (`(` $const_params^ `)`)? attr-dict-with-keyword $body
+    $sym_name (`<` $params^ `>`)?  attr-dict-with-keyword $body
   }];
 }
 

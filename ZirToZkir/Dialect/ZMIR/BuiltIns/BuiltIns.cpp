@@ -33,10 +33,10 @@ struct BuildContext {
 
   /// Creates a component with parameters
   void createParametricComponent(
-      mlir::StringRef name, mlir::ArrayRef<mlir::StringRef> typeParams,
-      mlir::ArrayRef<mlir::StringRef> constParams, std::function<void(ComponentOp &)> buildComponent
+      mlir::StringRef name, mlir::ArrayRef<mlir::StringRef> params,
+      std::function<void(ComponentOp &)> buildComponent
   ) {
-    ComponentOp op = builder.create<ComponentOp>(unk, name, typeParams, constParams, IsBuiltIn{});
+    ComponentOp op = builder.create<ComponentOp>(unk, name, params, IsBuiltIn{});
     mlir::OpBuilder::InsertionGuard insertionGuard(builder);
     auto *block = builder.createBlock(&op.getRegion());
     builder.setInsertionPointToStart(block);
@@ -167,9 +167,9 @@ void addArrayComponent(BuildContext &ctx) {
 
   auto symT = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx.builder.getContext(), "T"));
   auto sizeVar = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx.builder.getContext(), "N"));
-  ctx.createParametricComponent("Array", {"T"}, {"N"}, [&](ComponentOp &op) {
+  ctx.createParametricComponent("Array", {"T", "N"}, [&](ComponentOp &op) {
     auto componentType =
-        ComponentType::get(ctx.builder.getContext(), op.getSymName(), {symT}, {sizeVar});
+        ComponentType::get(ctx.builder.getContext(), op.getSymName(), {symT, sizeVar});
     auto typeVar = TypeVarType::get(ctx.builder.getContext(), symT);
     auto type = BoundedArrayType::get(ctx.builder.getContext(), typeVar, sizeVar);
     // Special register where results are stored
@@ -200,8 +200,8 @@ void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
   bindings.Create("Isz", Val);
   bindings.Create("Neg", Val);
   zhl::ParamsMap arrayGenericParams;
-  arrayGenericParams[{"T", 0}] = Type;
-  arrayGenericParams[{"N", 1}] = Val;
+  arrayGenericParams.insert({{"T", 0}, Type});
+  arrayGenericParams.insert({{"N", 1}, Val});
   bindings.Create("Array", bindings.Component(), arrayGenericParams);
 }
 

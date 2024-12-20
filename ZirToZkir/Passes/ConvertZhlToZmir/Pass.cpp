@@ -2,6 +2,7 @@
 
 #include "Pass.h"
 #include "Patterns.h"
+#include "ZirToZkir/Dialect/ZHL/Typing/Analysis.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/Typing/ZMIRTypeConverter.h"
@@ -29,6 +30,8 @@ void ConvertZhlToZmirPass::runOnOperation() {
     return;
   }
 
+  auto &typeAnalysis = getAnalysis<zhl::ZIRTypeAnalysis>();
+  (void)typeAnalysis;
   mlir::MLIRContext *ctx = op->getContext();
   Zmir::ZMIRTypeConverter typeConverter;
   // Init patterns for this transformation
@@ -59,6 +62,7 @@ void ConvertZhlToZmirPass::runOnOperation() {
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();
   }
+  markAnalysesPreserved<zhl::ZIRTypeAnalysis>();
 }
 
 std::unique_ptr<OperationPass<Zmir::ComponentOp>> createConvertZhlToZmirPass() {
@@ -66,13 +70,14 @@ std::unique_ptr<OperationPass<Zmir::ComponentOp>> createConvertZhlToZmirPass() {
 }
 
 void TransformComponentDeclsPass::runOnOperation() {
+  auto &typeAnalysis = getAnalysis<zhl::ZIRTypeAnalysis>();
   mlir::ModuleOp module = getOperation();
   mlir::MLIRContext *ctx = module->getContext();
 
   // Init patterns for this transformation
   Zmir::ZMIRTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);
-  patterns.add<ZhlCompToZmirCompPattern, ZhlParameterLowering>(typeConverter, ctx);
+  patterns.add<ZhlCompToZmirCompPattern, ZhlParameterLowering>(typeAnalysis, typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
@@ -85,6 +90,7 @@ void TransformComponentDeclsPass::runOnOperation() {
   if (mlir::failed(mlir::applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
   }
+  markAnalysesPreserved<zhl::ZIRTypeAnalysis>();
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createTransformComponentDeclsPass() {
@@ -121,6 +127,7 @@ void ConvertZhlToScfPass::runOnOperation() {
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();
   }
+  markAnalysesPreserved<zhl::ZIRTypeAnalysis>();
 }
 
 std::unique_ptr<OperationPass<Zmir::ComponentOp>> createConvertZhlToScfPass() {
