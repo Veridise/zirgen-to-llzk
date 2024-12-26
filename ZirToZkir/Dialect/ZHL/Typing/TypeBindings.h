@@ -2,6 +2,7 @@
 
 #include "mlir/IR/Diagnostics.h"
 #include "llvm/ADT/StringRef.h"
+#include <cassert>
 #include <deque>
 #include <functional>
 #include <llvm/Support/Debug.h>
@@ -17,78 +18,6 @@
 namespace zhl {
 
 class TypeBindings;
-
-#if 0
-class TypeBindingW;
-
-class TypeBindingBase {
-public:
-  virtual std::string_view getName() const = 0;
-  void print(llvm::raw_ostream &os) const {
-    os << getName();
-    if (variadic) {
-      os << "...";
-    }
-  }
-
-  /// Returns true if the instance is a subtype of the argument
-  virtual mlir::LogicalResult subtypeOf(const TypeBindingBase &other) const = 0;
-  /// Returns the closest common supertype between the instance and the argument
-  virtual const TypeBindingBase *commonSupertypeWith(const TypeBindingBase &other) const = 0;
-
-private:
-  bool variadic;
-};
-
-class TypeBinding {
-private:
-  class Concept {
-public:
-    virtual std::string_view getName() const = 0;
-    virtual void print(llvm::raw_ostream &os) const = 0;
-    /// Returns true if the instance is a subtype of the argument
-    virtual mlir::LogicalResult subtypeOf(const Concept &other) const = 0;
-    /// Returns the closest common supertype between the instance and the argument
-    virtual TypeBinding commonSupertypeWith(const Concept &other) const = 0;
-  };
-
-  template<typename T>
-  class Model : public Concept {
-public:
-      std::string_view getName() const final {
-return inner.getName();
-    }
-     void print(llvm::raw_ostream &os) const final { inner->print(os); }
-    /// Returns true if the instance is a subtype of the argument
-     mlir::LogicalResult subtypeOf(const Concept &other) const final {
-     return inner->subtypeOf(other.inner)
-    }
-    /// Returns the closest common supertype between the instance and the argument
-     TypeBinding commonSupertypeWith(const TypeBinding &other) const = 0;
-
-    private:
-      const T *inner;
-  };
-};
-
-
-class Component : public TypeBindingBase {
-public:
-  std::string_view getName() const final { return "Component"; }
-
-  /// The root component is not a subtype of anything except itself.
-  mlir::LogicalResult subtypeOf(const TypeBindingBase &other) const final {
-    if (getName() == other.getName()) {
-      return mlir::success();
-    }
-    return mlir::failure();
-  }
-
-  const TypeBindingBase *commonSupertypeWith(const TypeBindingBase &other) const final {
-    return this;
-  }
-};
-#endif
 
 const std::string BOTTOM = "!";
 const std::string CONST = "$";
@@ -176,16 +105,17 @@ public:
   bool isGeneric() const;
   /// Returns true if the type is not generic or has an specialization of its generic parameters
   bool isSpecialized() const;
+  bool isVariadic() const;
 
   mlir::ArrayRef<std::string> getGenericParamNames() const;
   std::vector<mlir::Location> getConstructorParamLocations() const;
   const Params &getConstructorParams() const;
+  const MembersMap &getMembers() const;
+  mlir::Location getLocation() const;
+  const TypeBinding &getSuperType() const;
 
   mlir::FailureOr<TypeBinding> getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError
   ) const;
-
-  // Creates an MLIR Type from the binding
-  // mlir::Type materialize();
 
   /// Attempts to create an specialized version of the type using the provided parameters.
   mlir::FailureOr<TypeBinding> specialize(
@@ -216,9 +146,12 @@ public:
 
   friend TypeBindings;
 
+  void selfConstructs();
+
 private:
   bool variadic = false;
   bool specialized = false;
+  bool selfConstructor = false;
   llvm::StringRef name;
   mlir::Location loc;
   std::optional<uint64_t> constVal;

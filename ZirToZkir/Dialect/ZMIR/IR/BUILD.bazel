@@ -140,13 +140,15 @@ cc_library(
         "Dialect.cpp",
         "Ops.cpp",
         "Types.cpp",
+        "Builder.cpp"
     ],
     hdrs = [
         "Dialect.h",
         "Attrs.h",
         "Ops.h",
         "Types.h",
-        "OpInterfaces.h"
+        "OpInterfaces.h",
+        "Builder.h"
     ],
     deps = [
         ":AttrsIncGen",

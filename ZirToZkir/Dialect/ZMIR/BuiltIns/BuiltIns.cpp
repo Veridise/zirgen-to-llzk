@@ -1,4 +1,6 @@
 #include "BuiltIns.h"
+#include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
+#include "ZirToZkir/Dialect/ZMIR/IR/Builder.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
 #include <functional>
@@ -7,219 +9,236 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinTypes.h>
+#include <mlir/IR/ValueRange.h>
 #include <unordered_set>
 
 using namespace zkc::Zmir;
 
-/// Holds information related to building
-/// the built-ins
-struct BuildContext {
-  mlir::OpBuilder &builder;
-  mlir::Location unk;
+ComponentBuilder &builtinCommon(ComponentBuilder &builder) { return builder.isBuiltin(); }
 
-  explicit BuildContext(mlir::OpBuilder &builder)
-      : builder(builder), unk(builder.getUnknownLoc()) {}
+ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
+  return builder.fillBody({type}, {type}, [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+    // Reference to self
+    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), type);
+    // Construct Component superType
+    mlir::FunctionType constructor =
+        builder.getFunctionType({}, ComponentType::get(builder.getContext(), "Component"));
+    auto ref = builder.create<ConstructorRefOp>(
+        builder.getUnknownLoc(), constructor,
+        mlir::SymbolRefAttr::get(builder.getStringAttr("Component")), builder.getUnitAttr()
+    );
+    auto comp = builder.create<mlir::func::CallIndirectOp>(builder.getUnknownLoc(), ref);
+    // Store the result
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", comp.getResult(0));
+    // Return self
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({args[0]}));
+  });
+}
 
-  /// Creates a component with no extra attributes and no parameters
-  void
-  createBasicComponent(mlir::StringRef name, std::function<void(ComponentOp &)> buildComponent) {
-    ComponentOp op = builder.create<ComponentOp>(unk, name, IsBuiltIn{});
-    mlir::OpBuilder::InsertionGuard insertionGuard(builder);
-    auto *block = builder.createBlock(&op.getRegion());
-    builder.setInsertionPointToStart(block);
+template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef name) {
+  auto componentType = ComponentType::get(builder.getContext(), name);
+  auto superType = ComponentType::get(builder.getContext(), "Val");
 
-    buildComponent(op);
+  builtinCommon(ComponentBuilder()
+                    .name(name)
+                    .field("$super", superType)
+                    .fillBody(
+                        {superType, superType}, {componentType},
+                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+    // Reference to self
+    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    // Do the computation
+    auto op = builder.create<OpTy>(builder.getUnknownLoc(), superType, args[0], args[1]);
+    // Store the result
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", op);
+    // Return self
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
   }
+                    )
+  ).build(builder);
+}
 
-  /// Creates a component with parameters
-  void createParametricComponent(
-      mlir::StringRef name, mlir::ArrayRef<mlir::StringRef> params,
-      std::function<void(ComponentOp &)> buildComponent
-  ) {
-    ComponentOp op = builder.create<ComponentOp>(unk, name, params, IsBuiltIn{});
-    mlir::OpBuilder::InsertionGuard insertionGuard(builder);
-    auto *block = builder.createBlock(&op.getRegion());
-    builder.setInsertionPointToStart(block);
+template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringRef name) {
+  auto componentType = ComponentType::get(builder.getContext(), name);
+  auto superType = ComponentType::get(builder.getContext(), "Val");
 
-    buildComponent(op);
+  builtinCommon(ComponentBuilder()
+                    .name(name)
+                    .field("$super", superType)
+                    .fillBody(
+                        {superType}, {componentType},
+                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+    // Reference to self
+    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    // Do the computation
+    auto op = builder.create<OpTy>(builder.getUnknownLoc(), superType, args[0]);
+    // Store the result
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", op);
+    // Return self
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
   }
+                    )
+  ).build(builder);
+}
 
-  void fillOutBody(
-      ComponentOp &op, mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results,
-      std::function<void(mlir::ValueRange)> buildBody
-  ) {
+void addInRange(mlir::OpBuilder &builder) {
+  auto componentType = ComponentType::get(builder.getContext(), "InRange");
+  auto superType = ComponentType::get(builder.getContext(), "Val");
 
-    auto funcType = builder.getFunctionType(argTypes, results);
-    std::vector<mlir::NamedAttribute> attrs = {mlir::NamedAttribute(
-        builder.getStringAttr("sym_visibility"), builder.getStringAttr("nested")
-    )};
-
-    auto bodyOp = builder.create<mlir::func::FuncOp>(unk, op.getBodyFuncName(), funcType, attrs);
-    mlir::OpBuilder::InsertionGuard insertionGuard(builder);
-    builder.setInsertionPointToStart(bodyOp.addEntryBlock());
-    buildBody(bodyOp.getArguments());
+  builtinCommon(ComponentBuilder()
+                    .name("InRange")
+                    .field("$super", superType)
+                    .fillBody(
+                        {superType, superType, superType}, {componentType},
+                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+    // Reference to self
+    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    // Do the computation
+    auto op =
+        builder.create<InRangeOp>(builder.getUnknownLoc(), superType, args[0], args[1], args[2]);
+    // Store the result
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", op);
+    // Return self
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
   }
-};
-
-template <typename OpTy> void addBinOp(BuildContext &ctx, mlir::StringRef name) {
-  ctx.createBasicComponent(name, [&](ComponentOp &op) {
-    auto componentType = ComponentType::get(ctx.builder.getContext(), op.getSymName());
-    auto val = ValType::get(ctx.builder.getContext());
-    // Special register where results are stored
-    ctx.builder.create<FieldDefOp>(ctx.unk, "$super", val);
-    ctx.fillOutBody(op, {val, val}, {val}, [&](mlir::ValueRange args) {
-      // Reference to self
-      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-      // Do the computation
-      auto op = ctx.builder.create<OpTy>(ctx.unk, args[0], args[1]);
-      // Store the result
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", op);
-      // Return self
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({op}));
-    });
-  });
+                    )
+  ).build(builder);
 }
 
-template <typename OpTy> void addUnaryOp(BuildContext &ctx, mlir::StringRef name) {
-  ctx.createBasicComponent(name, [&](ComponentOp &op) {
-    auto componentType = ComponentType::get(ctx.builder.getContext(), op.getSymName());
-    auto val = ValType::get(ctx.builder.getContext());
-    // Special register where results are stored
-    ctx.builder.create<FieldDefOp>(ctx.unk, "$super", val);
-    ctx.fillOutBody(op, {val}, {val}, [&](mlir::ValueRange args) {
-      // Reference to self
-      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-      // Do the computation
-      auto op = ctx.builder.create<OpTy>(ctx.unk, args[0]);
-      // Store the result
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", op);
-      // Return self
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({op}));
-    });
-  });
+void addComponent(mlir::OpBuilder &builder) {
+  auto componentType = ComponentType::get(builder.getContext(), "Component");
+  mlir::SmallVector<mlir::Type> args;
+
+  builtinCommon(ComponentBuilder()
+                    .name("Component")
+                    .fillBody(
+                        args, {componentType},
+                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+    auto op = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({op}));
+  }
+                    )
+  ).build(builder);
 }
 
-void addInRange(BuildContext &ctx) {
-  ctx.createBasicComponent("InRange", [&](ComponentOp &op) {
-    auto componentType = ComponentType::get(ctx.builder.getContext(), op.getSymName());
-    auto val = ValType::get(ctx.builder.getContext());
-    // Special register where results are stored
-    ctx.builder.create<FieldDefOp>(ctx.unk, "$super", val);
-    ctx.fillOutBody(op, {val, val, val}, {componentType}, [&](mlir::ValueRange args) {
-      // Reference to self
-      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-      // Do the computation
-      auto op = ctx.builder.create<InRangeOp>(ctx.unk, args[0], args[1], args[2]);
-      // Store the result
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", op);
-      // Return self
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({self}));
-    });
-  });
+void addNondetReg(mlir::OpBuilder &builder) {
+  auto componentType = ComponentType::get(builder.getContext(), "NondetReg");
+  auto superType = ComponentType::get(builder.getContext(), "Val");
+
+  builtinCommon(ComponentBuilder()
+                    .name("NondetReg")
+                    .field("$super", superType)
+                    .field("$reg", superType)
+                    .fillBody(
+                        {superType}, {componentType},
+                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+    // Reference to self
+    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "reg", args[0]);
+    // Store the result
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", args[0]);
+    // Return self
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+  }
+                    )
+  ).build(builder);
 }
 
-void addComponent(BuildContext &ctx) {
-  ctx.createBasicComponent("Component", [&](ComponentOp &op) {
-    auto componentType = ComponentType::get(ctx.builder.getContext(), op.getSymName());
-    mlir::SmallVector<mlir::Type> args;
-    ctx.fillOutBody(op, args, {componentType}, [&](mlir::ValueRange) {
-      auto op = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({op}));
-    });
-  });
+void addTrivial(mlir::OpBuilder &builder, mlir::StringRef name) {
+  auto componentType = ComponentType::get(builder.getContext(), name);
+  auto superType = ComponentType::get(builder.getContext(), "Component");
+
+  selfConstructs(
+      builtinCommon(ComponentBuilder().name(name).field("$super", superType)
+
+      ),
+      componentType
+  )
+      .build(builder);
 }
 
-void addNondetReg(BuildContext &ctx) {
-  ctx.createBasicComponent("NondetReg", [&](ComponentOp &op) {
-    auto componentType = ComponentType::get(ctx.builder.getContext(), op.getSymName());
-    auto val = ValType::get(ctx.builder.getContext());
-    ctx.builder.create<FieldDefOp>(ctx.unk, "reg", val);
-    // Special register where results are stored
-    ctx.builder.create<FieldDefOp>(ctx.unk, "$super", val);
-    ctx.fillOutBody(op, {val}, {componentType}, [&](mlir::ValueRange args) {
-      // Reference to self
-      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "reg", args[0]);
-      // Store the result
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", args[0]);
-      // Return self
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({self}));
-    });
-  });
+void addArrayComponent(mlir::OpBuilder &builder) {
+  auto symT = mlir::SymbolRefAttr::get(mlir::StringAttr::get(builder.getContext(), "T"));
+  auto sizeVar = mlir::SymbolRefAttr::get(mlir::StringAttr::get(builder.getContext(), "N"));
+  auto componentType = ComponentType::get(builder.getContext(), "Array", {symT, sizeVar});
+  auto superType = ComponentType::get(builder.getContext(), "Component");
+
+  selfConstructs(
+      builtinCommon(
+          ComponentBuilder().name("Array").typeParam("T").typeParam("N").field("$super", superType)
+      ),
+      componentType
+  )
+      .build(builder);
 }
 
-void addTrivial(BuildContext &ctx, mlir::StringRef name, mlir::Type type) {
-  ctx.createBasicComponent(name, [&](ComponentOp &op) {
-    auto componentType = ComponentType::get(ctx.builder.getContext(), op.getSymName());
-    // Special register where results are stored
-    ctx.builder.create<FieldDefOp>(ctx.unk, "$super", type);
-    ctx.fillOutBody(op, {type}, {componentType}, [&](mlir::ValueRange args) {
-      // Reference to self
-      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-      // Store the result
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", args[0]);
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({self}));
-    });
-  });
-}
-
-void addArrayComponent(BuildContext &ctx) {
-
-  auto symT = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx.builder.getContext(), "T"));
-  auto sizeVar = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx.builder.getContext(), "N"));
-  ctx.createParametricComponent("Array", {"T", "N"}, [&](ComponentOp &op) {
-    auto componentType =
-        ComponentType::get(ctx.builder.getContext(), op.getSymName(), {symT, sizeVar});
-    auto typeVar = TypeVarType::get(ctx.builder.getContext(), symT);
-    auto type = BoundedArrayType::get(ctx.builder.getContext(), typeVar, sizeVar);
-    // Special register where results are stored
-    ctx.builder.create<FieldDefOp>(ctx.unk, "$super", type);
-
-    ctx.fillOutBody(op, {type}, {componentType}, [&](mlir::ValueRange args) {
-      // Reference to self
-      auto self = ctx.builder.create<GetSelfOp>(ctx.unk, componentType);
-      // Store the result
-      ctx.builder.create<WriteFieldOp>(ctx.unk, self, "$super", args[0]);
-      ctx.builder.create<mlir::func::ReturnOp>(ctx.unk, mlir::ValueRange({self}));
-    });
-  });
-}
+/*template <typename... Args> zhl::ParamsMap makeParams(Args &&...args) {*/
+/*  zhl::ParamsMap map;*/
+/*  (((void)map.insert(std::forward<Args>(args)), ...));*/
+/*  return map;*/
+/*}*/
 
 void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
   auto &Val = bindings.Create("Val", bindings.Component());
-  bindings.Create("String", bindings.Component());
+  const_cast<zhl::TypeBinding &>(Val).selfConstructs();
+  auto &String = bindings.Create("String", bindings.Component());
+  const_cast<zhl::TypeBinding &>(String).selfConstructs();
   auto &Type = bindings.Create("Type", bindings.Component());
 
-  bindings.Create("NondetReg", Val);
-  bindings.Create("InRange", Val);
-  bindings.Create("BitAnd", Val);
-  bindings.Create("Add", Val);
-  bindings.Create("Sub", Val);
-  bindings.Create("Mul", Val);
-  bindings.Create("Inv", Val);
-  bindings.Create("Isz", Val);
-  bindings.Create("Neg", Val);
-  zhl::ParamsMap arrayGenericParams;
-  arrayGenericParams.insert({{"T", 0}, Type});
-  arrayGenericParams.insert({{"N", 1}, Val});
-  bindings.Create("Array", bindings.Component(), arrayGenericParams);
+  zhl::ParamsMap NondetRegParams;
+  bindings.Create(
+      "NondetReg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+  );
+  bindings.Create(
+      "InRange", Val, zhl::ParamsMap(),
+      zhl::ParamsMap({{{"low", 0}, Val}, {{"mid", 1}, Val}, {{"high", 2}, Val}}), zhl::MembersMap()
+  );
+  bindings.Create(
+      "BitAnd", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+      zhl::MembersMap()
+  );
+  bindings.Create(
+      "Add", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+      zhl::MembersMap()
+  );
+  bindings.Create(
+      "Sub", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+      zhl::MembersMap()
+  );
+  bindings.Create(
+      "Mul", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+      zhl::MembersMap()
+  );
+  bindings.Create(
+      "Inv", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+  );
+  bindings.Create(
+      "Isz", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+  );
+  bindings.Create(
+      "Neg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+  );
+  auto &Array = bindings.Create(
+      "Array", bindings.Component(), zhl::ParamsMap({{{"T", 0}, Type}, {{"N", 1}, Val}})
+  );
+  const_cast<zhl::TypeBinding &>(Array).selfConstructs();
 }
 
 /// Adds the builtin operations that have not been overriden
 void zkc::Zmir::addBuiltins(mlir::OpBuilder &builder) {
-  BuildContext ctx(builder);
-  addComponent(ctx);
-  addTrivial(ctx, "Val", ValType::get(builder.getContext()));
-  addTrivial(ctx, "String", StringType::get(builder.getContext()));
+  addComponent(builder);
 
-  addNondetReg(ctx);
-  addInRange(ctx);
-  addBinOp<BitAndOp>(ctx, "BitAnd");
-  addBinOp<AddOp>(ctx, "Add");
-  addBinOp<SubOp>(ctx, "Sub");
-  addBinOp<MulOp>(ctx, "Mul");
-  addUnaryOp<InvOp>(ctx, "Inv");
-  addUnaryOp<IsZeroOp>(ctx, "Isz");
-  addUnaryOp<NegOp>(ctx, "Neg");
-  addArrayComponent(ctx);
+  addTrivial(builder, "Val");
+  addTrivial(builder, "String");
+
+  addNondetReg(builder);
+  addInRange(builder);
+  addBinOp<BitAndOp>(builder, "BitAnd");
+  addBinOp<AddOp>(builder, "Add");
+  addBinOp<SubOp>(builder, "Sub");
+  addBinOp<MulOp>(builder, "Mul");
+  addUnaryOp<InvOp>(builder, "Inv");
+  addUnaryOp<IsZeroOp>(builder, "Isz");
+  addUnaryOp<NegOp>(builder, "Neg");
+  addArrayComponent(builder);
 }

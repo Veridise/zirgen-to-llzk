@@ -1,5 +1,6 @@
 #include "Patterns.h"
 #include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
+#include "ZirToZkir/Dialect/ZMIR/IR/Builder.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
 #include "ZirToZkir/Dialect/ZMIR/Typing/Materialize.h"
@@ -70,7 +71,12 @@ mlir::LogicalResult FoldUnrealizedCasts::matchAndRewrite(
 mlir::LogicalResult ZhlLiteralLowering::matchAndRewrite(
     Zhl::LiteralOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  Zmir::ValType val = Zmir::ValType::get(getContext());
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
+
+  auto val = Zmir::materializeTypeBinding(getContext(), *binding);
   rewriter.replaceOpWithNewOp<Zmir::LitValOp>(op, val, adaptor.getValue());
   return mlir::success();
 }
@@ -96,12 +102,13 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 ) const {
   auto body = op->getParentOfType<mlir::func::FuncOp>();
   mlir::BlockArgument arg = body.getArgument(adaptor.getIndex());
-  auto conv = getTypeConverter()->materializeSourceConversion(
-      rewriter, op.getLoc(), Zhl::ExprType::get(getContext()), {arg}
-  );
+  /*auto conv = getTypeConverter()->materializeSourceConversion(*/
+  /*    rewriter, op.getLoc(), Zhl::ExprType::get(getContext()), {arg}*/
+  /*);*/
 
-  rewriter.replaceAllUsesWith(op, conv);
-  rewriter.eraseOp(op);
+  /*rewriter.replaceAllUsesWith(op, arg);*/
+  /*rewriter.eraseOp(op);*/
+  rewriter.replaceOpWithNewOp<Zmir::NopOp>(op, arg.getType(), arg);
   return mlir::success();
 }
 
@@ -112,19 +119,20 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  Zhl::GlobalOp typeNameOp = op.getType().getDefiningOp<Zhl::GlobalOp>();
-  if (!typeNameOp) {
-    return op.emitError("constructed type is not declared by a global");
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op.emitOpError("failed to type check");
   }
 
   auto calleeComp = op->getParentOfType<mlir::ModuleOp>().lookupSymbol<Zmir::ComponentInterface>(
-      typeNameOp.getNameAttr()
+      binding->getName()
   );
   if (!calleeComp) {
-    return op->emitError() << "could not find component with name " << typeNameOp.getNameAttr();
+    return op->emitError() << "could not find component with name " << binding->getName();
   }
 
-  auto constructorTypes = calleeComp.getBodyFunc().getFunctionType().getInputs();
+  /*auto constructorTypes = calleeComp.getBodyFunc().getFunctionType().getInputs();*/
+  auto constructorTypes = Zmir::materializeTypeBindingConstructor(rewriter, *binding).getInputs();
   {
     bool isVariadic =
         !constructorTypes.empty() && mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
@@ -135,9 +143,8 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
         (!isVariadic && adaptor.getArgs().size() > constructorTypes.size())) {
       return op->emitOpError()
           .append(
-              "incorrect number of arguments for component ", typeNameOp.getNameAttr(),
-              expectingNArgsMsg, constructorTypes.size(), " arguments and got ",
-              adaptor.getArgs().size()
+              "incorrect number of arguments for component ", binding->getName(), expectingNArgsMsg,
+              constructorTypes.size(), " arguments and got ", adaptor.getArgs().size()
           )
           .attachNote(calleeComp.getLoc())
           .append("component declared here");
@@ -186,7 +193,20 @@ mlir::Value ZhlConstructLowering::prepareArgument(
     mlir::Value arg, mlir::Type expectedType, mlir::Location loc,
     mlir::ConversionPatternRewriter &rewriter
 ) const {
-  return getTypeConverter()->materializeTargetConversion(rewriter, loc, expectedType, arg);
+  auto binding = getType(arg);
+  auto type = expectedType;
+
+  if (mlir::succeeded(binding)) {
+    type = Zmir::materializeTypeBinding(rewriter.getContext(), *binding);
+  }
+  if (arg.getType() == type) {
+    return arg;
+  }
+  auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, type, arg);
+  if (expectedType == cast.getResult(0).getType()) {
+    return cast.getResult(0);
+  }
+  return rewriter.create<Zmir::SuperCoerceOp>(loc, expectedType, cast.getResult(0));
 }
 
 mlir::FailureOr<mlir::Type> ZhlConstructLowering::getTypeFromName(mlir::StringRef name) const {
@@ -203,13 +223,29 @@ mlir::FailureOr<mlir::Type> ZhlConstructLowering::getTypeFromName(mlir::StringRe
 mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     Zhl::ConstraintOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto lhs = getTypeConverter()->materializeTargetConversion(
-      rewriter, op->getLoc(), Zmir::ValType::get(getContext()), {adaptor.getLhs()}
-  );
-  auto rhs = getTypeConverter()->materializeTargetConversion(
-      rewriter, op->getLoc(), Zmir::ValType::get(getContext()), {adaptor.getRhs()}
-  );
-  rewriter.replaceOpWithNewOp<Zmir::ConstrainOp>(op, lhs, rhs);
+
+  auto lhsBinding = getType(op.getLhs());
+  if (mlir::failed(lhsBinding)) {
+    return op->emitOpError() << "failed to type check lhs";
+  }
+  auto rhsBinding = getType(op.getRhs());
+  if (mlir::failed(rhsBinding)) {
+    return op->emitOpError() << "failed to type check rhs";
+  }
+
+  mlir::Value lhsValue = adaptor.getLhs();
+  mlir::Type lhsTarget = Zmir::materializeTypeBinding(getContext(), *lhsBinding);
+  if (lhsValue.getType() != lhsTarget) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), lhsTarget, lhsValue);
+    lhsValue = cast.getResult(0);
+  }
+  mlir::Value rhsValue = adaptor.getRhs();
+  mlir::Type rhsTarget = Zmir::materializeTypeBinding(getContext(), *rhsBinding);
+  if (rhsValue.getType() != rhsTarget) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), rhsTarget, rhsValue);
+    rhsValue = cast.getResult(0);
+  }
+  rewriter.replaceOpWithNewOp<Zmir::ConstrainOp>(op, lhsValue, rhsValue);
   return mlir::success();
 }
 
@@ -268,23 +304,32 @@ void createField(
   mlir::OpBuilder::InsertionGuard guard(rewriter);
 
   rewriter.setInsertionPointToStart(&comp.getRegion().front());
-  rewriter.create<Zmir::FieldDefOp>(loc, name, type);
+  rewriter.create<Zmir::FieldDefOp>(loc, name, mlir::dyn_cast<Zmir::ComponentType>(type));
 }
 
 mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
     zirgen::Zhl::DefinitionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
+
   Zhl::DeclarationOp declr = op.getDeclaration().getDefiningOp<Zhl::DeclarationOp>();
   if (!declr) {
-    return op.emitError("definition does not depend on a declaration");
+    return op.emitOpError("does not depend on a declaration");
   }
   auto name = declr.getMemberAttr();
 
-  auto value = findTypeInUseDefChain(adaptor.getDefinition(), getTypeConverter());
-
   auto comp = op->getParentOfType<Zmir::ComponentOp>();
   assert(comp);
-  createField(comp, name, value.getType(), rewriter, declr.getLoc());
+
+  mlir::Value value = adaptor.getDefinition();
+  mlir::Type target = Zmir::materializeTypeBinding(getContext(), *binding);
+  if (value.getType() != target) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), target, value);
+    value = cast.getResult(0);
+  }
 
   auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
   auto writeOp = rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, name, value);
@@ -309,34 +354,27 @@ mlir::FailureOr<mlir::Type> deduceTypeOfKnownExtern(mlir::StringRef name, mlir::
 mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
     zirgen::Zhl::SuperOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
   if (!mlir::isa<mlir::func::FuncOp>(op->getParentOp())) {
-    return op.emitError("lowering of super ops inside blocks is not defined yet");
+    return mlir::failure();
   }
   auto comp = op->getParentOfType<Zmir::ComponentInterface>();
   assert(comp);
   auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
 
-  auto deducedType = deduceTypeOfKnownExtern(comp.getName(), rewriter.getContext());
-
-  mlir::Type type;
-  mlir::Value value;
-  if (mlir::succeeded(deducedType)) {
-    type = *deducedType;
-    value = getTypeConverter()->materializeTargetConversion(
-        rewriter, op->getLoc(), type, adaptor.getValue()
-    );
-    auto v = findTypeInUseDefChain(value, getTypeConverter());
-    if (v.getType() == type) {
-      value = v;
-    }
-  } else {
-    value = findTypeInUseDefChain(adaptor.getValue(), getTypeConverter());
-    type = value.getType();
+  mlir::Value value = adaptor.getValue();
+  mlir::Type target = Zmir::materializeTypeBinding(getContext(), *binding);
+  if (value.getType() != target) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), target, value);
+    value = cast.getResult(0);
   }
 
-  createField(comp, "$super", type, rewriter, op.getLoc());
+  /*createField(comp, "$super", type, rewriter, op.getLoc());*/
   auto writeOp = rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", value);
-  maybeAnnotateConstructorCallWithField(writeOp, value);
+  maybeAnnotateConstructorCallWithField(writeOp, adaptor.getValue());
 
   // Find the prologue and join it to the current block
   auto *prologue = &comp.getBodyFunc().getRegion().back();
@@ -426,27 +464,45 @@ getExternRetType(Zhl::ExternOp op, mlir::ConversionPatternRewriter &rewriter) {
 mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
     Zhl::ExternOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
   auto comp = op->getParentOfType<Zmir::ComponentOp>();
   if (!comp) {
     return mlir::failure();
   }
 
+  std::vector<mlir::Type> argBindings;
+  for (auto arg : op.getArgs()) {
+    auto argBinding = getType(arg);
+    if (mlir::failed(argBinding)) {
+      return op->emitOpError() << "failed to type check argument #" << argBindings.size();
+    }
+    argBindings.push_back(Zmir::materializeTypeBinding(getContext(), *argBinding));
+  }
+
   std::vector<mlir::Value> args;
   std::transform(
-      adaptor.getArgs().begin(), adaptor.getArgs().end(), std::back_inserter(args),
-      [&](mlir::Value v) { return findTypeInUseDefChain(v, getTypeConverter()); }
+      adaptor.getArgs().begin(), adaptor.getArgs().end(), argBindings.begin(),
+      std::back_inserter(args),
+      [&](mlir::Value adaptorValue, mlir::Type argType) {
+    if (adaptorValue.getType() == argType) {
+      return adaptorValue;
+    }
+
+    auto cast =
+        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), argType, adaptorValue);
+    return cast.getResult(0);
+  }
   );
 
-  std::vector<mlir::Type> argTypes;
-  for (auto arg : args) {
-    argTypes.push_back(arg.getType());
-  }
-  auto retType = getExternRetType(op, rewriter);
-  if (mlir::failed(retType)) {
-    return mlir::failure();
-  }
-  auto funcType = rewriter.getFunctionType(argTypes, {*retType});
+  auto retType = Zmir::materializeTypeBinding(getContext(), *binding);
+
+  // Extern ops are wrapped around a component by the AST->ZHL step and have the same inputs as the
+  // component.
+  auto funcType =
+      rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
   std::string externName(op.getName().str());
   externName += "$$extern";
   auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
@@ -466,21 +522,37 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
 mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto comp = findTypeInUseDefChain(adaptor.getComponent(), getTypeConverter());
-  auto compType = mlir::dyn_cast<Zmir::ComponentType>(comp.getType());
-  assert(compType && "expected a component type");
-  auto mod = op->getParentOfType<mlir::ModuleOp>();
-  assert(mod && "expected a module as one of the parents of the op");
-  mlir::SymbolTableCollection st;
-  auto compOp = compType.getDefinition(st, mod);
-  auto t =
-      compOp.lookupFieldType(mlir::SymbolRefAttr::get(rewriter.getStringAttr(adaptor.getMember())));
-  if (mlir::failed(t)) {
-    return op->emitError() << "field '" << adaptor.getMember() << "' not found for component '"
-                           << compOp.getName() << "'";
+  /*auto comp = findTypeInUseDefChain(adaptor.getComponent(), getTypeConverter());*/
+  auto comp = adaptor.getComponent();
+  auto originalComp = getType(op.getComponent());
+  if (mlir::failed(originalComp)) {
+    return op->emitOpError() << "failed to type check component reference";
   }
+  auto compType = Zmir::materializeTypeBinding(getContext(), *originalComp);
+  if (comp.getType() != compType) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
+    comp = cast.getResult(0);
+  }
+  /*auto compType = mlir::dyn_cast<Zmir::ComponentType>(comp.getType());*/
+  /*assert(compType && "expected a component type");*/
+  /*auto mod = op->getParentOfType<mlir::ModuleOp>();*/
+  /*assert(mod && "expected a module as one of the parents of the op");*/
+  /*mlir::SymbolTableCollection st;*/
+  /*auto compOp = compType.getDefinition(st, mod);*/
+  /*auto t =*/
+  /*    compOp.lookupFieldType(mlir::SymbolRefAttr::get(rewriter.getStringAttr(adaptor.getMember())));*/
+  /*if (mlir::failed(t)) {*/
+  /*  return op->emitError() << "field '" << adaptor.getMember() << "' not found for component '"*/
+  /*                         << compOp.getName() << "'";*/
+  /*}*/
 
-  rewriter.replaceOpWithNewOp<Zmir::ReadFieldOp>(op, *t, comp, adaptor.getMember());
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
+  auto bindingType = Zmir::materializeTypeBinding(getContext(), *binding);
+
+  rewriter.replaceOpWithNewOp<Zmir::ReadFieldOp>(op, bindingType, comp, adaptor.getMember());
   return mlir::success();
 }
 
@@ -491,13 +563,39 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
 mlir::LogicalResult ZhlSubscriptLowering::matchAndRewrite(
     Zhl::SubscriptOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto arr = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());
-  auto elem = findTypeInUseDefChain(adaptor.getElement(), getTypeConverter());
-  if (auto arrType = mlir::dyn_cast<Zmir::ArrayType>(arr.getType())) {
-    rewriter.replaceOpWithNewOp<Zmir::ReadArrayOp>(op, arrType.getInnerType(), arr, elem);
-  } else {
-    rewriter.replaceOpWithNewOp<Zmir::ReadArrayOp>(op, arr.getType(), arr, elem);
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
   }
+
+  auto arrayBinding = getType(op.getArray());
+  if (mlir::failed(arrayBinding)) {
+    return op->emitOpError() << "failed to type check array reference";
+  }
+  auto elementBinding = getType(op.getElement());
+  if (mlir::failed(elementBinding)) {
+    return op->emitOpError() << "failed to type check index";
+  }
+
+  /*auto arr = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());*/
+  /*auto elem = findTypeInUseDefChain(adaptor.getElement(), getTypeConverter());*/
+
+  auto arrayVal = adaptor.getArray();
+  auto arrayType = Zmir::materializeTypeBinding(getContext(), *arrayBinding);
+  if (arrayVal.getType() != arrayType) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), arrayType, arrayVal);
+    arrayVal = cast.getResult(0);
+  }
+  auto elementVal = adaptor.getElement();
+  auto elementType = Zmir::materializeTypeBinding(getContext(), *elementBinding);
+  if (elementVal.getType() != elementType) {
+    auto cast =
+        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), elementType, elementVal);
+    elementVal = cast.getResult(0);
+  }
+  rewriter.replaceOpWithNewOp<Zmir::ReadArrayOp>(
+      op, Zmir::materializeTypeBinding(getContext(), *binding), arrayVal, elementVal
+  );
   return mlir::success();
 }
 
@@ -508,7 +606,24 @@ mlir::LogicalResult ZhlSubscriptLowering::matchAndRewrite(
 mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
     Zhl::ArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
+
+  if (!binding->isArray()) {
+    return op->emitOpError() << "was expecting an 'Array' component but got '" << binding->getName()
+                             << "'";
+  }
+  auto arrayType = Zmir::materializeTypeBinding(getContext(), *binding);
+  auto elementTypeBinding = binding->getArrayElement([&]() { return op->emitOpError(); });
+  if (mlir::failed(elementTypeBinding)) {
+    return mlir::failure();
+  }
+  auto elementType = Zmir::materializeTypeBinding(getContext(), *elementTypeBinding);
+
   if (adaptor.getElements().empty()) {
+    assert(false && "TODO");
     rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(
         op, Zmir::UnboundedArrayType::get(
                 rewriter.getContext(), Zmir::PendingType::get(rewriter.getContext())
@@ -518,13 +633,25 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   }
 
   llvm::SmallVector<mlir::Value> args;
-  findTypesInUseDefChain(adaptor.getElements(), getTypeConverter(), args);
+
+  std::transform(
+      adaptor.getElements().begin(), adaptor.getElements().end(), std::back_inserter(args),
+      [&](auto element) {
+    if (element.getType() == elementType) {
+      return element;
+    }
+
+    auto cast =
+        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), elementType, element);
+    return cast.getResult(0);
+  }
+  );
   rewriter.replaceOpWithNewOp<Zmir::NewArrayOp>(
-      op,
-      Zmir::BoundedArrayType::get(
-          rewriter.getContext(), args.front().getType(),
-          rewriter.getIndexAttr(adaptor.getElements().size())
-      ),
+      op, arrayType,
+      /*Zmir::BoundedArrayType::get(*/
+      /*    rewriter.getContext(), args.front().getType(),*/
+      /*    rewriter.getIndexAttr(adaptor.getElements().size())*/
+      /*),*/
       args
   );
   return mlir::success();
@@ -534,189 +661,47 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
 /// ZhlCompToZmirCompPattern
 ///////////////////////////////////////////////////////////
 
-class ZhlCompToZmirCompPatternImpl {
-public:
-  using OpAdaptor = zirgen::Zhl::ComponentOp::Adaptor;
-  ZhlCompToZmirCompPatternImpl(
-      zirgen::Zhl::ComponentOp prev, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter,
-      const ZhlCompToZmirCompPattern &pattern
-  )
-      : prev(prev), adaptor(adaptor), rewriter(rewriter), pattern(pattern) {}
-
-  mlir::LogicalResult matchAndRewrite() {
-    auto name = pattern.getType(prev.getName());
-    if (mlir::failed(name)) {
-      return prev->emitOpError() << "could not be lowered because its type could not be infered";
-    }
-    llvm::dbgs() << "Component type:\n   ";
-    name->print(llvm::dbgs());
-    llvm::dbgs() << "\n";
-
-    auto newCompOp = createComponent(*name);
-    mlir::OpBuilder::InsertionGuard compInsertionGuard(rewriter);
-    auto *block = rewriter.createBlock(&newCompOp.getRegion());
-    rewriter.setInsertionPointToStart(block);
-
-    /*auto types = deduceConstructorArgTypes();*/
-    /*if (mlir::failed(types)) {*/
-    /*  return mlir::failure();*/
-    /*}*/
-    /**/
-    /*auto arity = getComponentConstructorArity(prev);*/
-    /*if (types->size() != arity.paramCount) {*/
-    /*  return prev->emitError() << "Inconsistent parameter detection result. Type detection "*/
-    /*                           << types->size() << ", arity detection " << arity.paramCount;*/
-    /*}*/
-    auto funcType = Zmir::materializeTypeBindingConstructor(rewriter, *name);
-    assert(funcType);
-    auto locs = name->getConstructorParamLocations();
-    createComponentBody(newCompOp, locs, funcType);
-    rewriter.replaceOp(prev.getOperation(), newCompOp.getOperation());
-    return mlir::success();
-  }
-
-private:
-  mlir::FailureOr<std::map<uint32_t, mlir::Type>> deduceConstructorArgTypes() {
-    std::map<uint32_t, mlir::Type> types;
-    for (auto param : prev.getOps<Zhl::ConstructorParamOp>()) {
-
-      auto type = inferType(param.getType(), param.getOperation());
-      if (mlir::failed(type)) {
-        return mlir::failure();
-      }
-      types.insert({param.getIndex(), *type});
-    }
-
-    return types;
-  }
-
-  mlir::FailureOr<mlir::Type>
-  inferType(mlir::TypedValue<Zhl::ExprType> paramType, mlir::Operation *op) {
-    // Option 1: The type is declared with zhl.global
-    Zhl::GlobalOp typeNameOp = paramType.getDefiningOp<Zhl::GlobalOp>();
-    if (typeNameOp) {
-      auto type = getTypeFromName(typeNameOp);
-      if (mlir::failed(type)) {
-        return mlir::failure();
-      } else {
-        return type;
-      }
-    }
-    // Option 2: The type is declared with zhl.specialize
-    Zhl::SpecializeOp specializeOp = paramType.getDefiningOp<Zhl::SpecializeOp>();
-    if (specializeOp) {
-      auto t = inferType(specializeOp.getType(), specializeOp.getOperation());
-      if (mlir::failed(t)) {
-        return mlir::failure();
-      }
-
-      // What to do with the arguments of the specialization is TBD
-      return t;
-    }
-
-    // Fail if none of the options match
-    return op->emitError("could not detect the type of the parameter");
-  }
-
-  mlir::MLIRContext *getContext() { return rewriter.getContext(); }
-
-  void maybeOverwriteBuiltin() {
-    auto maybeBuiltin = mlir::SymbolTable::lookupSymbolIn(
-        prev->getParentOfType<mlir::ModuleOp>().getOperation(), prev.getName()
-    );
-    if (maybeBuiltin) {
-      rewriter.eraseOp(maybeBuiltin);
-    }
-  }
-
-  zkc::Zmir::ComponentOp createComponent(const TypeBinding &binding) {
-    maybeOverwriteBuiltin();
-
-    auto attrs = prev->getAttrs();
-
-    assert(prev.getGeneric() == binding.isGeneric());
-    if (prev.getGeneric()) {
-      std::vector<mlir::StringRef> typeParams;
-      auto genericNames = binding.getGenericParamNames();
-      std::transform(
-          genericNames.begin(), genericNames.end(), std::back_inserter(typeParams),
-          [](auto &s) { return s; }
-      );
-      return rewriter.create<zkc::Zmir::ComponentOp>(
-          prev.getLoc(), prev.getName(), typeParams, attrs
-      );
-    } else {
-      return rewriter.create<zkc::Zmir::ComponentOp>(prev.getLoc(), prev.getName(), attrs);
-    }
-  }
-
-  std::vector<mlir::NamedAttribute> funcBodyAttrs() {
-    return {mlir::NamedAttribute(
-        rewriter.getStringAttr("sym_visibility"), rewriter.getStringAttr("nested")
-    )};
-  }
-  std::vector<mlir::Type>
-  getArgTypes(ComponentArity &arity, std::map<uint32_t, mlir::Type> &types) {
-    std::vector<mlir::Type> argTypes;
-
-    for (uint32_t i = 0; i < arity.paramCount; i++) {
-      // If the component is variadic mark the last argument as such
-      if (i == arity.paramCount - 1 && arity.isVariadic) {
-        argTypes.push_back(Zmir::VarArgsType::get(getContext(), types.at(i)));
-        continue;
-      }
-      argTypes.push_back(types.at(i));
-    }
-
-    return argTypes;
-  }
-
-  void createComponentBody(
-      zkc::Zmir::ComponentOp newOp, mlir::ArrayRef<mlir::Location> argLocs,
-      mlir::FunctionType funcType
-  ) {
-    /*auto argTypes = getArgTypes(arity, types);*/
-    /*mlir::Type compType = newOp.getType();*/
-    /*auto funcType = rewriter.getFunctionType(argTypes, {compType});*/
-    auto attrs = funcBodyAttrs();
-
-    auto bodyOp = rewriter.create<mlir::func::FuncOp>(
-        prev.getLoc(), newOp.getBodyFuncName(), funcType, attrs
-    );
-    bodyOp.getRegion().takeBody(prev.getRegion());
-
-    // Create arguments for the entry block (aka region arguments)
-    auto &entryBlock = bodyOp.front();
-    entryBlock.addArguments(funcType.getInputs(), argLocs);
-
-    // Fill out epilogue
-    auto *epilogue = bodyOp.addBlock();
-    fillEpilogue(epilogue, newOp, rewriter);
-  }
-
-  void fillEpilogue(
-      mlir::Block *block, zkc::Zmir::ComponentOp newOp, mlir::ConversionPatternRewriter &rewriter
-  ) {
-    mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
-    rewriter.setInsertionPointToEnd(block);
-
-    mlir::Location unk = rewriter.getUnknownLoc();
-    // Prologue of Zmir components
-    auto self = rewriter.create<zkc::Zmir::GetSelfOp>(unk, newOp.getType());
-    rewriter.create<mlir::func::ReturnOp>(unk, mlir::ValueRange({self}));
-  }
-
-  zirgen::Zhl::ComponentOp prev;
-  OpAdaptor adaptor;
-  mlir::ConversionPatternRewriter &rewriter;
-  const ZhlCompToZmirCompPattern &pattern;
-};
-
 mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     zirgen::Zhl::ComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  ZhlCompToZmirCompPatternImpl impl(op, adaptor, rewriter, *this);
-  return impl.matchAndRewrite();
+  auto name = getType(op.getName());
+  if (mlir::failed(name)) {
+    return op->emitOpError() << "could not be lowered because its type could not be infered";
+  }
+
+  Zmir::ComponentBuilder builder;
+  auto genericNames = name->getGenericParamNames();
+  builder.name(name->getName())
+      .location(op->getLoc())
+      .attrs(op->getAttrs())
+      .typeParams(genericNames)
+      .constructor(
+          Zmir::materializeTypeBindingConstructor(rewriter, *name),
+          name->getConstructorParamLocations()
+      )
+      .takeRegion(&op.getRegion());
+  for (auto &[fieldName, binding] : name->getMembers()) {
+    if (!binding.has_value()) {
+      return op->emitOpError() << "failed to type check component member '" << fieldName << "'";
+    }
+    builder.field(
+        fieldName, Zmir::materializeTypeBinding(getContext(), *binding), binding->getLocation()
+    );
+  }
+  auto &super = name->getSuperType();
+  builder.field("$super", Zmir::materializeTypeBinding(getContext(), super));
+  auto maybeBuiltin = mlir::SymbolTable::lookupSymbolIn(
+      op->getParentOfType<mlir::ModuleOp>().getOperation(), op.getName()
+  );
+
+  if (maybeBuiltin) {
+    rewriter.eraseOp(maybeBuiltin);
+  }
+  auto comp = builder.build(rewriter);
+
+  rewriter.replaceOp(op.getOperation(), comp.getOperation());
+
+  return mlir::success();
 }
 
 ///////////////////////////////////////////////////////////
@@ -726,24 +711,36 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
 mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
     Zhl::RangeOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  // Allocate an unbounded array of vals
-  auto arrAlloc = rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(
-      op, Zmir::UnboundedArrayType::get(
-              rewriter.getContext(), Zmir::ValType::get(rewriter.getContext())
-          )
-  );
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
+  auto startBinding = getType(op.getStart());
+  if (mlir::failed(startBinding)) {
+    return op->emitOpError() << "failed to type check start";
+  }
+  auto endBinding = getType(op.getEnd());
+  if (mlir::failed(endBinding)) {
+    return op->emitOpError() << "failed to type check end";
+  }
+  auto type = Zmir::materializeTypeBinding(getContext(), *binding);
+  assert(binding->isArray());
+  auto innerBinding = binding->getArrayElement([&]() { return op->emitError(); });
+  if (mlir::failed(innerBinding)) {
+    return mlir::failure();
+  }
+  auto innerType = Zmir::materializeTypeBinding(getContext(), *innerBinding);
+  /*auto startType = Zmir::materializeTypeBinding(getContext(), *startBinding);*/
+  /*auto endType = Zmir::materializeTypeBinding(getContext(), *endBinding);*/
+  auto arrAlloc = rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(op, type);
   // Create a for loop op using the operands as bounds
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
-  auto start = rewriter.create<Zmir::ValToIndexOp>(
-      op.getStart().getLoc(), findTypeInUseDefChain(adaptor.getStart(), getTypeConverter())
-  );
-  auto end = rewriter.create<Zmir::ValToIndexOp>(
-      op.getEnd().getLoc(), findTypeInUseDefChain(adaptor.getEnd(), getTypeConverter())
-  );
+  auto start = rewriter.create<Zmir::ValToIndexOp>(op.getStart().getLoc(), adaptor.getStart());
+  auto end = rewriter.create<Zmir::ValToIndexOp>(op.getEnd().getLoc(), adaptor.getEnd());
   rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), start, end, one, mlir::ValueRange(),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange) {
-    auto conv = builder.create<Zmir::IndexToValOp>(loc, iv);
+    auto conv = builder.create<Zmir::IndexToValOp>(loc, innerType, iv);
     builder.create<Zmir::WriteArrayOp>(loc, arrAlloc, iv, conv);
     builder.create<mlir::scf::YieldOp>(loc);
   }
@@ -776,32 +773,60 @@ inline Zmir::ArrayType resultArrayType(
 mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     Zhl::MapOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto arrValue = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());
-  if (!(mlir::isa<Zmir::ArrayType>(arrValue.getType()) ||
-        mlir::isa<Zmir::PendingType>(arrValue.getType()))) {
-    return op.emitOpError()
-        .append("was expecting an array type but got ", arrValue.getType())
-        .attachNote(arrValue.getLoc())
-        .append("defined here");
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
+  if (!binding->isArray()) {
+    return op->emitOpError() << "was expecting 'Array' but got '" << binding->getName() << "'";
+  }
+  auto inputBinding = getType(op.getArray());
+  if (mlir::failed(inputBinding)) {
+    return op->emitOpError() << "failed to type check input";
+  }
+  if (!inputBinding->isArray()) {
+    return op->emitOpError() << "was expecting 'Array' but got '" << inputBinding->getName() << "'";
+  }
+  auto innerInputBinding = inputBinding->getArrayElement([&]() { return op->emitError(); });
+  if (mlir::failed(innerInputBinding)) {
+    return mlir::failure();
   }
 
-  int64_t size = -1;
-  if (auto a = mlir::dyn_cast<Zmir::BoundedArrayType>(arrValue.getType())) {
-    size = a.getSizeInt();
-  }
-  auto inner = tryGetArrayInnerType(arrValue.getType());
-  auto finalType = resultArrayType(inner, size, getContext(), rewriter);
+  /*auto inputType = Zmir::materializeTypeBinding(getContext(), *inputBinding);*/
+  auto itType = Zmir::materializeTypeBinding(getContext(), *innerInputBinding);
+  auto outputType = Zmir::materializeTypeBinding(getContext(), *binding);
 
-  auto arrAlloc = rewriter.create<Zmir::AllocArrayOp>(op.getLoc(), finalType);
+  auto arrValue = adaptor.getArray();
+  /*auto arrValue = findTypeInUseDefChain(adaptor.getArray(), getTypeConverter());*/
+  /*if (!(mlir::isa<Zmir::ArrayType>(arrValue.getType()) ||*/
+  /*      mlir::isa<Zmir::PendingType>(arrValue.getType()))) {*/
+  /*  return op.emitOpError()*/
+  /*      .append("was expecting an array type but got ", arrValue.getType())*/
+  /*      .attachNote(arrValue.getLoc())*/
+  /*      .append("defined here");*/
+  /*}*/
+
+  /*int64_t size = -1;*/
+  /*if (auto a = mlir::dyn_cast<Zmir::BoundedArrayType>(arrValue.getType())) {*/
+  /*  size = a.getSizeInt();*/
+  /*}*/
+  /*auto inner = itType;*/
+  /*auto inner = tryGetArrayInnerType(arrValue.getType());*/
+  /*auto finalType = resultArrayType(inner, size, getContext(), rewriter);*/
+
+  auto arrAlloc = rewriter.create<Zmir::AllocArrayOp>(op.getLoc(), outputType);
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
-  auto len = (size >= 0) ? rewriter.create<mlir::index::ConstantOp>(op.getLoc(), size)
-                         : rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), arrValue);
+  /*auto len = (size >= 0) ? rewriter.create<mlir::index::ConstantOp>(op.getLoc(), size)*/
+  /*                       : rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(),
+   * adaptor.getArray());*/
+  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), adaptor.getArray());
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
-    auto itVal = builder.create<Zmir::ReadArrayOp>(loc, inner, arrValue, mlir::ValueRange(iv));
+    auto itVal = builder.create<Zmir::ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv));
+    // Cast it to a zhl Expr type for the block inlining
     auto itValCast = builder.create<mlir::UnrealizedConversionCastOp>(
         loc, mlir::TypeRange(Zhl::ExprType::get(getContext())), mlir::ValueRange(itVal)
     );
@@ -823,12 +848,17 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
 mlir::LogicalResult ZhlBlockLowering::matchAndRewrite(
     Zhl::BlockOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  mlir::SmallVector<mlir::Type> types;
-  auto convRes = getTypeConverter()->convertTypes(op->getResultTypes(), types);
-  if (mlir::failed(convRes)) {
-    return op->emitError("failed to convert types from zhl to zmir");
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
   }
-  auto exec = rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, types);
+  /*mlir::SmallVector<mlir::Type> types;*/
+  /*auto convRes = getTypeConverter()->convertTypes(op->getResultTypes(), types);*/
+  /*if (mlir::failed(convRes)) {*/
+  /*  return op->emitError("failed to convert types from zhl to zmir");*/
+  /*}*/
+  auto type = Zmir::materializeTypeBinding(getContext(), *binding);
+  auto exec = rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, type);
   rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
   return mlir::success();
 }
@@ -863,13 +893,24 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
   if (!parent || !mlir::isa<mlir::scf::ExecuteRegionOp>(parent)) {
     return mlir::failure();
   }
+  auto binding = getType(op);
+  if (mlir::failed(binding)) {
+    return op->emitOpError() << "failed to type check";
+  }
 
-  auto regionOp = mlir::cast<mlir::scf::ExecuteRegionOp>(parent);
-  auto value = findTypeInUseDefChain(adaptor.getValue(), getTypeConverter());
-  auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(
-      op.getLoc(), regionOp.getResultTypes(), mlir::ValueRange(value)
-  );
+  auto value = adaptor.getValue();
+  auto type = Zmir::materializeTypeBinding(getContext(), *binding);
+  if (value.getType() != type) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), type, value);
+    value = cast.getResult(0);
+  }
 
-  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, cast.getResults());
+  /*auto regionOp = mlir::cast<mlir::scf::ExecuteRegionOp>(parent);*/
+  /*auto value = findTypeInUseDefChain(adaptor.getValue(), getTypeConverter());*/
+  /*auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(*/
+  /*    op.getLoc(), regionOp.getResultTypes(), mlir::ValueRange(value)*/
+  /*);*/
+
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, value);
   return mlir::success();
 }

@@ -20,17 +20,7 @@ def StripDirectives : Pass<"strip-directives", "mlir::ModuleOp"> {
   let dependentDialects = ["zirgen::Zhl::ZhlDialect"];
 }
 
-def TransformComponentDecls : Pass<"zhl-components-to-zmir", "mlir::ModuleOp"> {
-  let summary = "Transforms zhl components into zmir components";
-  let constructor = "zkc::createTransformComponentDeclsPass()";
-
-  let dependentDialects = ["zirgen::Zhl::ZhlDialect",
-                           "::zkc::Zmir::ZmirDialect",
-                           "::mlir::func::FuncDialect",
-  ];
-}
-
-def ConvertZhlToZmir : Pass<"zhl-to-zmir", "zkc::Zmir::ComponentOp"> {
+def ConvertZhlToZmir : Pass<"zhl-to-zmir", "mlir::ModuleOp"> {
   let summary =
       "Converts ZHL operations in the body of a component to ZMIR operations";
   let constructor = "zkc::createConvertZhlToZmirPass()";

@@ -304,3 +304,21 @@ TypeBindings::TypeBindings(OpBuilder &builder)
     : unk(builder.getUnknownLoc()), bottom(TypeBinding(BOTTOM, unk, Component())) {
   (void)Component();
 }
+void zhl::TypeBinding::selfConstructs() {
+  if (selfConstructor) {
+    return;
+  }
+  selfConstructor = true;
+  ParamsMap map = constructorParams;
+  map.clear();
+  map.insert({{"x", 0}, *this});
+
+  constructorParams = map;
+}
+const zhl::MembersMap &zhl::TypeBinding::getMembers() const { return members; }
+mlir::Location zhl::TypeBinding::getLocation() const { return loc; }
+const zhl::TypeBinding &zhl::TypeBinding::getSuperType() const {
+  assert(superType != nullptr);
+  return *superType;
+}
+bool zhl::TypeBinding::isVariadic() const { return variadic; }

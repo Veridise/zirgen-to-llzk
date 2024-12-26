@@ -63,10 +63,9 @@ ZKC_OPT_PIPELINE = Scope(
     Pass("strip-tests"),
     Pass("strip-directives"),
     Pass("inject-builtins"),
-    Pass("zhl-components-to-zmir"),
+    Pass("zhl-to-zmir"),
     Scope(
         "zmir.component",
-        Pass("zhl-to-zmir"),
         Pass("zhl-to-scf"),
         Pass("insert-temporaries"),
         Scope("func.func", Pass("lower-builtins")),

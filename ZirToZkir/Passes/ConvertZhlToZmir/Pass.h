@@ -18,11 +18,6 @@ class ConvertZhlToZmirPass : public ConvertZhlToZmirBase<ConvertZhlToZmirPass> {
   void runOnOperation() override;
 };
 
-class TransformComponentDeclsPass
-    : public TransformComponentDeclsBase<TransformComponentDeclsPass> {
-  void runOnOperation() override;
-};
-
 class ConvertZhlToScfPass : public ConvertZhlToScfBase<ConvertZhlToScfPass> {
   void runOnOperation() override;
 };

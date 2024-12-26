@@ -15,16 +15,23 @@ Type materializeTypeBinding(MLIRContext *context, const TypeBinding &binding) {
     return nullptr;
   }
 
-  if (binding.isGeneric()) {
-    if (!binding.isSpecialized()) {
-      return nullptr;
-    }
+  auto materializeBaseType = [&]() -> mlir::Type {
+    if (binding.isGeneric()) {
+      if (!binding.isSpecialized()) {
+        return nullptr;
+      }
 
-    std::vector<Attribute> params; // TODO: Fill this up
-    return ComponentType::get(context, binding.getName(), params);
-  } else {
-    return ComponentType::get(context, binding.getName());
-  }
+      std::vector<Attribute> params; // TODO: Fill this up
+      return ComponentType::get(context, binding.getName(), params);
+    } else if (binding.isConst()) {
+      return ComponentType::get(context, "Val");
+    } else {
+      return ComponentType::get(context, binding.getName());
+    }
+  };
+
+  return binding.isVariadic() ? VarArgsType::get(context, materializeBaseType())
+                              : materializeBaseType();
 }
 
 FunctionType materializeTypeBindingConstructor(OpBuilder &builder, const TypeBinding &binding) {

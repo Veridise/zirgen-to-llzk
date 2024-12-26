@@ -13,6 +13,7 @@
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
+#include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <system_error>
 #include <tuple>
@@ -32,7 +33,7 @@ class InsertTemporariesPass : public InsertTemporariesBase<InsertTemporariesPass
     auto desiredName = mlir::StringAttr::get(&getContext(), "$temp");
     mlir::OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfter(&op.getRegion().front().front());
-    auto fieldDef = builder.create<FieldDefOp>(loc, desiredName, type);
+    auto fieldDef = builder.create<FieldDefOp>(loc, desiredName, TypeAttr::get(type));
     return mlir::FlatSymbolRefAttr::get(&getContext(), st.insert(fieldDef));
   }
 

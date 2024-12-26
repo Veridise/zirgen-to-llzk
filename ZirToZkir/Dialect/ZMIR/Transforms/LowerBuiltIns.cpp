@@ -78,10 +78,11 @@ public:
       return mlir::failure();
     }
 
+    auto val = ComponentType::get(getContext(), "Val");
     mlir::ValueRange args(
         mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
     );
-    rewriter.replaceOpWithNewOp<NewOp>(op, args);
+    rewriter.replaceOpWithNewOp<NewOp>(op, val, args);
     return mlir::success();
   }
 };
