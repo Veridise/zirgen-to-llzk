@@ -984,26 +984,39 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   return mlir::success();
 }
 
+/// Builds an if-then-else chain with each region of the switch op.
+/// The regions are inserted in the opposite order because the condition
+/// used in the `scf.if` op is the inverse of the condition used in ZIR.
 Operation *buildIfThenElseChain(
     RegionRange::iterator region_begin, RegionRange::iterator region_end,
     ConversionPatternRewriter &rewriter, int idx, Value selector, Type retType
 ) {
   auto val = Zmir::ComponentType::Val(rewriter.getContext());
+
+  // If we reach the end we only generate the final assert.
   if (region_begin == region_end) {
     auto zero = rewriter.create<Zmir::LitValOp>(rewriter.getUnknownLoc(), val, 0);
     return rewriter.create<Zmir::AssertOp>(rewriter.getUnknownLoc(), retType, zero);
   }
   auto region = *region_begin;
+
+  // Test if the nth element of the selector is zero.
   auto nth = rewriter.create<Zmir::LitValOp>(rewriter.getUnknownLoc(), val, idx);
   auto item = rewriter.create<Zmir::ReadArrayOp>(region->getLoc(), val, selector, ValueRange(nth));
   auto isz = rewriter.create<Zmir::IsZeroOp>(region->getLoc(), val, item);
   auto toBool = rewriter.create<Zmir::ValToI1Op>(region->getLoc(), isz);
   auto ifOp = rewriter.create<scf::IfOp>(region->getLoc(), retType, toBool, true, true);
+
+  // If it's not zero then we execute the code of the nth region that has been copied to the else
+  // branch.
   {
     auto &elseBlock = ifOp.getElseRegion().front();
     assert(region->getBlocks().size() == 1);
     rewriter.inlineBlockBefore(&region->front(), &elseBlock, elseBlock.end());
   }
+
+  // If it's zero then we execute the then branch that recursively contains the pending regions to
+  // check.
   {
     auto &thenBlock = ifOp.getThenRegion().front();
     OpBuilder::InsertionGuard guard(rewriter);
