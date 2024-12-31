@@ -322,3 +322,13 @@ const zhl::TypeBinding &zhl::TypeBinding::getSuperType() const {
   return *superType;
 }
 bool zhl::TypeBinding::isVariadic() const { return variadic; }
+mlir::ArrayRef<TypeBinding> zhl::Params::getParams() const { return params; }
+
+mlir::ArrayRef<TypeBinding> zhl::TypeBinding::getGenericParams() const {
+  return genericParams.getParams();
+}
+uint64_t zhl::TypeBinding::getConst() const {
+  assert(constVal.has_value());
+  return *constVal;
+}
+bool zhl::TypeBinding::hasSuperType() const { return superType != nullptr; }

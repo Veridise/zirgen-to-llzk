@@ -32,10 +32,10 @@ void ComponentScope::declareMember(StringRef name) {
 void ComponentScope::declareSuperType(TypeBinding type) { superType = type; }
 
 void ComponentScope::declareMember(StringRef name, TypeBinding type) {
-  if (members.find(name) != members.end()) {
-    // If the value is present and we are (re-)declaring it
-    // we can only do so if it has not value.
-    assert(!members[name].has_value());
+  // If the value is present and we are (re-)declaring it
+  // we can only do so if it has not value.
+  if (members.find(name) != members.end() && members[name].has_value()) {
+    return;
   }
   members[name] = type;
 }

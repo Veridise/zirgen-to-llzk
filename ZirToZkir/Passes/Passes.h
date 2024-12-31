@@ -19,7 +19,6 @@ template <typename Op> using OpPass = std::unique_ptr<mlir::OperationPass<Op>>;
 OpPass<mlir::ModuleOp> createStripTestsPass();
 OpPass<mlir::ModuleOp> createStripDirectivesPass();
 OpPass<mlir::ModuleOp> createConvertZhlToZmirPass();
-OpPass<Zmir::ComponentOp> createConvertZhlToScfPass();
 OpPass<zkir::StructDefOp> createConvertZmirToZkirPass();
 OpPass<mlir::ModuleOp> createConvertZmirComponentsToZkirPass();
 

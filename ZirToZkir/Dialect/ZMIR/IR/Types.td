@@ -29,11 +29,12 @@ def String : ZmirType<"String", "string"> { let summary = "string type"; }
 
 def Union : ZmirType<"Union", "union"> { let summary = "union type"; }
 
-def Component : ZmirType<"Component", "component"> {
+def Component : ZmirType<"Component", ""> {
   let summary = "component type";
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name,
+      OptionalParameter<"ComponentType">:$superType,
       OptionalArrayRefParameter<"::mlir::Attribute">:$params);
-  let assemblyFormat = [{ `<` $name (`<` $params^ `>`)?  `>` }];
+  let assemblyFormat = [{$name (`<` $params^ `>`)?(`:``>`$superType^)?}];
 
   let extraClassDeclaration = [{
 
@@ -48,18 +49,34 @@ def Component : ZmirType<"Component", "component"> {
     /// Returns wether the component associated to this type is the root 'Component'
     bool isRoot() const { return getName().getValue() == "Component"; }
 
-    static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "Component"); }
+    static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
+    static ComponentType Component(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
+    static ComponentType Val(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "Val", Component(ctx)); }
+    static ComponentType String(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "String", Component(ctx)); }
+    static ComponentType Array(mlir::MLIRContext *ctx) { 
+      auto symT = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx, "T"));
+      auto sizeVar = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx, "N"));
+      return ComponentType::get(ctx, "Array", Component(ctx), {symT, sizeVar});
+    }
+    static ComponentType Array(mlir::MLIRContext *ctx, ComponentType inner, uint64_t size) { 
+      auto innerAttr = mlir::TypeAttr::get(inner);
+      auto sizeAttr = mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 64), size);
+      return ComponentType::get(ctx, "Array", Component(ctx), {innerAttr, sizeAttr});
+    }
   }];
 
-  let builders = [TypeBuilder<
-                      (ins "::llvm::StringRef":$name,
-                          "::llvm::ArrayRef<::mlir::Attribute>":$params),
-                      [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), params);
-}]>,
-
-                  TypeBuilder<(ins "::llvm::StringRef":$name), [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), std::nullopt);
+  let builders =
+      [TypeBuilder<(ins "::llvm::StringRef":$name, "ComponentType":$superType,
+                       "::llvm::ArrayRef<::mlir::Attribute>":$params),
+                   [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, params);
+  }]>,
+       TypeBuilder<(ins), [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, "Component")), nullptr, std::nullopt);
+  }]>,
+       TypeBuilder<(ins "::llvm::StringRef":$name, "ComponentType":$superType),
+                   [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, std::nullopt);
     }]>];
 
   let genVerifyDecl = 1;

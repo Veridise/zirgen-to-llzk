@@ -87,7 +87,8 @@ def ConstructorRefOp : ZmirOp<"constructor", [Pure]> {
   let results = (outs FunctionType);
   let assemblyFormat = "attr-dict $component `:` type(results)";
 
-  let builders = [OpBuilder<(ins "ComponentInterface":$comp)>];
+  let builders = [OpBuilder<(ins "ComponentInterface":$comp,
+      "mlir::FunctionType":$fn)>];
 
   let extraClassDeclaration = [{
     /// Returns true if can be built with the given value
@@ -287,6 +288,16 @@ def ValToIndexOp : ZmirOp<"toindex"> {
 
   let arguments = (ins Component:$val);
   let results = (outs Index:$result);
+
+  let assemblyFormat = "$val `:` type($val) attr-dict";
+}
+
+def ValToI1Op : ZmirOp<"tobool"> {
+  let summary = "convert val to i1";
+
+  let arguments = (ins Component:$val);
+  let results = (outs I1:$result);
+  let assemblyFormat = "$val `:` type($val) attr-dict";
 }
 
 def IndexToValOp : ZmirOp<"fromindex"> {
@@ -294,6 +305,7 @@ def IndexToValOp : ZmirOp<"fromindex"> {
 
   let arguments = (ins Index:$index);
   let results = (outs Component:$result);
+  let assemblyFormat = "$index `:` type($result) attr-dict";
 }
 
 def LitValOp : ZmirOp<"literal"> {
@@ -314,6 +326,17 @@ def LitStrOp : ZmirOp<"string"> {
   let assemblyFormat = [{
     $value `:` type($val) attr-dict
   }];
+}
+
+// Used for the last branch of an if-then-else lowered from a zhl.switch
+def AssertOp : ZmirOp<"assert"> {
+  let summary = "assert";
+  let arguments = (ins AnyType:$cond);
+  let results = (outs Component:$comp);
+
+  let assemblyFormat = [{
+    $cond  `:` type($cond) `,` type($comp) attr-dict 
+    }];
 }
 
 ///////////////////// Builtin Ops /////////////////////

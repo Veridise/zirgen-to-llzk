@@ -34,11 +34,10 @@ checkValidZmirType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mli
 
 mlir::LogicalResult
 checkValidParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Attribute attr) {
-  if (!(llvm::isa<mlir::SymbolRefAttr>(attr) || llvm::isa<mlir::IntegerAttr>(attr))) {
-    return emitError() << "expected either a symbol or a literal integer but got " << attr;
-  } else {
+  if (llvm::isa<mlir::SymbolRefAttr, mlir::IntegerAttr, mlir::TypeAttr>(attr)) {
     return mlir::success();
   }
+  return emitError() << "expected either a symbol or a literal integer but got " << attr;
 }
 
 mlir::LogicalResult checkValidTypeParam(
@@ -54,7 +53,7 @@ mlir::LogicalResult checkValidTypeParam(
 
 mlir::LogicalResult ComponentType::verify(
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError, ::mlir::FlatSymbolRefAttr name,
-    ::llvm::ArrayRef<::mlir::Attribute> params
+    ComponentType superType, ::llvm::ArrayRef<::mlir::Attribute> params
 ) {
   std::vector<mlir::LogicalResult> results;
   std::transform(

@@ -78,7 +78,7 @@ public:
       return mlir::failure();
     }
 
-    auto val = ComponentType::get(getContext(), "Val");
+    auto val = ComponentType::Val(getContext());
     mlir::ValueRange args(
         mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
     );

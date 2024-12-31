@@ -10,7 +10,6 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/ValueRange.h>
-#include <unordered_set>
 
 using namespace zkc::Zmir;
 
@@ -22,7 +21,7 @@ ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
     auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), type);
     // Construct Component superType
     mlir::FunctionType constructor =
-        builder.getFunctionType({}, ComponentType::get(builder.getContext(), "Component"));
+        builder.getFunctionType({}, ComponentType::Component(builder.getContext()));
     auto ref = builder.create<ConstructorRefOp>(
         builder.getUnknownLoc(), constructor,
         mlir::SymbolRefAttr::get(builder.getStringAttr("Component")), builder.getUnitAttr()
@@ -36,8 +35,8 @@ ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
 }
 
 template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef name) {
-  auto componentType = ComponentType::get(builder.getContext(), name);
-  auto superType = ComponentType::get(builder.getContext(), "Val");
+  auto superType = ComponentType::Val(builder.getContext());
+  auto componentType = ComponentType::get(builder.getContext(), name, superType);
 
   builtinCommon(ComponentBuilder()
                     .name(name)
@@ -59,8 +58,8 @@ template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef
 }
 
 template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringRef name) {
-  auto componentType = ComponentType::get(builder.getContext(), name);
-  auto superType = ComponentType::get(builder.getContext(), "Val");
+  auto superType = ComponentType::Val(builder.getContext());
+  auto componentType = ComponentType::get(builder.getContext(), name, superType);
 
   builtinCommon(ComponentBuilder()
                     .name(name)
@@ -82,8 +81,8 @@ template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringR
 }
 
 void addInRange(mlir::OpBuilder &builder) {
-  auto componentType = ComponentType::get(builder.getContext(), "InRange");
-  auto superType = ComponentType::get(builder.getContext(), "Val");
+  auto superType = ComponentType::Val(builder.getContext());
+  auto componentType = ComponentType::get(builder.getContext(), "InRange", superType);
 
   builtinCommon(ComponentBuilder()
                     .name("InRange")
@@ -106,7 +105,7 @@ void addInRange(mlir::OpBuilder &builder) {
 }
 
 void addComponent(mlir::OpBuilder &builder) {
-  auto componentType = ComponentType::get(builder.getContext(), "Component");
+  auto componentType = ComponentType::Component(builder.getContext());
   mlir::SmallVector<mlir::Type> args;
 
   builtinCommon(ComponentBuilder()
@@ -122,8 +121,8 @@ void addComponent(mlir::OpBuilder &builder) {
 }
 
 void addNondetReg(mlir::OpBuilder &builder) {
-  auto componentType = ComponentType::get(builder.getContext(), "NondetReg");
-  auto superType = ComponentType::get(builder.getContext(), "Val");
+  auto superType = ComponentType::Val(builder.getContext());
+  auto componentType = ComponentType::get(builder.getContext(), "NondetReg", superType);
 
   builtinCommon(ComponentBuilder()
                     .name("NondetReg")
@@ -145,8 +144,8 @@ void addNondetReg(mlir::OpBuilder &builder) {
 }
 
 void addTrivial(mlir::OpBuilder &builder, mlir::StringRef name) {
-  auto componentType = ComponentType::get(builder.getContext(), name);
-  auto superType = ComponentType::get(builder.getContext(), "Component");
+  auto superType = ComponentType::Component(builder.getContext());
+  auto componentType = ComponentType::get(builder.getContext(), name, superType);
 
   selfConstructs(
       builtinCommon(ComponentBuilder().name(name).field("$super", superType)
@@ -158,10 +157,8 @@ void addTrivial(mlir::OpBuilder &builder, mlir::StringRef name) {
 }
 
 void addArrayComponent(mlir::OpBuilder &builder) {
-  auto symT = mlir::SymbolRefAttr::get(mlir::StringAttr::get(builder.getContext(), "T"));
-  auto sizeVar = mlir::SymbolRefAttr::get(mlir::StringAttr::get(builder.getContext(), "N"));
-  auto componentType = ComponentType::get(builder.getContext(), "Array", {symT, sizeVar});
-  auto superType = ComponentType::get(builder.getContext(), "Component");
+  auto componentType = ComponentType::Array(builder.getContext());
+  auto superType = ComponentType::Component(builder.getContext());
 
   selfConstructs(
       builtinCommon(
@@ -171,12 +168,6 @@ void addArrayComponent(mlir::OpBuilder &builder) {
   )
       .build(builder);
 }
-
-/*template <typename... Args> zhl::ParamsMap makeParams(Args &&...args) {*/
-/*  zhl::ParamsMap map;*/
-/*  (((void)map.insert(std::forward<Args>(args)), ...));*/
-/*  return map;*/
-/*}*/
 
 void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
   auto &Val = bindings.Create("Val", bindings.Component());

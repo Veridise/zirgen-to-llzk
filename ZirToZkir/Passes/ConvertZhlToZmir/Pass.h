@@ -18,8 +18,4 @@ class ConvertZhlToZmirPass : public ConvertZhlToZmirBase<ConvertZhlToZmirPass> {
   void runOnOperation() override;
 };
 
-class ConvertZhlToScfPass : public ConvertZhlToScfBase<ConvertZhlToScfPass> {
-  void runOnOperation() override;
-};
-
 } // namespace zkc

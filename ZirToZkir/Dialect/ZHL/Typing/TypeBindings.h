@@ -8,6 +8,7 @@
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
 #include <map>
+#include <memory>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
@@ -43,6 +44,7 @@ public:
   TypeBinding getParam(size_t i) const;
 
   mlir::ArrayRef<std::string> getNames() const;
+  mlir::ArrayRef<TypeBinding> getParams() const;
 
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
 
@@ -81,6 +83,92 @@ private:
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type);
 
+/// Interface for the different types of bindings
+class TypeBindingImpl {
+public:
+  virtual ~TypeBindingImpl() = default;
+  virtual std::string_view getName() const = 0;
+};
+
+/// The root Component
+class ComponentRoot : public TypeBindingImpl {
+public:
+  virtual std::string_view getName() const override { return "Component"; }
+};
+
+enum class TrivialTypes { Val, String, Array };
+
+/// Represents the trivial types Val, String, Array, etc.
+class TrivialType : public TypeBindingImpl {
+public:
+  virtual std::string_view getName() const override {
+    switch (type) {
+    case zhl::TrivialTypes::Val:
+      return "Val";
+    case zhl::TrivialTypes::String:
+      return "String";
+    case zhl::TrivialTypes::Array:
+      return "Array";
+    }
+  }
+
+private:
+  TrivialTypes type;
+};
+
+/// Represents the bottom type that is a subtype of any other.
+class BottomType : public TypeBindingImpl {
+public:
+  virtual std::string_view getName() const override { return BOTTOM; }
+};
+
+/// Represents the type of a component.
+class NamedBinding : public TypeBindingImpl {
+public:
+  virtual std::string_view getName() const override { return name; }
+
+private:
+  std::string name;
+  MembersMap members;
+  Params genericParams;
+  Params constructorParams;
+  const TypeBinding *superType;
+};
+
+/// Represents a type variable.
+class TypeVariable : public TypeBindingImpl {
+public:
+  virtual std::string_view getName() const override { return varName; }
+
+private:
+  std::string varName;
+};
+
+/// Represents a constant Val.
+class ConstVal : public TypeBindingImpl {
+public:
+  virtual std::string_view getName() const override { return valueStrRepr; }
+
+private:
+  uint64_t value;
+  std::string valueStrRepr;
+};
+
+/// Represents a constant Val whose actual value is unknown.
+class UnkConstVal : public TypeBindingImpl {
+public:
+  virtual std::string_view getName() const override {
+    if (varName.has_value()) {
+      return *varName;
+    } else {
+      return "?";
+    }
+  }
+
+private:
+  std::optional<std::string> varName;
+};
+
 /// Binding to a ZIR type
 class TypeBinding {
 public:
@@ -106,13 +194,16 @@ public:
   /// Returns true if the type is not generic or has an specialization of its generic parameters
   bool isSpecialized() const;
   bool isVariadic() const;
+  bool hasSuperType() const;
 
   mlir::ArrayRef<std::string> getGenericParamNames() const;
+  mlir::ArrayRef<TypeBinding> getGenericParams() const;
   std::vector<mlir::Location> getConstructorParamLocations() const;
   const Params &getConstructorParams() const;
   const MembersMap &getMembers() const;
   mlir::Location getLocation() const;
   const TypeBinding &getSuperType() const;
+  uint64_t getConst() const;
 
   mlir::FailureOr<TypeBinding> getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError
   ) const;
@@ -159,6 +250,8 @@ private:
   MembersMap members;
   Params genericParams;
   Params constructorParams;
+
+  std::shared_ptr<TypeBindingImpl> impl;
 };
 
 class TypeBindings {

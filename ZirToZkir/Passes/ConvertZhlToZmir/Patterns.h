@@ -48,9 +48,9 @@ public:
 };
 
 /// Lowers literal Vals
-class ZhlLiteralStrLowering : public mlir::OpConversionPattern<zirgen::Zhl::StringOp> {
+class ZhlLiteralStrLowering : public ZhlOpLoweringPattern<zirgen::Zhl::StringOp> {
 public:
-  using OpConversionPattern<zirgen::Zhl::StringOp>::OpConversionPattern;
+  using ZhlOpLoweringPattern<zirgen::Zhl::StringOp>::ZhlOpLoweringPattern;
 
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::StringOp, OpAdaptor, mlir::ConversionPatternRewriter &)
@@ -119,6 +119,26 @@ public:
       const override;
 };
 
+/// Remove `zhl.generic` ops
+class ZhlGenericRemoval : public ZhlOpLoweringPattern<zirgen::Zhl::TypeParamOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::TypeParamOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::TypeParamOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
+/// Remove `zhl.specialize` ops
+class ZhlSpecializeRemoval : public ZhlOpLoweringPattern<zirgen::Zhl::SpecializeOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::SpecializeOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::SpecializeOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
 /// Removes `zhl.declare` ops
 class ZhlDeclarationRemoval : public ZhlOpLoweringPattern<zirgen::Zhl::DeclarationOp> {
 public:
@@ -159,6 +179,15 @@ public:
 };
 
 class ZhlSuperLoweringInBlock : public ZhlOpLoweringPattern<zirgen::Zhl::SuperOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::SuperOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::SuperOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
+class ZhlSuperLoweringInSwitch : public ZhlOpLoweringPattern<zirgen::Zhl::SuperOp> {
 public:
   using ZhlOpLoweringPattern<zirgen::Zhl::SuperOp>::ZhlOpLoweringPattern;
 
@@ -240,6 +269,24 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::BlockOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
+class ZhlReduceLowering : public ZhlOpLoweringPattern<zirgen::Zhl::ReduceOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::ReduceOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::ReduceOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
+class ZhlSwitchLowering : public ZhlOpLoweringPattern<zirgen::Zhl::SwitchOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::SwitchOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::SwitchOp, OpAdaptor, mlir::ConversionPatternRewriter &)
       const override;
 };
 

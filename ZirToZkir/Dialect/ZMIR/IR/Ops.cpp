@@ -2,6 +2,8 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
 #include "zkir/Dialect/ZKIR/IR/Ops.h"
 #include <algorithm>
+#include <cmath>
+#include <functional>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
 #include <mlir/IR/Attributes.h>
@@ -11,6 +13,7 @@
 #include <mlir/IR/OperationSupport.h>
 #include <mlir/IR/Region.h>
 #include <mlir/Interfaces/FunctionImplementation.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <string_view>
 
@@ -114,23 +117,33 @@ void SplitComponentOp::build(
   state.addRegion();
 }
 
-mlir::Type ComponentOp::getType() {
-  if (getParams().has_value()) {
-    auto params = *getParams();
-    return ComponentType::get(getContext(), getSymName(), params.getValue());
+template <typename CompOp> ComponentType getSuperType(CompOp &op) {
+  if (op.isRoot()) {
+    return nullptr;
+  }
+  auto result = op.lookupFieldType(op.getSuperFieldName());
+  assert(mlir::succeeded(result));
+  auto t = *result;
+  assert(mlir::isa<ComponentType>(t));
+  return mlir::cast<ComponentType>(t);
+}
+
+template <typename CompOp> mlir::Type getType(CompOp &op) {
+  if (op.isRoot()) {
+    return ComponentType::Component(op.getContext());
+  }
+  if (op.getParams().has_value()) {
+    auto params = *op.getParams();
+    return ComponentType::get(
+        op.getContext(), op.getSymName(), getSuperType(op), params.getValue()
+    );
   } else {
-    return ComponentType::get(getContext(), getSymName());
+    return ComponentType::get(op.getContext(), op.getSymName(), getSuperType(op));
   }
 }
 
-mlir::Type SplitComponentOp::getType() {
-  if (getParams().has_value()) {
-    auto params = *getParams();
-    return ComponentType::get(getContext(), getSymName(), params.getValue());
-  } else {
-    return ComponentType::get(getContext(), getSymName());
-  }
-}
+mlir::Type ComponentOp::getType() { return ::zkc::Zmir::getType(*this); }
+mlir::Type SplitComponentOp::getType() { return ::zkc::Zmir::getType(*this); }
 
 template <typename CompOp> mlir::FailureOr<mlir::Type> getSuperTypeCommon(CompOp &op) {
   if (op.isRoot()) {
@@ -167,13 +180,35 @@ mlir::FailureOr<::mlir::Type> SplitComponentOp::lookupFieldType(mlir::FlatSymbol
 }
 
 void ConstructorRefOp::build(
-    mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op
+    mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op,
+    mlir::FunctionType fnType
 ) {
   state.getOrAddProperties<Properties>().component = mlir::SymbolRefAttr::get(op.getNameAttr());
   if (op.getBuiltin()) {
     state.getOrAddProperties<Properties>().builtin = mlir::UnitAttr::get(builder.getContext());
   }
-  state.addTypes({op.getBodyFunc().getFunctionType()});
+  state.addTypes({fnType});
+}
+
+mlir::LogicalResult checkConstructorTypeIsValid(
+    mlir::FunctionType expected, mlir::Type provided,
+    std::function<mlir::InFlightDiagnostic()> emitError
+) {
+  if (!mlir::isa<mlir::FunctionType>(provided)) {
+    return emitError() << "has malformed IR: was expecting a function type";
+  }
+  auto providedFn = mlir::cast<mlir::FunctionType>(provided);
+
+  if (expected.getInputs().size() != providedFn.getInputs().size()) {
+    return emitError() << "was expecting " << expected.getInputs().size() << " arguments and got "
+                       << providedFn.getInputs().size();
+  }
+  if (providedFn.getResults().size() != 1) {
+    return emitError() << "was expecting 1 result and got " << providedFn.getResults().size();
+  }
+
+  // TODO: Need to check each individual type
+  return mlir::success();
 }
 
 mlir::LogicalResult ConstructorRefOp::verify() {
@@ -194,12 +229,9 @@ mlir::LogicalResult ConstructorRefOp::verify() {
     return emitOpError() << "reference to undefined component '" << compName << "'";
   }
 
-  // Check that the referenced component's constructor has the correct type.
-  if (comp.getBodyFunc().getFunctionType() != type) {
-    return emitOpError("reference to constructor with mismatched type");
-  }
-
-  return mlir::success();
+  return checkConstructorTypeIsValid(comp.getBodyFunc().getFunctionType(), type, [&]() {
+    return emitOpError();
+  });
 }
 
 bool ConstructorRefOp::isBuildableWith(mlir::Attribute value, mlir::Type type) {

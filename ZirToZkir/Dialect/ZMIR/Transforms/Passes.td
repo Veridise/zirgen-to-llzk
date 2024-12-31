@@ -73,6 +73,7 @@ def LegalizeTypes : Pass<"legalize-types", "zkc::Zmir::ComponentOp"> {
   let dependentDialects = ["zkc::Zmir::ZmirDialect", "mlir::func::FuncDialect"];
 }
 
+/*
 def ExpandSuperCoercion : Pass<"super-coercion", "zkc::Zmir::ComponentOp"> {
   let summary = "transitively coerces components types into their super type";
 
@@ -80,5 +81,6 @@ def ExpandSuperCoercion : Pass<"super-coercion", "zkc::Zmir::ComponentOp"> {
 
   let dependentDialects = ["zkc::Zmir::ZmirDialect", "mlir::func::FuncDialect"];
 }
+*/
 
 #endif

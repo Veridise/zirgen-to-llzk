@@ -40,7 +40,7 @@ cc_library(
         "RemoveBuiltIns.cpp",
         "InsertTemporaries.cpp",
         "LegalizeTypes.cpp",
-        "ExpandSuperCoercion.cpp"
+        #"ExpandSuperCoercion.cpp"
     ],
     hdrs = [
         "Passes.h",

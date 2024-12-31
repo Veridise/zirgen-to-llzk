@@ -3,6 +3,7 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
 #include <algorithm>
 #include <iterator>
+#include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 
 using namespace mlir;
@@ -16,17 +17,43 @@ Type materializeTypeBinding(MLIRContext *context, const TypeBinding &binding) {
   }
 
   auto materializeBaseType = [&]() -> mlir::Type {
+    if (!binding.hasSuperType()) {
+      return ComponentType::Component(context);
+    }
+    auto superType = materializeTypeBinding(context, binding.getSuperType());
+    if (!mlir::isa<ComponentType>(superType)) {
+      return nullptr;
+    }
+    auto superTypeComp = mlir::cast<ComponentType>(superType);
     if (binding.isGeneric()) {
-      if (!binding.isSpecialized()) {
-        return nullptr;
+      std::vector<Attribute> params;
+      if (binding.isSpecialized()) {
+        // Put the types associated with the specialization
+        auto paramBindings = binding.getGenericParams();
+        std::transform(
+            paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
+            [&](const auto &b) -> Attribute {
+          if (b.isConst()) {
+            return mlir::IntegerAttr::get(mlir::IntegerType::get(context, 64), b.getConst());
+          } else {
+            return mlir::TypeAttr::get(materializeTypeBinding(context, b));
+          }
+        }
+        );
+      } else {
+        // Put the names of the parameters
+        auto names = binding.getGenericParamNames();
+        std::transform(
+            names.begin(), names.end(), std::back_inserter(params),
+            [&](const auto &name) { return SymbolRefAttr::get(StringAttr::get(context, name)); }
+        );
       }
 
-      std::vector<Attribute> params; // TODO: Fill this up
-      return ComponentType::get(context, binding.getName(), params);
+      return ComponentType::get(context, binding.getName(), superTypeComp, params);
     } else if (binding.isConst()) {
-      return ComponentType::get(context, "Val");
+      return ComponentType::Val(context);
     } else {
-      return ComponentType::get(context, binding.getName());
+      return ComponentType::get(context, binding.getName(), superTypeComp);
     }
   };
 

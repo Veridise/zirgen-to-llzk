@@ -1,0 +1,13 @@
+// RUN: zirgen --test %s --test-cycles 2 2>&1 | FileCheck %s
+
+extern GetCycle() : Val;
+
+component Top() {
+  a : Reg;
+  isFirst := NondetReg(Isz(GetCycle()));
+  x := [isFirst, 1 - isFirst] -> ({
+     a := Reg(3);
+  },{
+     a := Reg(4);
+  });
+}

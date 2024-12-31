@@ -35,20 +35,25 @@ test MuxArm1 {
   PrintVal(x@1);
 }
 
+component Foo(x: Val, y: Val) {
+  x..y -> (1, 2)
+}
+
 // CHECK-LABEL: Running SharedDecl
-test SharedDecl {
-  a : Reg;
-  isFirst := NondetReg(Isz(GetCycle()));
-  x := [isFirst, 1 - isFirst] -> ({
-     a := Reg(3);
-     Log("a := %u", a);
-  },{
-     b := Reg(5);
-     a := Reg(4);
-     Log("a := %u", a);
-     Log("a@1 = %u", a@1);
-  });
-  Log("outer a@0 = %u", a@0);
+component Top() {
+  Foo(1,2);
+  //a : Reg;
+  //isFirst := NondetReg(Isz(GetCycle()));
+  //x := [isFirst, 1 - isFirst] -> ({
+   //  a := Reg(3);
+  //   Log("a := %u", a);
+  //},{
+  //   b := Reg(5);
+  //   a := Reg(4);
+  //   Log("a := %u", a);
+  //   Log("a@1 = %u", a@1);
+  //});
+  //Log("outer a@0 = %u", a@0);
   // CHECK: [0] Log: a := 3
   // CHECK: [0] Log: outer a@0 = 3
   // CHECK: [1] Log: a := 4
