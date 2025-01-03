@@ -1,11 +1,11 @@
-
+component Foo<T: Type>(x: Val, y: Val) {
+  t := T(x, y);
+}
 
 component Bar<Foo: Type>(x: Val) {
   t := Foo(x);
 }
-component Foo<T: Type>(x: Val, y: Val) {
-  t := T(x, y);
-}
+
 component Top() {
   f := Foo<Add>(1, 2);
   b := Bar<Reg>(2);
