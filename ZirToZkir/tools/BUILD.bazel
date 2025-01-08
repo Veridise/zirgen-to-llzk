@@ -13,6 +13,6 @@ cc_binary(
       "//ZirToZkir/Passes:passes",  
       "@llvm-project//mlir:MlirOptLib",
       "@llvm-project//mlir:ReconcileUnrealizedCasts",
-      "//:zkir"
+      "//:llzk"
     ],
 )

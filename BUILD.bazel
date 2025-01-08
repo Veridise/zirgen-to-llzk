@@ -20,11 +20,20 @@ alias(
 )
 
 cmake(
-    name = "zkir",
+    name = "libllzk",
     cache_entries = {
       "BUILD_TESTING": "OFF"
         # "CMAKE_C_FLAGS": "-fPIC",
     },
-    lib_source = "@zkir-lib//:all_srcs",
-    out_static_libs = ["libZKIRDialect.a"],
+    generate_args = ["-GNinja"],
+    lib_source = "@llzk-lib//:all_srcs",
+    out_static_libs = ["libLLZKDialect.a"],
+)
+
+cc_library(
+  name = "llzk",
+  deps = [
+    "//:libllzk",
+    "@llvm-project//llvm:Support"
+  ]
 )

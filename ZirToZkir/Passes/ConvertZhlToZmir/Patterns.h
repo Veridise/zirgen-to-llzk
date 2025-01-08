@@ -57,16 +57,6 @@ public:
       const override;
 };
 
-class FoldUnrealizedCasts : public mlir::OpConversionPattern<mlir::UnrealizedConversionCastOp> {
-
-public:
-  using OpConversionPattern<mlir::UnrealizedConversionCastOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::UnrealizedConversionCastOp, OpAdaptor, mlir::ConversionPatternRewriter &)
-      const override;
-};
-
 /// Converts `zhl.parameter` op uses to the corresponding argument of the body
 /// and updates the type of the argument.
 class ZhlParameterLowering : public ZhlOpLoweringPattern<zirgen::Zhl::ConstructorParamOp> {

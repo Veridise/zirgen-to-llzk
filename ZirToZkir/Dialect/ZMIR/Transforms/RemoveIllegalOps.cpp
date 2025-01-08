@@ -164,10 +164,12 @@ class RemoveIllegalComputeOpsPass
     return getOperation() == comp.getBodyFunc();
   }
 
-  void setLegality(ConversionTarget &target) override { target.addIllegalOp<ConstrainOp>(); }
+  void setLegality(ConversionTarget &target) override {
+    target.addIllegalOp<ConstrainOp, ConstrainCallOp>();
+  }
 
   void addPatterns(RewritePatternSet &patterns) override {
-    patterns.add<RemoveOp<ConstrainOp>>(&getContext());
+    patterns.add<RemoveOp<ConstrainOp>, RemoveOp<ConstrainCallOp>>(&getContext());
   }
 };
 
@@ -188,14 +190,14 @@ class RemoveIllegalConstrainOpsPass
     // And there's probably more
     target.addIllegalOp<
         WriteFieldOp, GetSelfOp, BitAndOp, InvOp, WriteArrayOp, AllocArrayOp, NewArrayOp>();
-    /*target.addIllegalOp<func::CallIndirectOp>();*/
+    target.addIllegalOp<func::CallIndirectOp>();
   }
 
   void addPatterns(RewritePatternSet &patterns) override {
     patterns.add<
         ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
         ReplaceUsesWithArg<GetSelfOp, 0>, RemoveOp<WriteArrayOp>, RemoveOp<AllocArrayOp>,
-        RemoveOp<NewArrayOp>>(&getContext());
+        RemoveOp<NewArrayOp>, RemoveOp<func::CallIndirectOp>>(&getContext());
   }
 };
 

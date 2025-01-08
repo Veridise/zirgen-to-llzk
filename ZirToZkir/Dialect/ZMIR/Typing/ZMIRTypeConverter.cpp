@@ -51,28 +51,23 @@ ZMIRTypeConverter::ZMIRTypeConverter() {
       return std::nullopt;
     }
 
-    // Try to find a previous value in the use-def chain that is valid.
-    /*auto value = findTypeInUseDefChain(inputs[0], type);*/
-    /*if (mlir::succeeded(value)) {*/
-    /*  return *value;*/
-    /*}*/
-    // Otherwise materialize a conversion
     return builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs).getResult(0);
   }
   );
-  /*addTargetMaterialization(*/
-  /*    [](mlir::OpBuilder &builder, Zmir::ValType type, mlir::ValueRange inputs,*/
-  /*       mlir::Location loc) -> std::optional<mlir::Value> {*/
-  /*  if (auto compTyp = mlir::dyn_cast<Zmir::ComponentType>(inputs[0].getType())) {*/
-  /*    if (compTyp.getName().getValue() != "Component") {*/
-  /*      return builder.create<Zmir::SuperCoerceOp>(*/
-  /*          loc, Zmir::ValType::get(builder.getContext()), inputs[0]*/
-  /*      );*/
-  /*    }*/
-  /*  }*/
-  /*  return std::nullopt;*/
-  /*}*/
-  /*);*/
+  addTargetMaterialization(
+      [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
+         mlir::Location loc) -> std::optional<mlir::Value> {
+    if (!mlir::isa<Zmir::ComponentType>(type)) {
+      return std::nullopt;
+    }
+    if (auto compTyp = mlir::dyn_cast<Zmir::ComponentType>(inputs[0].getType())) {
+      if (compTyp.getName().getValue() != "Component") {
+        return builder.create<Zmir::SuperCoerceOp>(loc, type, inputs[0]);
+      }
+    }
+    return std::nullopt;
+  }
+  );
 
   addArgumentMaterialization(
       [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,

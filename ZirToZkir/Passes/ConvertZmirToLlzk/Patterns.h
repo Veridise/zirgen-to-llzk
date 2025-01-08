@@ -2,9 +2,9 @@
 
 #include "Helpers.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
+#include "llzk/Dialect/LLZK/IR/Ops.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zkir/Dialect/ZKIR/IR/Ops.h"
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
@@ -126,13 +126,13 @@ public:
   }
 };
 
-using LowerBitAnd = LowerArithBuiltIns<Zmir::BitAndOp, zkir::AndFeltOp>;
-using LowerAdd = LowerArithBuiltIns<Zmir::AddOp, zkir::AddFeltOp>;
-using LowerSub = LowerArithBuiltIns<Zmir::SubOp, zkir::SubFeltOp>;
-using LowerMul = LowerArithBuiltIns<Zmir::MulOp, zkir::MulFeltOp>;
-using LowerInv = LowerArithBuiltIns<Zmir::InvOp, zkir::InvFeltOp>;
+using LowerBitAnd = LowerArithBuiltIns<Zmir::BitAndOp, llzk::AndFeltOp>;
+using LowerAdd = LowerArithBuiltIns<Zmir::AddOp, llzk::AddFeltOp>;
+using LowerSub = LowerArithBuiltIns<Zmir::SubOp, llzk::SubFeltOp>;
+using LowerMul = LowerArithBuiltIns<Zmir::MulOp, llzk::MulFeltOp>;
+using LowerInv = LowerArithBuiltIns<Zmir::InvOp, llzk::InvFeltOp>;
 // TODO LowerIsz
-using LowerNeg = LowerArithBuiltIns<Zmir::NegOp, zkir::NegFeltOp>;
+using LowerNeg = LowerArithBuiltIns<Zmir::NegOp, llzk::NegFeltOp>;
 
 class LowerIsz : public mlir::OpConversionPattern<IsZeroOp> {
 public:
@@ -220,6 +220,30 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(WriteArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerConstrainCallOp : public mlir::OpConversionPattern<ConstrainCallOp> {
+public:
+  using mlir::OpConversionPattern<ConstrainCallOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(ConstrainCallOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerNopOp : public mlir::OpConversionPattern<NopOp> {
+public:
+  using mlir::OpConversionPattern<NopOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(NopOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerSuperCoerceOp : public mlir::OpConversionPattern<SuperCoerceOp> {
+public:
+  using mlir::OpConversionPattern<SuperCoerceOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(SuperCoerceOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 } // namespace zkc::Zmir

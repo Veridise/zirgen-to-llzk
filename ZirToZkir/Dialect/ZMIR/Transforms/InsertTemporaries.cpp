@@ -14,10 +14,8 @@
 #include <cassert>
 #include <llvm/Support/Debug.h>
 #include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/PatternMatch.h>
 #include <mlir/Transforms/DialectConversion.h>
-#include <system_error>
-#include <tuple>
-#include <unordered_set>
 
 using namespace mlir;
 
@@ -50,6 +48,7 @@ class InsertTemporariesPass : public InsertTemporariesBase<InsertTemporariesPass
     builder.setInsertionPointAfter(op);
     auto self = builder.create<GetSelfOp>(op.getLoc(), getOperation().getType());
     builder.create<WriteFieldOp>(op->getLoc(), self, name, op.getResult(0));
+    auto readOp = builder.create<ReadFieldOp>(op->getLoc(), results[0], self, name);
 
     op->setAttr("writes_into", name.getAttr());
   }

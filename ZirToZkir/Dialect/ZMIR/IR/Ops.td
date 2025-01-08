@@ -195,6 +195,16 @@ def GetGlobalOp
   }];
 }
 
+def ConstrainCallOp : ZmirOp<"constrain_call"> {
+  let summary = "calls the constrain function";
+
+  let arguments = (ins Component:$self, Variadic<AnyType>:$args);
+
+  let assemblyFormat = [{
+    $self `(` $args `)` `:` `(` type($self) `,` type($args) `)` attr-dict
+  }];
+}
+
 def ConstrainOp : ZmirOp<"constrain"> {
   let summary = "emits a constraint";
 

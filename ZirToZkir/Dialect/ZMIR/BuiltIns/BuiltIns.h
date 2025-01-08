@@ -11,8 +11,9 @@ void addBuiltinBindings(zhl::TypeBindings &);
 void addBuiltins(mlir::OpBuilder &);
 mlir::Operation *getBuiltInOp(mlir::StringRef);
 
-static const std::unordered_set<std::string> BuiltInComponentNames = {"BitAnd", "Add", "Sub", "Mul",
-                                                                      "Inv",    "Isz", "Neg"};
+static const std::unordered_set<std::string> BuiltInComponentNames = {"BitAnd", "Add", "Sub",
+                                                                      "Mul",    "Inv", "Isz",
+                                                                      "Neg",    "Val", "String"};
 
 static const char BitAndStr[] = "BitAnd";
 static const char AddStr[] = "Add";
@@ -21,5 +22,7 @@ static const char MulStr[] = "Mul";
 static const char InvStr[] = "Inv";
 static const char IszStr[] = "Isz";
 static const char NegStr[] = "Neg";
+static const char ValStr[] = "Val";
+static const char StrStr[] = "String";
 
 } // namespace zkc::Zmir

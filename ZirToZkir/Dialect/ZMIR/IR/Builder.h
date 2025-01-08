@@ -39,8 +39,12 @@ private:
     std::vector<mlir::Location> argLocs;
     std::unique_ptr<BodySrc> body;
     bool isBuiltin = false;
+    bool forceSetGeneric = false;
 
     bool isGeneric() {
+      if (forceSetGeneric) {
+        return true;
+      }
       if (compAttrs.empty()) {
         return false;
       }
@@ -153,6 +157,11 @@ private:
   Ctx ctx;
 
 public:
+  ComponentBuilder &forceGeneric() {
+    ctx.forceSetGeneric = true;
+    return *this;
+  }
+
   ComponentBuilder &isBuiltin() {
     ctx.isBuiltin = true;
     return *this;

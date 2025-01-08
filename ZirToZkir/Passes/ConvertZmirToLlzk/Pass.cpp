@@ -1,13 +1,13 @@
 #include "Pass.h"
+#include "LLZKTypeConverter.h"
 #include "Patterns.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Dialect.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
-#include "ZirToZkir/Passes/ConvertZmirToZkir/ZKIRTypeConverter.h"
+#include "llzk/Dialect/LLZK/IR/Dialect.h"
+#include "llzk/Dialect/LLZK/IR/Ops.h"
+#include "llzk/Dialect/LLZK/Util/SymbolHelper.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "zkir/Dialect/ZKIR/IR/Dialect.h"
-#include "zkir/Dialect/ZKIR/IR/Ops.h"
-#include "zkir/Dialect/ZKIR/Util/SymbolHelper.h"
 #include <cassert>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
@@ -22,11 +22,11 @@ using namespace zkc::Zmir;
 
 namespace zkc {
 
-void ConvertZmirToZkirPass::runOnOperation() {
+void ConvertZmirToLlzkPass::runOnOperation() {
   auto op = getOperation();
 
   mlir::MLIRContext *ctx = op->getContext();
-  zkir::ZKIRTypeConverter typeConverter;
+  llzk::LLZKTypeConverter typeConverter;
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 
@@ -34,19 +34,20 @@ void ConvertZmirToZkirPass::runOnOperation() {
       LitValOpLowering, GetSelfOpLowering, LowerBitAnd, LowerAdd, LowerSub, LowerMul, LowerInv,
       LowerIsz, LowerNeg, LowerConstrainOp, LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp,
       LowerReadArrayOp, LowerAllocArrayOp, LowerArrayLengthOp, LowerIndexToValOp, LowerValToIndexOp,
-      LowerWriteArrayOp, WriteFieldOpLowering>(typeConverter, ctx);
+      LowerWriteArrayOp, WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp,
+      LowerSuperCoerceOp>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<
-      zkir::ZKIRDialect, mlir::arith::ArithDialect, index::IndexDialect, scf::SCFDialect>();
+      llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect, scf::SCFDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp>();
   target.addIllegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
 
   target.addIllegalOp<
       LitValOp, GetSelfOp, BitAndOp, AddOp, SubOp, MulOp, InvOp, IsZeroOp, NegOp, ReadFieldOp,
       ConstrainOp, InRangeOp, NewArrayOp, ReadArrayOp, AllocArrayOp, GetArrayLenOp, IndexToValOp,
-      ValToIndexOp, WriteArrayOp, WriteFieldOp>();
+      ValToIndexOp, WriteArrayOp, WriteFieldOp, ConstrainCallOp, NopOp, SuperCoerceOp>();
 
   // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
@@ -54,19 +55,19 @@ void ConvertZmirToZkirPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<zkir::StructDefOp>> createConvertZmirToZkirPass() {
-  return std::make_unique<ConvertZmirToZkirPass>();
+std::unique_ptr<OperationPass<llzk::StructDefOp>> createConvertZmirToLlzkPass() {
+  return std::make_unique<ConvertZmirToLlzkPass>();
 }
 
-void ConvertZmirComponentsToZkirPass::runOnOperation() {
+void ConvertZmirComponentsToLlzkPass::runOnOperation() {
   auto op = getOperation();
   op->setAttr(
-      zkir::LANG_ATTR_NAME,
-      mlir::StringAttr::get(&getContext(), zkir::ZKIRDialect::getDialectNamespace())
+      llzk::LANG_ATTR_NAME,
+      mlir::StringAttr::get(&getContext(), llzk::LLZKDialect::getDialectNamespace())
   );
 
   mlir::MLIRContext *ctx = op->getContext();
-  zkir::ZKIRTypeConverter typeConverter;
+  llzk::LLZKTypeConverter typeConverter;
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 
@@ -78,7 +79,7 @@ void ConvertZmirComponentsToZkirPass::runOnOperation() {
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<
-      zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, zkir::ZKIRDialect, mlir::arith::ArithDialect,
+      zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, llzk::LLZKDialect, mlir::arith::ArithDialect,
       index::IndexDialect, scf::SCFDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
@@ -91,8 +92,8 @@ void ConvertZmirComponentsToZkirPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZmirComponentsToZkirPass() {
-  return std::make_unique<ConvertZmirComponentsToZkirPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZmirComponentsToLlzkPass() {
+  return std::make_unique<ConvertZmirComponentsToLlzkPass>();
 }
 
 } // namespace zkc

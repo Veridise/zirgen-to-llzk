@@ -82,7 +82,7 @@ public:
     mlir::ValueRange args(
         mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
     );
-    rewriter.replaceOpWithNewOp<NewOp>(op, val, args);
+    rewriter.replaceOpWithNewOp<NewOp>(op, op.getResult(0).getType(), args);
     return mlir::success();
   }
 };

@@ -29,6 +29,10 @@ ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
     auto comp = builder.create<mlir::func::CallIndirectOp>(builder.getUnknownLoc(), ref);
     // Store the result
     builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", comp.getResult(0));
+    auto super = builder.create<ReadFieldOp>(
+        builder.getUnknownLoc(), comp.getResultTypes().front(), self, "$super"
+    );
+    builder.create<ConstrainCallOp>(builder.getUnknownLoc(), super, mlir::ValueRange());
     // Return self
     builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({args[0]}));
   });
@@ -127,7 +131,7 @@ void addNondetReg(mlir::OpBuilder &builder) {
   builtinCommon(ComponentBuilder()
                     .name("NondetReg")
                     .field("$super", superType)
-                    .field("$reg", superType)
+                    .field("reg", superType)
                     .fillBody(
                         {superType}, {componentType},
                         [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
@@ -162,7 +166,9 @@ void addArrayComponent(mlir::OpBuilder &builder) {
 
   selfConstructs(
       builtinCommon(
-          ComponentBuilder().name("Array").typeParam("T").typeParam("N").field("$super", superType)
+          ComponentBuilder().name("Array").forceGeneric().typeParam("T").typeParam("N").field(
+              "$super", superType
+          )
       ),
       componentType
   )

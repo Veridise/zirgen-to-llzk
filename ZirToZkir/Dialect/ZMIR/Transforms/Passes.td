@@ -29,6 +29,8 @@ def RemoveBuiltIns : Pass<"remove-builtins", "mlir::ModuleOp"> {
 
   let dependentDialects = ["::zkc::Zmir::ZmirDialect",
                            "::mlir::func::FuncDialect"];
+  let options = [ListOption<"componentsToRemove", "remove-only", "std::string",
+                            "remove only these components">];
 }
 
 def SplitComponentBody : Pass<"split-component-body", "mlir::ModuleOp"> {

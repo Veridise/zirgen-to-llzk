@@ -26,6 +26,7 @@ class Scope(Pipeline):
     def passes(self):
         if self.stop_point is None:
             yield from self.all_passes
+            return
         for p in self.all_passes:
             yield p
             if p.is_stop_point():
@@ -64,14 +65,17 @@ ZKC_OPT_PIPELINE = Scope(
     Pass("strip-directives"),
     Pass("inject-builtins"),
     Pass("lower-zhl"),
+    Pass("reconcile-unrealized-casts"),
+    Pass("topological-sort"),
+    # Pass("canonicalize"), # For cleanup for should not be relied on for correctness
     Scope(
         "zmir.component",
-        Pass("insert-temporaries"),
+        # Pass("insert-temporaries"),
         Scope("func.func", Pass("lower-builtins")),
-        Pass("legalize-types"),
+        # Pass("legalize-types"),
         # Pass("super-coercion"),
     ),
-    Pass("remove-builtins"),
+    Pass("remove-builtins"),  # {remove-only=Val,String}
     Pass("split-component-body"),
     Scope(
         "zmir.split_component",
@@ -82,9 +86,12 @@ ZKC_OPT_PIPELINE = Scope(
         ),
     ),
     Pass("cse"),
-    Pass("canonicalize"),
-    Pass("zmir-components-to-zkir"),
-    Scope("zkir.struct", Pass("zmir-to-zkir")),
+    # Pass("canonicalize"),
+    Pass("zmir-components-to-llzk"),
+    Scope("llzk.struct", Pass("zmir-to-llzk")),
+    # Pass("remove-builtins"),
+    Pass("reconcile-unrealized-casts"),
+    # Pass("remove-builtins"),
     Pass("canonicalize"),
 )
 

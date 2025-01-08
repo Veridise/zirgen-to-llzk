@@ -3,12 +3,12 @@ package(
 )
 
 cc_library(
-  name = "ConvertZmirToZkir",
+  name = "ConvertZmirToLlzk",
   srcs = [
     "Patterns.cpp",
     "Patterns.h",
-    "ZKIRTypeConverter.h",
-    "ZKIRTypeConverter.cpp",
+    "LLZKTypeConverter.h",
+    "LLZKTypeConverter.cpp",
     "Pass.cpp",
     "Helpers.h",
     "Helpers.cpp",
@@ -18,7 +18,7 @@ cc_library(
   ],
   deps = [
         "//ZirToZkir/Dialect/ZMIR/IR",  
-        "//:zkir",
+        "//:llzk",
         "//ZirToZkir/Passes:PassDetail",  
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:SCFDialect",

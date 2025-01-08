@@ -1,6 +1,6 @@
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
-#include "zkir/Dialect/ZKIR/IR/Ops.h"
+#include "llzk/Dialect/LLZK/IR/Ops.h"
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -221,7 +221,7 @@ mlir::LogicalResult ConstructorRefOp::verify() {
   if (!comp) {
     // The constructor reference could be temporarly pointing
     // to a zkir struct. Assume it is correct if that's the case.
-    auto structComp = mod.lookupSymbol<zkir::StructDefOp>(compName);
+    auto structComp = mod.lookupSymbol<llzk::StructDefOp>(compName);
     if (structComp) {
       return mlir::success();
     }

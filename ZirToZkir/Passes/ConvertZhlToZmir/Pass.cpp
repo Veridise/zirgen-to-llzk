@@ -44,7 +44,7 @@ void ConvertZhlToZmirPass::runOnOperation() {
       ZhlSubscriptLowering, ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap,
       ZhlLiteralStrLowering, ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval,
       ZhlSpecializeRemoval, ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch>(
-      typeAnalysis, ctx
+      typeAnalysis, typeConverter, ctx
   );
 
   // Set conversion target

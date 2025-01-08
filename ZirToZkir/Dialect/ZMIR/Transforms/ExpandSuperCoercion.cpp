@@ -183,7 +183,7 @@ public:
 /// Checks wether the cast is forcefully transforming a component
 /// into another or a val.
 bool doesntHaveForcedConversion(mlir::UnrealizedConversionCastOp op) {
-  // Ignore N-M casts where N != 1 and M != 1
+  // Ignore N-M casts where N != 1 or M != 1
   if (op.getOperands().size() != 1 || op.getResults().size() != 1) {
     return true;
   }

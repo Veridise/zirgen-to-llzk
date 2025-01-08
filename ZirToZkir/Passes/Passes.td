@@ -30,22 +30,22 @@ def ConvertZhlToZmir : Pass<"lower-zhl", "mlir::ModuleOp"> {
                            "mlir::index::IndexDialect"];
 }
 
-def ConvertZmirToZkir : Pass<"zmir-to-zkir", "zkir::StructDefOp"> {
+def ConvertZmirToLlzk : Pass<"zmir-to-llzk", "llzk::StructDefOp"> {
   let summary =
-      "Converts ZMIR operations in the body of a component to ZKIR operations";
-  let constructor = "zkc::createConvertZmirToZkirPass()";
+      "Converts ZMIR operations in the body of a component to LLZK operations";
+  let constructor = "zkc::createConvertZmirToLlzkPass()";
 
-  let dependentDialects = ["zkir::ZKIRDialect", "zkc::Zmir::ZmirDialect",
+  let dependentDialects = ["llzk::LLZKDialect", "zkc::Zmir::ZmirDialect",
                            "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
                            "mlir::index::IndexDialect"];
 }
 
-def ConvertZmirComponentsToZkir
-    : Pass<"zmir-components-to-zkir", "mlir::ModuleOp"> {
-  let summary = "Converts ZMIR component operations to ZKIR operations";
-  let constructor = "zkc::createConvertZmirComponentsToZkirPass()";
+def ConvertZmirComponentsToLlzk
+    : Pass<"zmir-components-to-llzk", "mlir::ModuleOp"> {
+  let summary = "Converts ZMIR component operations to LLZK operations";
+  let constructor = "zkc::createConvertZmirComponentsToLlzkPass()";
 
-  let dependentDialects = ["zkir::ZKIRDialect", "zkc::Zmir::ZmirDialect",
+  let dependentDialects = ["llzk::LLZKDialect", "zkc::Zmir::ZmirDialect",
                            "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
                            "mlir::index::IndexDialect"];
 }

@@ -1,6 +1,7 @@
 #include "Patterns.h"
 #include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Builder.h"
+#include "ZirToZkir/Dialect/ZMIR/IR/OpInterfaces.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 #include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
 #include "ZirToZkir/Dialect/ZMIR/Typing/Materialize.h"
@@ -28,45 +29,6 @@ using namespace zirgen;
 using namespace zkc;
 using namespace zhl;
 using namespace mlir;
-
-///////////////////////////////////////////////////////////
-/// Cast folding
-///////////////////////////////////////////////////////////
-
-mlir::LogicalResult FoldUnrealizedCasts::matchAndRewrite(
-    mlir::UnrealizedConversionCastOp op, OpAdaptor adaptor,
-    mlir::ConversionPatternRewriter &rewriter
-) const {
-
-  if (op.getInputs().size() != 1 || op.getOutputs().size() != 1) {
-    return mlir::failure();
-  }
-
-  if (!getTypeConverter()->isLegal(op.getOutputs()[0].getType())) {
-    return mlir::failure();
-  }
-
-  auto parent = adaptor.getInputs()[0].getDefiningOp();
-  if (!parent) {
-    return mlir::failure();
-  }
-  auto parentCast = mlir::dyn_cast<mlir::UnrealizedConversionCastOp>(parent);
-  if (!parentCast) {
-    return mlir::failure();
-  }
-
-  if (parentCast.getInputs().size() != 1 || parentCast.getOutputs().size() != 1) {
-    return mlir::failure();
-  }
-  if (!getTypeConverter()->isLegal(parentCast.getInputs()[0].getType())) {
-    return mlir::failure();
-  }
-
-  rewriter.replaceAllUsesWith(op.getOutputs()[0], parentCast.getInputs()[0]);
-  rewriter.eraseOp(op);
-
-  return mlir::success();
-}
 
 ///////////////////////////////////////////////////////////
 /// ZhlLiteralLowering
@@ -119,6 +81,17 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 /// ZhlConstructLowering
 ///////////////////////////////////////////////////////////
 
+mlir::FlatSymbolRefAttr createTempField(
+    mlir::Location loc, mlir::Type type, mlir::OpBuilder &builder, Zmir::ComponentInterface op
+) {
+  mlir::SymbolTable st(op);
+  auto desiredName = mlir::StringAttr::get(op.getContext(), "$temp");
+  mlir::OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointAfter(&op.getRegion().front().front());
+  auto fieldDef = builder.create<Zmir::FieldDefOp>(loc, desiredName, TypeAttr::get(type));
+  return mlir::FlatSymbolRefAttr::get(op.getContext(), st.insert(fieldDef));
+}
+
 mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -127,6 +100,8 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     return op.emitOpError("failed to type check");
   }
 
+  auto callerComp = op->getParentOfType<Zmir::ComponentOp>();
+  assert(callerComp);
   auto calleeComp = op->getParentOfType<mlir::ModuleOp>().lookupSymbol<Zmir::ComponentInterface>(
       binding->getName()
   );
@@ -161,7 +136,19 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   );
 
   auto funcPtr = rewriter.create<Zmir::ConstructorRefOp>(op.getLoc(), calleeComp, constructorType);
-  rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, funcPtr, preparedArguments);
+  auto call = rewriter.create<mlir::func::CallIndirectOp>(op->getLoc(), funcPtr, preparedArguments);
+
+  auto name = createTempField(op->getLoc(), constructorType.getResult(0), rewriter, callerComp);
+
+  // Write the construction in a temporary
+  auto self = rewriter.create<Zmir::GetSelfOp>(op->getLoc(), callerComp.getType());
+  rewriter.create<Zmir::WriteFieldOp>(op->getLoc(), self, name, call.getResult(0));
+
+  // Read the temporary back to a SSA value
+  auto result =
+      rewriter.replaceOpWithNewOp<Zmir::ReadFieldOp>(op, constructorType.getResult(0), self, name);
+
+  rewriter.create<Zmir::ConstrainCallOp>(op->getLoc(), result, ValueRange(preparedArguments));
   return mlir::success();
 }
 
@@ -245,11 +232,23 @@ mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), lhsTarget, lhsValue);
     lhsValue = cast.getResult(0);
   }
+  // Coerce to Val if necessary
+  if (lhsValue.getType() != Zmir::ComponentType::Val(getContext())) {
+    lhsValue = rewriter.create<Zmir::SuperCoerceOp>(
+        op.getLoc(), Zmir::ComponentType::Val(getContext()), lhsValue
+    );
+  }
   mlir::Value rhsValue = adaptor.getRhs();
   mlir::Type rhsTarget = Zmir::materializeTypeBinding(getContext(), *rhsBinding);
   if (rhsValue.getType() != rhsTarget) {
     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), rhsTarget, rhsValue);
     rhsValue = cast.getResult(0);
+  }
+  // Coerce to Val if necessary
+  if (rhsValue.getType() != Zmir::ComponentType::Val(getContext())) {
+    rhsValue = rewriter.create<Zmir::SuperCoerceOp>(
+        op.getLoc(), Zmir::ComponentType::Val(getContext()), rhsValue
+    );
   }
   rewriter.replaceOpWithNewOp<Zmir::ConstrainOp>(op, lhsValue, rhsValue);
   return mlir::success();
@@ -323,6 +322,11 @@ mlir::LogicalResult ZhlDeclarationRemoval::matchAndRewrite(
   return mlir::success();
 }
 
+inline bool opConstructsComponent(mlir::Operation *op) {
+  // TODO: Add the rest of the ops: array constructors, for loops, etc
+  return mlir::isa<func::CallIndirectOp>(op);
+}
+
 /// Tries to get an operation from the value written into the field.
 /// If it is then adds an attribute into the operation with the name of the
 /// field.
@@ -333,8 +337,16 @@ void maybeAnnotateConstructorCallWithField(Zmir::WriteFieldOp op, mlir::Value va
   if (!valueOp) {
     return; // The value doesn't come from an op
   }
+  if (opConstructsComponent(valueOp)) {
+    valueOp->setAttr("writes_into", mlir::StringAttr::get(op.getContext(), op.getFieldName()));
+    return; // We are done
+  }
 
-  valueOp->setAttr("writes_into", mlir::StringAttr::get(op.getContext(), op.getFieldName()));
+  if (valueOp->getNumOperands() != 1) {
+    return;
+  }
+  // If the operation has only one operand try recursively
+  maybeAnnotateConstructorCallWithField(op, valueOp->getOperand(0));
 }
 
 ///////////////////////////////////////////////////////////

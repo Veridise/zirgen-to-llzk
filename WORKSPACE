@@ -4,9 +4,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-ZIRGEN_COMMIT = "91b3abdb1778f0089f5f07119c5d57b5477d8bcf"
-ZIRGEN_SHA256 = "f7bc4f3dd192247905c7be86bae64fa66b4fcb7812e0a247a79aad46a69c5693"
-ZKIR_COMMIT = "68f9042191035b5d564eb6504d190ebd142726ad"
+ZIRGEN_COMMIT = "59b7284f5359968b05a3ebccf234ef3c931d5d0f"
+ZIRGEN_SHA256 = "17c98f9a0448ee2fa1cbc885ebe18b015001a53827b032bc0ba0562e562c0b06"
+LLZK_COMMIT = "4e0ab7eef6831b08cc488b34890bc7ea24c19afe"
 
 http_archive(
   name = "zirgen",
@@ -26,10 +26,10 @@ filegroup(
 """
 
 git_repository(
-  name = "zkir-lib",
+  name = "llzk-lib",
   build_file_content = _ALL_CONTENT,
-  commit = ZKIR_COMMIT,
-  remote = "git@github.com:Veridise/zkir-lib.git"
+  commit = LLZK_COMMIT,
+  remote = "git@github.com:Veridise/llzk-lib.git"
 )
 
 # http_archive(
@@ -62,9 +62,10 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
 
-LLVM_COMMIT = "0d72fe9777e7c131dfb50c172b944d64437e2ece"
+# Commit of the 18.1.8 release
+LLVM_COMMIT = "3b5b5c1ec4a3095ab096dd780e84d7ab81f3d7ff"
 
-LLVM_SHA256 = "41f69c116fd1e25d290031c408f6ea0246cafb993b1fdab6f781c87fc0b903cf"
+LLVM_SHA256 = "c1e2b4dc569b9acde8a6aca6fa4f53c1979d7122d37f465c60a63f5d00c021fe"
 
 http_archive(
     name = "llvm-raw",
