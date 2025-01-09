@@ -1,0 +1,125 @@
+// RUN: zklang %s | FileCheck %s
+
+// An empty zir file still produces output for the builtin components.
+// This test serves as a ground truth of what these builtins look like in the final output.
+
+//      CHECK: module attributes {veridise.lang = "llzk"} {
+// CHECK-NEXT:   llzk.struct @Component<[]> {
+// CHECK-NEXT:     func @compute() -> !llzk.struct<@Component<[]>> {
+// CHECK-NEXT:       %self = new_struct : <@Component<[]>>
+// CHECK-NEXT:       return %self : !llzk.struct<@Component<[]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@Component<[]>>) {
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   llzk.struct @NondetReg<[]> {
+// CHECK-NEXT:     field @"$super" : !llzk.felt
+// CHECK-NEXT:     field @reg : !llzk.felt
+// CHECK-NEXT:     func @compute(%arg0: !llzk.felt) -> !llzk.struct<@NondetReg<[]>> {
+// CHECK-NEXT:       %self = new_struct : <@NondetReg<[]>>
+// CHECK-NEXT:       writef %self[@reg] = %arg0 : <@NondetReg<[]>>, !llzk.felt
+// CHECK-NEXT:       writef %self[@"$super"] = %arg0 : <@NondetReg<[]>>, !llzk.felt
+// CHECK-NEXT:       return %self : !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@NondetReg<[]>>, %arg1: !llzk.felt) {
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   llzk.struct @InRange<[]> {
+// CHECK-NEXT:     field @"$super" : !llzk.felt
+// CHECK-NEXT:     func @compute(%arg0: !llzk.felt, %arg1: !llzk.felt, %arg2: !llzk.felt) -> !llzk.struct<@InRange<[]>> {
+// CHECK-NEXT:       %self = new_struct : <@InRange<[]>>
+// CHECK-NEXT:       %0 = cmp le(%arg0, %arg1)
+// CHECK-NEXT:       %1 = cmp lt(%arg1, %arg2)
+// CHECK-NEXT:       %2 = arith.muli %0, %1 : i1
+// CHECK-NEXT:       %3 = tofelt %2 : i1
+// CHECK-NEXT:       writef %self[@"$super"] = %3 : <@InRange<[]>>, !llzk.felt
+// CHECK-NEXT:       return %self : !llzk.struct<@InRange<[]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@InRange<[]>>, %arg1: !llzk.felt, %arg2: !llzk.felt, %arg3: !llzk.felt) {
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   llzk.struct @Array<[@T, @N]> {
+// CHECK-NEXT:     field @"$super" : !llzk.struct<@Component<[]>>
+// CHECK-NEXT:     func @compute(%arg0: !llzk.struct<@Array<[@T, @N]>>) -> !llzk.struct<@Array<[@T, @N]>> {
+// CHECK-NEXT:       %self = new_struct : <@Array<[@T, @N]>>
+// CHECK-NEXT:       %0 = call @Component::@compute() : () -> !llzk.struct<@Component<[]>>
+// CHECK-NEXT:       writef %self[@"$super"] = %0 : <@Array<[@T, @N]>>, !llzk.struct<@Component<[]>>
+// CHECK-NEXT:       %1 = readf %self[@"$super"] : <@Array<[@T, @N]>>, !llzk.struct<@Component<[]>>
+// CHECK-NEXT:       return %arg0 : !llzk.struct<@Array<[@T, @N]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@Array<[@T, @N]>>, %arg1: !llzk.struct<@Array<[@T, @N]>>) {
+// CHECK-NEXT:       %0 = readf %arg0[@"$super"] : <@Array<[@T, @N]>>, !llzk.struct<@Component<[]>>
+// CHECK-NEXT:       call @Component::@constrain(%0) : (!llzk.struct<@Component<[]>>) -> ()
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   llzk.struct @Reg<[]> {
+// CHECK-NEXT:     field @reg : !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:     field @"$temp" : !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:     field @"$super" : !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:     func @compute(%arg0: !llzk.felt) -> !llzk.struct<@Reg<[]>> {
+// CHECK-NEXT:       %0 = call @NondetReg::@compute(%arg0) : (!llzk.felt) -> !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:       %self = new_struct : <@Reg<[]>>
+// CHECK-NEXT:       writef %self[@"$temp"] = %0 : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:       %1 = readf %self[@"$temp"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:       writef %self[@reg] = %1 : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:       %2 = readf %1[@"$super"] : <@NondetReg<[]>>, !llzk.felt
+// CHECK-NEXT:       writef %self[@"$super"] = %1 : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:       return %self : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@Reg<[]>>, %arg1: !llzk.felt) {
+// CHECK-NEXT:       %0 = readf %arg0[@"$temp"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:       call @NondetReg::@constrain(%0, %arg1) : (!llzk.struct<@NondetReg<[]>>, !llzk.felt) -> ()
+// CHECK-NEXT:       %1 = readf %0[@"$super"] : <@NondetReg<[]>>, !llzk.felt
+// CHECK-NEXT:       emit_eq %arg1, %1 : !llzk.felt, !llzk.felt
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   llzk.struct @Div<[]> {
+// CHECK-NEXT:     field @reciprocal : !llzk.felt
+// CHECK-NEXT:     field @"$temp_1" : !llzk.felt
+// CHECK-NEXT:     field @"$temp_0" : !llzk.felt
+// CHECK-NEXT:     field @"$temp" : !llzk.felt
+// CHECK-NEXT:     field @"$super" : !llzk.felt
+// CHECK-NEXT:     func @compute(%arg0: !llzk.felt, %arg1: !llzk.felt) -> !llzk.struct<@Div<[]>> {
+// CHECK-NEXT:       %0 = inv %arg1 : !llzk.felt
+// CHECK-NEXT:       %self = new_struct : <@Div<[]>>
+// CHECK-NEXT:       writef %self[@"$temp"] = %0 : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       %1 = readf %self[@"$temp"] : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       writef %self[@reciprocal] = %1 : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       %2 = mul %1, %arg1 : !llzk.felt, !llzk.felt
+// CHECK-NEXT:       writef %self[@"$temp_0"] = %2 : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       %3 = readf %self[@"$temp_0"] : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       %4 = mul %1, %arg0 : !llzk.felt, !llzk.felt
+// CHECK-NEXT:       writef %self[@"$temp_1"] = %4 : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       %5 = readf %self[@"$temp_1"] : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       writef %self[@"$super"] = %5 : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       return %self : !llzk.struct<@Div<[]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@Div<[]>>, %arg1: !llzk.felt, %arg2: !llzk.felt) {
+// CHECK-NEXT:       %felt_const_1 = constfelt  1
+// CHECK-NEXT:       %0 = readf %arg0[@"$temp"] : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       %1 = readf %arg0[@"$temp_0"] : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       emit_eq %1, %felt_const_1 : !llzk.felt, !llzk.felt
+// CHECK-NEXT:       %2 = readf %arg0[@"$temp_1"] : <@Div<[]>>, !llzk.felt
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   llzk.struct @Log<[]> {
+// CHECK-NEXT:     field @"$super" : !llzk.struct<@Component<[]>>
+// CHECK-NEXT:     func @compute(%arg0: !llzk.string, %arg1: !llzk.array<-9223372036854775808 x !llzk.felt>) -> !llzk.struct<@Log<[]>> {
+// CHECK-NEXT:       %0 = call @Log$$extern(%arg0, %arg1) : (!llzk.string, !llzk.array<-9223372036854775808 x !llzk.felt>) -> !llzk.struct<@Component<[]>>
+// CHECK-NEXT:       %self = new_struct : <@Log<[]>>
+// CHECK-NEXT:       writef %self[@"$super"] = %0 : <@Log<[]>>, !llzk.struct<@Component<[]>>
+// CHECK-NEXT:       return %self : !llzk.struct<@Log<[]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@Log<[]>>, %arg1: !llzk.string, %arg2: !llzk.array<-9223372036854775808 x !llzk.felt>) {
+// CHECK-NEXT:       %0 = call @Log$$extern(%arg1, %arg2) : (!llzk.string, !llzk.array<-9223372036854775808 x !llzk.felt>) -> !llzk.struct<@Component<[]>>
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   llzk.func private @Log$$extern(!llzk.string, !llzk.array<-9223372036854775808 x !llzk.felt>) -> !llzk.struct<@Component<[]>> attributes {extern}
+// CHECK-NEXT: }

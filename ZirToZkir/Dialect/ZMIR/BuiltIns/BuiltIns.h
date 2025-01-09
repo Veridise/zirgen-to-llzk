@@ -24,5 +24,6 @@ static const char IszStr[] = "Isz";
 static const char NegStr[] = "Neg";
 static const char ValStr[] = "Val";
 static const char StrStr[] = "String";
+static const char ComponentStr[] = "Component";
 
 } // namespace zkc::Zmir

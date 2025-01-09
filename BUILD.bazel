@@ -4,14 +4,16 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
+
+
 alias(
     name = "lit_cfg",
-    actual = "@zirgen//:lit_cfg",
+    actual = "//tests/lit:lit_cfg",
 )
 
 alias(
     name = "lit_utils",
-    actual = "@zirgen//:lit_utils",
+    actual = "//tests/lit:lit_utils",
 )
 
 alias(

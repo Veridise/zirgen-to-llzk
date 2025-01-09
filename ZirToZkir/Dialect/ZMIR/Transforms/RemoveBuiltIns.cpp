@@ -52,6 +52,7 @@ using IszPattern = RemoveBuiltIn<IszStr, Zmir::ComponentOp>;
 using NegPattern = RemoveBuiltIn<NegStr, Zmir::ComponentOp>;
 using ValPattern = RemoveBuiltIn<ValStr, Zmir::ComponentOp>;
 using StringPattern = RemoveBuiltIn<StrStr, Zmir::ComponentOp>;
+using ComponentPattern = RemoveBuiltIn<ComponentStr, Zmir::ComponentOp>;
 
 namespace {
 class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
@@ -75,10 +76,7 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
 
     patterns.add<
         BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern, IszPattern, NegPattern,
-        ValPattern, StringPattern>(
-
-        typeConverter, ctx
-    );
+        ValPattern, StringPattern>(typeConverter, ctx);
     /*fillPatterns<*/
     /*    BitAndStr, AddStr, SubStr, MulStr, InvStr, IszStr, NegStr, ValStr, StringStr,*/
     /*    llzk::StructDefOp>(patterns, typeConverter, ctx);*/

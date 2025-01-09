@@ -1,0 +1,19 @@
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "lit_cfg",
+    srcs = ["lit.cfg"],
+)
+
+filegroup(
+    name = "lit_utils",
+    testonly = True,
+    data = [
+        "//ZirToZkir/tools:zkc-opt",
+        "@zirgen//zirgen/dsl:zirgen",
+        "//zklang:zklang",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

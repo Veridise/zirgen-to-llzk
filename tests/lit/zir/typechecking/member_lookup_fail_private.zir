@@ -1,4 +1,5 @@
-
+// RUN: zklang %s --pipeline='builtin.module(zhl-print-type-bindings)' 2>&1 
+// XFAIL: *
 
 component A() {
   _x := Reg(1);
