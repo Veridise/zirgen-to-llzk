@@ -47,7 +47,8 @@ Params::ParamsList::iterator Params::end() { return params.end(); }
 Params::ParamsList::const_iterator Params::end() const { return params.end(); }
 
 TypeBinding::TypeBinding(uint64_t value, mlir::Location loc, const TypeBindings &bindings)
-    : name(CONST), loc(loc), constVal(value), superType(&bindings.Get("Val")) {}
+    : name(CONST), loc(loc), constVal(value),
+      superType(&const_cast<TypeBinding &>(bindings.Get("Val"))) {}
 
 TypeBinding TypeBinding::WithUpdatedLocation(mlir::Location loc) const {
   TypeBinding b = *this;
@@ -102,8 +103,8 @@ zhl::TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
     ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members
 )
-    : name(name), loc(loc), superType(&superType), members(members), genericParams(t_genericParams),
-      constructorParams(t_constructorParams) {}
+    : name(name), loc(loc), superType(&const_cast<TypeBinding &>(superType)), members(members),
+      genericParams(t_genericParams), constructorParams(t_constructorParams) {}
 
 zhl::TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
@@ -120,9 +121,21 @@ zhl::TypeBinding::TypeBinding(mlir::Location loc)
     : name("Component"), loc(loc), superType(nullptr) {}
 zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
+    print(llvm::dbgs());
+    llvm::dbgs() << " is a sub type of ";
+    other.print(llvm::dbgs());
+    llvm::dbgs() << " and thus we return ";
+    other.print(llvm::dbgs());
+    llvm::dbgs() << "\n";
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
+    other.print(llvm::dbgs());
+    llvm::dbgs() << " is a sub type of ";
+    print(llvm::dbgs());
+    llvm::dbgs() << " and thus we return ";
+    print(llvm::dbgs());
+    llvm::dbgs() << "\n";
     return *this;
   }
 
@@ -193,6 +206,10 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os) const {
     } else {
       os << "?";
     }
+    return;
+  }
+  if (isGenericParam()) {
+    os << *genericParamName;
     return;
   }
   os << name;
@@ -332,3 +349,53 @@ uint64_t zhl::TypeBinding::getConst() const {
   return *constVal;
 }
 bool zhl::TypeBinding::hasSuperType() const { return superType != nullptr; }
+bool zhl::TypeBinding::isGenericParam() const {
+  if (superType == nullptr) {
+    return false;
+  }
+  return genericParamName.has_value() && (superType->isTypeMarker() || superType->isVal());
+}
+
+zhl::TypeBinding zhl::TypeBinding::MakeGenericParam(const TypeBinding &t, llvm::StringRef name) {
+  TypeBinding copy(name, t.loc, t);
+  copy.genericParamName = name;
+  return copy;
+}
+llvm::StringRef zhl::TypeBinding::getGenericParamName() const {
+  assert(isGenericParam());
+  return *genericParamName;
+}
+const zhl::Params &zhl::TypeBinding::getGenericParamsMapping() const { return genericParams; }
+const TypeBinding *zhl::Params::operator[](std::string_view name) const {
+  for (size_t i = 0; i < names.size(); i++) {
+    if (names.at(i) == name) {
+      return &params.at(i);
+    }
+  }
+  return nullptr;
+}
+
+TypeBinding *zhl::Params::operator[](std::string_view name) {
+  for (size_t i = 0; i < names.size(); i++) {
+    if (names.at(i) == name) {
+      return &params.at(i);
+    }
+  }
+  return nullptr;
+}
+bool zhl::Params::empty() const { return names.empty(); }
+void zhl::Params::replaceParam(std::string_view name, const TypeBinding &binding) {
+  auto found = this->operator[](name);
+  if (found != nullptr) {
+    *found = binding;
+  }
+}
+void zhl::TypeBinding::replaceGenericParamByName(
+    std::string_view name, const TypeBinding &binding
+) {
+  genericParams.replaceParam(name, binding);
+}
+zhl::TypeBinding &zhl::TypeBinding::getSuperType() {
+  assert(superType != nullptr);
+  return *superType;
+}

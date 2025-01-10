@@ -41,21 +41,6 @@
 // CHECK-NEXT:       return
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   llzk.struct @Array<[@T, @N]> {
-// CHECK-NEXT:     field @"$super" : !llzk.struct<@Component<[]>>
-// CHECK-NEXT:     func @compute(%arg0: !llzk.struct<@Array<[@T, @N]>>) -> !llzk.struct<@Array<[@T, @N]>> {
-// CHECK-NEXT:       %self = new_struct : <@Array<[@T, @N]>>
-// CHECK-NEXT:       %0 = call @Component::@compute() : () -> !llzk.struct<@Component<[]>>
-// CHECK-NEXT:       writef %self[@"$super"] = %0 : <@Array<[@T, @N]>>, !llzk.struct<@Component<[]>>
-// CHECK-NEXT:       %1 = readf %self[@"$super"] : <@Array<[@T, @N]>>, !llzk.struct<@Component<[]>>
-// CHECK-NEXT:       return %arg0 : !llzk.struct<@Array<[@T, @N]>>
-// CHECK-NEXT:     }
-// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@Array<[@T, @N]>>, %arg1: !llzk.struct<@Array<[@T, @N]>>) {
-// CHECK-NEXT:       %0 = readf %arg0[@"$super"] : <@Array<[@T, @N]>>, !llzk.struct<@Component<[]>>
-// CHECK-NEXT:       call @Component::@constrain(%0) : (!llzk.struct<@Component<[]>>) -> ()
-// CHECK-NEXT:       return
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
 // CHECK-NEXT:   llzk.struct @Reg<[]> {
 // CHECK-NEXT:     field @reg : !llzk.struct<@NondetReg<[]>>
 // CHECK-NEXT:     field @"$temp" : !llzk.struct<@NondetReg<[]>>

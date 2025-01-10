@@ -53,8 +53,16 @@ mlir::LogicalResult checkValidTypeParam(
 
 mlir::LogicalResult ComponentType::verify(
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError, ::mlir::FlatSymbolRefAttr name,
-    ComponentType superType, ::llvm::ArrayRef<::mlir::Attribute> params
+    mlir::Type superType, ::llvm::ArrayRef<::mlir::Attribute> params
 ) {
+  if (!superType && name.getValue() != "Component") {
+    return emitError() << "malformed IR: super type for " << name << " cannot be null";
+  }
+  if (superType) {
+    if (!mlir::isa<ComponentType, TypeVarType>(superType)) {
+      return emitError() << "unexpected type " << superType;
+    }
+  }
   std::vector<mlir::LogicalResult> results;
   std::transform(
       params.begin(), params.end(), std::back_inserter(results),

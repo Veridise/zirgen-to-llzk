@@ -34,8 +34,8 @@ void ConvertZmirToLlzkPass::runOnOperation() {
       LitValOpLowering, GetSelfOpLowering, LowerBitAnd, LowerAdd, LowerSub, LowerMul, LowerInv,
       LowerIsz, LowerNeg, LowerConstrainOp, LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp,
       LowerReadArrayOp, LowerAllocArrayOp, LowerArrayLengthOp, LowerIndexToValOp, LowerValToIndexOp,
-      LowerWriteArrayOp, WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp,
-      LowerSuperCoerceOp>(typeConverter, ctx);
+      LowerWriteArrayOp, WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp,
+      LowerLoadValParamOp>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
@@ -47,7 +47,8 @@ void ConvertZmirToLlzkPass::runOnOperation() {
   target.addIllegalOp<
       LitValOp, GetSelfOp, BitAndOp, AddOp, SubOp, MulOp, InvOp, IsZeroOp, NegOp, ReadFieldOp,
       ConstrainOp, InRangeOp, NewArrayOp, ReadArrayOp, AllocArrayOp, GetArrayLenOp, IndexToValOp,
-      ValToIndexOp, WriteArrayOp, WriteFieldOp, ConstrainCallOp, NopOp, SuperCoerceOp>();
+      ValToIndexOp, WriteArrayOp, WriteFieldOp, ConstrainCallOp, NopOp, SuperCoerceOp,
+      LoadValParamOp>();
 
   // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {

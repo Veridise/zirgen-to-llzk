@@ -1,4 +1,5 @@
 #include "Rules.h"
+#include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
 #include <numeric>
 
 namespace zhl {
@@ -130,7 +131,7 @@ mlir::FailureOr<TypeBinding> GenericParamTypeRule::
   }
 
   scope.declareGenericParam(op.getName(), op.getIndex(), operands[0]);
-  return operands[0];
+  return TypeBinding::MakeGenericParam(getBindings().Manage(operands[0]), op.getName());
 }
 mlir::FailureOr<TypeBinding> SpecializeTypeRule::
     typeCheck(zirgen::Zhl::SpecializeOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
@@ -159,8 +160,18 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
 
   auto commonType = std::reduce(
       operands.drop_front().begin(), operands.end(), operands.front(),
-      [](auto a, auto b) { return a.commonSupertypeWith(b); }
+      [](auto a, auto b) {
+    llvm::dbgs() << "a = ";
+    a.print(llvm::dbgs());
+    llvm::dbgs() << ", b = ";
+    b.print(llvm::dbgs());
+    llvm::dbgs() << "\n";
+    return a.commonSupertypeWith(b);
+  }
   );
+  llvm::dbgs() << "final common type = ";
+  commonType.print(llvm::dbgs());
+  llvm::dbgs() << "\n";
 
   return getBindings().Array(commonType, operands.size());
 }

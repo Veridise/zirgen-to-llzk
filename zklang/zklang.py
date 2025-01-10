@@ -83,17 +83,27 @@ ZKC_OPT_PIPELINE = Scope(
             "func.func",
             Pass("remove-illegal-compute-ops"),
             Pass("remove-illegal-constrain-ops"),
+            Pass("cse"),
         ),
     ),
-    Pass("cse"),
     # Pass("canonicalize"),
     Pass("zmir-components-to-llzk"),
-    Scope("llzk.struct", Pass("zmir-to-llzk")),
+    Scope(
+        "llzk.struct",
+        Pass("zmir-to-llzk"),
+        Pass("reconcile-unrealized-casts"),
+        Pass("canonicalize"),
+    ),
     # Pass("remove-builtins"),
-    Pass("reconcile-unrealized-casts"),
     # Pass("remove-builtins"),
-    Pass("canonicalize"),
 )
+
+# Pipeline schedule improvements:
+# - Make inject-builtins, strip-tests, and strip-directives part of lower-zhl
+# - Run lower-zhl on a zhl.component scope,
+# - Run reconcile-unrealized-casts, remove-builtins, and split-component-body on a zmir.component scope.
+# - Run cse,and zmir-to-llzk on a zmir.split_component scope
+# - Merge zmir-components-to-llzk and zmir-to-llzk into one pass and rename to lower-zmir-to-llzk
 
 
 class ZkcOpt:

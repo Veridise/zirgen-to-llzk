@@ -1,0 +1,29 @@
+// RUN: zklang %s | FileCheck %s
+
+component A<N: Val>() {
+  N+1
+}
+
+component Top() {
+  a := A<1>();
+}
+
+//      CHECK:   llzk.struct @A<[@N]> {
+// CHECK-NEXT:     field @"$super" : !llzk.felt
+// CHECK-NEXT:     field @"$temp" : !llzk.felt
+// CHECK-NEXT:     func @compute() -> !llzk.struct<@A<[@N]>> {
+// CHECK-NEXT:       %felt_const_1 = constfelt  1
+// CHECK-NEXT:       %0 = read_const @N : !llzk.felt
+// CHECK-NEXT:       %1 = add %0, %felt_const_1 : !llzk.felt, !llzk.felt
+// CHECK-NEXT:       %self = new_struct : <@A<[@N]>>
+// CHECK-NEXT:       writef %self[@"$temp"] = %1 : <@A<[@N]>>, !llzk.felt
+// CHECK-NEXT:       %2 = readf %self[@"$temp"] : <@A<[@N]>>, !llzk.felt
+// CHECK-NEXT:       writef %self[@"$super"] = %2 : <@A<[@N]>>, !llzk.felt
+// CHECK-NEXT:       return %self : !llzk.struct<@A<[@N]>>
+// CHECK-NEXT:     }
+// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@A<[@N]>>) {
+// CHECK-NEXT:       %0 = read_const @N : !llzk.felt
+// CHECK-NEXT:       %1 = readf %arg0[@"$temp"] : <@A<[@N]>>, !llzk.felt
+// CHECK-NEXT:       return
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }

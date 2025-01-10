@@ -48,7 +48,6 @@ class InsertTemporariesPass : public InsertTemporariesBase<InsertTemporariesPass
     builder.setInsertionPointAfter(op);
     auto self = builder.create<GetSelfOp>(op.getLoc(), getOperation().getType());
     builder.create<WriteFieldOp>(op->getLoc(), self, name, op.getResult(0));
-    auto readOp = builder.create<ReadFieldOp>(op->getLoc(), results[0], self, name);
 
     op->setAttr("writes_into", name.getAttr());
   }

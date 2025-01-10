@@ -81,17 +81,6 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 /// ZhlConstructLowering
 ///////////////////////////////////////////////////////////
 
-mlir::FlatSymbolRefAttr createTempField(
-    mlir::Location loc, mlir::Type type, mlir::OpBuilder &builder, Zmir::ComponentInterface op
-) {
-  mlir::SymbolTable st(op);
-  auto desiredName = mlir::StringAttr::get(op.getContext(), "$temp");
-  mlir::OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointAfter(&op.getRegion().front().front());
-  auto fieldDef = builder.create<Zmir::FieldDefOp>(loc, desiredName, TypeAttr::get(type));
-  return mlir::FlatSymbolRefAttr::get(op.getContext(), st.insert(fieldDef));
-}
-
 mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -138,17 +127,15 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   auto funcPtr = rewriter.create<Zmir::ConstructorRefOp>(op.getLoc(), calleeComp, constructorType);
   auto call = rewriter.create<mlir::func::CallIndirectOp>(op->getLoc(), funcPtr, preparedArguments);
 
-  auto name = createTempField(op->getLoc(), constructorType.getResult(0), rewriter, callerComp);
+  auto result = storeValueInTemporary(
+      op.getLoc(), callerComp, constructorType.getResult(0), call.getResult(0), rewriter
+  );
 
-  // Write the construction in a temporary
-  auto self = rewriter.create<Zmir::GetSelfOp>(op->getLoc(), callerComp.getType());
-  rewriter.create<Zmir::WriteFieldOp>(op->getLoc(), self, name, call.getResult(0));
+  rewriter.replaceOp(op, result);
 
-  // Read the temporary back to a SSA value
-  auto result =
-      rewriter.replaceOpWithNewOp<Zmir::ReadFieldOp>(op, constructorType.getResult(0), self, name);
-
-  rewriter.create<Zmir::ConstrainCallOp>(op->getLoc(), result, ValueRange(preparedArguments));
+  rewriter.create<Zmir::ConstrainCallOp>(
+      op->getLoc(), result->getResult(0), ValueRange(preparedArguments)
+  );
   return mlir::success();
 }
 
@@ -283,10 +270,14 @@ mlir::LogicalResult ZhlGenericRemoval::matchAndRewrite(
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
-  rewriter.replaceOpWithNewOp<Zmir::NopOp>(
-      op, mlir::TypeRange({Zmir::materializeTypeBinding(getContext(), *binding)}),
-      mlir::ValueRange()
-  );
+  auto type = Zmir::materializeTypeBinding(getContext(), *binding);
+  if (binding->isGenericParam() && binding->getSuperType().isVal()) {
+    rewriter.replaceOpWithNewOp<Zmir::LoadValParamOp>(
+        op, Zmir::ComponentType::Val(getContext()), op.getNameAttr()
+    );
+  } else {
+    rewriter.replaceOpWithNewOp<Zmir::NopOp>(op, mlir::TypeRange({type}), mlir::ValueRange());
+  }
   return mlir::success();
 }
 
@@ -650,6 +641,16 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   }
   auto elementType = Zmir::materializeTypeBinding(getContext(), *elementTypeBinding);
 
+  llvm::SmallVector<FailureOr<TypeBinding>> argBindings;
+  std::transform(
+      op.getElements().begin(), op.getElements().end(), std::back_inserter(argBindings),
+      [&](auto element) { return getType(element); }
+  );
+
+  if (std::any_of(argBindings.begin(), argBindings.end(), failed)) {
+    return op->emitOpError() << "failed to type check array values";
+  }
+
   if (adaptor.getElements().empty()) {
     assert(false && "TODO");
     rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(
@@ -663,18 +664,28 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   llvm::SmallVector<mlir::Value> args;
 
   std::transform(
-      adaptor.getElements().begin(), adaptor.getElements().end(), std::back_inserter(args),
-      [&](auto element) {
-    if (element.getType() == elementType) {
+      adaptor.getElements().begin(), adaptor.getElements().end(), argBindings.begin(),
+      std::back_inserter(args),
+      [&](auto element, auto eltBinding) -> Value {
+    auto bindingType = Zmir::materializeTypeBinding(getContext(), *eltBinding);
+    if (element.getType() == bindingType) {
       return element;
     }
 
     auto cast =
-        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), elementType, element);
-    return cast.getResult(0);
+        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), bindingType, element);
+    if (cast.getResult(0).getType() == elementType) {
+      return cast.getResult(0);
+    }
+    return rewriter.create<Zmir::SuperCoerceOp>(op.getLoc(), elementType, cast.getResult(0));
   }
   );
-  rewriter.replaceOpWithNewOp<Zmir::NewArrayOp>(op, arrayType, args);
+  auto arr = rewriter.create<Zmir::NewArrayOp>(op.getLoc(), arrayType, args);
+  rewriter.replaceOp(
+      op, storeValueInTemporary(
+              op.getLoc(), op->getParentOfType<Zmir::ComponentOp>(), arrayType, arr, rewriter
+          )
+  );
   return mlir::success();
 }
 

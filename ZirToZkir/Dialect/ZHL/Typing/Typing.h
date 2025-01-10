@@ -8,9 +8,9 @@ namespace zhl {
 
 class TypingRule {
 public:
-  explicit TypingRule(const TypeBindings &bindings);
+  explicit TypingRule(TypeBindings &bindings);
 
-  const TypeBindings &getBindings() const;
+  TypeBindings &getBindings() const;
 
   virtual mlir::LogicalResult match(mlir::Operation *op) const = 0;
 
@@ -23,7 +23,7 @@ public:
       const = 0;
 
 private:
-  const TypeBindings *bindings;
+  TypeBindings *bindings;
 };
 
 template <typename Op> class OpTypingRule : public TypingRule {
@@ -107,6 +107,6 @@ private:
 
 std::unique_ptr<ZhlOpBindings>
 typeCheck(mlir::Operation *, TypeBindings &, const FrozenTypingRuleSet &);
-FrozenTypingRuleSet zhlTypingRules(const TypeBindings &);
+FrozenTypingRuleSet zhlTypingRules(TypeBindings &);
 
 } // namespace zhl

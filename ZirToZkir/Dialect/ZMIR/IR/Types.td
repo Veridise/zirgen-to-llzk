@@ -32,7 +32,7 @@ def Union : ZmirType<"Union", "union"> { let summary = "union type"; }
 def Component : ZmirType<"Component", ""> {
   let summary = "component type";
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name,
-      OptionalParameter<"ComponentType">:$superType,
+      OptionalParameter<"mlir::Type">:$superType,
       OptionalArrayRefParameter<"::mlir::Attribute">:$params);
   let assemblyFormat = [{$name (`<` $params^ `>`)?(`:``>`$superType^)?}];
 
@@ -58,7 +58,7 @@ def Component : ZmirType<"Component", ""> {
       auto sizeVar = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx, "N"));
       return ComponentType::get(ctx, "Array", Component(ctx), {symT, sizeVar});
     }
-    static ComponentType Array(mlir::MLIRContext *ctx, ComponentType inner, uint64_t size) { 
+    static ComponentType Array(mlir::MLIRContext *ctx, Type inner, uint64_t size) { 
       auto innerAttr = mlir::TypeAttr::get(inner);
       auto sizeAttr = mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 64), size);
       return ComponentType::get(ctx, "Array", Component(ctx), {innerAttr, sizeAttr});
@@ -66,7 +66,7 @@ def Component : ZmirType<"Component", ""> {
   }];
 
   let builders =
-      [TypeBuilder<(ins "::llvm::StringRef":$name, "ComponentType":$superType,
+      [TypeBuilder<(ins "::llvm::StringRef":$name, "Type":$superType,
                        "::llvm::ArrayRef<::mlir::Attribute>":$params),
                    [{
       return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, params);
@@ -74,8 +74,7 @@ def Component : ZmirType<"Component", ""> {
        TypeBuilder<(ins), [{
       return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, "Component")), nullptr, std::nullopt);
   }]>,
-       TypeBuilder<(ins "::llvm::StringRef":$name, "ComponentType":$superType),
-                   [{
+       TypeBuilder<(ins "::llvm::StringRef":$name, "Type":$superType), [{
       return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, std::nullopt);
     }]>];
 
@@ -123,3 +122,4 @@ def AnyZmirType
           "potentially unknown type that can participate in ZMIR components">;
 
 class PendingOf<Type type> : AnyTypeOf<[type, Pending]>;
+class TypeVarOr<Type type> : AnyTypeOf<[type, TypeVar]>;

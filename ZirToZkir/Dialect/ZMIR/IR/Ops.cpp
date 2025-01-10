@@ -117,15 +117,14 @@ void SplitComponentOp::build(
   state.addRegion();
 }
 
-template <typename CompOp> ComponentType getSuperType(CompOp &op) {
+template <typename CompOp> mlir::Type getSuperType(CompOp &op) {
   if (op.isRoot()) {
+    llvm::dbgs() << "Super type of root is null\n";
     return nullptr;
   }
   auto result = op.lookupFieldType(op.getSuperFieldName());
   assert(mlir::succeeded(result));
-  auto t = *result;
-  assert(mlir::isa<ComponentType>(t));
-  return mlir::cast<ComponentType>(t);
+  return *result;
 }
 
 template <typename CompOp> mlir::Type getType(CompOp &op) {
@@ -162,7 +161,6 @@ mlir::FailureOr<mlir::Type> SplitComponentOp::getSuperType() { return getSuperTy
 
 inline mlir::FailureOr<mlir::Type>
 lookupFieldTypeCommon(mlir::FlatSymbolRefAttr fieldName, mlir::Operation *op) {
-
   auto fieldOp = mlir::SymbolTable::lookupNearestSymbolFrom<FieldDefOp>(op, fieldName);
   if (!fieldOp) {
     return mlir::failure();

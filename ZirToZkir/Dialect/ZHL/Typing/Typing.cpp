@@ -159,7 +159,7 @@ typeCheck(Operation *root, TypeBindings &typeBindings, const FrozenTypingRuleSet
   return bindings;
 }
 
-FrozenTypingRuleSet zhlTypingRules(const TypeBindings &bindings) {
+FrozenTypingRuleSet zhlTypingRules(TypeBindings &bindings) {
   TypingRuleSet rules;
   rules.add<
       LiteralTypingRule, StringTypingRule, GlobalTypingRule, ParameterTypingRule, SuperTypingRule,
@@ -171,8 +171,8 @@ FrozenTypingRuleSet zhlTypingRules(const TypeBindings &bindings) {
   return rules;
 }
 
-TypingRule::TypingRule(const TypeBindings &bindings) : bindings(&bindings) {}
-const TypeBindings &TypingRule::getBindings() const { return *bindings; }
+TypingRule::TypingRule(TypeBindings &bindings) : bindings(&bindings) {}
+TypeBindings &TypingRule::getBindings() const { return *bindings; }
 FrozenTypingRuleSet::FrozenTypingRuleSet(RuleSet &&rules) : rules(std::move(rules)) {}
 FrozenTypingRuleSet::RuleSet::const_iterator FrozenTypingRuleSet::begin() const {
   return rules.begin();

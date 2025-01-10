@@ -46,6 +46,9 @@ public:
   mlir::ArrayRef<std::string> getNames() const;
   mlir::ArrayRef<TypeBinding> getParams() const;
 
+  const TypeBinding *operator[](std::string_view name) const;
+  TypeBinding *operator[](std::string_view name);
+
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
 
   void printParams(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
@@ -54,6 +57,10 @@ public:
   ParamsList::const_iterator begin() const;
   ParamsList::iterator end();
   ParamsList::const_iterator end() const;
+
+  bool empty() const;
+
+  void replaceParam(std::string_view name, const TypeBinding &binding);
 
 private:
   template <typename Elt>
@@ -191,6 +198,7 @@ public:
   bool isArray() const;
   bool isConst() const;
   bool isGeneric() const;
+  bool isGenericParam() const;
   /// Returns true if the type is not generic or has an specialization of its generic parameters
   bool isSpecialized() const;
   bool isVariadic() const;
@@ -200,13 +208,18 @@ public:
   mlir::ArrayRef<TypeBinding> getGenericParams() const;
   std::vector<mlir::Location> getConstructorParamLocations() const;
   const Params &getConstructorParams() const;
+  const Params &getGenericParamsMapping() const;
   const MembersMap &getMembers() const;
   mlir::Location getLocation() const;
   const TypeBinding &getSuperType() const;
+  TypeBinding &getSuperType();
   uint64_t getConst() const;
+  llvm::StringRef getGenericParamName() const;
 
   mlir::FailureOr<TypeBinding> getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError
   ) const;
+
+  void replaceGenericParamByName(std::string_view name, const TypeBinding &binding);
 
   /// Attempts to create an specialized version of the type using the provided parameters.
   mlir::FailureOr<TypeBinding> specialize(
@@ -234,6 +247,7 @@ public:
   TypeBinding WithUpdatedLocation(mlir::Location loc) const;
 
   static TypeBinding WrapVariadic(const TypeBinding &t);
+  static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name);
 
   friend TypeBindings;
 
@@ -246,7 +260,8 @@ private:
   llvm::StringRef name;
   mlir::Location loc;
   std::optional<uint64_t> constVal;
-  const TypeBinding *superType;
+  std::optional<llvm::StringRef> genericParamName;
+  TypeBinding *superType;
   MembersMap members;
   Params genericParams;
   Params constructorParams;

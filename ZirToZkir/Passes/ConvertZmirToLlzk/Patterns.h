@@ -246,4 +246,12 @@ public:
   matchAndRewrite(SuperCoerceOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerLoadValParamOp : public mlir::OpConversionPattern<LoadValParamOp> {
+public:
+  using mlir::OpConversionPattern<LoadValParamOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(LoadValParamOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 } // namespace zkc::Zmir

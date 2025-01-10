@@ -103,7 +103,8 @@ def FieldDefOp : ZmirOp<"field", [HasParent<"::zkc::Zmir::ComponentOp, "
                                             "::zkc::Zmir::SplitComponentOp">,
                                   Symbol]> {
   let summary = "component field definition";
-  let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<Component>:$type);
+  let arguments = (ins SymbolNameAttr:$sym_name,
+      TypeAttrOf<TypeVarOr<Component>>:$type);
 
   let assemblyFormat = [{
     $sym_name `:` $type attr-dict
@@ -117,9 +118,9 @@ def ReadFieldOp
     Reads the value of a field in a component.
   }];
 
-  let arguments = (ins PendingOf<Component>:$component,
+  let arguments = (ins TypeVarOr<Component>:$component,
       FlatSymbolRefAttr:$field_name);
-  let results = (outs Component:$val);
+  let results = (outs TypeVarOr<Component>:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` attr-dict `:` type($component) `,` type($val) 
@@ -134,8 +135,8 @@ def WriteFieldOp
     Writes a value into a field in a component.
   }];
 
-  let arguments = (ins Component:$component, FlatSymbolRefAttr:$field_name,
-      Component:$val);
+  let arguments = (ins TypeVarOr<Component>:$component,
+      FlatSymbolRefAttr:$field_name, TypeVarOr<Component>:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` `=` $val attr-dict `:` type($component) `,` type($val) 
@@ -147,7 +148,7 @@ def SuperCoerceOp : ZmirOp<"super_coerce"> {
       "transitively reads the super field until the target type is reached";
 
   let arguments = (ins Component:$component);
-  let results = (outs Component:$val);
+  let results = (outs TypeVarOr<Component>:$val);
 
   let assemblyFormat =
       "$component attr-dict `:` type($component) `->` type($val)";
@@ -198,7 +199,7 @@ def GetGlobalOp
 def ConstrainCallOp : ZmirOp<"constrain_call"> {
   let summary = "calls the constrain function";
 
-  let arguments = (ins Component:$self, Variadic<AnyType>:$args);
+  let arguments = (ins TypeVarOr<Component>:$self, Variadic<AnyType>:$args);
 
   let assemblyFormat = [{
     $self `(` $args `)` `:` `(` type($self) `,` type($args) `)` attr-dict
@@ -208,7 +209,7 @@ def ConstrainCallOp : ZmirOp<"constrain_call"> {
 def ConstrainOp : ZmirOp<"constrain"> {
   let summary = "emits a constraint";
 
-  let arguments = (ins Component:$lhs, Component:$rhs);
+  let arguments = (ins TypeVarOr<Component>:$lhs, TypeVarOr<Component>:$rhs);
 
   let assemblyFormat = [{
   $lhs `=` $rhs attr-dict `:` type($lhs) `,` type($rhs)
@@ -229,7 +230,7 @@ def NewArrayOp
   let summary = "creates a new array with data";
 
   let arguments = (ins Variadic<AnyZmirType>:$elements);
-  let results = (outs Component:$result);
+  let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat =
       "$elements attr-dict `:` `[` type($elements) `]` `->` type($result)";
@@ -268,8 +269,9 @@ def AllocArrayOp : ZmirOp<"alloc_array"> {
 def ReadArrayOp : ZmirOp<"read_array"> {
   let summary = "read data from an array";
 
-  let arguments = (ins Component:$lvalue, Variadic<AnyType>:$indices);
-  let results = (outs Component:$result);
+  let arguments = (ins TypeVarOr<Component>:$lvalue,
+      Variadic<AnyType>:$indices);
+  let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat = [{
     $lvalue `[` $indices `]` attr-dict `:` type($lvalue) `[` type($indices) `]` `,` type($result)
@@ -279,7 +281,7 @@ def ReadArrayOp : ZmirOp<"read_array"> {
 def WriteArrayOp : ZmirOp<"write_array"> {
   let summary = "write data into an array";
 
-  let arguments = (ins Component:$array, Variadic<AnyType>:$indices,
+  let arguments = (ins TypeVarOr<Component>:$array, Variadic<AnyType>:$indices,
       AnyZmirType:$value);
   let assemblyFormat = [{
     $array `[` $indices `]` `=` $value attr-dict `:` type($array) `[` type($indices) `]` `,` type($value)
@@ -289,14 +291,14 @@ def WriteArrayOp : ZmirOp<"write_array"> {
 def GetArrayLenOp : ZmirOp<"array_len"> {
   let summary = "returns the length of an array";
 
-  let arguments = (ins Component:$array);
+  let arguments = (ins TypeVarOr<Component>:$array);
   let results = (outs Index:$length);
 }
 
 def ValToIndexOp : ZmirOp<"toindex"> {
   let summary = "convert val to index";
 
-  let arguments = (ins Component:$val);
+  let arguments = (ins TypeVarOr<Component>:$val);
   let results = (outs Index:$result);
 
   let assemblyFormat = "$val `:` type($val) attr-dict";
@@ -305,7 +307,7 @@ def ValToIndexOp : ZmirOp<"toindex"> {
 def ValToI1Op : ZmirOp<"tobool"> {
   let summary = "convert val to i1";
 
-  let arguments = (ins Component:$val);
+  let arguments = (ins TypeVarOr<Component>:$val);
   let results = (outs I1:$result);
   let assemblyFormat = "$val `:` type($val) attr-dict";
 }
@@ -342,11 +344,19 @@ def LitStrOp : ZmirOp<"string"> {
 def AssertOp : ZmirOp<"assert"> {
   let summary = "assert";
   let arguments = (ins AnyType:$cond);
-  let results = (outs Component:$comp);
+  let results = (outs TypeVarOr<Component>:$comp);
 
   let assemblyFormat = [{
     $cond  `:` type($cond) `,` type($comp) attr-dict 
     }];
+}
+
+def LoadValParamOp : ZmirOp<"load_param"> {
+  let summary = "loads val from parameter";
+  let arguments = (ins SymbolNameAttr:$param);
+  let results = (outs Component:$val);
+
+  let assemblyFormat = "$param `:` type($val) attr-dict";
 }
 
 ///////////////////// Builtin Ops /////////////////////

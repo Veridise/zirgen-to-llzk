@@ -1,10 +1,14 @@
 #include "Helpers.h"
+#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
 
-using namespace zkc;
+using namespace mlir;
+using namespace zkc::Zmir;
+
+namespace zkc {
 
 ComponentArity::ComponentArity() : isVariadic(false), paramCount(0) {}
 
-ComponentArity zkc::getComponentConstructorArity(zirgen::Zhl::ComponentOp op) {
+ComponentArity getComponentConstructorArity(zirgen::Zhl::ComponentOp op) {
   ComponentArity arity;
 
   // Add locations for each index and keep them sorted
@@ -23,3 +27,32 @@ ComponentArity zkc::getComponentConstructorArity(zirgen::Zhl::ComponentOp op) {
 
   return arity;
 }
+
+mlir::FlatSymbolRefAttr createTempField(
+    mlir::Location loc, mlir::Type type, mlir::OpBuilder &builder, Zmir::ComponentInterface op
+) {
+  mlir::SymbolTable st(op);
+  auto desiredName = mlir::StringAttr::get(op.getContext(), "$temp");
+  mlir::OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointAfter(&op.getRegion().front().front());
+  auto fieldDef = builder.create<Zmir::FieldDefOp>(loc, desiredName, TypeAttr::get(type));
+  return mlir::FlatSymbolRefAttr::get(op.getContext(), st.insert(fieldDef));
+}
+
+/// Creates a temporary field to store the value and a sequence of reads and writes
+/// that disconnect the value creation from its users.
+mlir::Operation *storeValueInTemporary(
+    mlir::Location loc, Zmir::ComponentOp callerComp, mlir::Type fieldType, mlir::Value value,
+    mlir::ConversionPatternRewriter &rewriter
+) {
+  // Create the field
+  auto name = createTempField(loc, fieldType, rewriter, callerComp);
+  // Write the construction in a temporary
+  auto self = rewriter.create<Zmir::GetSelfOp>(loc, callerComp.getType());
+  rewriter.create<Zmir::WriteFieldOp>(loc, self, name, value);
+
+  // Read the temporary back to a SSA value
+  return rewriter.create<Zmir::ReadFieldOp>(loc, fieldType, self, name);
+}
+
+} // namespace zkc

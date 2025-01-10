@@ -183,7 +183,19 @@ LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
       // longer.
       break;
     }
-    auto typ = std::exchange(t, t.getSuperType());
+    if (t.getName().getValue() == "Array") {
+      break;
+    }
+    auto typ = t.getSuperType();
+    if (!typ) {
+      break;
+    }
+    if (auto comp = mlir::dyn_cast<Zmir::ComponentType>(typ)) {
+      t = comp;
+    }
+    if (auto comp = mlir::dyn_cast<Zmir::TypeVarType>(typ)) {
+      break;
+    }
     opChain =
         rewriter.create<llzk::FieldReadOp>(op.getLoc(), tc->convertType(t), opChain, "$super");
     assert(t);
@@ -210,6 +222,15 @@ LogicalResult Zmir::LowerConstrainCallOp::matchAndRewrite(
   );
   rewriter.replaceOpWithNewOp<llzk::CallOp>(op, sym, TypeRange(), adaptor.getOperands());
 
+  return success();
+}
+
+LogicalResult Zmir::LowerLoadValParamOp::matchAndRewrite(
+    Zmir::LoadValParamOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  rewriter.replaceOpWithNewOp<llzk::ConstReadOp>(
+      op, llzk::FeltType::get(getContext()), mlir::SymbolRefAttr::get(op.getParamAttr())
+  );
   return success();
 }
 
