@@ -290,6 +290,7 @@ public:
 
   template <typename... Args>
   const TypeBinding &Create(std::string_view name, mlir::Location loc, Args &&...args) {
+    llvm::dbgs() << "Creating binding with name " << name << "\n";
     assert(bindings.find(name) == bindings.end() && "double binding write");
     bindings.emplace(name, TypeBinding(name, loc, std::forward<Args>(args)...));
     return bindings.at(name);

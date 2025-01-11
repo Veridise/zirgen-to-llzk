@@ -7,6 +7,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <unordered_set>
 
 namespace zhl {
 
@@ -49,7 +50,11 @@ class ConcreteImpl : public zhl::ZIRTypeAnalysis::Impl {
 public:
   explicit ConcreteImpl(mlir::ModuleOp module, mlir::OpBuilder &builder)
       : typeBindings(builder), opBindings(nullptr) {
-    zkc::Zmir::addBuiltinBindings(typeBindings);
+    std::unordered_set<std::string_view> definedNames;
+    for (auto op : module.getOps<zirgen::Zhl::ComponentOp>()) {
+      definedNames.insert(op.getName());
+    }
+    zkc::Zmir::addBuiltinBindings(typeBindings, definedNames);
     opBindings = typeCheck(module, typeBindings, zhlTypingRules(typeBindings));
   }
 

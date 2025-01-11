@@ -10,6 +10,7 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/ValueRange.h>
+#include <unordered_set>
 
 using namespace zkc::Zmir;
 
@@ -174,68 +175,87 @@ void addArrayComponent(mlir::OpBuilder &builder) {
   )
       .build(builder);
 }
+#define MAYBE(name) if (definedNames.find(name) == definedNames.end())
 
-void zkc::Zmir::addBuiltinBindings(zhl::TypeBindings &bindings) {
+void zkc::Zmir::addBuiltinBindings(
+    zhl::TypeBindings &bindings, const std::unordered_set<std::string_view> &definedNames
+) {
   auto &Val = bindings.Create("Val", bindings.Component());
   const_cast<zhl::TypeBinding &>(Val).selfConstructs();
-  auto &String = bindings.Create("String", bindings.Component());
-  const_cast<zhl::TypeBinding &>(String).selfConstructs();
+  MAYBE("String") {
+    auto &String = bindings.Create("String", bindings.Component());
+    const_cast<zhl::TypeBinding &>(String).selfConstructs();
+  }
   auto &Type = bindings.Create("Type", bindings.Component());
 
-  zhl::ParamsMap NondetRegParams;
+  MAYBE("NondetReg")
   bindings.Create(
       "NondetReg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
+  MAYBE("InRange")
   bindings.Create(
       "InRange", Val, zhl::ParamsMap(),
       zhl::ParamsMap({{{"low", 0}, Val}, {{"mid", 1}, Val}, {{"high", 2}, Val}}), zhl::MembersMap()
   );
+  MAYBE("BitAnd")
   bindings.Create(
       "BitAnd", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
+  MAYBE("Add")
   bindings.Create(
       "Add", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
+  MAYBE("Sub")
   bindings.Create(
       "Sub", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
+  MAYBE("Mul")
   bindings.Create(
       "Mul", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
+  MAYBE("Inv")
   bindings.Create(
       "Inv", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
+  MAYBE("Isz")
   bindings.Create(
       "Isz", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
+  MAYBE("Neg")
   bindings.Create(
       "Neg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
-  auto &Array = bindings.Create(
-      "Array", bindings.Component(), zhl::ParamsMap({{{"T", 0}, Type}, {{"N", 1}, Val}})
-  );
-  const_cast<zhl::TypeBinding &>(Array).selfConstructs();
+  MAYBE("Array") {
+    auto &Array = bindings.Create(
+        "Array", bindings.Component(), zhl::ParamsMap({{{"T", 0}, Type}, {{"N", 1}, Val}})
+    );
+    const_cast<zhl::TypeBinding &>(Array).selfConstructs();
+  }
 }
 
 /// Adds the builtin operations that have not been overriden
-void zkc::Zmir::addBuiltins(mlir::OpBuilder &builder) {
+void zkc::Zmir::addBuiltins(
+    mlir::OpBuilder &builder, const std::unordered_set<std::string_view> &definedNames
+) {
+  assert(definedNames.find("Component") == definedNames.end() && "Can't redefine Component type");
   addComponent(builder);
 
+  assert(definedNames.find("Val") == definedNames.end() && "Can't redefine Val type");
   addTrivial(builder, "Val");
-  addTrivial(builder, "String");
+  MAYBE("String") { addTrivial(builder, "String"); }
 
-  addNondetReg(builder);
-  addInRange(builder);
-  addBinOp<BitAndOp>(builder, "BitAnd");
-  addBinOp<AddOp>(builder, "Add");
-  addBinOp<SubOp>(builder, "Sub");
-  addBinOp<MulOp>(builder, "Mul");
-  addUnaryOp<InvOp>(builder, "Inv");
-  addUnaryOp<IsZeroOp>(builder, "Isz");
-  addUnaryOp<NegOp>(builder, "Neg");
-  addArrayComponent(builder);
+  MAYBE("NondetReg") { addNondetReg(builder); }
+  MAYBE("InRange") { addInRange(builder); }
+  MAYBE("BitAnd") { addBinOp<BitAndOp>(builder, "BitAnd"); }
+  MAYBE("Add") { addBinOp<AddOp>(builder, "Add"); }
+  MAYBE("Sub") { addBinOp<SubOp>(builder, "Sub"); }
+  MAYBE("Mul") { addBinOp<MulOp>(builder, "Mul"); }
+  MAYBE("Inv") { addUnaryOp<InvOp>(builder, "Inv"); }
+  MAYBE("Isz") { addUnaryOp<IsZeroOp>(builder, "Isz"); }
+  MAYBE("Neg") { addUnaryOp<NegOp>(builder, "Neg"); }
+  MAYBE("Array") { addArrayComponent(builder); }
 }

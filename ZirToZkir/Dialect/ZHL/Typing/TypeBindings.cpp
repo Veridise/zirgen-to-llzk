@@ -1,5 +1,6 @@
 #include "TypeBindings.h"
 #include <iterator>
+#include <mlir/Support/LogicalResult.h>
 
 using namespace zhl;
 using namespace mlir;
@@ -151,10 +152,18 @@ zhl::TypeBinding::getArrayElement(std::function<mlir::InFlightDiagnostic()> emit
   if (!isArray()) {
     return emitError() << "non array type '" << name << "' cannot be subscripted";
   }
-  assert(genericParams.size() == 2);
-  if (!specialized) {
-    return emitError() << "array type has not been specialized";
+  // A component with an array super type can behave like an array but it doesn't have all the
+  // information required. In that case we defer the answer to the super type.
+  if (name != "Array") {
+    if (!hasSuperType()) {
+      return failure();
+    }
+    return getSuperType().getArrayElement(emitError);
   }
+  assert(genericParams.size() == 2);
+  /*if (!specialized) {*/
+  /*  return emitError() << "array type has not been specialized";*/
+  /*}*/
   return genericParams.getParam(0);
 }
 
@@ -239,7 +248,9 @@ bool zhl::TypeBinding::isTypeMarker() const { return name == "Type"; }
 
 bool zhl::TypeBinding::isVal() const { return name == "Val"; }
 
-bool zhl::TypeBinding::isArray() const { return name == "Array"; }
+bool zhl::TypeBinding::isArray() const {
+  return name == "Array" || (hasSuperType() && getSuperType().isArray());
+}
 
 bool zhl::TypeBinding::isConst() const { return name == CONST; }
 
