@@ -1,0 +1,3 @@
+[submodule "third-party/zirgen"]
+	path = third-party/zirgen
+	url = git@github.com:Veridise/zirgen.git
