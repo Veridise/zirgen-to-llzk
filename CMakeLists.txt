@@ -33,9 +33,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS
 
 find_package(LLVM 18.1 REQUIRED CONFIG)
 find_package(MLIR REQUIRED CONFIG)
+find_package(LLZK REQUIRED CONFIG)
 
 message(STATUS "Using LLVM in: ${LLVM_DIR}")
 message(STATUS "Using MLIR in: ${MLIR_DIR}")
+message(STATUS "Using LLZK in: ${LLZK_DIR}")
 
 # Adds an INTERFACE library that only includes headers
 function(add_header_library _name _include_dirs _export_name)
@@ -128,7 +130,7 @@ set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doc")
 set(ZIRC_MLIR_DOC_OUTPUT_DIR "${DOXYGEN_OUTPUT_DIRECTORY}/mlir")
 
 # We need the include dir so we can pass it to mlir-tblgen
-# set(ZIRC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+set(ZIRC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 # include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZIRCMacros.cmake)
 
@@ -143,8 +145,8 @@ set(ZIRC_MLIR_DOC_OUTPUT_DIR "${DOXYGEN_OUTPUT_DIRECTORY}/mlir")
 # install(TARGETS LLZKAllDialects EXPORT LLZKTargets)
 
 add_subdirectory(third-party)
-# add_subdirectory(include)
-# add_subdirectory(lib)
+add_subdirectory(include)
+add_subdirectory(lib)
 # add_subdirectory(tools)
 
 # Documentation

@@ -13,7 +13,6 @@ target_include_directories(
             # TableGen'd files
             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/zirgen/Dialect/ZHL/IR>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-            # We assume LLZK is installed as-is to include top level
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/zirgen/Dialect/ZHL/IR>)
 install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/zirgen/zirgen/Dialect/ZHL/IR" "${CMAKE_CURRENT_BINARY_DIR}/zirgen/Dialect/ZHL/IR"
