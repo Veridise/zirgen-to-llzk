@@ -9,7 +9,7 @@
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
 
-#include "zklang/Dialect/ZML/IR/TypeInterfaces.inc.cpp"
+#include "zklang/Dialect/ZML/IR/TypeInterfaces.cpp.inc"
 
 namespace zkc::Zmir {
 

@@ -52,9 +52,6 @@ add_dependencies(mlir-headers ZHLDialectIncGen)
 add_dependencies(ZHLDialectHeaders ZHLDialectIncGen)
 
 add_library(ZHLDialect)
-file(GLOB_RECURSE ZIRGEN_CXX_FILES LIST_DIRECTORIES true "zirgen")
-message(STATUS "cpp files: ${ZIRGEN_CXX_FILES}")
-execute_process(COMMAND ls -la ${CMAKE_CURRENT_SOURCE_DIR})
 target_sources(ZHLDialect PRIVATE 
   ${CMAKE_CURRENT_SOURCE_DIR}/zirgen/zirgen/Dialect/ZHL/IR/Dialect.cpp 
   ${CMAKE_CURRENT_SOURCE_DIR}/zirgen/zirgen/Dialect/ZHL/IR/Ops.cpp 

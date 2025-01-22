@@ -1,8 +1,7 @@
-#include "Patterns.h"
-#include "Helpers.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "zklang/Passes/ConvertZmlToLlzk/Patterns.h"
 #include "llzk/Dialect/LLZK/IR/Ops.h"
+#include "zklang/Dialect/ZML/IR/Ops.h"
+#include "zklang/Dialect/ZML/IR/Types.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>

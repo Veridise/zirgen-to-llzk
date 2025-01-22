@@ -24,6 +24,6 @@ OpPass<mlir::ModuleOp> createConvertZmirComponentsToLlzkPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#include "ZirToZkir/Passes/Passes.inc.h"
+#include "zklang/Passes/Passes.h.inc"
 
 } // namespace zkc

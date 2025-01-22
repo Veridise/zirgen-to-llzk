@@ -1,6 +1,6 @@
-#include "Materialize.h"
-#include "ZirToZkir/Dialect/ZHL/Typing/TypeBindings.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "zklang/Dialect/ZML/Typing/Materialize.h"
+#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
+#include "zklang/Dialect/ZML/IR/Types.h"
 #include <algorithm>
 #include <iterator>
 #include <mlir/IR/BuiltinAttributes.h>

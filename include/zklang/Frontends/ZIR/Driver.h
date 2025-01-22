@@ -4,6 +4,6 @@
 namespace zklang {
 
 /// ZIR frontend driver
-mlir::LogicalResult zirDriver(int, char **);
+mlir::LogicalResult zirDriver(int &, char **);
 
 } // namespace zklang

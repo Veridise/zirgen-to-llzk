@@ -28,4 +28,25 @@ static const char StrStr[] = "String";
 static const char ComponentStr[] = "Component";
 static const char ArrayStr[] = "Array";
 
+// Taken from zirgen
+// Builtins that are defined using the DSL.
+static llvm::StringLiteral zirPreamble = R"(
+
+component Reg(v: Val) {
+   reg := NondetReg(v);
+   v = reg;
+   reg
+}
+
+function Div(lhs: Val, rhs: Val) {
+   reciprocal := Inv(rhs);
+   reciprocal * rhs = 1;
+
+   reciprocal * lhs
+}
+
+extern Log(message: String, vals: Val...);
+
+)";
+
 } // namespace zkc::Zmir

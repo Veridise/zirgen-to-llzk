@@ -12,6 +12,6 @@
 namespace zkc {
 
 #define GEN_PASS_CLASSES
-#include "ZirToZkir/Passes/Passes.inc.h"
+#include "zklang/Passes/Passes.h.inc"
 
 } // namespace zkc

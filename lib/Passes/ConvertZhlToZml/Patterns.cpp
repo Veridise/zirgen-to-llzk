@@ -6,7 +6,7 @@
 #include "zklang/Dialect/ZML/IR/Types.h"
 #include "zklang/Dialect/ZML/Typing/Materialize.h"
 #include "zklang/Dialect/ZML/Typing/ZMIRTypeConverter.h"
-#include "zklang/Passes/ConvertZhlToZmir/Helpers.h"
+#include "zklang/Passes/ConvertZhlToZml/Helpers.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>

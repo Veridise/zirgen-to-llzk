@@ -1,8 +1,8 @@
 
-#include "LLZKTypeConverter.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
+#include "zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h"
 #include "llzk/Dialect/LLZK/IR/Types.h"
+#include "zklang/Dialect/ZML/IR/Ops.h"
+#include "zklang/Dialect/ZML/IR/Types.h"
 #include <mlir/IR/BuiltinOps.h>
 
 using namespace zkc::Zmir;
