@@ -9,6 +9,7 @@
 /*#include "zirgen/dsl/stats.h"*/
 #include "llzk/Dialect/LLZK/IR/Dialect.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+#include "mlir/Debug/CLOptionsSetup.h"
 #include "mlir/Transforms/Passes.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZHL/Typing/Passes.h"
@@ -55,31 +56,39 @@ static cl::opt<enum Action> emitAction(
 );
 
 static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::value_desc("path"));
+struct ZirFrontendDialects {
+
+  ZirFrontendDialects() {
+    registry.insert<zkc::Zmir::ZmirDialect>();
+    registry.insert<zirgen::Zhl::ZhlDialect>();
+    registry.insert<llzk::LLZKDialect>();
+  }
+  mlir::DialectRegistry registry;
+};
 
 class Driver {
 public:
-  static FailureOr<std::unique_ptr<Driver>> Make(int &argc, char **argv);
+  static FailureOr<std::unique_ptr<Driver>> Make(int &argc, char **&argv);
   LogicalResult run();
 
 private:
-  Driver(int &argc, char **argv);
+  Driver(int &argc, char **&argv);
   void openMainFile(std::string);
   zirgen::dsl::ast::Module::Ptr parse();
   std::optional<mlir::ModuleOp> lowerToZhl(zirgen::dsl::ast::Module &);
   void configureLoweringPipeline();
 
   llvm::InitLLVM llvm;
-  mlir::DialectRegistry registry;
+  ZirFrontendDialects dialects;
   mlir::MLIRContext context;
   llvm::SourceMgr sourceManager;
   mlir::SourceMgrDiagnosticHandler sourceMgrHandler;
-  zirgen::dsl::Parser parser;
   mlir::PassManager pm;
 };
 
-FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **argv) {
+FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv) {
   // Done this way to keep the constructor private
-  auto driver = std::unique_ptr<Driver>(new Driver(argc, argv));
+  std::unique_ptr<Driver> driver(new Driver(argc, argv));
 
   applyDefaultTimingPassManagerCLOptions(driver->pm);
   if (failed(applyPassManagerCLOptions(driver->pm))) {
@@ -90,34 +99,37 @@ FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **argv) {
   return std::move(driver);
 }
 
-Driver::Driver(int &argc, char **argv)
-    : llvm(argc, argv), registry{}, context(registry), sourceManager{},
-      sourceMgrHandler(sourceManager, &context), parser(sourceManager), pm(&context) {
-  sourceManager.setIncludeDirs(includeDirs);
+Driver::Driver(int &argc, char **&argv)
+    : llvm(argc, argv), dialects(), context(dialects.registry), sourceManager{},
+      sourceMgrHandler(sourceManager, &context), pm(&context) {
+  mlir::registerAsmPrinterCLOptions();
+  mlir::registerMLIRContextCLOptions();
+  mlir::registerPassManagerCLOptions();
+  mlir::registerDefaultTimingManagerCLOptions();
+  mlir::tracing::DebugConfig::registerCLOptions();
+  cl::ParseCommandLineOptions(argc, argv, "zklang ZIR frontend\n");
 
-  parser.addPreamble(zkc::Zmir::zirPreamble);
+  context.loadAllAvailableDialects();
 }
 
 void Driver::configureLoweringPipeline() {
   pm.clear();
-  auto modPipeline = pm.nest<mlir::ModuleOp>();
-  modPipeline.addPass(zkc::createStripTestsPass());
-  modPipeline.addPass(zkc::createStripDirectivesPass());
-  modPipeline.addPass(zkc::Zmir::createInjectBuiltInsPass());
-  modPipeline.addPass(zkc::createConvertZhlToZmirPass());
-  modPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
+  pm.addPass(zkc::createStripTestsPass());
+  pm.addPass(zkc::createStripDirectivesPass());
+  pm.addPass(zkc::Zmir::createInjectBuiltInsPass());
+  pm.addPass(zkc::createConvertZhlToZmirPass());
+  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
 
   if (emitAction == Action::PrintZML) {
     return;
   }
 
-  modPipeline.nest<zkc::Zmir::ComponentOp>().nest<mlir::func::FuncOp>().addPass(
+  pm.nest<zkc::Zmir::ComponentOp>().nest<mlir::func::FuncOp>().addPass(
       zkc::Zmir::createLowerBuiltInsPass()
   );
-  modPipeline.addPass(zkc::Zmir::createRemoveBuiltInsPass());
-  modPipeline.addPass(zkc::Zmir::createSplitComponentBodyPass());
-  auto splitCompFuncsPipeline =
-      modPipeline.nest<zkc::Zmir::SplitComponentOp>().nest<mlir::func::FuncOp>();
+  pm.addPass(zkc::Zmir::createRemoveBuiltInsPass());
+  pm.addPass(zkc::Zmir::createSplitComponentBodyPass());
+  auto &splitCompFuncsPipeline = pm.nest<zkc::Zmir::SplitComponentOp>().nest<mlir::func::FuncOp>();
   splitCompFuncsPipeline.addPass(zkc::Zmir::createRemoveIllegalComputeOpsPass());
   splitCompFuncsPipeline.addPass(zkc::Zmir::createRemoveIllegalConstrainOpsPass());
   splitCompFuncsPipeline.addPass(mlir::createCSEPass());
@@ -126,14 +138,16 @@ void Driver::configureLoweringPipeline() {
     return;
   }
 
-  modPipeline.addPass(zkc::createConvertZmirComponentsToLlzkPass());
-  auto llzkStructPipeline = modPipeline.nest<llzk::StructDefOp>();
+  pm.addPass(zkc::createConvertZmirComponentsToLlzkPass());
+  auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
   llzkStructPipeline.addPass(zkc::createConvertZmirToLlzkPass());
   llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
   llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
 }
 
 zirgen::dsl::ast::Module::Ptr Driver::parse() {
+  zirgen::dsl::Parser parser(sourceManager);
+  parser.addPreamble(zkc::Zmir::zirPreamble);
   auto ast = parser.parseModule();
   if (!ast) {
     const auto &errors = parser.getErrors();
@@ -151,6 +165,7 @@ std::optional<mlir::ModuleOp> Driver::lowerToZhl(zirgen::dsl::ast::Module &mod) 
 
 LogicalResult Driver::run() {
   openMainFile(inputFilename);
+  sourceManager.setIncludeDirs(includeDirs);
   auto ast = parse();
   if (!ast) {
     return failure();
@@ -170,6 +185,7 @@ LogicalResult Driver::run() {
   }
 
   configureLoweringPipeline();
+  pm.dump();
   if (failed(pm.run(*mod))) {
     llvm::errs() << "an internal compiler error ocurred while lowering this module:\n";
     mod->print(llvm::errs());
@@ -193,7 +209,7 @@ void Driver::openMainFile(std::string filename) {
 
 namespace zklang {
 
-LogicalResult zirDriver(int &argc, char **argv) {
+LogicalResult zirDriver(int &argc, char **&argv) {
   auto driver = Driver::Make(argc, argv);
   if (failed(driver)) {
     return failure();

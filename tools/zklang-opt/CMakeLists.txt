@@ -17,7 +17,7 @@ include_directories(${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 
 set_target_properties(zklang-opt PROPERTIES RUNTIME_OUTPUT_DIRECTORY
                                           ${CMAKE_BINARY_DIR}/bin)
-# install(
-#   TARGETS llzk-opt
-#   EXPORT LLZKTargets
-#   COMPONENT devtools)
+install(
+  TARGETS zklang-opt
+  EXPORT ZklangTargets
+  COMPONENT devtools)

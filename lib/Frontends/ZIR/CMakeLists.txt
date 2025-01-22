@@ -13,6 +13,7 @@ target_link_libraries(ZirFrontend PUBLIC
   ZIRParser 
   ZIRC
   MLIRReconcileUnrealizedCasts 
+MLIRDebug
   MLIRPass)
 include_directories(${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 

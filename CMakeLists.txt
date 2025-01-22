@@ -228,25 +228,25 @@ add_subdirectory(tools)
 #           $<$<BOOL:BUILD_TESTING>:check-lit>)
 #
 # # Install
-#
-# export(
-#   EXPORT ${ZKLANG_EXPORT_TARGETS}
-#   FILE ${CMAKE_CURRENT_BINARY_DIR}/${ZKLANG_EXPORT_TARGETS}.cmake
-#   NAMESPACE ZKLANG::)
-# install(
-#   EXPORT ${ZKLANG_EXPORT_TARGETS}
-#   NAMESPACE ZKLANG::
-#   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/zirc)
-#
+
+export(
+  EXPORT ${ZKLANG_EXPORT_TARGETS}
+  FILE ${CMAKE_CURRENT_BINARY_DIR}/${ZKLANG_EXPORT_TARGETS}.cmake
+  NAMESPACE ZKLANG::)
+install(
+  EXPORT ${ZKLANG_EXPORT_TARGETS}
+  NAMESPACE ZKLANG::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/zklang)
+
 # include(CMakePackageConfigHelpers)
 # write_basic_package_version_file(
-#   "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfigVersion.cmake"
+#   "${CMAKE_CURRENT_BINARY_DIR}/ZklangConfigVersion.cmake"
 #   VERSION "${PROJECT_VERSION}"
 #   COMPATIBILITY AnyNewerVersion)
 # configure_package_config_file(
-#   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZKLANGConfig.cmake.in"
-#   "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfig.cmake"
-#   INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/zirc")
-# install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfig.cmake"
-#               "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfigVersion.cmake"
-#         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ZKLANG")
+#   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZklangConfig.cmake.in"
+#   "${CMAKE_CURRENT_BINARY_DIR}/ZklangConfig.cmake"
+#   INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/zklang")
+# install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ZklangConfig.cmake"
+#               "${CMAKE_CURRENT_BINARY_DIR}/ZklangConfigVersion.cmake"
+#         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Zklang")
