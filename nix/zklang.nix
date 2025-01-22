@@ -4,6 +4,7 @@
   # build dependencies
   clang, cmake, ninja,
   mlir, nlohmann_json,
+  llzk, #zirgen,
 
   # test dependencies
   gtest, python3, lit, z3, cvc5
@@ -32,11 +33,8 @@ stdenv.mkDerivation {
       };
 
   nativeBuildInputs = [ clang cmake ninja ];
-  buildInputs = [
-    mlir llzk
-  ] ++ lib.optionals mlir.hasPythonBindings [
-    mlir.python
-    mlir.pythonDeps
+  buildInputs =  [
+    mlir  llzk 
   ];
 
   # cmakeFlags = [

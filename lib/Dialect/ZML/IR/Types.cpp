@@ -1,6 +1,6 @@
-#include "ZirToZkir/Dialect/ZMIR/IR/Types.h"
-#include "ZirToZkir/Dialect/ZMIR/IR/Ops.h"
+#include "zklang/Dialect/ZML/IR/Types.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
+#include "zklang/Dialect/ZML/IR/Ops.h"
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/STLFunctionalExtras.h>
@@ -9,7 +9,7 @@
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
 
-#include "ZirToZkir/Dialect/ZMIR/IR/TypeInterfaces.inc.cpp"
+#include "zklang/Dialect/ZML/IR/TypeInterfaces.inc.cpp"
 
 namespace zkc::Zmir {
 

@@ -9,9 +9,9 @@
     };
 
     llzk = {
-      url = "git+ssh://git@github.com/Veridise/llzk.git?ref=main";
+      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
-    }
+    };
   };
 
   # Custom colored bash prompt
@@ -25,7 +25,7 @@
           enablePythonBindings = true;
         };
 
-        zklang = final.callPackage ./nix/zklang.nix { clang = final.clang_18; };
+        zklang = final.callPackage ./nix/zklang.nix { clang = final.clang_18; llzk = final.llzk; };
 
         # llzkWithPython = final.llzk.override {
         #   mlir = final.mlirWithPython;
@@ -112,6 +112,7 @@
 
               # git-clang-format
               libclang.python
+
             ]);
 
             shellHook = ''
@@ -134,6 +135,7 @@
           overlays = [
             self.overlays.default
             veridise-pkgs.overlays.default
+            llzk.overlays.default
           ];
         };
       in
@@ -144,9 +146,9 @@
           inherit (pkgs) zklang ;
 
           # For debug purposes, expose the MLIR/LLVM packages.
-          inherit (pkgs) libllvm llvm mlir mlirWithPython;
+          inherit (pkgs) libllvm llvm mlir mlirWithPython ;
 
-          default = pkgs.llzk;
+          default = pkgs.zklang;
           # debugClang = pkgs.llzkDebugClang;
           # debugClangCov = pkgs.llzkDebugClangCov;
           # debugGCC = pkgs.llzkDebugGCC;

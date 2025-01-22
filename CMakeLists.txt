@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(
-  ZIRC
+  Zklang
   DESCRIPTION
     "Veridise's ZIR frontend for LLZK"
   VERSION 0.1.0
   HOMEPAGE_URL https://github.com/Veridise/zir-to-zkir) # TODO: Change the repo name
 
-option(ZIRC_TEMPLATE_BACKTRACE_LIMIT
+option(ZKLANG_TEMPLATE_BACKTRACE_LIMIT
        "Add -ftemplate-backtrace-limit=0 to the compile flags")
 
 include(GNUInstallDirs)
@@ -31,12 +31,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS
 
 # Dependency setup
 
+message(STATUS "${CMAKE_MODULE_PATH}")
 find_package(LLVM 18.1 REQUIRED CONFIG)
-find_package(MLIR REQUIRED CONFIG)
-find_package(LLZK REQUIRED CONFIG)
-
 message(STATUS "Using LLVM in: ${LLVM_DIR}")
+find_package(MLIR REQUIRED CONFIG)
 message(STATUS "Using MLIR in: ${MLIR_DIR}")
+find_package(LLZK REQUIRED CONFIG)
 message(STATUS "Using LLZK in: ${LLZK_DIR}")
 
 # Adds an INTERFACE library that only includes headers
@@ -46,11 +46,11 @@ function(add_header_library _name _include_dirs _export_name)
   install(TARGETS ${_name} EXPORT ${_export_name})
 endfunction()
 
-set(ZIRC_EXPORT_TARGETS "ZIRCTargets")
+set(ZKLANG_EXPORT_TARGETS "ZklangTargets")
 # LLVM & MLIR do not propagate their include dirs correctly We define them as
 # INTERFACE libraries and link against them
-add_header_library(LLVMHeaders ${LLVM_INCLUDE_DIRS} ${ZIRC_EXPORT_TARGETS})
-add_header_library(MLIRHeaders ${MLIR_INCLUDE_DIRS} ${ZIRC_EXPORT_TARGETS})
+add_header_library(LLVMHeaders ${LLVM_INCLUDE_DIRS} ${ZKLANG_EXPORT_TARGETS})
+add_header_library(MLIRHeaders ${MLIR_INCLUDE_DIRS} ${ZKLANG_EXPORT_TARGETS})
 
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
@@ -77,25 +77,25 @@ if(CMAKE_CONFIGURATION_TYPES)
   list(REMOVE_DUPLICATES CMAKE_CONFIGURATION_TYPES)
 endif()
 
-set(ZIRC_LIT_COMPATIBLE_COVERAGE
+set(ZKLANG_LIT_COMPATIBLE_COVERAGE
     OFF
     CACHE INTERNAL "")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
-  if(ZIRC_LIT_COMPATIBLE_COVERAGE)
-    message(FATAL_ERROR "Don't manually set ZIRC_LIT_COMPATIBLE_COVERAGE.")
+  if(ZKLANG_LIT_COMPATIBLE_COVERAGE)
+    message(FATAL_ERROR "Don't manually set ZKLANG_LIT_COMPATIBLE_COVERAGE.")
   endif()
   if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     message(STATUS "Adding coverage flags")
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
     add_link_options(-fprofile-instr-generate -fcoverage-mapping)
-    set(ZIRC_LIT_COMPATIBLE_COVERAGE ON)
+    set(ZKLANG_LIT_COMPATIBLE_COVERAGE ON)
     message(
-      STATUS "ZIRC_LIT_COMPATIBLE_COVERAGE=${ZIRC_LIT_COMPATIBLE_COVERAGE}")
+      STATUS "ZKLANG_LIT_COMPATIBLE_COVERAGE=${ZKLANG_LIT_COMPATIBLE_COVERAGE}")
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(WARNING "Gcov reports are not supported by the test environment.")
-    message(WARNING "Set ZIRC_FORCE_GCC_COVERAGE to enable coverage in GCC.")
-    if(ZIRC_FORCE_GCC_COVERAGE)
+    message(WARNING "Set ZKLANG_FORCE_GCC_COVERAGE to enable coverage in GCC.")
+    if(ZKLANG_FORCE_GCC_COVERAGE)
       add_compile_options(--coverage -O0 -g)
       add_link_options(--coverage)
     endif()
@@ -117,7 +117,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
   add_link_options(-fsanitize=address,leak)
 endif()
 
-if(ZIRC_TEMPLATE_BACKTRACE_LIMIT)
+if(ZKLANG_TEMPLATE_BACKTRACE_LIMIT)
   add_compile_options(-ftemplate-backtrace-limit=0)
 endif()
 
@@ -127,12 +127,12 @@ endif()
 # Project files
 
 set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doc")
-set(ZIRC_MLIR_DOC_OUTPUT_DIR "${DOXYGEN_OUTPUT_DIRECTORY}/mlir")
+set(ZKLANG_MLIR_DOC_OUTPUT_DIR "${DOXYGEN_OUTPUT_DIRECTORY}/mlir")
 
 # We need the include dir so we can pass it to mlir-tblgen
-set(ZIRC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+set(ZKLANG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-# include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZIRCMacros.cmake)
+# include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZKLANGMacros.cmake)
 
 # Create an empty list for the dialect libraries, to be populated in the lib
 # subdirectory.
@@ -147,7 +147,7 @@ set(ZIRC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 add_subdirectory(third-party)
 add_subdirectory(include)
 add_subdirectory(lib)
-# add_subdirectory(tools)
+add_subdirectory(tools)
 
 # Documentation
 # add_custom_target(doc)
@@ -180,9 +180,9 @@ add_subdirectory(lib)
 #     "${CMAKE_CURRENT_SOURCE_DIR}/tools/"
 #     "${CMAKE_CURRENT_BINARY_DIR}/include/"
 #     "${CMAKE_CURRENT_SOURCE_DIR}/include/"
-#     "${ZIRC_MLIR_DOC_OUTPUT_DIR}"
+#     "${ZKLANG_MLIR_DOC_OUTPUT_DIR}"
 #     "${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/")
-#   add_dependencies(doxygen ZIRCDialectHeaders LLZKDialectHeaders mlir-doc)
+#   add_dependencies(doxygen ZKLANGDialectHeaders LLZKDialectHeaders mlir-doc)
 #   add_dependencies(doc doxygen)
 # endif()
 
@@ -230,23 +230,23 @@ add_subdirectory(lib)
 # # Install
 #
 # export(
-#   EXPORT ${ZIRC_EXPORT_TARGETS}
-#   FILE ${CMAKE_CURRENT_BINARY_DIR}/${ZIRC_EXPORT_TARGETS}.cmake
-#   NAMESPACE ZIRC::)
+#   EXPORT ${ZKLANG_EXPORT_TARGETS}
+#   FILE ${CMAKE_CURRENT_BINARY_DIR}/${ZKLANG_EXPORT_TARGETS}.cmake
+#   NAMESPACE ZKLANG::)
 # install(
-#   EXPORT ${ZIRC_EXPORT_TARGETS}
-#   NAMESPACE ZIRC::
+#   EXPORT ${ZKLANG_EXPORT_TARGETS}
+#   NAMESPACE ZKLANG::
 #   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/zirc)
 #
 # include(CMakePackageConfigHelpers)
 # write_basic_package_version_file(
-#   "${CMAKE_CURRENT_BINARY_DIR}/ZIRCConfigVersion.cmake"
+#   "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfigVersion.cmake"
 #   VERSION "${PROJECT_VERSION}"
 #   COMPATIBILITY AnyNewerVersion)
 # configure_package_config_file(
-#   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZIRCConfig.cmake.in"
-#   "${CMAKE_CURRENT_BINARY_DIR}/ZIRCConfig.cmake"
+#   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZKLANGConfig.cmake.in"
+#   "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfig.cmake"
 #   INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/zirc")
-# install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ZIRCConfig.cmake"
-#               "${CMAKE_CURRENT_BINARY_DIR}/ZIRCConfigVersion.cmake"
-#         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ZIRC")
+# install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfig.cmake"
+#               "${CMAKE_CURRENT_BINARY_DIR}/ZKLANGConfigVersion.cmake"
+#         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ZKLANG")

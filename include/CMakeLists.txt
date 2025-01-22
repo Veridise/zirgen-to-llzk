@@ -1,6 +1,6 @@
-add_library(ZIRCHeaders INTERFACE)
+add_library(ZklangHeaders INTERFACE)
 target_include_directories(
-  ZIRCHeaders SYSTEM
+  ZklangHeaders SYSTEM
   INTERFACE # headers in this folder's subdirectories
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
             # TableGen'd files
@@ -20,3 +20,5 @@ install(
 
 add_subdirectory(zklang/Dialect/ZHL/Typing)
 add_subdirectory(zklang/Dialect/ZML/IR)
+add_subdirectory(zklang/Dialect/ZML/Transforms)
+add_subdirectory(zklang/Passes)

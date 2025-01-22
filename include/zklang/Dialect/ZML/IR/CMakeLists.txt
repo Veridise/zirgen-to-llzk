@@ -27,4 +27,4 @@ mlir_tablegen(OpInterfaces.cpp.inc -gen-op-interface-defs)
 
 add_public_tablegen_target(ZMLDialectIncGen)
 add_dependencies(mlir-headers ZMLDialectIncGen)
-add_dependencies(ZIRCHeaders ZMLDialectIncGen)
+add_dependencies(ZklangHeaders ZMLDialectIncGen)
