@@ -194,6 +194,7 @@ LogicalResult Driver::run() {
 
   mod->print(llvm::outs());
 
+  mod->erase();
   return success();
 }
 

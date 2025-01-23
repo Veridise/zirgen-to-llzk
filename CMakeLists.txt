@@ -109,15 +109,15 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
   add_compile_options(-O0 -g)
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
+
+# Temporary arrangement for enabling ASAN on the "debug" nix derivations
+if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   # NOTE: undefined behavior sanitizer ("undefined") has been removed due to its
   # poor interaction with gtest fixtures and other standard MLIR/LLVM
   # operations.
-  add_compile_options(-fsanitize=address,leak)
-  add_link_options(-fsanitize=address,leak)
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
 endif()
-   add_compile_options(-fsanitize=address)
-   add_link_options(-fsanitize=address)
 
 if(ZKLANG_TEMPLATE_BACKTRACE_LIMIT)
   add_compile_options(-ftemplate-backtrace-limit=0)
