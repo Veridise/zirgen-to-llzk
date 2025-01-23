@@ -13,6 +13,7 @@ namespace zhl {
 
 class zhl::ZIRTypeAnalysis::Impl {
 public:
+  virtual ~Impl() = default;
   virtual const mlir::FailureOr<TypeBinding> &getType(mlir::Operation *op) const = 0;
   virtual const mlir::FailureOr<TypeBinding> &getType(mlir::Value value) const = 0;
   virtual mlir::FailureOr<TypeBinding> getType(mlir::StringRef name) const = 0;

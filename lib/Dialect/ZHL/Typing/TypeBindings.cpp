@@ -35,6 +35,27 @@ void Params::printParams(llvm::raw_ostream &os, char header, char footer) const 
   print<TypeBinding>(params, os, [&](const auto &e) { e.print(os); }, header, footer);
 }
 
+template <typename Elt>
+void Params::print(
+    const std::vector<Elt> &lst, llvm::raw_ostream &os, std::function<void(const Elt &)> handler,
+    char header, char footer
+) const {
+  if (params.size() == 0) {
+    return; // Don't print anything if there aren't any parameters
+  }
+
+  os << header;
+  size_t c = 1;
+  for (auto &e : lst) {
+    handler(e);
+    if (c < lst.size()) {
+      os << ",";
+    }
+    c++;
+  }
+  os << footer;
+}
+
 TypeBinding Params::getParam(size_t i) const {
   assert(i < params.size());
   return params[i];

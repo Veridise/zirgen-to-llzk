@@ -17,7 +17,9 @@ using namespace zkc::Zmir;
 ComponentBuilder &builtinCommon(ComponentBuilder &builder) { return builder.isBuiltin(); }
 
 ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
-  return builder.fillBody({type}, {type}, [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+  return builder.fillBody(
+      {type}, {type},
+      [type = type](mlir::ValueRange args, mlir::OpBuilder &builder) {
     // Reference to self
     auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), type);
     // Construct Component superType
@@ -36,7 +38,8 @@ ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
     builder.create<ConstrainCallOp>(builder.getUnknownLoc(), super, mlir::ValueRange());
     // Return self
     builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({args[0]}));
-  });
+  }
+  );
 }
 
 template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef name) {

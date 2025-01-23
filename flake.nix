@@ -25,7 +25,15 @@
           enablePythonBindings = true;
         };
 
+        # Default zklang build uses the default compiler for the system (usually gcc for Linux and clang for Macos)
         zklang = final.callPackage ./nix/zklang.nix { clang = final.clang_18; llzk = final.llzk; };
+        # Build in release with symbols mode with a particular compiler. Mostly useful for development and CI
+        zklangClang = (final.zklang.override { stdenv = final.clangStdenv; }).overrideAttrs(attrs: { 
+          cmakeBuildType = "RelWithDebInfo";
+        });
+        zklangGCC = (final.zklang.override { stdenv = final.gccStdenv; }).overrideAttrs(attrs: { 
+          cmakeBuildType = "RelWithDebInfo";
+        });
 
         # llzkWithPython = final.llzk.override {
         #   mlir = final.mlirWithPython;
@@ -149,6 +157,10 @@
           inherit (pkgs) libllvm llvm mlir mlirWithPython llzk ;
 
           default = pkgs.zklang;
+          withClang = pkgs.zklangClang;
+          withGCC = pkgs.zklangGCC;
+
+          
           # debugClang = pkgs.llzkDebugClang;
           # debugClangCov = pkgs.llzkDebugClangCov;
           # debugGCC = pkgs.llzkDebugGCC;

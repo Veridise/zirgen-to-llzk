@@ -116,6 +116,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
   add_compile_options(-fsanitize=address,leak)
   add_link_options(-fsanitize=address,leak)
 endif()
+   add_compile_options(-fsanitize=address)
+   add_link_options(-fsanitize=address)
 
 if(ZKLANG_TEMPLATE_BACKTRACE_LIMIT)
   add_compile_options(-ftemplate-backtrace-limit=0)

@@ -37,7 +37,6 @@ stdenv.mkDerivation {
     mlir  llzk 
   ];
 
-  cmakeBuildType = "RelWithDebInfo";
   # cmakeFlags = [
   #   "-DLLZK_BUILD_DEVTOOLS=ON"
   # ];
