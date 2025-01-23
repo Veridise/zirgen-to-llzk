@@ -21,13 +21,14 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 #include <mlir/Support/LogicalResult.h>
 
 namespace cl = llvm::cl;
 using namespace mlir;
 
 static cl::opt<std::string> inputFilename(
-    cl::Positional, cl::desc("<input zirgen file>"), cl::value_desc("filename"), cl::Required
+    cl::Positional, cl::desc("<input zir file>"), cl::value_desc("filename"), cl::Required
 );
 
 namespace {
@@ -56,6 +57,11 @@ static cl::opt<enum Action> emitAction(
 );
 
 static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::value_desc("path"));
+static cl::opt<std::string>
+    outputFile("o", cl::desc("Where to write the result"), cl::value_desc("path"));
+
+/// A wrapper around the dialect registry that ensures that the required dialects are available
+/// at initialization.
 struct ZirFrontendDialects {
 
   ZirFrontendDialects() {
@@ -68,11 +74,11 @@ struct ZirFrontendDialects {
 
 class Driver {
 public:
-  static FailureOr<std::unique_ptr<Driver>> Make(int &argc, char **&argv);
+  static FailureOr<std::unique_ptr<Driver>> Make(int &argc, char **&argv, llvm::raw_ostream &);
   LogicalResult run();
 
 private:
-  Driver(int &argc, char **&argv);
+  Driver(int &argc, char **&argv, llvm::raw_ostream &dst);
   void openMainFile(std::string);
   zirgen::dsl::ast::Module::Ptr parse();
   std::optional<mlir::ModuleOp> lowerToZhl(zirgen::dsl::ast::Module &);
@@ -84,11 +90,12 @@ private:
   llvm::SourceMgr sourceManager;
   mlir::SourceMgrDiagnosticHandler sourceMgrHandler;
   mlir::PassManager pm;
+  llvm::raw_ostream &dst;
 };
 
-FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv) {
+FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv, llvm::raw_ostream &dst) {
   // Done this way to keep the constructor private
-  std::unique_ptr<Driver> driver(new Driver(argc, argv));
+  std::unique_ptr<Driver> driver(new Driver(argc, argv, dst));
 
   applyDefaultTimingPassManagerCLOptions(driver->pm);
   if (failed(applyPassManagerCLOptions(driver->pm))) {
@@ -99,9 +106,9 @@ FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv) {
   return std::move(driver);
 }
 
-Driver::Driver(int &argc, char **&argv)
+Driver::Driver(int &argc, char **&argv, llvm::raw_ostream &dst)
     : llvm(argc, argv), dialects(), context(dialects.registry), sourceManager{},
-      sourceMgrHandler(sourceManager, &context), pm(&context) {
+      sourceMgrHandler(sourceManager, &context), pm(&context), dst(dst) {
   mlir::registerAsmPrinterCLOptions();
   mlir::registerMLIRContextCLOptions();
   mlir::registerPassManagerCLOptions();
@@ -163,15 +170,26 @@ std::optional<mlir::ModuleOp> Driver::lowerToZhl(zirgen::dsl::ast::Module &mod) 
   return zirgen::dsl::lower(context, sourceManager, &mod);
 }
 
+/// Ensures the module is erased no matter the lowerig result.
+class ModuleEraseGuard {
+public:
+  ModuleEraseGuard(mlir::ModuleOp &op) : mod(op) {}
+  ~ModuleEraseGuard() { mod.erase(); }
+
+private:
+  mlir::ModuleOp mod;
+};
+
 LogicalResult Driver::run() {
   openMainFile(inputFilename);
   sourceManager.setIncludeDirs(includeDirs);
+
   auto ast = parse();
   if (!ast) {
     return failure();
   }
   if (emitAction == Action::PrintAST) {
-    ast->print(llvm::outs());
+    ast->print(dst);
     return success();
   }
 
@@ -179,8 +197,9 @@ LogicalResult Driver::run() {
   if (!mod) {
     return failure();
   }
+  ModuleEraseGuard guard(*mod);
   if (emitAction == Action::PrintZHL) {
-    mod->print(llvm::outs());
+    mod->print(dst);
     return success();
   }
 
@@ -194,7 +213,6 @@ LogicalResult Driver::run() {
 
   mod->print(llvm::outs());
 
-  mod->erase();
   return success();
 }
 
@@ -208,10 +226,42 @@ void Driver::openMainFile(std::string filename) {
   sourceManager.AddNewSourceBuffer(std::move(*fileOrErr), mlir::SMLoc());
 }
 
+// Simple RAII for handling the destination stream
+class Dst {
+public:
+  Dst() : dst(&llvm::outs()) {
+    std::string out = outputFile;
+    if (outputFile.empty()) {
+      std::string base = inputFilename;
+      out = base + ".mlir";
+    }
+    if (out != "-") {
+      dst = new llvm::raw_fd_ostream(out, EC);
+    }
+  }
+  ~Dst() {
+    if (dst != &llvm::outs()) {
+      delete dst;
+    }
+  }
+  const std::error_code &error() { return EC; }
+
+  llvm::raw_ostream &operator*() { return *dst; }
+
+private:
+  std::error_code EC;
+  llvm::raw_ostream *dst;
+};
+
 namespace zklang {
 
 LogicalResult zirDriver(int &argc, char **&argv) {
-  auto driver = Driver::Make(argc, argv);
+  Dst dst;
+  if (dst.error()) {
+    llvm::errs() << "Failed to open output file: " << dst.error().message() << "\n";
+    return failure();
+  }
+  FailureOr<std::unique_ptr<Driver>> driver = Driver::Make(argc, argv, *dst);
   if (failed(driver)) {
     return failure();
   }

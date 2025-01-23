@@ -8,14 +8,18 @@
 #include "zklang/Dialect/ZML/IR/Ops.h"
 #include "zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h"
 #include "zklang/Passes/ConvertZmlToLlzk/Patterns.h"
+#include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/OperationSupport.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Support/LogicalResult.h>
+#include <unordered_set>
 
 using namespace mlir;
 using namespace zkc::Zmir;
@@ -26,7 +30,21 @@ void ConvertZmirToLlzkPass::runOnOperation() {
   auto op = getOperation();
 
   mlir::MLIRContext *ctx = op->getContext();
-  llzk::LLZKTypeConverter typeConverter;
+  std::unordered_set<std::string_view> builtinOverrideSet;
+  mlir::ModuleOp mod = op->getParentOfType<mlir::ModuleOp>();
+  if (mod->hasAttrOfType<mlir::ArrayAttr>("builtinOverrideSet")) {
+    auto attrSet = mod->getAttrOfType<mlir::ArrayAttr>("builtinOverrideSet");
+    std::transform(
+        attrSet.begin(), attrSet.end(), std::inserter(builtinOverrideSet, builtinOverrideSet.end()),
+        [](auto attr) {
+      auto strAttr = mlir::dyn_cast<mlir::StringAttr>(attr);
+      assert(strAttr && "attribute elements in builtinOverrideSet must be strings");
+      return strAttr.getValue();
+    }
+    );
+  }
+  llzk::LLZKTypeConverter typeConverter(builtinOverrideSet);
+
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 
@@ -67,8 +85,20 @@ void ConvertZmirComponentsToLlzkPass::runOnOperation() {
       mlir::StringAttr::get(&getContext(), llzk::LLZKDialect::getDialectNamespace())
   );
 
+  std::unordered_set<std::string_view> builtinOverrideSet;
+  if (mlir::isa<mlir::ModuleOp>(op) && op->hasAttrOfType<mlir::ArrayAttr>("builtinOverrideSet")) {
+    auto attrSet = op->getAttrOfType<mlir::ArrayAttr>("builtinOverrideSet");
+    std::transform(
+        attrSet.begin(), attrSet.end(), std::inserter(builtinOverrideSet, builtinOverrideSet.end()),
+        [](auto attr) {
+      auto strAttr = mlir::dyn_cast<mlir::StringAttr>(attr);
+      assert(strAttr && "attribute elements in builtinOverrideSet must be strings");
+      return strAttr.getValue();
+    }
+    );
+  }
   mlir::MLIRContext *ctx = op->getContext();
-  llzk::LLZKTypeConverter typeConverter;
+  llzk::LLZKTypeConverter typeConverter(builtinOverrideSet);
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 

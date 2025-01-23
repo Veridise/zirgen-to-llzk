@@ -728,6 +728,7 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
 
   if (maybeBuiltin) {
     rewriter.eraseOp(maybeBuiltin);
+    builtinOverriden(op.getName());
   }
   auto comp = builder.build(rewriter);
 

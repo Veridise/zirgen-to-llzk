@@ -15,11 +15,11 @@ namespace zkc::Zmir {
 static int errIdent;
 void errMsg(const TypeBinding &binding, StringRef reason) {
   for (int x = 0; x < errIdent; x++) {
-    llvm::dbgs() << "  ";
+    /*llvm::dbgs() << "  ";*/
   }
-  llvm::dbgs() << "failed to materialize type for ";
-  binding.print(llvm::dbgs());
-  llvm::dbgs() << ": " << reason << "\n";
+  /*llvm::dbgs() << "failed to materialize type for ";*/
+  /*binding.print(llvm::dbgs());*/
+  /*llvm::dbgs() << ": " << reason << "\n";*/
 }
 
 Type inner_materializeTypeBinding(MLIRContext *context, const TypeBinding &binding);
@@ -39,10 +39,10 @@ Type inner_materializeTypeBinding(MLIRContext *context, const TypeBinding &bindi
     std::string s;
     llvm::raw_string_ostream ss(s);
     binding.print(ss);
-    llvm::dbgs() << "              - bind: " << s << "\n";
-    for (auto &se : seen) {
-      llvm::dbgs() << "              - seen: " << se << "\n";
-    }
+    /*llvm::dbgs() << "              - bind: " << s << "\n";*/
+    /*for (auto &se : seen) {*/
+    /*llvm::dbgs() << "              - seen: " << se << "\n";*/
+    /*}*/
     std::unordered_set set(seen.begin(), seen.end());
     assert(set.find(s) == set.end() && "cycle detected");
     seen.push_back(s);
@@ -104,11 +104,11 @@ Type inner_materializeTypeBinding(MLIRContext *context, const TypeBinding &bindi
         );
       }
 
-      return ComponentType::get(context, binding.getName(), superType, params);
+      return ComponentType::get(context, binding.getName(), superType, params, binding.isBuiltin());
     } else if (binding.isConst()) {
       return ComponentType::Val(context);
     } else {
-      return ComponentType::get(context, binding.getName(), superType);
+      return ComponentType::get(context, binding.getName(), superType, binding.isBuiltin());
     }
   };
 
@@ -123,7 +123,7 @@ Type inner_materializeTypeBinding(MLIRContext *context, const TypeBinding &bindi
 
 void spaces(size_t n) {
   for (size_t i = 0; i < n; i++) {
-    llvm::dbgs() << "|  ";
+    /*llvm::dbgs() << "|  ";*/
   }
 }
 
@@ -172,7 +172,7 @@ private:
 LogicalResult
 specializeTypeBinding(MLIRContext *ctx, TypeBinding *dst, ParamsScopeStack &scopes, size_t ident) {
   spaces(ident);
-  scopes.print(llvm::dbgs());
+  /*scopes.print(llvm::dbgs());*/
   // If the destionation is null do nothing
   if (dst == nullptr) {
     return success();
@@ -180,38 +180,38 @@ specializeTypeBinding(MLIRContext *ctx, TypeBinding *dst, ParamsScopeStack &scop
   // If the type binding is a generic param replace it with the actual type.
   if (dst->isGenericParam()) {
     spaces(ident);
-    llvm::dbgs() << "Specializing ";
-    dst->print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    /*llvm::dbgs() << "Specializing ";*/
+    /*dst->print(llvm::dbgs());*/
+    /*llvm::dbgs() << "\n";*/
     auto varName = dst->getGenericParamName();
     auto replacement = scopes[varName];
     if (replacement == nullptr) {
       spaces(ident);
-      llvm::dbgs() << "Failed to convert because " << varName << " was not found\n";
+      /*llvm::dbgs() << "Failed to convert because " << varName << " was not found\n";*/
       return failure();
     }
     spaces(ident);
-    llvm::dbgs() << "Potential replacement ";
-    replacement->print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    /*llvm::dbgs() << "Potential replacement ";*/
+    /*replacement->print(llvm::dbgs());*/
+    /*llvm::dbgs() << "\n";*/
     // If the replacement is the type marker don't do anything
     if (replacement->isTypeMarker()) {
-      spaces(ident);
-      llvm::dbgs() << "Not replaced because there is no actual type to replace with\n";
+      /*spaces(ident);*/
+      /*llvm::dbgs() << "Not replaced because there is no actual type to replace with\n";*/
       return success();
     }
     // If the variable's replacement is a Val that is not constant then we don't do anything.
     if (!replacement->isConst() && replacement->isVal() && dst->getSuperType().isVal()) {
-      spaces(ident);
-      llvm::dbgs() << "Not replaced because there is no actual value to replace with\n";
+      /*spaces(ident);*/
+      /*llvm::dbgs() << "Not replaced because there is no actual value to replace with\n";*/
       return success();
     }
     // Create a copy of the replacement in the destination
     *dst = *replacement;
     spaces(ident);
-    llvm::dbgs() << "Into ";
-    dst->print(llvm::dbgs());
-    llvm::dbgs() << "  (generic)\n";
+    /*llvm::dbgs() << "Into ";*/
+    /*dst->print(llvm::dbgs());*/
+    /*llvm::dbgs() << "  (generic)\n";*/
     return success();
   }
   // If the type is a generic type apply the replacement to its generic parameters
@@ -222,36 +222,36 @@ specializeTypeBinding(MLIRContext *ctx, TypeBinding *dst, ParamsScopeStack &scop
         continue;
       }
       spaces(ident);
-      llvm::dbgs() << "Variable " << name << " binds to ";
-      params[name]->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      /*llvm::dbgs() << "Variable " << name << " binds to ";*/
+      /*params[name]->print(llvm::dbgs());*/
+      /*llvm::dbgs() << "\n";*/
       spaces(ident);
-      llvm::dbgs() << "Specializing variable " << name;
+      /*llvm::dbgs() << "Specializing variable " << name;*/
       auto replacement = scopes[name];
       // Fail the materialization if the name was not found. A well typed program should not have
       // this issue.
       if (replacement == nullptr) {
-        llvm::dbgs() << " failed to convert because " << name << " was not found\n";
+        /*llvm::dbgs() << " failed to convert because " << name << " was not found\n";*/
         return failure();
       }
 
       // If the replacement is the type marker don't do anything
       if (replacement->isTypeMarker()) {
-        llvm::dbgs() << " was not replaced because there is no actual type to replace with\n";
+        /*llvm::dbgs() << " was not replaced because there is no actual type to replace with\n";*/
         continue;
       }
 
       // If the variable's replacement is a Val that is not constant then we don't do anything.
       // This applies to the variables whose parent is of Val type
       if (!replacement->isConst() && replacement->isVal() && params[name]->getSuperType().isVal()) {
-        llvm::dbgs() << " was not replaced because there is no actual value to replace with\n";
+        /*llvm::dbgs() << " was not replaced because there is no actual value to replace with\n";*/
         continue;
       }
       // Create a copy of the actual type
       auto copy = *replacement;
-      llvm::dbgs() << " replaced with ";
-      copy.print(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      /*llvm::dbgs() << " replaced with ";*/
+      /*copy.print(llvm::dbgs());*/
+      /*llvm::dbgs() << "\n";*/
       // And specialize it
       /*auto result = success();*/
       auto &newScope = copy.getGenericParamsMapping();
@@ -260,14 +260,14 @@ specializeTypeBinding(MLIRContext *ctx, TypeBinding *dst, ParamsScopeStack &scop
         auto result = specializeTypeBinding(ctx, &copy, scopes, ident + 1);
         if (failed(result)) {
           spaces(ident);
-          llvm::dbgs() << "Failure\n";
+          /*llvm::dbgs() << "Failure\n";*/
           return failure();
         }
       }
       spaces(ident);
-      llvm::dbgs() << "Into ";
-      copy.print(llvm::dbgs());
-      llvm::dbgs() << "  (param)\n";
+      /*llvm::dbgs() << "Into ";*/
+      /*copy.print(llvm::dbgs());*/
+      /*llvm::dbgs() << "  (param)\n";*/
       // Replace the type binding with the specialization we just generated.
       dst->replaceGenericParamByName(name, copy);
     }
@@ -275,16 +275,16 @@ specializeTypeBinding(MLIRContext *ctx, TypeBinding *dst, ParamsScopeStack &scop
     if (dst->hasSuperType()) {
       auto &superTypeScope = dst->getSuperType().getGenericParamsMapping();
       spaces(ident);
-      llvm::dbgs() << "Specializing super type ";
-      dst->getSuperType().print(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      /*llvm::dbgs() << "Specializing super type ";*/
+      /*dst->getSuperType().print(llvm::dbgs());*/
+      /*llvm::dbgs() << "\n";*/
       {
         TypeBinding copy = dst->getSuperType();
         ScopeGuard guard(scopes, superTypeScope);
         auto superTypeResult = specializeTypeBinding(ctx, &copy, scopes, ident + 1);
         if (failed(superTypeResult)) {
           spaces(ident);
-          llvm::dbgs() << "Failure\n";
+          /*llvm::dbgs() << "Failure\n";*/
           return failure();
         }
         if (!copy.isTypeMarker()) {
@@ -292,16 +292,16 @@ specializeTypeBinding(MLIRContext *ctx, TypeBinding *dst, ParamsScopeStack &scop
         }
       }
       spaces(ident);
-      llvm::dbgs() << "Into ";
-      dst->getSuperType().print(llvm::dbgs());
-      llvm::dbgs() << "  (super type)\n";
+      /*llvm::dbgs() << "Into ";*/
+      /*dst->getSuperType().print(llvm::dbgs());*/
+      /*llvm::dbgs() << "  (super type)\n";*/
     }
     return success();
   }
 
   // Do nothing in the other cases.
   spaces(ident);
-  llvm::dbgs() << "Nothing\n";
+  /*llvm::dbgs() << "Nothing\n";*/
   return success();
 }
 
@@ -338,29 +338,29 @@ FunctionType materializeTypeBindingConstructor(OpBuilder &builder, const TypeBin
   std::vector<Type> args;
   auto retType = specializeAndMaterializeTypeBinding(builder.getContext(), binding, genericParams);
   if (!retType) {
-    llvm::dbgs() << "failed to materialize the return type for ";
-    binding.print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    /*llvm::dbgs() << "failed to materialize the return type for ";*/
+    /*binding.print(llvm::dbgs());*/
+    /*llvm::dbgs() << "\n";*/
     return nullptr;
   }
 
-  llvm::dbgs() << "For binding ";
-  binding.print(llvm::dbgs());
-  llvm::dbgs() << " constructor types are: \n";
+  /*llvm::dbgs() << "For binding ";*/
+  /*binding.print(llvm::dbgs());*/
+  /*llvm::dbgs() << " constructor types are: \n";*/
   auto &params = binding.getConstructorParams();
   std::transform(params.begin(), params.end(), std::back_inserter(args), [&](auto &argBinding) {
-    llvm::dbgs() << "|  ";
-    argBinding.print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    /*llvm::dbgs() << "|  ";*/
+    /*argBinding.print(llvm::dbgs());*/
+    /*llvm::dbgs() << "\n";*/
     auto materializedType =
         specializeAndMaterializeTypeBinding(builder.getContext(), argBinding, genericParams);
-    llvm::dbgs() << "Materialized to " << materializedType << "\n";
+    /*llvm::dbgs() << "Materialized to " << materializedType << "\n";*/
     return materializedType;
   });
   if (std::any_of(args.begin(), args.end(), [](Type t) { return !t; })) {
-    llvm::dbgs() << "failed to materialize an argument type for ";
-    binding.print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    /*llvm::dbgs() << "failed to materialize an argument type for ";*/
+    /*binding.print(llvm::dbgs());*/
+    /*llvm::dbgs() << "\n";*/
     return nullptr;
   }
 

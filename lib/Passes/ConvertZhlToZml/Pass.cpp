@@ -14,9 +14,11 @@
 #include <llvm/Support/Debug.h>
 #include <memory>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/OperationSupport.h>
 #include <mlir/Pass/Pass.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 
 using namespace mlir;
@@ -29,23 +31,25 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZhlToZmirPass() {
 
 void ConvertZhlToZmirPass::runOnOperation() {
   auto &typeAnalysis = getAnalysis<zhl::ZIRTypeAnalysis>();
+  mlir::SmallVector<mlir::Attribute> builtinOverrideSet;
   mlir::ModuleOp module = getOperation();
   mlir::MLIRContext *ctx = module->getContext();
 
   // Init patterns for this transformation
   Zmir::ZMIRTypeConverter typeConverter;
-  /*mlir::TypeConverter typeConverter;*/
-  /*typeConverter.addConversion([](Type t) { return t; });*/
   mlir::RewritePatternSet patterns(ctx);
   patterns.add<
-      ZhlGlobalRemoval, ZhlCompToZmirCompPattern, ZhlDefineLowering, ZhlParameterLowering,
-      ZhlConstructLowering, ZhlExternLowering, ZhlLiteralLowering, ZhlDeclarationRemoval,
-      ZhlSuperLoweringInFunc, ZhlConstrainLowering, ZhlLookupLowering, ZhlArrayLowering,
-      ZhlSubscriptLowering, ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap,
-      ZhlLiteralStrLowering, ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval,
-      ZhlSpecializeRemoval, ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch>(
+      ZhlGlobalRemoval, ZhlDefineLowering, ZhlParameterLowering, ZhlConstructLowering,
+      ZhlExternLowering, ZhlLiteralLowering, ZhlDeclarationRemoval, ZhlSuperLoweringInFunc,
+      ZhlConstrainLowering, ZhlLookupLowering, ZhlArrayLowering, ZhlSubscriptLowering,
+      ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
+      ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
+      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch>(
       typeAnalysis, typeConverter, ctx
   );
+  patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
+    builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
+  }, typeAnalysis, typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
@@ -66,7 +70,9 @@ void ConvertZhlToZmirPass::runOnOperation() {
   if (mlir::failed(mlir::applyFullConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
   }
-  markAnalysesPreserved<zhl::ZIRTypeAnalysis>();
+  if (!builtinOverrideSet.empty()) {
+    module->setAttr("builtinOverrideSet", mlir::ArrayAttr::get(ctx, builtinOverrideSet));
+  }
 }
 
 } // namespace zkc

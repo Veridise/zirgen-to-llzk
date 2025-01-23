@@ -229,11 +229,19 @@ public:
 
 class ZhlCompToZmirCompPattern : public ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp> {
 public:
-  using ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp>::ZhlOpLoweringPattern;
+  /*using ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp>::ZhlOpLoweringPattern;*/
+
+  template <typename... Args>
+  ZhlCompToZmirCompPattern(std::function<void(mlir::StringRef)> delegate, Args &&...args)
+      : ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp>(std::forward<Args>(args)...),
+        builtinOverriden(delegate) {}
 
   mlir::LogicalResult matchAndRewrite(
       zirgen::Zhl::ComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
   ) const override;
+
+private:
+  std::function<void(mlir::StringRef)> builtinOverriden;
 };
 
 class ZhlRangeOpLowering : public ZhlOpLoweringPattern<zirgen::Zhl::RangeOp> {

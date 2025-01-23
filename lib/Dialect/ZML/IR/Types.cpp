@@ -53,11 +53,12 @@ mlir::LogicalResult checkValidTypeParam(
 
 mlir::LogicalResult ComponentType::verify(
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError, ::mlir::FlatSymbolRefAttr name,
-    mlir::Type superType, ::llvm::ArrayRef<::mlir::Attribute> params
+    mlir::Type superType, ::llvm::ArrayRef<::mlir::Attribute> params, bool builtin
 ) {
   if (!superType && name.getValue() != "Component") {
     return emitError() << "malformed IR: super type for " << name << " cannot be null";
   }
+  // TODO: Maybe add a check that ensures that only known builtins can have the flag set to true?
   if (superType) {
     if (!mlir::isa<ComponentType, TypeVarType>(superType)) {
       return emitError() << "unexpected type " << superType;

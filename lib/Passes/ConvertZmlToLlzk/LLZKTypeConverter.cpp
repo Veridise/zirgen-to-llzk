@@ -3,6 +3,9 @@
 #include "llzk/Dialect/LLZK/IR/Types.h"
 #include "zklang/Dialect/ZML/IR/Ops.h"
 #include "zklang/Dialect/ZML/IR/Types.h"
+#include <algorithm>
+#include <iterator>
+#include <llvm/Support/FileSystem.h>
 #include <mlir/IR/BuiltinOps.h>
 
 using namespace zkc::Zmir;
@@ -56,12 +59,14 @@ mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   return sym;
 }
 
-llzk::LLZKTypeConverter::LLZKTypeConverter()
+llzk::LLZKTypeConverter::LLZKTypeConverter(std::unordered_set<std::string_view> builtinOverrideSet)
     : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv"}) {
+
   addConversion([](mlir::Type t) { return t; });
 
   addConversion([&](Zmir::ComponentType t) -> mlir::Type {
-    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end()) {
+    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
+        t.getBuiltin()) {
       return llzk::FeltType::get(t.getContext());
     }
     if (t.getName().getValue() == "String") {

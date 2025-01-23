@@ -68,8 +68,10 @@ Params::ParamsList::const_iterator Params::begin() const { return params.begin()
 Params::ParamsList::iterator Params::end() { return params.end(); }
 Params::ParamsList::const_iterator Params::end() const { return params.end(); }
 
-TypeBinding::TypeBinding(uint64_t value, mlir::Location loc, const TypeBindings &bindings)
-    : name(CONST), loc(loc), constVal(value),
+TypeBinding::TypeBinding(
+    uint64_t value, mlir::Location loc, const TypeBindings &bindings, bool isBuiltin
+)
+    : builtin(isBuiltin), name(CONST), loc(loc), constVal(value),
       superType(&const_cast<TypeBinding &>(bindings.Get("Val"))) {}
 
 TypeBinding TypeBinding::WithUpdatedLocation(mlir::Location loc) const {
@@ -123,24 +125,24 @@ TypeBinding::getMember(StringRef name, std::function<mlir::InFlightDiagnostic()>
 
 zhl::TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-    ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members
+    ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members, bool isBuiltin
 )
-    : name(name), loc(loc), superType(&const_cast<TypeBinding &>(superType)), members(members),
-      genericParams(t_genericParams), constructorParams(t_constructorParams) {}
+    : builtin(isBuiltin), name(name), loc(loc), superType(&const_cast<TypeBinding &>(superType)),
+      members(members), genericParams(t_genericParams), constructorParams(t_constructorParams) {}
 
 zhl::TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-    ParamsMap t_genericParams
+    ParamsMap t_genericParams, bool isBuiltin
 )
-    : TypeBinding(name, loc, superType, t_genericParams, {}, {}) {}
+    : TypeBinding(name, loc, superType, t_genericParams, {}, {}, isBuiltin) {}
 
 zhl::TypeBinding::TypeBinding(
-    llvm::StringRef name, mlir::Location loc, const TypeBinding &superType
+    llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, bool isBuiltin
 )
-    : TypeBinding(name, loc, superType, {}, {}, {}) {}
+    : TypeBinding(name, loc, superType, {}, {}, {}, isBuiltin) {}
 
 zhl::TypeBinding::TypeBinding(mlir::Location loc)
-    : name("Component"), loc(loc), superType(nullptr) {}
+    : builtin(true), name("Component"), loc(loc), superType(nullptr) {}
 zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
     print(llvm::dbgs());
@@ -273,6 +275,8 @@ bool zhl::TypeBinding::isArray() const {
   return name == "Array" || (hasSuperType() && getSuperType().isArray());
 }
 
+bool zhl::TypeBinding::isBuiltin() const { return builtin; }
+
 bool zhl::TypeBinding::isConst() const { return name == CONST; }
 
 bool TypeBinding::isGeneric() const { return genericParams.size() > 0; }
@@ -313,7 +317,7 @@ zhl::TypeBindings::Array(TypeBinding type, uint64_t size, mlir::Location loc) co
   zhl::ParamsMap arrayGenericParams;
   arrayGenericParams.insert({{"T", 0}, type});
   arrayGenericParams.insert({{"N", 1}, Const(size)});
-  TypeBinding array("Array", loc, Component(), arrayGenericParams);
+  TypeBinding array("Array", loc, Component(), arrayGenericParams, true);
   array.specialized = true;
   return array;
 }
@@ -324,7 +328,7 @@ zhl::TypeBinding zhl::TypeBindings::UnkArray(TypeBinding type, mlir::Location lo
   zhl::ParamsMap arrayGenericParams;
   arrayGenericParams.insert({{"T", 0}, type});
   arrayGenericParams.insert({{"N", 1}, UnkConst()});
-  TypeBinding array("Array", loc, Component(), arrayGenericParams);
+  TypeBinding array("Array", loc, Component(), arrayGenericParams, true);
   array.specialized = true;
   return array;
 }

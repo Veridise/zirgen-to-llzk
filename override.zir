@@ -1,0 +1,3 @@
+component Add(x: Val, y: Val) {
+  x * y
+}

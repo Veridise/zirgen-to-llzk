@@ -44,7 +44,7 @@ ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
 
 template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef name) {
   auto superType = ComponentType::Val(builder.getContext());
-  auto componentType = ComponentType::get(builder.getContext(), name, superType);
+  auto componentType = ComponentType::get(builder.getContext(), name, superType, true);
 
   builtinCommon(ComponentBuilder()
                     .name(name)
@@ -67,7 +67,7 @@ template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef
 
 template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringRef name) {
   auto superType = ComponentType::Val(builder.getContext());
-  auto componentType = ComponentType::get(builder.getContext(), name, superType);
+  auto componentType = ComponentType::get(builder.getContext(), name, superType, true);
 
   builtinCommon(ComponentBuilder()
                     .name(name)
@@ -90,7 +90,7 @@ template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringR
 
 void addInRange(mlir::OpBuilder &builder) {
   auto superType = ComponentType::Val(builder.getContext());
-  auto componentType = ComponentType::get(builder.getContext(), "InRange", superType);
+  auto componentType = ComponentType::get(builder.getContext(), "InRange", superType, true);
 
   builtinCommon(ComponentBuilder()
                     .name("InRange")
@@ -130,7 +130,7 @@ void addComponent(mlir::OpBuilder &builder) {
 
 void addNondetReg(mlir::OpBuilder &builder) {
   auto superType = ComponentType::Val(builder.getContext());
-  auto componentType = ComponentType::get(builder.getContext(), "NondetReg", superType);
+  auto componentType = ComponentType::get(builder.getContext(), "NondetReg", superType, true);
 
   builtinCommon(ComponentBuilder()
                     .name("NondetReg")
@@ -153,7 +153,7 @@ void addNondetReg(mlir::OpBuilder &builder) {
 
 void addTrivial(mlir::OpBuilder &builder, mlir::StringRef name) {
   auto superType = ComponentType::Component(builder.getContext());
-  auto componentType = ComponentType::get(builder.getContext(), name, superType);
+  auto componentType = ComponentType::get(builder.getContext(), name, superType, true);
 
   selfConstructs(
       builtinCommon(ComponentBuilder().name(name).field("$super", superType)
@@ -183,57 +183,57 @@ void addArrayComponent(mlir::OpBuilder &builder) {
 void zkc::Zmir::addBuiltinBindings(
     zhl::TypeBindings &bindings, const std::unordered_set<std::string_view> &definedNames
 ) {
-  auto &Val = bindings.Create("Val", bindings.Component());
+  auto &Val = bindings.CreateBuiltin("Val", bindings.Component());
   const_cast<zhl::TypeBinding &>(Val).selfConstructs();
   MAYBE("String") {
-    auto &String = bindings.Create("String", bindings.Component());
+    auto &String = bindings.CreateBuiltin("String", bindings.Component());
     const_cast<zhl::TypeBinding &>(String).selfConstructs();
   }
-  auto &Type = bindings.Create("Type", bindings.Component());
+  auto &Type = bindings.CreateBuiltin("Type", bindings.Component());
 
   MAYBE("NondetReg")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "NondetReg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
   MAYBE("InRange")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "InRange", Val, zhl::ParamsMap(),
       zhl::ParamsMap({{{"low", 0}, Val}, {{"mid", 1}, Val}, {{"high", 2}, Val}}), zhl::MembersMap()
   );
   MAYBE("BitAnd")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "BitAnd", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
   MAYBE("Add")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "Add", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
   MAYBE("Sub")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "Sub", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
   MAYBE("Mul")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "Mul", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
   MAYBE("Inv")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "Inv", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
   MAYBE("Isz")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "Isz", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
   MAYBE("Neg")
-  bindings.Create(
+  bindings.CreateBuiltin(
       "Neg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
   MAYBE("Array") {
-    auto &Array = bindings.Create(
+    auto &Array = bindings.CreateBuiltin(
         "Array", bindings.Component(), zhl::ParamsMap({{{"T", 0}, Type}, {{"N", 1}, Val}})
     );
     const_cast<zhl::TypeBinding &>(Array).selfConstructs();

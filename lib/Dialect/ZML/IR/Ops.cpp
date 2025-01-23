@@ -134,10 +134,10 @@ template <typename CompOp> mlir::Type getType(CompOp &op) {
   if (op.getParams().has_value()) {
     auto params = *op.getParams();
     return ComponentType::get(
-        op.getContext(), op.getSymName(), getSuperType(op), params.getValue()
+        op.getContext(), op.getSymName(), getSuperType(op), params.getValue(), op.getBuiltin()
     );
   } else {
-    return ComponentType::get(op.getContext(), op.getSymName(), getSuperType(op));
+    return ComponentType::get(op.getContext(), op.getSymName(), getSuperType(op), op.getBuiltin());
   }
 }
 

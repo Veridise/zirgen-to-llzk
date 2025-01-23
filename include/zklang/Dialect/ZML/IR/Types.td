@@ -33,8 +33,9 @@ def Component : ZmirType<"Component", ""> {
   let summary = "component type";
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name,
       OptionalParameter<"mlir::Type">:$superType,
-      OptionalArrayRefParameter<"::mlir::Attribute">:$params);
-  let assemblyFormat = [{$name (`<` $params^ `>`)?(`:``>`$superType^)?}];
+      OptionalArrayRefParameter<"::mlir::Attribute">:$params, "bool":$builtin);
+  let assemblyFormat = [{
+  $name $builtin (`<` $params^ `>`)?(`:``>`$superType^)?  }];
 
   let extraClassDeclaration = [{
 
@@ -51,31 +52,33 @@ def Component : ZmirType<"Component", ""> {
 
     static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
     static ComponentType Component(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
-    static ComponentType Val(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "Val", Component(ctx)); }
-    static ComponentType String(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "String", Component(ctx)); }
+    static ComponentType Val(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "Val", Component(ctx), true); }
+    static ComponentType String(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "String", Component(ctx), true); }
     static ComponentType Array(mlir::MLIRContext *ctx) { 
       auto symT = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx, "T"));
       auto sizeVar = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx, "N"));
-      return ComponentType::get(ctx, "Array", Component(ctx), {symT, sizeVar});
+      return ComponentType::get(ctx, "Array", Component(ctx), {symT, sizeVar}, true);
     }
     static ComponentType Array(mlir::MLIRContext *ctx, Type inner, uint64_t size) { 
       auto innerAttr = mlir::TypeAttr::get(inner);
       auto sizeAttr = mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 64), size);
-      return ComponentType::get(ctx, "Array", Component(ctx), {innerAttr, sizeAttr});
+      return ComponentType::get(ctx, "Array", Component(ctx), {innerAttr, sizeAttr}, true);
     }
   }];
 
-  let builders =
-      [TypeBuilder<(ins "::llvm::StringRef":$name, "Type":$superType,
-                       "::llvm::ArrayRef<::mlir::Attribute>":$params),
-                   [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, params);
+  let builders = [TypeBuilder<(ins "::llvm::StringRef":$name, "Type":$superType,
+                                  "::llvm::ArrayRef<::mlir::Attribute>":$params,
+                                  "bool":$builtin),
+                              [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, params, builtin);
   }]>,
-       TypeBuilder<(ins), [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, "Component")), nullptr, std::nullopt);
+                  TypeBuilder<(ins), [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, "Component")), nullptr, std::nullopt, true);
   }]>,
-       TypeBuilder<(ins "::llvm::StringRef":$name, "Type":$superType), [{
-      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, std::nullopt);
+                  TypeBuilder<(ins "::llvm::StringRef":$name, "Type":$superType,
+                                  "bool":$builtin),
+                              [{
+      return Base::get($_ctxt, mlir::SymbolRefAttr::get(mlir::StringAttr::get($_ctxt, name)), superType, std::nullopt, builtin);
     }]>];
 
   let genVerifyDecl = 1;

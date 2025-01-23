@@ -13,7 +13,6 @@ DEST=../risc0_v2_circuit_build_results/$(date +%Y-%m-%d-%H-%M)
 # BAZELFLAGS=--local_resources=cpu='HOST_CPUS*0.5' 
 BAZELFLAGS= 
 ZKLANG_FLAGS=
-DERIVATION='.?submodules=1#withGCC'
 
 mkdir -p $DEST
 
@@ -27,7 +26,7 @@ function zir_files {
 }
 
 function build_zklang {
-  nix build "$DERIVATION"
+  bazel build $BAZELFLAGS //zklang:zklang  
 }
 
 function build_zir {
@@ -38,7 +37,7 @@ function build_zir {
   stderr=$DEST/$name.stderr
   errcode=$DEST/$name.errcode
   echo "[=] Building $name..."
-  nix run "$DERIVATION" -- -o $mlir_out $zir $ZKLANG_FLAGS > $stdout 2> $stderr
+  bazel run $BAZELFLAGS //zklang:zklang -- -o $mlir_out $zir $ZKLANG_FLAGS > $stdout 2> $stderr #&
   # tail -F $stderr --pid=$!
   echo $? > $errcode
   echo " ============= $name =============="

@@ -184,6 +184,7 @@ public:
   bool isConst() const;
   bool isGeneric() const;
   bool isGenericParam() const;
+  bool isBuiltin() const;
   /// Returns true if the type is not generic or has an specialization of its generic parameters
   bool isSpecialized() const;
   bool isVariadic() const;
@@ -219,16 +220,21 @@ public:
   TypeBinding &operator=(const TypeBinding &) = default;
   TypeBinding &operator=(TypeBinding &&) = default;
   TypeBinding(mlir::Location);
-  TypeBinding(llvm::StringRef name, mlir::Location loc, const TypeBinding &superType);
   TypeBinding(
-      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-      ParamsMap t_genericParams
+      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, bool isBuiltin = false
   );
   TypeBinding(
       llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-      ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members
+      ParamsMap t_genericParams, bool isBuiltin = false
   );
-  TypeBinding(uint64_t value, mlir::Location loc, const TypeBindings &bindings);
+  TypeBinding(
+      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
+      ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members,
+      bool isBuiltin = false
+  );
+  TypeBinding(
+      uint64_t value, mlir::Location loc, const TypeBindings &bindings, bool isBuiltin = false
+  );
   TypeBinding WithUpdatedLocation(mlir::Location loc) const;
 
   static TypeBinding WrapVariadic(const TypeBinding &t);
@@ -242,6 +248,7 @@ private:
   bool variadic = false;
   bool specialized = false;
   bool selfConstructor = false;
+  bool builtin = false;
   llvm::StringRef name;
   mlir::Location loc;
   std::optional<uint64_t> constVal;
@@ -283,6 +290,19 @@ public:
 
   template <typename... Args> const TypeBinding &Create(std::string_view name, Args &&...args) {
     return Create(name, unk, std::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  const TypeBinding &CreateBuiltin(std::string_view name, mlir::Location loc, Args &&...args) {
+    llvm::dbgs() << "Creating binding with name " << name << "\n";
+    assert(bindings.find(name) == bindings.end() && "double binding write");
+    bindings.emplace(name, TypeBinding(name, loc, std::forward<Args>(args)..., true));
+    return bindings.at(name);
+  }
+
+  template <typename... Args>
+  const TypeBinding &CreateBuiltin(std::string_view name, Args &&...args) {
+    return CreateBuiltin(name, unk, std::forward<Args>(args)...);
   }
 
   [[nodiscard]] const TypeBinding &Get(std::string_view name) const;
