@@ -1,0 +1,7 @@
+component A() {
+  b := B();
+}
+
+component B<T: Type>() {
+  x := 1;
+}
