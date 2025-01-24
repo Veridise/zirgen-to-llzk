@@ -38,7 +38,7 @@ function build_zir {
   stderr=$DEST/$name.stderr
   errcode=$DEST/$name.errcode
   echo "[=] Building $name..."
-  nix run "$DERIVATION" -- -o $mlir_out $zir $ZKLANG_FLAGS > $stdout 2> $stderr
+  nix run "$DERIVATION" -- -o $mlir_out -I $CIRCUIT_PATH $zir $ZKLANG_FLAGS > $stdout 2> $stderr
   # tail -F $stderr --pid=$!
   echo $? > $errcode
   echo " ============= $name =============="

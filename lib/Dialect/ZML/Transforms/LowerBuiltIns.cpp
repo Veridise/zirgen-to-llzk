@@ -67,7 +67,7 @@ public:
       func::CallIndirectOp op,
       typename OpConversionPattern<func::CallIndirectOp>::OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter
-  ) const {
+  ) const override {
     auto name = getCallIndirectName(op);
     if (mlir::failed(name)) {
       return name;
@@ -92,7 +92,7 @@ public:
 
   LogicalResult matchAndRewrite(
       ConstructorRefOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-  ) const {
+  ) const override {
     if (isLegalConstructRefOp(op)) {
       return mlir::failure();
     }

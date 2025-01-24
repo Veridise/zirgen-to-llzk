@@ -106,21 +106,36 @@ mlir::LogicalResult zhl::TypeBinding::subtypeOf(const TypeBinding &other) const 
 
 inline bool isPrivate(StringRef name) { return name.starts_with("_"); }
 
+/// Locates the member in the inheritance chain. A component lower in the chain will shadow members
+/// in components higher in the chain.
+/// Returns failure if it was not found.
+/// If it was found but it couldn't get typechecked returns success wrapping a nullopt.
+FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef name) const {
+  if (members.find(name) != members.end()) {
+    return members.at(name);
+  }
+  if (superType != nullptr) {
+    return superType->locateMember(name);
+  }
+  return failure();
+}
+
 FailureOr<TypeBinding>
 TypeBinding::getMember(StringRef name, std::function<mlir::InFlightDiagnostic()> emitError) const {
-  if (members.find(name) == members.end()) {
+  auto memberLookupRes = locateMember(name);
+  if (failed(memberLookupRes)) {
     return emitError() << "member " << getName() << "." << name << " was not found";
   }
+  // We check this after ensuring the member exists to give a more accurate error message
   if (isPrivate(name)) {
     return emitError() << "member " << getName() << "." << name
                        << " is private and cannot be accessed";
   }
-  auto member = members.at(name);
-  if (!member.has_value()) {
+  if (!memberLookupRes->has_value()) {
     return emitError() << "internal error: could not deduce the type of member " << getName() << "."
                        << name;
   }
-  return *member;
+  return **memberLookupRes;
 }
 
 zhl::TypeBinding::TypeBinding(

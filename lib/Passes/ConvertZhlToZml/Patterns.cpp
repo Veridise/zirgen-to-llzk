@@ -584,23 +584,56 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
 mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  /*auto comp = findTypeInUseDefChain(adaptor.getComponent(), getTypeConverter());*/
   auto comp = adaptor.getComponent();
   auto originalComp = getType(op.getComponent());
   if (mlir::failed(originalComp)) {
     return op->emitOpError() << "failed to type check component reference";
   }
-  auto compType = Zmir::materializeTypeBinding(getContext(), *originalComp);
+  auto materializedType = Zmir::materializeTypeBinding(getContext(), *originalComp);
+  auto compType = mlir::dyn_cast<Zmir::ComponentType>(materializedType);
+  if (!compType) {
+    return op->emitError() << "type mismatch, cannot access a member for a non-component type "
+                           << materializedType;
+  }
   if (comp.getType() != compType) {
     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
     comp = cast.getResult(0);
   }
+  mlir::SymbolTableCollection st;
+  auto mod = op->getParentOfType<mlir::ModuleOp>();
+  auto compDef = compType.getDefinition(st, mod);
+  assert(compDef && "Component type without a definition!");
+
+  auto nameSym = mlir::SymbolRefAttr::get(adaptor.getMemberAttr());
+  while (mlir::failed(compDef.lookupFieldType(nameSym))) {
+    auto superType = compType.getSuperType();
+    if (!superType) {
+      return op->emitError() << "member " << adaptor.getMember() << " was not found";
+    }
+    compType = mlir::dyn_cast<Zmir::ComponentType>(superType);
+    if (!compType) {
+      return op->emitError() << "type mismatch, cannot access a member for a non-component type "
+                             << superType;
+    }
+
+    compDef = compType.getDefinition(st, mod);
+  }
+
+  auto fieldType = compDef.lookupFieldType(nameSym);
+  assert(mlir::succeeded(fieldType));
 
   auto binding = getType(op);
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
   auto bindingType = Zmir::materializeTypeBinding(getContext(), *binding);
+  if (*fieldType != bindingType) {
+    return op->emitError() << "type mismatch, was expecting " << bindingType << " but field "
+                           << adaptor.getMember() << " is of type " << *fieldType;
+  }
+
+  // Coerce to the type in the chain that defines the accessed member
+  comp = rewriter.create<Zmir::SuperCoerceOp>(op.getLoc(), compType, comp);
 
   rewriter.replaceOpWithNewOp<Zmir::ReadFieldOp>(op, bindingType, comp, adaptor.getMember());
   return mlir::success();

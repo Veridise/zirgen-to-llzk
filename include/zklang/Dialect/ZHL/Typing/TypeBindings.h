@@ -245,6 +245,8 @@ public:
   void selfConstructs();
 
 private:
+  mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
+
   bool variadic = false;
   bool specialized = false;
   bool selfConstructor = false;
