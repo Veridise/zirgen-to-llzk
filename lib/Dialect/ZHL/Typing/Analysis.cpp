@@ -9,6 +9,8 @@
 #include <mlir/Support/LogicalResult.h>
 #include <unordered_set>
 
+using namespace mlir;
+
 namespace zhl {
 
 class zhl::ZIRTypeAnalysis::Impl {
@@ -50,33 +52,58 @@ private:
 class ConcreteImpl : public zhl::ZIRTypeAnalysis::Impl {
 public:
   explicit ConcreteImpl(mlir::ModuleOp module, mlir::OpBuilder &builder)
-      : typeBindings(builder), opBindings(nullptr) {
+      : typeBindings(builder), failureRef(failure()), opBindings(nullptr) {
     std::unordered_set<std::string_view> definedNames;
     for (auto op : module.getOps<zirgen::Zhl::ComponentOp>()) {
       definedNames.insert(op.getName());
     }
     zkc::Zmir::addBuiltinBindings(typeBindings, definedNames);
-    opBindings = typeCheck(module, typeBindings, zhlTypingRules(typeBindings));
+    auto opBindingsResult = typeCheck(module, typeBindings, zhlTypingRules(typeBindings));
+    if (failed(opBindingsResult)) {
+      typeCheckingFailed = true;
+    } else {
+      opBindings = std::move(*opBindingsResult);
+    }
   }
 
   const mlir::FailureOr<TypeBinding> &getType(mlir::Operation *op) const final {
+    if (typeCheckingFailed) {
+      return failureRef;
+    }
     return opBindings->get(op);
   }
 
   const mlir::FailureOr<TypeBinding> &getType(mlir::Value value) const final {
+    if (typeCheckingFailed) {
+      return failureRef;
+    }
     return opBindings->getValue(value);
   }
 
   mlir::FailureOr<TypeBinding> getType(mlir::StringRef name) const final {
+    if (typeCheckingFailed) {
+      return failureRef;
+    }
     return typeBindings.MaybeGet(name);
   }
 
-  void print(llvm::raw_ostream &os) const final { opBindings->print(os); }
+  void print(llvm::raw_ostream &os) const final {
+    if (!typeCheckingFailed) {
+      opBindings->print(os);
+    } else {
+      os << "type checking process failed and did not produce bindings";
+    }
+  }
 
-  operator mlir::LogicalResult() const final { return *opBindings; }
+  operator mlir::LogicalResult() const final {
+    return typeCheckingFailed || failed(*opBindings) ? failure() : success();
+  }
 
 private:
   TypeBindings typeBindings;
+  bool typeCheckingFailed = false;
+  // Because the methods return references to a FailureOr
+  mlir::FailureOr<TypeBinding> failureRef;
   std::unique_ptr<ZhlOpBindings> opBindings;
 };
 } // namespace

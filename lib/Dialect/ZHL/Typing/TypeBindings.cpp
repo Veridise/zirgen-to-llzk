@@ -345,6 +345,7 @@ mlir::FailureOr<TypeBinding> zhl::TypeBindings::MaybeGet(std::string_view name) 
   if (Exists(name)) {
     return Get(name);
   }
+  llvm::dbgs() << "No binding found for " << name << "\n";
   return mlir::failure();
 }
 

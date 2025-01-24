@@ -105,7 +105,7 @@ private:
   std::vector<std::unique_ptr<TypingRule>> rules;
 };
 
-std::unique_ptr<ZhlOpBindings>
+mlir::FailureOr<std::unique_ptr<ZhlOpBindings>>
 typeCheck(mlir::Operation *, TypeBindings &, const FrozenTypingRuleSet &);
 FrozenTypingRuleSet zhlTypingRules(TypeBindings &);
 

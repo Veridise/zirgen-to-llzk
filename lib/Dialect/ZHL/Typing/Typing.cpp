@@ -1,5 +1,8 @@
 #include "zklang/Dialect/ZHL/Typing/Typing.h"
 #include "zklang/Dialect/ZHL/Typing/Rules.h"
+#include <llvm/ADT/StringMap.h>
+#include <llvm/ADT/StringSet.h>
+#include <mlir/Support/LLVM.h>
 
 using namespace mlir;
 using namespace zirgen::Zhl;
@@ -151,11 +154,123 @@ FailureOr<std::vector<TypeBinding>> getOperandTypes(
   return operandBindings;
 }
 
-std::unique_ptr<ZhlOpBindings>
+using GraphInDegrees = llvm::StringMap<int>;
+
+/// ZHL Component ops do not declare a symbol in MLIR's symbol tables machinery.
+class ZhlSymbolTable {
+public:
+  explicit ZhlSymbolTable(Operation *op) : st(op) {}
+
+  ComponentOp lookup(StringRef name) const {
+    for (auto &region : st->getRegions()) {
+      auto I = region.op_begin<ComponentOp>();
+      auto E = region.op_end<ComponentOp>();
+      for (; I != E; ++I) {
+        auto op = *I;
+        if (op.getName() == name) {
+          return op;
+        }
+      }
+    }
+    return nullptr;
+  }
+
+private:
+  Operation *st;
+};
+
+/// Fills the graph with all the components declared in ZHL. This ensures that
+/// while iterating the map components with an indegree of 0 will still have an entry in the map.
+void fillGraph(Operation *root, GraphInDegrees &indegrees) {
+  root->walk([&](ComponentOp op) {
+    llvm::dbgs() << "Adding " << op.getName() << " to the graph\n";
+    indegrees[op.getName()];
+  });
+}
+
+/// Sorts the components in topological order of declarations. This ensures that
+/// any component that is used by another will be type checked before any dependants.
+/// In ZIR this fine since recursion is forbidden, and thus the components must form a DAG.
+/// If the given components do not form a DAG and have a cycle then this function returns failure
+/// and reports an error back to the user.
+LogicalResult
+sortComponents(Operation *root, SmallVector<ComponentOp> &sortedComponents, ZhlSymbolTable &st) {
+  assert(sortedComponents.empty() && "output vector must be empty");
+  GraphInDegrees indegrees;
+  fillGraph(root, indegrees);
+  root->walk([&](ComponentOp op) {
+    op->walk([&](GlobalOp global) {
+      // We only add to the graph the component if its a name declared as a ZHL component op.
+      // This excludes builtins that have bindings but not a ZHL representation because they are
+      // generated directly in ZML.
+      if (indegrees.contains(global.getName())) {
+        llvm::dbgs() << "Component " << op.getName() << " depends on component " << global.getName()
+                     << "\n";
+        indegrees[global.getName()]++;
+      }
+    });
+  });
+  // To avoid unnecessary allocations
+  sortedComponents.reserve(indegrees.size());
+
+  // Prepare the initial queue for Kahn's algorithm with the components with indegree of 0
+  SmallVector<ComponentOp> queue;
+  for (auto &[name, indegreeCount] : indegrees) {
+    if (indegreeCount == 0) {
+      auto compOp = st.lookup(name);
+      assert(compOp);
+      llvm::dbgs() << "Adding " << name << " to the initial queue\n";
+      queue.push_back(compOp);
+    }
+  }
+
+  // Kahn's algorithm will find the topological order or fail if there is a cycle.
+  while (!queue.empty()) {
+    auto op = queue.front();
+    queue.erase(queue.begin());
+    llvm::dbgs() << "Adding " << op.getName() << " into the sorted vector\n";
+    // Since its traverses the graph in reverse we need to add the elements to front of the vector
+    sortedComponents.insert(sortedComponents.begin(), op);
+
+    op->walk([&](GlobalOp global) {
+      if (indegrees.contains(global.getName())) {
+        indegrees[global.getName()]--;
+        assert(indegrees[global.getName()] >= 0 && "More edges were removed than inserted");
+        if (indegrees[global.getName()] == 0) {
+          auto depOp = st.lookup(global.getName());
+          assert(depOp);
+          queue.push_back(depOp);
+        }
+      }
+    });
+  }
+
+  // Check that all indegrees were remove (aka no cycles)
+  for (auto &[name, indegree] : indegrees) {
+    if (indegree > 0) {
+      return root->emitError() << "Recursion cycle detected in component " << name;
+    }
+  }
+
+  return success();
+}
+
+FailureOr<std::unique_ptr<ZhlOpBindings>>
 typeCheck(Operation *root, TypeBindings &typeBindings, const FrozenTypingRuleSet &rules) {
+  // Initialize what we need for type checking
   SymbolTable st(root);
-  std::unique_ptr<ZhlOpBindings> bindings = std::make_unique<ZhlOpBindings>();
-  root->walk([&](ComponentOp op) { checkComponent(op, *bindings, typeBindings, rules); });
+  ZhlSymbolTable zhlSt(root);
+  auto bindings = std::make_unique<ZhlOpBindings>();
+  SmallVector<ComponentOp> sortedComponents;
+  if (failed(sortComponents(root, sortedComponents, zhlSt))) {
+    return failure();
+  }
+  // Run the typechecker
+  for (auto op : sortedComponents) {
+    llvm::dbgs() << "Type checking " << op.getName() << "\n";
+    checkComponent(op, *bindings, typeBindings, rules);
+  }
+
   return bindings;
 }
 

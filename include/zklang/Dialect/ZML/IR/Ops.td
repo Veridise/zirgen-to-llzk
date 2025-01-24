@@ -88,7 +88,9 @@ def ConstructorRefOp : ZmirOp<"constructor", [Pure]> {
   let assemblyFormat = "attr-dict $component `:` type(results)";
 
   let builders = [OpBuilder<(ins "ComponentInterface":$comp,
-      "mlir::FunctionType":$fn)>];
+                      "mlir::FunctionType":$fn)>,
+                  OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
+                      "mlir::FunctionType":$fn, "bool":$isBuiltin)>];
 
   let extraClassDeclaration = [{
     /// Returns true if can be built with the given value

@@ -81,6 +81,33 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 /// ZhlConstructLowering
 ///////////////////////////////////////////////////////////
 
+/// Finds the definition of the callee component. If the
+/// component was defined before the current operation wrt the physical order of
+/// the file then its defined by a ZML ComponentInterface op, if it hasn't been
+/// converted yet it is still a ZHL Component op. If the name could not be found
+/// in either form returns nullptr.
+mlir::Operation *findCallee(StringRef name, mlir::ModuleOp root) {
+  auto calleeComp = root.lookupSymbol<Zmir::ComponentInterface>(name);
+  if (calleeComp) {
+    return calleeComp;
+  }
+
+  // Zhl Component ops don't declare its symbols in the symbol table
+  for (auto zhlOp : root.getOps<Zhl::ComponentOp>()) {
+    if (zhlOp.getName() == name) {
+      return zhlOp;
+    }
+  }
+  return nullptr;
+}
+
+bool calleeIsBuiltin(mlir::Operation *op) {
+  if (auto zmlOp = mlir::dyn_cast<Zmir::ComponentInterface>(op)) {
+    return zmlOp.getBuiltin();
+  }
+  return false;
+}
+
 mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -91,9 +118,7 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
 
   auto callerComp = op->getParentOfType<Zmir::ComponentOp>();
   assert(callerComp);
-  auto calleeComp = op->getParentOfType<mlir::ModuleOp>().lookupSymbol<Zmir::ComponentInterface>(
-      binding->getName()
-  );
+  auto *calleeComp = findCallee(binding->getName(), op->getParentOfType<mlir::ModuleOp>());
   if (!calleeComp) {
     return op->emitError() << "could not find component with name " << binding->getName();
   }
@@ -105,7 +130,7 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     bool isVariadic =
         !constructorTypes.empty() && mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
     // Depending if it's variadic or not the message changes a bit.
-    std::string expectingNArgsMsg = isVariadic ? " was expecting at least " : " was expecting ";
+    std::string expectingNArgsMsg = isVariadic ? ", was expecting at least " : ", was expecting ";
 
     if (adaptor.getArgs().size() < constructorTypes.size() ||
         (!isVariadic && adaptor.getArgs().size() > constructorTypes.size())) {
@@ -114,7 +139,7 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
               "incorrect number of arguments for component ", binding->getName(), expectingNArgsMsg,
               constructorTypes.size(), " arguments and got ", adaptor.getArgs().size()
           )
-          .attachNote(calleeComp.getLoc())
+          .attachNote(calleeComp->getLoc())
           .append("component declared here");
     }
   }
@@ -124,7 +149,10 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
       adaptor.getArgs(), constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments
   );
 
-  auto funcPtr = rewriter.create<Zmir::ConstructorRefOp>(op.getLoc(), calleeComp, constructorType);
+  auto funcPtr = rewriter.create<Zmir::ConstructorRefOp>(
+      op.getLoc(), mlir::SymbolRefAttr::get(rewriter.getStringAttr(binding->getName())),
+      constructorType, calleeIsBuiltin(calleeComp)
+  );
   auto call = rewriter.create<mlir::func::CallIndirectOp>(op->getLoc(), funcPtr, preparedArguments);
 
   auto result = storeValueInTemporary(

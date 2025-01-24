@@ -1,7 +1,12 @@
+component C() {
+  x := 1;
+}
+
 component A() {
+  c := C();
   b := B();
 }
 
-component B<T: Type>() {
+component B() {
   x := 1;
 }

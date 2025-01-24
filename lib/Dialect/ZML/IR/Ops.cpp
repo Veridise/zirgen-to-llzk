@@ -181,8 +181,15 @@ void ConstructorRefOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op,
     mlir::FunctionType fnType
 ) {
-  state.getOrAddProperties<Properties>().component = mlir::SymbolRefAttr::get(op.getNameAttr());
-  if (op.getBuiltin()) {
+  build(builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), fnType, op.getBuiltin());
+}
+
+void ConstructorRefOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, mlir::FlatSymbolRefAttr sym,
+    mlir::FunctionType fnType, bool isBuiltin
+) {
+  state.getOrAddProperties<Properties>().component = sym;
+  if (isBuiltin) {
     state.getOrAddProperties<Properties>().builtin = mlir::UnitAttr::get(builder.getContext());
   }
   state.addTypes({fnType});

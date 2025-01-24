@@ -20,10 +20,15 @@ mlir::FailureOr<TypeBinding> StringTypingRule::
 mlir::FailureOr<TypeBinding> GlobalTypingRule::
     typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
+  llvm::dbgs() << "Typechecking " << op << "\n";
   auto binding = getBindings().MaybeGet(op.getName());
   if (mlir::failed(binding)) {
+    llvm::dbgs() << "Failed to obtain a binding for " << op.getName() << "\n";
     return op->emitError() << "type '" << op.getName() << "' was not found";
   }
+  llvm::dbgs() << "Found binding for " << op.getName() << ": ";
+  binding->print(llvm::dbgs());
+  llvm::dbgs() << "\n";
   return binding;
 }
 mlir::FailureOr<TypeBinding> ParameterTypingRule::
