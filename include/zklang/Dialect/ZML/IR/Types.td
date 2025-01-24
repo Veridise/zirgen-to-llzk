@@ -29,13 +29,13 @@ def String : ZmirType<"String", "string"> { let summary = "string type"; }
 
 def Union : ZmirType<"Union", "union"> { let summary = "union type"; }
 
-def Component : ZmirType<"Component", ""> {
+def Component : ZmirType<"Component", "comp"> {
   let summary = "component type";
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name,
       OptionalParameter<"mlir::Type">:$superType,
       OptionalArrayRefParameter<"::mlir::Attribute">:$params, "bool":$builtin);
   let assemblyFormat = [{
-  $name $builtin (`<` $params^ `>`)?(`:``>`$superType^)?  }];
+   `<` $name $builtin (`<` $params^ `>`)?(`:``>`$superType^)?  `>` }];
 
   let extraClassDeclaration = [{
 

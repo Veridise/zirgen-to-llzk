@@ -21,9 +21,7 @@
     {
       # First, we define the packages used in this repository/flake
       overlays.default = final: prev: {
-        mlirWithPython = final.mlir.override {
-          enablePythonBindings = true;
-        };
+     
 
         # Default zklang build uses the default compiler for the system (usually gcc for Linux and clang for Macos)
         zklang = final.callPackage ./nix/zklang.nix { clang = final.clang_18; llzk = final.llzk; };
@@ -108,7 +106,7 @@
         #
           # The default shell is used for ZKLANG development.
         # Because `nix develop` is used to set up a dev shell for a given
-        # derivation, we just need to extend the llzk derivation with any
+        # derivation, we just need to extend the  derivation with any
         # extra tools we need.
         devShellBase = { pkgs, zklangEnv ? final.zklang, ... }: {
           shell = zklangEnv.overrideAttrs (old: {
@@ -154,7 +152,7 @@
           inherit (pkgs) zklang ;
 
           # For debug purposes, expose the MLIR/LLVM packages.
-          inherit (pkgs) libllvm llvm mlir mlirWithPython llzk ;
+          inherit (pkgs) libllvm llvm mlir  llzk ;
 
           default = pkgs.zklang;
           withClang = pkgs.zklangClang;
@@ -171,10 +169,28 @@
         # };
 
         devShells = flake-utils.lib.flattenTree {
-          default = (pkgs.devShellBase pkgs).shell.overrideAttrs (_: {
-            # Use Debug by default so assertions are enabled by default.
-            cmakeBuildType = "Debug";
+          default =  pkgs.zklang.overrideAttrs (old: {
+            nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [
+              doxygen
+
+              # clang-tidy and clang-format
+              clang-tools_18
+
+              # git-clang-format
+              libclang.python
+
+            ]);
+
+            shellHook = ''
+              # needed to get accurate compile_commands.json
+              export CXXFLAGS="$NIX_CFLAGS_COMPILE"
+
+              # Add binary dir to PATH for convenience
+              export PATH="$PWD"/build/bin:"$PATH"
+
+            '';
           });
+
           # debugClang = _: (pkgs.devShellBase pkgs pkgs.llzkDebugClang).shell;
           # debugGCC = _: (pkgs.devShellBase pkgs pkgs.llzkDebugGCC).shell;
 

@@ -60,7 +60,7 @@ mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
 }
 
 llzk::LLZKTypeConverter::LLZKTypeConverter(std::unordered_set<std::string_view> builtinOverrideSet)
-    : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv"}) {
+    : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz"}) {
 
   addConversion([](mlir::Type t) { return t; });
 

@@ -58,7 +58,7 @@ static cl::opt<enum Action> emitAction(
 
 static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::value_desc("path"));
 static cl::opt<std::string>
-    outputFile("o", cl::desc("Where to write the result"), cl::value_desc("path"));
+    outputFile("o", cl::desc("Where to write the result"), cl::value_desc("output"));
 
 /// A wrapper around the dialect registry that ensures that the required dialects are available
 /// at initialization.
@@ -74,11 +74,11 @@ struct ZirFrontendDialects {
 
 class Driver {
 public:
-  static FailureOr<std::unique_ptr<Driver>> Make(int &argc, char **&argv, llvm::raw_ostream &);
+  static FailureOr<std::unique_ptr<Driver>> Make(int &argc, char **&argv);
   LogicalResult run();
 
 private:
-  Driver(int &argc, char **&argv, llvm::raw_ostream &dst);
+  Driver(int &argc, char **&argv);
   void openMainFile(std::string);
   zirgen::dsl::ast::Module::Ptr parse();
   std::optional<mlir::ModuleOp> lowerToZhl(zirgen::dsl::ast::Module &);
@@ -90,12 +90,11 @@ private:
   llvm::SourceMgr sourceManager;
   mlir::SourceMgrDiagnosticHandler sourceMgrHandler;
   mlir::PassManager pm;
-  llvm::raw_ostream &dst;
 };
 
-FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv, llvm::raw_ostream &dst) {
+FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv) {
   // Done this way to keep the constructor private
-  std::unique_ptr<Driver> driver(new Driver(argc, argv, dst));
+  std::unique_ptr<Driver> driver(new Driver(argc, argv));
 
   applyDefaultTimingPassManagerCLOptions(driver->pm);
   if (failed(applyPassManagerCLOptions(driver->pm))) {
@@ -106,9 +105,9 @@ FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv, llvm::r
   return std::move(driver);
 }
 
-Driver::Driver(int &argc, char **&argv, llvm::raw_ostream &dst)
+Driver::Driver(int &argc, char **&argv)
     : llvm(argc, argv), dialects(), context(dialects.registry), sourceManager{},
-      sourceMgrHandler(sourceManager, &context), pm(&context), dst(dst) {
+      sourceMgrHandler(sourceManager, &context), pm(&context) {
   mlir::registerAsmPrinterCLOptions();
   mlir::registerMLIRContextCLOptions();
   mlir::registerPassManagerCLOptions();
@@ -180,62 +179,17 @@ private:
   mlir::ModuleOp mod;
 };
 
-LogicalResult Driver::run() {
-  openMainFile(inputFilename);
-  sourceManager.setIncludeDirs(includeDirs);
-
-  auto ast = parse();
-  if (!ast) {
-    return failure();
-  }
-  if (emitAction == Action::PrintAST) {
-    ast->print(dst);
-    return success();
-  }
-
-  auto mod = lowerToZhl(*ast);
-  if (!mod) {
-    return failure();
-  }
-  ModuleEraseGuard guard(*mod);
-  if (emitAction == Action::PrintZHL) {
-    mod->print(dst);
-    return success();
-  }
-
-  configureLoweringPipeline();
-  pm.dump();
-  if (failed(pm.run(*mod))) {
-    llvm::errs() << "an internal compiler error ocurred while lowering this module:\n";
-    mod->print(llvm::errs());
-    return failure();
-  }
-
-  mod->print(llvm::outs());
-
-  return success();
-}
-
-void Driver::openMainFile(std::string filename) {
-  auto fileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filename);
-  if (std::error_code error = fileOrErr.getError()) {
-    sourceManager.PrintMessage(
-        llvm::SMLoc(), llvm::SourceMgr::DiagKind::DK_Error, "could not open input file " + filename
-    );
-  }
-  sourceManager.AddNewSourceBuffer(std::move(*fileOrErr), mlir::SMLoc());
-}
-
 // Simple RAII for handling the destination stream
 class Dst {
 public:
   Dst() : dst(&llvm::outs()) {
     std::string out = outputFile;
-    if (outputFile.empty()) {
+    if (out.empty()) {
       std::string base = inputFilename;
       out = base + ".mlir";
     }
     if (out != "-") {
+      llvm::dbgs() << "Writing result to " << out << "\n";
       dst = new llvm::raw_fd_ostream(out, EC);
     }
   }
@@ -253,15 +207,62 @@ private:
   llvm::raw_ostream *dst;
 };
 
-namespace zklang {
-
-LogicalResult zirDriver(int &argc, char **&argv) {
+LogicalResult Driver::run() {
   Dst dst;
   if (dst.error()) {
     llvm::errs() << "Failed to open output file: " << dst.error().message() << "\n";
     return failure();
   }
-  FailureOr<std::unique_ptr<Driver>> driver = Driver::Make(argc, argv, *dst);
+  openMainFile(inputFilename);
+  sourceManager.setIncludeDirs(includeDirs);
+
+  auto ast = parse();
+  if (!ast) {
+    return failure();
+  }
+  if (emitAction == Action::PrintAST) {
+    ast->print(*dst);
+    return success();
+  }
+
+  auto mod = lowerToZhl(*ast);
+  if (!mod) {
+    return failure();
+  }
+  ModuleEraseGuard guard(*mod);
+  if (emitAction == Action::PrintZHL) {
+    mod->print(*dst);
+    return success();
+  }
+
+  configureLoweringPipeline();
+  pm.dump();
+  if (failed(pm.run(*mod))) {
+    llvm::errs() << "an internal compiler error ocurred while lowering this module:\n";
+    // mod->print(llvm::errs());
+    return failure();
+  }
+
+  mod->print(*dst);
+
+  return success();
+}
+
+void Driver::openMainFile(std::string filename) {
+  auto fileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filename);
+  if (std::error_code error = fileOrErr.getError()) {
+    sourceManager.PrintMessage(
+        llvm::SMLoc(), llvm::SourceMgr::DiagKind::DK_Error, "could not open input file " + filename
+    );
+  }
+  sourceManager.AddNewSourceBuffer(std::move(*fileOrErr), mlir::SMLoc());
+}
+
+namespace zklang {
+
+LogicalResult zirDriver(int &argc, char **&argv) {
+
+  FailureOr<std::unique_ptr<Driver>> driver = Driver::Make(argc, argv);
   if (failed(driver)) {
     return failure();
   }
