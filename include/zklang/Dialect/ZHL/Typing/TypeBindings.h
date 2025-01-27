@@ -73,8 +73,6 @@ private:
   ParamNames names;
 };
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type);
-
 /// Interface for the different types of bindings
 class TypeBindingImpl {
 public:
@@ -182,6 +180,7 @@ public:
   bool isVal() const;
   bool isArray() const;
   bool isConst() const;
+  bool isKnownConst() const;
   bool isGeneric() const;
   bool isGenericParam() const;
   bool isBuiltin() const;
@@ -319,3 +318,5 @@ private:
 };
 
 } // namespace zhl
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding &b);

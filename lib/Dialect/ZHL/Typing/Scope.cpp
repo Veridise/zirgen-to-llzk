@@ -10,6 +10,9 @@ ComponentScope::ComponentScope(ComponentOp component, TypeBindings &bindings)
 
 ComponentScope::~ComponentScope() {
   assert(succeeded(superType));
+  llvm::dbgs() << "Super type for " << component.getName() << " is ";
+  superType->print(llvm::dbgs());
+  llvm::dbgs() << "\n";
   bindings->Create(
       component.getName(), component.getLoc(), bindings->Manage(*superType), genericParams,
       constructorParams, members

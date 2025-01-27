@@ -831,13 +831,37 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
     return mlir::failure();
   }
   auto innerType = Zmir::materializeTypeBinding(getContext(), *innerBinding);
-  /*auto startType = Zmir::materializeTypeBinding(getContext(), *startBinding);*/
-  /*auto endType = Zmir::materializeTypeBinding(getContext(), *endBinding);*/
+  auto startType = Zmir::materializeTypeBinding(getContext(), *startBinding);
+  Value startVal = adaptor.getStart();
+  if (startType != startVal.getType()) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(
+        startVal.getLoc(), TypeRange(startType), ValueRange(startVal)
+    );
+    startVal = cast.getResult(0);
+  }
+  if (startVal.getType() != Zmir::ComponentType::Val(getContext())) {
+    startVal = rewriter.create<Zmir::SuperCoerceOp>(
+        startVal.getLoc(), Zmir::ComponentType::Val(getContext()), startVal
+    );
+  }
+  auto endType = Zmir::materializeTypeBinding(getContext(), *endBinding);
+  Value endVal = adaptor.getEnd();
+  if (endType != endVal.getType()) {
+    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(
+        endVal.getLoc(), TypeRange(endType), ValueRange(endVal)
+    );
+    endVal = cast.getResult(0);
+  }
+  if (endVal.getType() != Zmir::ComponentType::Val(getContext())) {
+    endVal = rewriter.create<Zmir::SuperCoerceOp>(
+        endVal.getLoc(), Zmir::ComponentType::Val(getContext()), endVal
+    );
+  }
   auto arrAlloc = rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(op, type);
   // Create a for loop op using the operands as bounds
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
-  auto start = rewriter.create<Zmir::ValToIndexOp>(op.getStart().getLoc(), adaptor.getStart());
-  auto end = rewriter.create<Zmir::ValToIndexOp>(op.getEnd().getLoc(), adaptor.getEnd());
+  auto start = rewriter.create<Zmir::ValToIndexOp>(op.getStart().getLoc(), startVal);
+  auto end = rewriter.create<Zmir::ValToIndexOp>(op.getEnd().getLoc(), endVal);
   rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), start, end, one, mlir::ValueRange(),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange) {
