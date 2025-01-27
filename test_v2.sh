@@ -9,6 +9,7 @@ set -o pipefail
 # to the location where you have it.
 
 CIRCUIT_PATH=$HOME/code/veridise/risczero-wip/zirgen/circuit/rv32im/v2/dsl/
+KECCAK_PATH=$HOME/code/veridise/zir-benchmarks/keccak2/
 DEST=../risc0_v2_circuit_build_results/$(date +%Y-%m-%d-%H-%M)
 # BAZELFLAGS=--local_resources=cpu='HOST_CPUS*0.5' 
 BAZELFLAGS= 
@@ -23,7 +24,8 @@ function die {
 }
 
 function zir_files {
-  find $CIRCUIT_PATH -name '*.zir'
+  workdir=$(realpath $1)
+  find $workdir -name '*.zir'
 }
 
 function build_zklang {
@@ -32,13 +34,15 @@ function build_zklang {
 
 function build_zir {
   zir=$(realpath $1)
+  workdir=$(realpath $2)
+  dst=$(realpath $3)
   name=$(basename $zir)
-  mlir_out=$(realpath $DEST/$name.mlir)
-  stdout=$DEST/$name.stdout
-  stderr=$DEST/$name.stderr
-  errcode=$DEST/$name.errcode
+  mlir_out=$(realpath $dst/$name.mlir)
+  stdout=$dst/$name.stdout
+  stderr=$dst/$name.stderr
+  errcode=$dst/$name.errcode
   echo "[=] Building $name..."
-  nix run "$DERIVATION" -- -o $mlir_out -I $CIRCUIT_PATH $zir $ZKLANG_FLAGS > $stdout 2> $stderr
+  nix run "$DERIVATION" -- -o $mlir_out -I $workdir $zir $ZKLANG_FLAGS > $stdout 2> $stderr
   # tail -F $stderr --pid=$!
   echo $? > $errcode
   echo " ============= $name =============="
@@ -51,8 +55,17 @@ function build_zir {
   
 }
 
+function build_project {
+  name=$1
+  workdir=$(realpath $2)
+  dst=$(realpath $3)/$name
+  mkdir -p $dst
+  for zir in $(zir_files $workdir); do 
+    build_zir $zir $workdir $dst
+  done
+}
+
 # Build first to avoid filling run output with build logs
 build_zklang || die "Failed to build zklang!"
-for zir in $(zir_files); do 
-  build_zir $zir
-done
+#build_project "rv32im-v2" $CIRCUIT_PATH $DEST
+build_project keccak2 $KECCAK_PATH $DEST

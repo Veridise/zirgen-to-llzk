@@ -287,6 +287,13 @@ mlir::LogicalResult ZhlGlobalRemoval::matchAndRewrite(
   return mlir::success();
 }
 
+LogicalResult ZhlDirectiveRemoval::matchAndRewrite(
+    zirgen::Zhl::DirectiveOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+  rewriter.eraseOp(op);
+  return success();
+}
+
 ///////////////////////////////////////////////////////////
 /// ZhlGenericRemoval
 ///////////////////////////////////////////////////////////

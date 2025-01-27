@@ -44,7 +44,7 @@ void ConvertZhlToZmirPass::runOnOperation() {
       ZhlConstrainLowering, ZhlLookupLowering, ZhlArrayLowering, ZhlSubscriptLowering,
       ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
       ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
-      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch>(
+      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval>(
       typeAnalysis, typeConverter, ctx
   );
   patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
@@ -64,7 +64,7 @@ void ConvertZhlToZmirPass::runOnOperation() {
       zirgen::Zhl::GlobalOp, zirgen::Zhl::LookupOp, zirgen::Zhl::ArrayOp, zirgen::Zhl::SubscriptOp,
       zirgen::Zhl::RangeOp, zirgen::Zhl::MapOp, zirgen::Zhl::SuperOp, zirgen::Zhl::BlockOp,
       zirgen::Zhl::StringOp, zirgen::Zhl::TypeParamOp, zirgen::Zhl::SpecializeOp,
-      zirgen::Zhl::ReduceOp, zirgen::Zhl::SwitchOp>();
+      zirgen::Zhl::ReduceOp, zirgen::Zhl::SwitchOp, zirgen::Zhl::DirectiveOp>();
 
   // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(module, target, std::move(patterns)))) {

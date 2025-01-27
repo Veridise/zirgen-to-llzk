@@ -121,7 +121,7 @@ Driver::Driver(int &argc, char **&argv)
 void Driver::configureLoweringPipeline() {
   pm.clear();
   pm.addPass(zkc::createStripTestsPass());
-  pm.addPass(zkc::createStripDirectivesPass());
+  /*pm.addPass(zkc::createStripDirectivesPass());*/
   pm.addPass(zkc::Zmir::createInjectBuiltInsPass());
   pm.addPass(zkc::createConvertZhlToZmirPass());
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());

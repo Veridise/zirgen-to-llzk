@@ -109,6 +109,16 @@ public:
       const override;
 };
 
+/// Remove compiler directive ops
+class ZhlDirectiveRemoval : public ZhlOpLoweringPattern<zirgen::Zhl::DirectiveOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::DirectiveOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::DirectiveOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
 /// Remove `zhl.generic` ops
 class ZhlGenericRemoval : public ZhlOpLoweringPattern<zirgen::Zhl::TypeParamOp> {
 public:
