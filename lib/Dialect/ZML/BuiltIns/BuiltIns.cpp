@@ -220,6 +220,11 @@ void zkc::Zmir::addBuiltinBindings(
       "Mul", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
+  MAYBE("Mod")
+  bindings.CreateBuiltin(
+      "Mod", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+      zhl::MembersMap()
+  );
   MAYBE("Inv")
   bindings.CreateBuiltin(
       "Inv", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
@@ -257,6 +262,7 @@ void zkc::Zmir::addBuiltins(
   MAYBE("Add") { addBinOp<AddOp>(builder, "Add"); }
   MAYBE("Sub") { addBinOp<SubOp>(builder, "Sub"); }
   MAYBE("Mul") { addBinOp<MulOp>(builder, "Mul"); }
+  MAYBE("Mod") { addBinOp<ModOp>(builder, "Mod"); }
   MAYBE("Inv") { addUnaryOp<InvOp>(builder, "Inv"); }
   MAYBE("Isz") { addUnaryOp<IsZeroOp>(builder, "Isz"); }
   MAYBE("Neg") { addUnaryOp<NegOp>(builder, "Neg"); }

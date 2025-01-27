@@ -396,3 +396,4 @@ def AddOp : BinaryOp<"add", [Commutative]> {}
 def SubOp : BinaryOp<"sub"> {}
 def MulOp : BinaryOp<"mul", [Commutative]> {}
 def BitAndOp : BinaryOp<"bit_and"> {}
+def ModOp : BinaryOp<"mod"> {}

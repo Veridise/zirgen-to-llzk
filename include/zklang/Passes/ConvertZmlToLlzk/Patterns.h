@@ -129,8 +129,8 @@ using LowerBitAnd = LowerArithBuiltIns<Zmir::BitAndOp, llzk::AndFeltOp>;
 using LowerAdd = LowerArithBuiltIns<Zmir::AddOp, llzk::AddFeltOp>;
 using LowerSub = LowerArithBuiltIns<Zmir::SubOp, llzk::SubFeltOp>;
 using LowerMul = LowerArithBuiltIns<Zmir::MulOp, llzk::MulFeltOp>;
+using LowerMod = LowerArithBuiltIns<Zmir::ModOp, llzk::ModFeltOp>;
 using LowerInv = LowerArithBuiltIns<Zmir::InvOp, llzk::InvFeltOp>;
-// TODO LowerIsz
 using LowerNeg = LowerArithBuiltIns<Zmir::NegOp, llzk::NegFeltOp>;
 
 class LowerIsz : public mlir::OpConversionPattern<IsZeroOp> {

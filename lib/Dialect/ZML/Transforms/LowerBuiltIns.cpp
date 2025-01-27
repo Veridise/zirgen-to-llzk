@@ -106,6 +106,7 @@ using BitAndPattern = ReplaceConstructorCallWithBuiltIn<Zmir::BitAndOp, BitAndSt
 using AddPattern = ReplaceConstructorCallWithBuiltIn<Zmir::AddOp, AddStr>;
 using SubPattern = ReplaceConstructorCallWithBuiltIn<Zmir::SubOp, SubStr>;
 using MulPattern = ReplaceConstructorCallWithBuiltIn<Zmir::MulOp, MulStr>;
+using ModPattern = ReplaceConstructorCallWithBuiltIn<Zmir::ModOp, ModStr>;
 using InvPattern = ReplaceConstructorCallWithBuiltIn<Zmir::InvOp, InvStr>;
 using IszPattern = ReplaceConstructorCallWithBuiltIn<Zmir::IsZeroOp, IszStr>;
 using NegPattern = ReplaceConstructorCallWithBuiltIn<Zmir::NegOp, NegStr>;
@@ -122,7 +123,7 @@ class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
 
     patterns.add<
         BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern, IszPattern, NegPattern,
-        RemoveConstructorRef>(typeConverter, ctx);
+        ModPattern, RemoveConstructorRef>(typeConverter, ctx);
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);

@@ -53,7 +53,7 @@ void ConvertZmirToLlzkPass::runOnOperation() {
       LowerIsz, LowerNeg, LowerConstrainOp, LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp,
       LowerReadArrayOp, LowerAllocArrayOp, LowerArrayLengthOp, LowerIndexToValOp, LowerValToIndexOp,
       LowerWriteArrayOp, WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp,
-      LowerLoadValParamOp>(typeConverter, ctx);
+      LowerMod, LowerLoadValParamOp>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
@@ -63,9 +63,9 @@ void ConvertZmirToLlzkPass::runOnOperation() {
   target.addIllegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
 
   target.addIllegalOp<
-      LitValOp, GetSelfOp, BitAndOp, AddOp, SubOp, MulOp, InvOp, IsZeroOp, NegOp, ReadFieldOp,
-      ConstrainOp, InRangeOp, NewArrayOp, ReadArrayOp, AllocArrayOp, GetArrayLenOp, IndexToValOp,
-      ValToIndexOp, WriteArrayOp, WriteFieldOp, ConstrainCallOp, NopOp, SuperCoerceOp,
+      LitValOp, GetSelfOp, BitAndOp, AddOp, SubOp, MulOp, ModOp, InvOp, IsZeroOp, NegOp,
+      ReadFieldOp, ConstrainOp, InRangeOp, NewArrayOp, ReadArrayOp, AllocArrayOp, GetArrayLenOp,
+      IndexToValOp, ValToIndexOp, WriteArrayOp, WriteFieldOp, ConstrainCallOp, NopOp, SuperCoerceOp,
       LoadValParamOp>();
 
   // Call partialTransformation
