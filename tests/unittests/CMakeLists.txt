@@ -6,7 +6,7 @@ function(zklang_gtest_suite target)
       CACHE INTERNAL "")
 endfunction()
 
-add_subdirectory(helloworld) # example
+add_subdirectory(hello) # example
 
 add_custom_target(
   check-unit

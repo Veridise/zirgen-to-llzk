@@ -215,7 +215,7 @@ if(BUILD_TESTING AND GTest_FOUND)
     set(GTEST_EXE_TARGET GTest::Main)
   endif()
 
-  add_subdirectory(unittests)
+  add_subdirectory(tests/unittests)
 elseif(BUILD_TESTING)
   message(STATUS "gtest not found, unit tests will not be run")
 else()
