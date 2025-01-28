@@ -7,6 +7,7 @@ function(zklang_gtest_suite target)
 endfunction()
 
 add_subdirectory(hello) # example
+add_subdirectory(ZHL)
 
 add_custom_target(
   check-unit

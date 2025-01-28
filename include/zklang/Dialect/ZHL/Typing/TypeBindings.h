@@ -264,7 +264,7 @@ private:
 
 class TypeBindings {
 public:
-  explicit TypeBindings(mlir::OpBuilder &);
+  explicit TypeBindings(mlir::Location);
 
   const TypeBinding &Component();
   const TypeBinding &Component() const;

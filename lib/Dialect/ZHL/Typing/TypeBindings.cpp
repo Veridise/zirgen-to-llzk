@@ -370,8 +370,8 @@ const zhl::TypeBinding &zhl::TypeBindings::Manage(const zhl::TypeBinding &bindin
   return managedBindings.back();
 }
 
-TypeBindings::TypeBindings(OpBuilder &builder)
-    : unk(builder.getUnknownLoc()), bottom(TypeBinding(BOTTOM, unk, Component())) {
+TypeBindings::TypeBindings(Location defaultLoc)
+    : unk(defaultLoc), bottom(TypeBinding(BOTTOM, unk, Component())) {
   (void)Component();
 }
 void zhl::TypeBinding::selfConstructs() {

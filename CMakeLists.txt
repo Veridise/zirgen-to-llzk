@@ -96,7 +96,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
     message(WARNING "Gcov reports are not supported by the test environment.")
     message(WARNING "Set ZKLANG_FORCE_GCC_COVERAGE to enable coverage in GCC.")
     if(ZKLANG_FORCE_GCC_COVERAGE)
-      add_compile_options(--coverage -O0 -g)
+      add_compile_options(--coverage -g)
       add_link_options(--coverage)
     endif()
   else()
@@ -106,7 +106,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
     )
   endif()
 
-  add_compile_options(-O0 -g)
+  add_compile_options(-g)
 endif()
 
 
@@ -205,7 +205,7 @@ if(BUILD_TESTING AND GTest_FOUND)
   message(STATUS "gtest found, enabling unit tests...")
   include(GoogleTest)
 
-  add_custom_target(LLZKUnitTests)
+  # add_custom_target(LLZKUnitTests)
 
   if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.20")
     set(GTEST_LIB_TARGETS "GTest::gtest;GTest::gmock")

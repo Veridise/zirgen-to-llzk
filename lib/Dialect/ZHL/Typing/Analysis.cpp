@@ -52,7 +52,7 @@ private:
 class ConcreteImpl : public zhl::ZIRTypeAnalysis::Impl {
 public:
   explicit ConcreteImpl(mlir::ModuleOp module, mlir::OpBuilder &builder)
-      : typeBindings(builder), failureRef(failure()), opBindings(nullptr) {
+      : typeBindings(builder.getUnknownLoc()), failureRef(failure()), opBindings(nullptr) {
     std::unordered_set<std::string_view> definedNames;
     for (auto op : module.getOps<zirgen::Zhl::ComponentOp>()) {
       definedNames.insert(op.getName());
