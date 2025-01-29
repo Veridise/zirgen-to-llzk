@@ -57,32 +57,6 @@ TEST_F(MaterializationTest, componentBaseConstructorType) {
   ASSERT_EQ(output, expected);
 }
 
-/*TEST_F(MaterializationTestWithBuiltins, genericCompWithArrayArgument) {*/
-/*  auto &Val = bindings.Get("Val");*/
-/*  auto Size = TypeBinding::MakeGenericParam(Val, "SIZE");*/
-/*  auto &Array = bindings.Get("Array");*/
-/*  auto ValArray = Array; // Copy to create the specialization*/
-/*  ValArray.replaceGenericParamByName("T", Val);*/
-/*  ValArray.replaceGenericParamByName("N", Size);*/
-/*  // Foo<Size>(Array<Val(Val),Size>(Array<T,N>),Val(Val))*/
-/*  auto &Foo = bindings.Create(*/
-/*      "Foo", bindings.Component(), zhl::ParamsMap({{{"SIZE", 0}, Val}}),*/
-/*      zhl::ParamsMap({{{"0", 0}, ValArray}, {{"1", 1}, Val}}), zhl::MembersMap()*/
-/*  );*/
-/*  FunctionType output = Zmir::materializeTypeBindingConstructor(builder, Foo);*/
-/*  Type ValZmlType = Zmir::ComponentType::Val(&ctx);*/
-/*  Attribute ValZmlTypeAttr = mlir::TypeAttr::get(ValZmlType);*/
-/*  Attribute SIZE_var = mlir::SymbolRefAttr::get(mlir::StringAttr::get(&ctx, "SIZE"));*/
-/*  Type ValArrayZmlType = Zmir::ComponentType::get(*/
-/*      &ctx, "Array", Zmir::ComponentType::Component(&ctx), {ValZmlTypeAttr, SIZE_var}, true*/
-/*  );*/
-/*  Type FooZmlType = Zmir::ComponentType::get(*/
-/*      &ctx, "Foo", Zmir::ComponentType::Component(&ctx), {SIZE_var}, false*/
-/*  );*/
-/*  FunctionType expected = builder.getFunctionType({ValArrayZmlType, ValZmlType}, FooZmlType);*/
-/*  ASSERT_EQ(output, expected);*/
-/*}*/
-
 //=----------------------------------------------------------=//
 //  Specialization tests
 //=----------------------------------------------------------=//
