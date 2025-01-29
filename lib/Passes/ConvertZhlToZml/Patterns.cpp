@@ -132,8 +132,11 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     // Depending if it's variadic or not the message changes a bit.
     std::string expectingNArgsMsg = isVariadic ? ", was expecting at least " : ", was expecting ";
 
-    if (adaptor.getArgs().size() < constructorTypes.size() ||
-        (!isVariadic && adaptor.getArgs().size() > constructorTypes.size())) {
+    // Can be constructorTypes.size() - 1 as the variadic args can be empty
+    bool isInRangeVariadic = isVariadic && (adaptor.getArgs().size() >= (constructorTypes.size() - 1));
+    bool isInRangeNonVariadic = !isVariadic && (adaptor.getArgs().size() == constructorTypes.size());
+
+    if (!isInRangeVariadic && !isInRangeNonVariadic) {
       return op->emitOpError()
           .append(
               "incorrect number of arguments for component ", binding->getName(), expectingNArgsMsg,
@@ -192,9 +195,14 @@ void ZhlConstructLowering::prepareArguments(
 
     auto va = rewriter.create<Zmir::VarArgsOp>(loc, constructorTypes.back(), vargs);
     preparedArgs.push_back(va);
-  }
 
-  assert(preparedArgs.size() == constructorTypes.size() && "incorrect number of arguments");
+    // If the varargs value is empty, then prepared args will be smaller than constructorTypes
+    // by one, otherwise it can be arbitrarily larger than the constructorTypes.
+    assert(preparedArgs.size() >= constructorTypes.size() - 1 && "incorrect number of arguments");
+  } else {
+    // Without varargs, the number of arguments should match exactly
+    assert(preparedArgs.size() == constructorTypes.size() && "incorrect number of arguments");
+  }
 }
 
 mlir::Value ZhlConstructLowering::prepareArgument(

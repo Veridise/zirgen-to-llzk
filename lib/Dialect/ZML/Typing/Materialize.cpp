@@ -220,6 +220,14 @@ specializeTypeBinding(MLIRContext *ctx, TypeBinding *dst, ParamsScopeStack &scop
       _LLVM_DEBUG(spaces(ident);
                   llvm::dbgs() << "Variable " << name << " binds to " << *params[name] << "\n";
                   spaces(ident); llvm::dbgs() << "Specializing variable " << name;)
+
+      // In the array case, use the bound param, since arrays use artificial "T" and "N" params
+      // for type and size that will not have a replacement.
+      if (dst->isArray()) {
+        dst->replaceGenericParamByName(name, *params[name]);
+        continue;
+      }
+
       auto replacement = scopes[name];
       // Fail the materialization if the name was not found. A well typed program should not have
       // this issue.
