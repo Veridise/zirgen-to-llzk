@@ -75,16 +75,17 @@ private:
         std::transform(
             paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
             [&](const auto &b) -> Attribute {
-          if (b.isConst()) {
-            return mlir::IntegerAttr::get(
-                mlir::IntegerType::get(context, 64),
-                b.isKnownConst() ? b.getConst() : mlir::ShapedType::kDynamic
-            );
-          } else if (b.isGenericParam() && b.getSuperType().isVal()) {
-            return SymbolRefAttr::get(StringAttr::get(context, b.getGenericParamName()));
-          } else {
-            return mlir::TypeAttr::get(materializeImpl(b));
-          }
+              if (b.isConst()) {
+                return mlir::IntegerAttr::get(
+                    mlir::IntegerType::get(context, 64),
+                    b.isKnownConst() ? b.getConst() : mlir::ShapedType::kDynamic
+                );
+              } else if (b.isGenericParam() && b.getSuperType().isVal()) {
+                return SymbolRefAttr::get(StringAttr::get(context, b.getGenericParamName()));
+              } else {
+                return mlir::TypeAttr::get(materializeImpl(b));
+              }
+            }
         );
       } else {
         // Put the names of the parameters
