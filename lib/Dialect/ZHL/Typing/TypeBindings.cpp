@@ -1,4 +1,5 @@
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
+#include <cassert>
 #include <iterator>
 #include <mlir/Support/LogicalResult.h>
 
@@ -33,6 +34,20 @@ void Params::printNames(llvm::raw_ostream &os, char header, char footer) const {
 
 void Params::printParams(llvm::raw_ostream &os, char header, char footer) const {
   print<TypeBinding>(params, os, [&](const auto &e) { e.print(os); }, header, footer);
+}
+
+void Params::printMapping(llvm::raw_ostream &os) const {
+  os << "{ ";
+  ParamsMap tmp = *this; // Copy into a map
+  size_t c = 1;
+  for (auto &[name, type] : tmp) {
+    os << name.first << ": " << type;
+    if (c < tmp.size()) {
+      os << ", ";
+    }
+    c++;
+  }
+  os << " }";
 }
 
 template <typename Elt>
@@ -216,8 +231,12 @@ mlir::FailureOr<TypeBinding> zhl::TypeBinding::specialize(
   }
   if (genericParams.size() != params.size()) {
     return emitError() << "wrong number of specialization parameters. Expected "
-                       << genericParams.size() << " and got " << params.size();
+                       << genericParams.size() << " but got " << params.size();
   }
+
+  // Root cause, the specialization does not update all the places where the type could reference a
+  // generic. I could port the specialization logic I implemented in the materializer here and make
+  // it use this implementation.
   ParamsMap generics;
   for (unsigned i = 0; i < params.size(); i++) {
     // TODO: Validation
@@ -242,6 +261,27 @@ std::vector<mlir::Location> TypeBinding::getConstructorParamLocations() const {
       [](auto &binding) { return binding.loc; }
   );
   return locs;
+}
+
+bool Params::operator==(const Params &other) const {
+  return params == other.params && names == other.names;
+}
+
+bool TypeBinding::operator==(const TypeBinding &other) const {
+  bool superTypeIsEqual;
+  if (superType == nullptr && other.superType == nullptr) {
+    superTypeIsEqual = true;
+  } else if (superType == nullptr || other.superType == nullptr) {
+    superTypeIsEqual = false;
+  } else {
+    superTypeIsEqual = *superType == *other.superType;
+  }
+
+  return superTypeIsEqual && variadic == other.variadic && specialized == other.specialized &&
+         selfConstructor == other.selfConstructor && builtin == other.builtin &&
+         name == other.name && loc == other.loc && constVal == other.constVal &&
+         genericParamName == other.genericParamName && members == other.members &&
+         genericParams == other.genericParams && constructorParams == other.constructorParams;
 }
 
 const Params &TypeBinding::getConstructorParams() const { return constructorParams; }
@@ -298,6 +338,11 @@ bool zhl::TypeBinding::isKnownConst() const { return isConst() && constVal.has_v
 bool TypeBinding::isGeneric() const { return genericParams.size() > 0; }
 
 bool TypeBinding::isSpecialized() const { return !isGeneric() || specialized; }
+
+void TypeBinding::markAsSpecialized() {
+  assert(isGeneric());
+  specialized = true;
+}
 
 ArrayRef<std::string> TypeBinding::getGenericParamNames() const { return genericParams.getNames(); }
 

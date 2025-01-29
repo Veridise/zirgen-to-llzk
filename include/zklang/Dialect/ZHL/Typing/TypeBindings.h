@@ -49,8 +49,8 @@ public:
   const TypeBinding *operator[](std::string_view name) const;
   TypeBinding *operator[](std::string_view name);
 
+  void printMapping(llvm::raw_ostream &os) const;
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
-
   void printParams(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
 
   ParamsList::iterator begin();
@@ -61,6 +61,8 @@ public:
   bool empty() const;
 
   void replaceParam(std::string_view name, const TypeBinding &binding);
+
+  bool operator==(const Params &) const;
 
 private:
   template <typename Elt>
@@ -242,6 +244,9 @@ public:
   friend TypeBindings;
 
   void selfConstructs();
+  void markAsSpecialized();
+
+  bool operator==(const TypeBinding &) const;
 
 private:
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;

@@ -119,6 +119,14 @@ if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_link_options(-fsanitize=address)
 endif()
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # NOTE: undefined behavior sanitizer ("undefined") has been removed due to its
+  # poor interaction with gtest fixtures and other standard MLIR/LLVM
+  # operations.
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
+endif()
+
 if(ZKLANG_TEMPLATE_BACKTRACE_LIMIT)
   add_compile_options(-ftemplate-backtrace-limit=0)
 endif()

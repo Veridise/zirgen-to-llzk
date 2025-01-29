@@ -154,7 +154,8 @@ public:
   void print(llvm::raw_ostream &os) {
     os << "[Scope top -> ";
     for (auto It = stack.rbegin(); It != stack.rend(); ++It) {
-      os << *It << " -> ";
+      (*It)->printMapping(os);
+      os << " -> ";
     }
     os << " <- bottom]\n";
   }
