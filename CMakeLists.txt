@@ -229,14 +229,15 @@ elseif(BUILD_TESTING)
 else()
   message(STATUS "Unit tests are disabled")
 endif()
-#
-# # Catch-all target for running all tests
-# add_custom_target(
-#   check
-#   DEPENDS # test targets may not exist if BUILD_TESTING is off
-#           $<$<BOOL:BUILD_TESTING>:check-unit>
-#           $<$<BOOL:BUILD_TESTING>:check-lit>)
-#
+
+# Catch-all target for running all tests
+add_custom_target(
+  check
+  DEPENDS # test targets may not exist if BUILD_TESTING is off
+          $<$<BOOL:BUILD_TESTING>:check-unit>
+          # $<$<BOOL:BUILD_TESTING>:check-lit>
+)
+
 # # Install
 
 export(
