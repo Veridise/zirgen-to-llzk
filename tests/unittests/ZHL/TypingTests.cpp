@@ -14,6 +14,17 @@ using namespace zhl;
 using namespace mlir;
 using namespace zkc;
 
+namespace zhl {
+
+void PrintTo(const TypeBinding &binding, std::ostream *os) {
+  std::string s;
+  llvm::raw_string_ostream ss(s);
+  binding.print(ss, true);
+  *os << s;
+}
+
+} // namespace zhl
+
 class MaterializationTest : public testing::Test {
 protected:
   MaterializationTest() : ctx{}, builder(&ctx), bindings(builder.getUnknownLoc()) {
@@ -94,9 +105,10 @@ InFlightDiagnostic diag() { return InFlightDiagnostic(); }
 TEST_F(SpecializationTest, specializationPropagatesProperly) {
   auto &Component = bindings.Component();
   auto &Type = bindings.Get("Type");
+  auto T = TypeBinding::MakeGenericParam(Type, "T");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, Type}}), zhl::ParamsMap(), zhl::MembersMap()
+      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap(), zhl::MembersMap()
   );
   TypeBinding ExpectedSpecializedFoo(
       "Foo", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}}), zhl::ParamsMap(),
@@ -115,7 +127,7 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyToConstructor) {
   auto T = TypeBinding::MakeGenericParam(Type, "T");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, Type}}), zhl::ParamsMap({{{"t", 0}, T}}),
+      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap({{{"t", 0}, T}}),
       zhl::MembersMap()
   );
   TypeBinding ExpectedSpecializedFoo(
@@ -136,24 +148,24 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyToSuperType) {
   auto F = TypeBinding::MakeGenericParam(Type, "F");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, Type}}), zhl::ParamsMap(), zhl::MembersMap()
+      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap(), zhl::MembersMap()
   );
   auto Foo_F = Foo.specialize(diag, {F}); // The specialized version of Foo within Bar.
   ASSERT_TRUE(succeeded(Foo_F));
   auto &Bar = bindings.Create(
-      "Bar", *Foo_F, zhl::ParamsMap({{{"F", 0}, Type}}), zhl::ParamsMap(), zhl::MembersMap()
+      "Bar", *Foo_F, zhl::ParamsMap({{{"F", 0}, F}}), zhl::ParamsMap(), zhl::MembersMap()
   );
   // The supertype should be like this after specializing Bar
   TypeBinding ExpectedSpecializedFoo(
       "Foo", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}}), zhl::ParamsMap(),
-      zhl::MembersMap({{"t", Val}})
+      zhl::MembersMap()
   );
   ExpectedSpecializedFoo.markAsSpecialized();
 
   auto SpecializedBar = Bar.specialize(diag, {Val});
   ASSERT_TRUE(succeeded(SpecializedBar));
   ASSERT_TRUE(SpecializedBar->hasSuperType());
-  auto super = SpecializedBar->getSuperType();
+  auto &super = SpecializedBar->getSuperType();
   ASSERT_EQ(super, ExpectedSpecializedFoo);
 }
 
@@ -164,7 +176,7 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyToMembers) {
   auto T = TypeBinding::MakeGenericParam(Type, "T");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, Type}}), zhl::ParamsMap(),
+      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap(),
       zhl::MembersMap({{"t", T}})
   );
   TypeBinding ExpectedSpecializedFoo(

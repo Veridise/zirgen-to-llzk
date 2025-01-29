@@ -169,7 +169,7 @@ public:
   /// Returns the name of the type.
   std::string_view getName() const;
 
-  void print(llvm::raw_ostream &os) const;
+  void print(llvm::raw_ostream &os, bool fullPrintout = false) const;
 
   /// Returns true if the instance is a subtype of the argument
   mlir::LogicalResult subtypeOf(const TypeBinding &other) const;
@@ -195,8 +195,10 @@ public:
   mlir::ArrayRef<TypeBinding> getGenericParams() const;
   std::vector<mlir::Location> getConstructorParamLocations() const;
   const Params &getConstructorParams() const;
+  Params &getConstructorParams();
   const Params &getGenericParamsMapping() const;
   const MembersMap &getMembers() const;
+  MembersMap &getMembers();
   mlir::Location getLocation() const;
   const TypeBinding &getSuperType() const;
   TypeBinding &getSuperType();
@@ -216,10 +218,10 @@ public:
   mlir::FailureOr<TypeBinding>
       getMember(mlir::StringRef, std::function<mlir::InFlightDiagnostic()>) const;
 
-  TypeBinding(const TypeBinding &) = default;
-  TypeBinding(TypeBinding &&) = default;
-  TypeBinding &operator=(const TypeBinding &) = default;
-  TypeBinding &operator=(TypeBinding &&) = default;
+  TypeBinding(const TypeBinding &);
+  TypeBinding(TypeBinding &&);
+  TypeBinding &operator=(const TypeBinding &);
+  TypeBinding &operator=(TypeBinding &&);
   TypeBinding(mlir::Location);
   TypeBinding(
       llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, bool isBuiltin = false
@@ -264,7 +266,7 @@ private:
   Params genericParams;
   Params constructorParams;
 
-  std::shared_ptr<TypeBindingImpl> impl;
+  std::shared_ptr<TypeBindingImpl> impl; // TODO
 };
 
 class TypeBindings {
