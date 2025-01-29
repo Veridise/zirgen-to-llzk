@@ -80,7 +80,7 @@ TypeBinding TypeBinding::WithUpdatedLocation(mlir::Location loc) const {
   return b;
 }
 
-llvm::raw_ostream &zhl::operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
   type.print(os);
   return os;
 }
@@ -293,6 +293,7 @@ bool zhl::TypeBinding::isArray() const {
 bool zhl::TypeBinding::isBuiltin() const { return builtin; }
 
 bool zhl::TypeBinding::isConst() const { return name == CONST; }
+bool zhl::TypeBinding::isKnownConst() const { return isConst() && constVal.has_value(); }
 
 bool zhl::TypeBinding::isUnkConst() const { return name == CONST && !constVal.has_value(); }
 
