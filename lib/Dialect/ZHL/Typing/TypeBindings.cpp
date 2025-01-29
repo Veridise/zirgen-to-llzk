@@ -294,6 +294,8 @@ bool zhl::TypeBinding::isBuiltin() const { return builtin; }
 
 bool zhl::TypeBinding::isConst() const { return name == CONST; }
 
+bool zhl::TypeBinding::isUnkConst() const { return name == CONST && !constVal.has_value(); }
+
 bool TypeBinding::isGeneric() const { return genericParams.size() > 0; }
 
 bool TypeBinding::isSpecialized() const { return !isGeneric() || specialized; }

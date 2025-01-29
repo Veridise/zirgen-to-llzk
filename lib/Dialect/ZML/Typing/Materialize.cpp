@@ -85,15 +85,20 @@ Type inner_materializeTypeBinding(MLIRContext *context, const TypeBinding &bindi
         auto paramBindings = binding.getGenericParams();
         std::transform(
             paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
-            [&](const auto &b) -> Attribute {
-          if (b.isConst()) {
-            return mlir::IntegerAttr::get(mlir::IntegerType::get(context, 64), b.getConst());
-          } else if (b.isGenericParam() && b.getSuperType().isVal()) {
-            return SymbolRefAttr::get(StringAttr::get(context, b.getGenericParamName()));
-          } else {
-            return mlir::TypeAttr::get(inner_materializeTypeBinding(context, b));
+            [&](const auto &b) -> Attribute
+          {
+            if (b.isConst()) {
+              if (b.isUnkConst()) {
+                return mlir::TypeAttr::get(inner_materializeTypeBinding(context, b.getSuperType()));
+              } else {
+                return mlir::IntegerAttr::get(mlir::IntegerType::get(context, 64), b.getConst());
+              }
+            } else if (b.isGenericParam() && b.getSuperType().isVal()) {
+              return SymbolRefAttr::get(StringAttr::get(context, b.getGenericParamName()));
+            } else {
+              return mlir::TypeAttr::get(inner_materializeTypeBinding(context, b));
+            }
           }
-        }
         );
       } else {
         // Put the names of the parameters

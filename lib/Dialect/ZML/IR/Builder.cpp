@@ -106,6 +106,7 @@ ComponentBuilder &ComponentBuilder::location(mlir::Location loc) {
 ComponentBuilder &ComponentBuilder::constructor(
     mlir::FunctionType constructorType, std::vector<mlir::Location> argLocs
 ) {
+  assert(constructorType != nullptr);
   ctx.constructorType = constructorType;
   ctx.argLocs = argLocs;
   return *this;

@@ -62,8 +62,8 @@ public:
     }
   }
 
-  Scope &get() {
-    auto scope = new BlockScope(parent);
+  Scope &get(mlir::Region &region) {
+    auto scope = new BlockScope(parent, region);
     scopes.push_back(scope);
     return *scope;
   }
@@ -118,7 +118,7 @@ FailureOr<TypeBinding> typeCheckOp(
     }
 
     regionCheckFailed = regionCheckFailed ||
-                        failed(typeCheckRegion(regions[i], regionScopes.get(), rules, bindings));
+                        failed(typeCheckRegion(regions[i], regionScopes.get(regions[i]), rules, bindings));
   }
   if (regionCheckFailed) {
     return failure();

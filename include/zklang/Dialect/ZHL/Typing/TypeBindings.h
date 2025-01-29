@@ -182,6 +182,7 @@ public:
   bool isVal() const;
   bool isArray() const;
   bool isConst() const;
+  bool isUnkConst() const;
   bool isGeneric() const;
   bool isGenericParam() const;
   bool isBuiltin() const;

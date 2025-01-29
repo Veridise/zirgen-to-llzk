@@ -2,6 +2,8 @@
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <numeric>
 
+#include <llvm/Support/raw_ostream.h>
+
 namespace zhl {
 
 using namespace zirgen::Zhl;

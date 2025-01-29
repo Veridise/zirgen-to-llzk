@@ -18,6 +18,7 @@ public:
   virtual void declareSuperType(TypeBinding) = 0;
   virtual zirgen::Zhl::ComponentOp getOp() const = 0;
   virtual mlir::FailureOr<TypeBinding> getSuperType() const = 0;
+  virtual TypeBindings &getTypeBindings() = 0;
 };
 
 class ComponentScope : public Scope {
@@ -44,6 +45,8 @@ public:
 
   mlir::FailureOr<TypeBinding> getSuperType() const override;
 
+  TypeBindings &getTypeBindings() override;
+
 private:
   TypeBindings *bindings;
   zirgen::Zhl::ComponentOp component;
@@ -55,7 +58,8 @@ private:
 
 class BlockScope : public Scope {
 public:
-  explicit BlockScope(Scope &);
+  explicit BlockScope(Scope &, mlir::Region &);
+  ~BlockScope() override;
 
   void declareGenericParam(mlir::StringRef name, uint64_t index, TypeBinding type) override;
 
@@ -69,12 +73,17 @@ public:
   void declareMember(mlir::StringRef name, TypeBinding type) override;
 
   bool memberDeclaredWithType(mlir::StringRef name) override;
+
   zirgen::Zhl::ComponentOp getOp() const override;
 
   mlir::FailureOr<TypeBinding> getSuperType() const override;
 
+  TypeBindings &getTypeBindings() override;
+
 private:
   Scope *parent;
+  mlir::Region &region;
+  MembersMap shadowedMembers;
   mlir::FailureOr<TypeBinding> superType;
 };
 
