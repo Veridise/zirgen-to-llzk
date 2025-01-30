@@ -60,7 +60,7 @@ stdenv.mkDerivation {
     fi
   '';
 
-  # doCheck = true;
+  doCheck = true;
   checkTarget = "check";
   checkInputs = [ clang gtest python3 lit z3 cvc5 ];
 }

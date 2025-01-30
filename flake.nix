@@ -152,7 +152,7 @@
           inherit (pkgs) zklang ;
 
           # For debug purposes, expose the MLIR/LLVM packages.
-          inherit (pkgs) libllvm llvm mlir  llzk ;
+          inherit (pkgs) libllvm llvm mlir llzk clang gtest python3 lit z3 cvc5 ;
 
           default = pkgs.zklang;
           withClang = pkgs.zklangClang;

@@ -49,8 +49,8 @@ public:
   const TypeBinding *operator[](std::string_view name) const;
   TypeBinding *operator[](std::string_view name);
 
+  void printMapping(llvm::raw_ostream &os) const;
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
-
   void printParams(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
 
   ParamsList::iterator begin();
@@ -61,6 +61,8 @@ public:
   bool empty() const;
 
   void replaceParam(std::string_view name, const TypeBinding &binding);
+
+  bool operator==(const Params &) const;
 
 private:
   template <typename Elt>
@@ -167,7 +169,7 @@ public:
   /// Returns the name of the type.
   std::string_view getName() const;
 
-  void print(llvm::raw_ostream &os) const;
+  void print(llvm::raw_ostream &os, bool fullPrintout = false) const;
 
   /// Returns true if the instance is a subtype of the argument
   mlir::LogicalResult subtypeOf(const TypeBinding &other) const;
@@ -194,8 +196,10 @@ public:
   mlir::ArrayRef<TypeBinding> getGenericParams() const;
   std::vector<mlir::Location> getConstructorParamLocations() const;
   const Params &getConstructorParams() const;
+  Params &getConstructorParams();
   const Params &getGenericParamsMapping() const;
   const MembersMap &getMembers() const;
+  MembersMap &getMembers();
   mlir::Location getLocation() const;
   const TypeBinding &getSuperType() const;
   TypeBinding &getSuperType();
@@ -215,10 +219,10 @@ public:
   mlir::FailureOr<TypeBinding>
       getMember(mlir::StringRef, std::function<mlir::InFlightDiagnostic()>) const;
 
-  TypeBinding(const TypeBinding &) = default;
-  TypeBinding(TypeBinding &&) = default;
-  TypeBinding &operator=(const TypeBinding &) = default;
-  TypeBinding &operator=(TypeBinding &&) = default;
+  TypeBinding(const TypeBinding &);
+  TypeBinding(TypeBinding &&);
+  TypeBinding &operator=(const TypeBinding &);
+  TypeBinding &operator=(TypeBinding &&);
   TypeBinding(mlir::Location);
   TypeBinding(
       llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, bool isBuiltin = false
@@ -243,6 +247,9 @@ public:
   friend TypeBindings;
 
   void selfConstructs();
+  void markAsSpecialized();
+
+  bool operator==(const TypeBinding &) const;
 
 private:
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
@@ -260,12 +267,15 @@ private:
   Params genericParams;
   Params constructorParams;
 
-  std::shared_ptr<TypeBindingImpl> impl;
+  // TODO: This class is starting to get unwieldy. I plan to refactor it to a more flexible model
+  // but currently we don't have enough tests about this class to prove that I didn't break anything
+  // during refactoring.
+  // std::shared_ptr<TypeBindingImpl> impl;
 };
 
 class TypeBindings {
 public:
-  explicit TypeBindings(mlir::OpBuilder &);
+  explicit TypeBindings(mlir::Location);
 
   const TypeBinding &Component();
   const TypeBinding &Component() const;
