@@ -31,11 +31,6 @@ const TypeBinding *ParamsScopeStack::operator[](StringRef name) {
     auto level = *It;
     auto binding = (*level)[name];
     if (binding != nullptr) {
-      // If the  binding is a generic parameter with the same name we are looking for
-      // ignore it and continue
-      if (binding->isGenericParam() && binding->getGenericParamName() == name) {
-        continue;
-      }
       return binding;
     }
   }
@@ -115,8 +110,9 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     }
     _LLVM_DEBUG(spaces(ident);
                 llvm::dbgs() << "Variable " << name << " binds to " << *params[name] << "\n";
-                spaces(ident); llvm::dbgs() << "Specializing variable " << name;)
-    auto replacement = scopes[name];
+                spaces(ident);
+                llvm::dbgs() << "Specializing variable " << params[name]->getGenericParamName();)
+    auto replacement = scopes[params[name]->getGenericParamName()];
     // Fail the materialization if the name was not found. A well typed program should not have
     // this issue.
     if (replacement == nullptr) {
@@ -185,7 +181,6 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     _LLVM_DEBUG(spaces(ident);
                 llvm::dbgs() << "Specializing constructor argument's type " << param << "\n";);
     {
-      ScopeGuard guard(scopes, paramScope);
       auto paramTypeResult = specializeTypeBindingImpl(&param, scopes, FV, ident + 1);
       if (failed(paramTypeResult)) {
         _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)

@@ -1,0 +1,7 @@
+component A() {
+  a := 1;
+  b := for i : 0..10 {
+    x := a * i;
+    x
+  };
+}
