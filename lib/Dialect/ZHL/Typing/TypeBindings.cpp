@@ -105,8 +105,7 @@ mlir::LogicalResult zhl::TypeBinding::subtypeOf(const TypeBinding &other) const 
     /*llvm::dbgs() << "Yes because is the bottom type\n";*/
     return mlir::success();
   }
-  // TODO: Proper equality function
-  if (getName() == other.getName()) {
+  if (*this == other) {
     /*llvm::dbgs() << "Yes because they have the same name\n";*/
     return mlir::success();
   }
@@ -316,24 +315,22 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     } else {
       os << "?";
     }
-    goto tail;
-  }
-  if (isGenericParam()) {
+  } else if (isGenericParam()) {
     os << *genericParamName;
-    goto tail;
-  }
-  os << name;
-  if (specialized) {
-    genericParams.printParams(os);
   } else {
-    genericParams.printNames(os);
+    os << name;
+    if (specialized) {
+      genericParams.printParams(os);
+    } else {
+      genericParams.printNames(os);
+    }
+    if (fullPrintout) {
+      constructorParams.printParams(os, '(', ')');
+    }
+    if (variadic) {
+      os << "...";
+    }
   }
-  constructorParams.printParams(os, '(', ')');
-  if (variadic) {
-    os << "...";
-  }
-  // To avoid duplicating the code of the full printout
-tail:
   if (fullPrintout) {
     os << " { ";
     if (variadic) {

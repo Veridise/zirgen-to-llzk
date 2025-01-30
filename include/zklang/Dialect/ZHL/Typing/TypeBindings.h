@@ -266,7 +266,10 @@ private:
   Params genericParams;
   Params constructorParams;
 
-  std::shared_ptr<TypeBindingImpl> impl; // TODO
+  // TODO: This class is starting to get unwieldy. I plan to refactor it to a more flexible model
+  // but currently we don't have enough tests about this class to prove that I didn't break anything
+  // during refactoring.
+  // std::shared_ptr<TypeBindingImpl> impl;
 };
 
 class TypeBindings {

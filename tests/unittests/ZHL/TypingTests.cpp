@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 //=----------------------------------------------------------=//
 //  Materialization tests
@@ -16,6 +17,8 @@ using namespace zkc;
 
 namespace zhl {
 
+/// Makes gtest about to print TypeBinding instances when reporting
+/// test results
 void PrintTo(const TypeBinding &binding, std::ostream *os) {
   std::string s;
   llvm::raw_string_ostream ss(s);
@@ -92,6 +95,24 @@ TEST_F(SpecializationTest, specializationPropagatesProperly) {
   auto SpecializedFoo = Foo.specialize(diag, {Val});
   ASSERT_TRUE(succeeded(SpecializedFoo));
   ASSERT_EQ(*SpecializedFoo, ExpectedSpecializedFoo);
+}
+
+TEST_F(SpecializationTest, specializationPropagatesProperlyForArrays) {
+  auto &Component = bindings.Component();
+  auto &Type = bindings.Get("Type");
+  auto T = TypeBinding::MakeGenericParam(Type, "T");
+  auto Const10 = bindings.Const(10);
+  auto &Val = bindings.Get("Val");
+  auto &Arr = bindings.Get("Array");
+  TypeBinding ExpectedSpecializedArray(
+      "Array", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}, {{"N", 1}, Const10}}),
+      zhl::ParamsMap(), zhl::MembersMap(), true
+  );
+  ExpectedSpecializedArray.markAsSpecialized();
+  ExpectedSpecializedArray.selfConstructs();
+  auto SpecializedArr = Arr.specialize(diag, {Val, Const10});
+  ASSERT_TRUE(succeeded(SpecializedArr));
+  ASSERT_EQ(*SpecializedArr, ExpectedSpecializedArray);
 }
 
 /// Tests that the specialization specializes the constructor params of a type

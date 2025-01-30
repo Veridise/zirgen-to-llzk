@@ -1,3 +1,4 @@
+#include "zklang/Dialect/ZHL/Typing/Specialization.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Support/Debug.h>
@@ -23,36 +24,37 @@ void spaces(size_t n) {
   }
 }
 
-class ParamsScopeStack {
-public:
-  explicit ParamsScopeStack(const Params &root) { stack.push_back(&root); }
-  const TypeBinding *operator[](std::string_view name) {
-    for (auto It = stack.rbegin(); It != stack.rend(); ++It) {
-      auto level = *It;
-      auto binding = (*level)[name];
-      if (binding != nullptr) {
-        return binding;
+ParamsScopeStack::ParamsScopeStack(const Params &root) { stack.push_back(&root); }
+
+const TypeBinding *ParamsScopeStack::operator[](StringRef name) {
+  for (auto It = stack.rbegin(); It != stack.rend(); ++It) {
+    auto level = *It;
+    auto binding = (*level)[name];
+    if (binding != nullptr) {
+      // If the  binding is a generic parameter with the same name we are looking for
+      // ignore it and continue
+      if (binding->isGenericParam() && binding->getGenericParamName() == name) {
+        continue;
       }
+      return binding;
     }
-    return nullptr;
   }
 
-  void pushScope(const Params &param) { stack.push_back(&param); }
+  return nullptr;
+}
 
-  void popScope() { stack.pop_back(); }
+void ParamsScopeStack::pushScope(const Params &param) { stack.push_back(&param); }
 
-  void print(llvm::raw_ostream &os) {
-    os << "[Scope top -> ";
-    for (auto It = stack.rbegin(); It != stack.rend(); ++It) {
-      (*It)->printMapping(os);
-      os << " -> ";
-    }
-    os << " <- bottom]\n";
+void ParamsScopeStack::popScope() { stack.pop_back(); }
+
+void ParamsScopeStack::print(llvm::raw_ostream &os) const {
+  os << "[Scope top -> ";
+  for (auto It = stack.rbegin(); It != stack.rend(); ++It) {
+    (*It)->printMapping(os);
+    os << " -> ";
   }
-
-private:
-  std::vector<const Params *> stack;
-};
+  os << " <- bottom]\n";
+}
 
 class ScopeGuard {
 public:
@@ -65,7 +67,7 @@ private:
   ParamsScopeStack *stack;
 };
 
-LogicalResult specializeTypeBinding(
+LogicalResult specializeTypeBindingImpl(
     TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t ident
 );
 
@@ -143,7 +145,7 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     auto &newScope = copy.getGenericParamsMapping();
     {
       ScopeGuard guard(scopes, newScope);
-      auto result = specializeTypeBinding(&copy, scopes, FV, ident + 1);
+      auto result = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
       if (failed(result)) {
         _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
         return failure();
@@ -161,7 +163,7 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     TypeBinding copy = dst->getSuperType();
     {
       ScopeGuard guard(scopes, superTypeScope);
-      auto superTypeResult = specializeTypeBinding(&copy, scopes, FV, ident + 1);
+      auto superTypeResult = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
       if (failed(superTypeResult)) {
         _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
         return failure();
@@ -184,10 +186,13 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
                 llvm::dbgs() << "Specializing constructor argument's type " << param << "\n";);
     {
       ScopeGuard guard(scopes, paramScope);
-      auto paramTypeResult = specializeTypeBinding(&param, scopes, FV, ident + 1);
+      auto paramTypeResult = specializeTypeBindingImpl(&param, scopes, FV, ident + 1);
       if (failed(paramTypeResult)) {
         _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
         return failure();
+      }
+      if (param.isGeneric()) {
+        param.markAsSpecialized();
       }
     }
   }
@@ -200,9 +205,12 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
                   llvm::dbgs() << "Specializing member " << name << " of type " << *type << "\n";);
       {
         ScopeGuard guard(scopes, memberScope);
-        if (failed(specializeTypeBinding(&type.value(), scopes, FV, ident + 1))) {
+        if (failed(specializeTypeBindingImpl(&type.value(), scopes, FV, ident + 1))) {
           _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
           return failure();
+        }
+        if (type->isGeneric()) {
+          type->markAsSpecialized();
         }
       }
     } else {
@@ -227,7 +235,7 @@ void printFVs(const llvm::StringSet<> &FV, llvm::raw_ostream &os) {
   os << " }\n";
 }
 
-LogicalResult specializeTypeBinding(
+LogicalResult specializeTypeBindingImpl(
     TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t ident
 ) {
   _LLVM_DEBUG(spaces(ident); scopes.print(llvm::dbgs()); spaces(ident); printFVs(FV, llvm::dbgs());)
@@ -249,6 +257,17 @@ LogicalResult specializeTypeBinding(
   return success();
 }
 
+mlir::LogicalResult zhl::specializeTypeBinding(
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV
+) {
+  return specializeTypeBindingImpl(dst, scopes, FV, 2);
+}
+
+mlir::LogicalResult zhl::specializeTypeBinding(TypeBinding *dst, ParamsScopeStack &scopes) {
+  llvm::StringSet<> emptyFVs;
+  return specializeTypeBindingImpl(dst, scopes, emptyFVs, 2);
+}
+
 mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
     std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params
 ) const {
@@ -263,26 +282,25 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
                        << genericParams.size() << " but got " << params.size();
   }
 
-  // Root cause, the specialization does not update all the places where the type could reference a
-  // generic. I could port the specialization logic I implemented in the materializer here and make
-  // it use this implementation.
-  ParamsMap generics; // The root scope for specialization
-  llvm::StringSet<>
-      freeVariables; // Any type variable introduced by the specialization is a free variable.
+  // The root scope for specialization is a mapping between the n-th generic
+  // parameter and the n-th TypeBinding passed as argument to this method.
+  ParamsMap generics;
+  // Any type variable introduced by the specialization is a free variable.
+  llvm::StringSet<> freeVariables;
   for (unsigned i = 0; i < params.size(); i++) {
-    // TODO: Validation
+    // TODO: Validate that for a parameter of type Val only constant values or generic parameters of
+    // type Val are passed.
     generics.insert({{genericParams.getName(i), i}, params[i]});
     if (params[i].isGenericParam()) {
       freeVariables.insert(params[i].getGenericParamName());
     }
   }
 
-  // TypeBinding specializedBinding(name, loc, *superType, generics, constructorParams, members);
   TypeBinding specializedBinding(*this); // Make a copy to create the specialization
 
   Params initialScope(generics);
   ParamsScopeStack scopeStack(initialScope);
-  auto result = specializeTypeBinding(&specializedBinding, scopeStack, freeVariables, 2);
+  auto result = specializeTypeBindingImpl(&specializedBinding, scopeStack, freeVariables, 2);
   if (failed(result)) {
     _LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << *this << "\n";)
     return failure();

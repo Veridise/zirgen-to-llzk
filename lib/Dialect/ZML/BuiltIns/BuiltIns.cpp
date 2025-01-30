@@ -190,6 +190,8 @@ void zkc::Zmir::addBuiltinBindings(
     const_cast<zhl::TypeBinding &>(String).selfConstructs();
   }
   auto &Type = bindings.CreateBuiltin("Type", bindings.Component());
+  auto T = zhl::TypeBinding::MakeGenericParam(Type, "T");
+  auto N = zhl::TypeBinding::MakeGenericParam(Val, "N");
 
   MAYBE("NondetReg")
   bindings.CreateBuiltin(
@@ -239,7 +241,7 @@ void zkc::Zmir::addBuiltinBindings(
   );
   MAYBE("Array") {
     auto &Array = bindings.CreateBuiltin(
-        "Array", bindings.Component(), zhl::ParamsMap({{{"T", 0}, Type}, {{"N", 1}, Val}})
+        "Array", bindings.Component(), zhl::ParamsMap({{{"T", 0}, T}, {{"N", 1}, N}})
     );
     const_cast<zhl::TypeBinding &>(Array).selfConstructs();
   }
