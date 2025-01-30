@@ -4,10 +4,13 @@
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZHL/Typing/Analysis.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
 
 namespace zkc {
 
@@ -31,6 +34,45 @@ public:
 
   mlir::FailureOr<zhl::TypeBinding> getType(mlir::StringRef name) const {
     return typeAnalysis->getType(name);
+  }
+
+  /// Extracts the binding from the input value/operation and creates a
+  /// cast of the value into the type materialized from the binding.
+  /// If the super type is specified generates an additional SuperCoerceOp
+  /// fromt the binding's type to the super type.
+  /// Assumes the operation has only one result.
+  mlir::FailureOr<mlir::Value>
+  getCastedValue(mlir::Operation *op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    assert(op->getNumResults() == 1);
+    return getCastedValue(op->getResult(0), builder, super);
+  }
+
+  mlir::FailureOr<mlir::Value>
+  getCastedValue(Op op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    return getCastedValue(op.getOperation(), builder, super);
+  }
+
+  mlir::FailureOr<mlir::Value>
+  getCastedValue(mlir::Value value, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    auto binding = getType(value);
+    if (mlir::failed(binding)) {
+      return mlir::failure();
+    }
+    auto materialized = Zmir::materializeTypeBinding(builder.getContext(), *binding);
+    if (!materialized) {
+      return mlir::failure();
+    }
+    if (value.getType() == materialized) {
+      return value;
+    }
+    auto cast = builder.create<mlir::UnrealizedConversionCastOp>(
+        value.getLoc(), mlir::TypeRange(materialized), mlir::ValueRange(value)
+    );
+    mlir::Value result = cast.getResult(0);
+    if (super && super != materialized) {
+      result = builder.create<Zmir::SuperCoerceOp>(value.getLoc(), super, result);
+    }
+    return result;
   }
 
 private:

@@ -425,17 +425,6 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
 /// ZhlSuperLowering
 ///////////////////////////////////////////////////////////
 
-/// A best-effort check of known externs to the type
-/// they return.
-/*mlir::FailureOr<mlir::Type> deduceTypeOfKnownExtern(mlir::StringRef name, mlir::MLIRContext *ctx)
- * {*/
-/*  if (name == "Log") {*/
-/*    return Zmir::ComponentType::get(ctx, "Component");*/
-/*  }*/
-/**/
-/*  return mlir::failure();*/
-/*}*/
-
 mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
     zirgen::Zhl::SuperOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -920,17 +909,18 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   auto itType = Zmir::materializeTypeBinding(getContext(), *innerInputBinding);
   auto outputType = Zmir::materializeTypeBinding(getContext(), *binding);
 
-  auto arrValue = adaptor.getArray();
+  auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
+  assert(succeeded(arrValue) && "this binding was validated above");
 
   auto arrAlloc = rewriter.create<Zmir::AllocArrayOp>(op.getLoc(), outputType);
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
-  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), adaptor.getArray());
+  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), *arrValue);
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
-    auto itVal = builder.create<Zmir::ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv));
+    auto itVal = builder.create<Zmir::ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv));
     // Cast it to a zhl Expr type for the block inlining
     auto itValCast = builder.create<mlir::UnrealizedConversionCastOp>(
         loc, mlir::TypeRange(Zhl::ExprType::get(getContext())), mlir::ValueRange(itVal)
@@ -1066,17 +1056,18 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
 
   auto itType = Zmir::materializeTypeBinding(getContext(), *innerInputBinding);
 
-  auto arrValue = adaptor.getArray();
-
+  auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
+  assert(succeeded(arrValue) && "this binding was validated above and should not fail here");
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
-  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), adaptor.getArray());
+
+  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), *arrValue);
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(adaptor.getInit()),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     mlir::Value lhs =
-        builder.create<Zmir::ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv));
+        builder.create<Zmir::ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv));
     if (lhs.getType() != constructorType.getInputs()[0]) {
       lhs = builder.create<Zmir::SuperCoerceOp>(loc, constructorType.getInputs()[0], lhs);
     }
