@@ -7,13 +7,7 @@
 using namespace mlir;
 using namespace zhl;
 
-// TODO: Use LLVM debug mechanism, but that requires a Debug build of LLVM
-#define ENABLE_DEBUG
-#ifdef ENABLE_DEBUG
-#define _LLVM_DEBUG(X) {X}
-#else
-#define _LLVM_DEBUG(X)
-#endif
+#define DEBUG_TYPE "zhl-type-binding-specialization"
 
 void spaces(size_t n) {
   for (size_t i = 0; i < n; i++) {
@@ -66,34 +60,34 @@ LogicalResult specializeTypeBindingImpl(
 inline LogicalResult specializeTypeBinding_genericParamCase(
     TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t ident
 ) {
-  _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Specializing " << *dst << "\n";)
+  LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Specializing " << *dst << "\n");
   auto varName = dst->getGenericParamName();
   if (FV.contains(varName)) {
-    _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Is a free variable\n";)
+    LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Is a free variable\n");
     return success();
   }
   auto replacement = scopes[varName];
   if (replacement == nullptr) {
-    _LLVM_DEBUG(spaces(ident);
-                llvm::dbgs() << "Failed to convert because " << varName << " was not found\n";)
+    LLVM_DEBUG(spaces(ident);
+               llvm::dbgs() << "Failed to convert because " << varName << " was not found\n");
     return failure();
   }
-  _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Potential replacement " << *replacement << "\n";)
+  LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Potential replacement " << *replacement << "\n");
   // If the replacement is the type marker don't do anything
   if (replacement->isTypeMarker()) {
-    _LLVM_DEBUG(spaces(ident);
-                llvm::dbgs() << "Not replaced because there is no actual type to replace with\n";)
+    LLVM_DEBUG(spaces(ident);
+               llvm::dbgs() << "Not replaced because there is no actual type to replace with\n");
     return success();
   }
   // If the variable's replacement is a Val that is not constant then we don't do anything.
   if (!replacement->isConst() && replacement->isVal() && dst->getSuperType().isVal()) {
-    _LLVM_DEBUG(spaces(ident);
-                llvm::dbgs() << "Not replaced because there is no actual value to replace with\n";)
+    LLVM_DEBUG(spaces(ident);
+               llvm::dbgs() << "Not replaced because there is no actual value to replace with\n");
     return success();
   }
   // Create a copy of the replacement in the destination
   *dst = *replacement;
-  _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << *dst << "  (generic)\n";)
+  LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << *dst << "  (generic)\n");
   return success();
 }
 
@@ -105,60 +99,62 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     if (!params[name]->isGenericParam()) {
       continue;
     }
-    _LLVM_DEBUG(spaces(ident);
-                llvm::dbgs() << "Variable " << name << " binds to " << *params[name] << "\n";
-                spaces(ident);
-                llvm::dbgs() << "Specializing variable " << params[name]->getGenericParamName();)
+    LLVM_DEBUG(spaces(ident);
+               llvm::dbgs() << "Variable " << name << " binds to " << *params[name] << "\n";
+               spaces(ident);
+               llvm::dbgs() << "Specializing variable " << params[name]->getGenericParamName());
     auto replacement = scopes[params[name]->getGenericParamName()];
     // Fail the materialization if the name was not found. A well typed program should not have
     // this issue.
     if (replacement == nullptr) {
-      _LLVM_DEBUG(llvm::dbgs() << " failed to convert because " << name << " was not found\n";)
+      LLVM_DEBUG(llvm::dbgs() << " failed to convert because " << name << " was not found\n");
       return failure();
     }
 
     // If the replacement is the type marker don't do anything
     if (replacement->isTypeMarker()) {
-      _LLVM_DEBUG(llvm::dbgs(
-                  ) << " was not replaced because there is no actual type to replace with\n";)
+      LLVM_DEBUG(
+          llvm::dbgs() << " was not replaced because there is no actual type to replace with\n"
+      );
       continue;
     }
 
     // If the variable's replacement is a Val that is not constant then we don't do anything.
     // This applies to the variables whose parent is of Val type
     if (!replacement->isConst() && replacement->isVal() && params[name]->getSuperType().isVal()) {
-      _LLVM_DEBUG(llvm::dbgs(
-                  ) << " was not replaced because there is no actual value to replace with\n";)
+      LLVM_DEBUG(
+          llvm::dbgs() << " was not replaced because there is no actual value to replace with\n"
+      );
       continue;
     }
     // Create a copy of the actual type
     auto copy = *replacement;
-    _LLVM_DEBUG(llvm::dbgs() << " replaced with " << copy << "\n";)
+    LLVM_DEBUG(llvm::dbgs() << " replaced with " << copy << "\n");
     // And specialize it if necessary
     auto &newScope = copy.getGenericParamsMapping();
     {
       ScopeGuard guard(scopes, newScope);
       auto result = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
       if (failed(result)) {
-        _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
+        LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");
         return failure();
       }
     }
-    _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << copy << "  (param)\n";)
+    LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << copy << "  (param)\n");
     // Replace the type binding with the specialization we just generated.
     dst->replaceGenericParamByName(name, copy);
   }
   // After the replacement follow the chain on super types and apply specializations.
   if (dst->hasSuperType()) {
     auto &superTypeScope = dst->getSuperType().getGenericParamsMapping();
-    _LLVM_DEBUG(spaces(ident);
-                llvm::dbgs() << "Specializing super type " << dst->getSuperType() << "\n";)
+    LLVM_DEBUG(spaces(ident);
+               llvm::dbgs() << "Specializing super type " << dst->getSuperType() << "\n");
     TypeBinding copy = dst->getSuperType();
     {
       ScopeGuard guard(scopes, superTypeScope);
       auto superTypeResult = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
       if (failed(superTypeResult)) {
-        _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
+        LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");
         return failure();
       }
       if (copy.isGeneric()) {
@@ -168,19 +164,18 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
         dst->getSuperType() = copy;
       }
     }
-    _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << dst->getSuperType() << "  (super type)\n";
-    )
+    LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << dst->getSuperType() << "  (super type)\n");
   }
   // Specialize the types of the constructor's arguments
   auto &constructorParams = dst->getConstructorParams();
   for (auto &param : constructorParams) {
     auto &paramScope = param.getGenericParamsMapping();
-    _LLVM_DEBUG(spaces(ident);
-                llvm::dbgs() << "Specializing constructor argument's type " << param << "\n";);
+    LLVM_DEBUG(spaces(ident);
+               llvm::dbgs() << "Specializing constructor argument's type " << param << "\n");
     {
       auto paramTypeResult = specializeTypeBindingImpl(&param, scopes, FV, ident + 1);
       if (failed(paramTypeResult)) {
-        _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
+        LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");
         return failure();
       }
       if (param.isGeneric()) {
@@ -193,12 +188,12 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
   for (auto &[name, type] : members) {
     if (type.has_value()) {
       auto &memberScope = type->getGenericParamsMapping();
-      _LLVM_DEBUG(spaces(ident);
-                  llvm::dbgs() << "Specializing member " << name << " of type " << *type << "\n";);
+      LLVM_DEBUG(spaces(ident);
+                 llvm::dbgs() << "Specializing member " << name << " of type " << *type << "\n");
       {
         ScopeGuard guard(scopes, memberScope);
         if (failed(specializeTypeBindingImpl(&type.value(), scopes, FV, ident + 1))) {
-          _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n";)
+          LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");
           return failure();
         }
         if (type->isGeneric()) {
@@ -206,8 +201,8 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
         }
       }
     } else {
-      _LLVM_DEBUG(spaces(ident);
-                  llvm::dbgs() << "Ignored " << name << " because it does not have a type";)
+      LLVM_DEBUG(spaces(ident);
+                 llvm::dbgs() << "Ignored " << name << " because it does not have a type");
     }
   }
 
@@ -230,7 +225,7 @@ void printFVs(const llvm::StringSet<> &FV, llvm::raw_ostream &os) {
 LogicalResult specializeTypeBindingImpl(
     TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t ident
 ) {
-  _LLVM_DEBUG(spaces(ident); scopes.print(llvm::dbgs()); spaces(ident); printFVs(FV, llvm::dbgs());)
+  LLVM_DEBUG(spaces(ident); scopes.print(llvm::dbgs()); spaces(ident); printFVs(FV, llvm::dbgs()));
   // If the destionation is null do nothing
   if (dst == nullptr) {
     return success();
@@ -245,7 +240,7 @@ LogicalResult specializeTypeBindingImpl(
   }
 
   // Do nothing in the other cases.
-  _LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Nothing\n";)
+  LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Nothing\n");
   return success();
 }
 
@@ -294,7 +289,7 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   ParamsScopeStack scopeStack(initialScope);
   auto result = specializeTypeBindingImpl(&specializedBinding, scopeStack, freeVariables, 2);
   if (failed(result)) {
-    _LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << *this << "\n";)
+    LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << *this << "\n");
     return failure();
   }
 

@@ -8,23 +8,17 @@
 #include <mlir/IR/MLIRContext.h>
 #include <unordered_set>
 
+#define DEBUG_TYPE "zml-type-materialization"
+
 using namespace mlir;
 using namespace zhl;
 
-// TODO: Use LLVM debug mechanism, but that requires a Debug build of LLVM
-#define ENABLE_DEBUG
-#ifdef ENABLE_DEBUG
-#define _LLVM_DEBUG(X) {X}
-#else
-#define _LLVM_DEBUG(X)
-#endif
-
 namespace zkc::Zmir {
 
-/*static int errIdent;*/
 void errMsg(const TypeBinding &binding, StringRef reason) {
-  _LLVM_DEBUG(llvm::dbgs() << "failed to materialize type for "; binding.print(llvm::dbgs());
-              llvm::dbgs() << ": " << reason << "\n";);
+  LLVM_DEBUG(
+      llvm::dbgs() << "failed to materialize type for " << binding << ": " << reason << "\n"
+  );
 }
 
 namespace {
@@ -108,10 +102,6 @@ private:
     std::string s;
     llvm::raw_string_ostream ss(s);
     binding.print(ss);
-    /*llvm::dbgs() << "              - bind: " << s << "\n";*/
-    /*for (auto &se : seen) {*/
-    /*llvm::dbgs() << "              - seen: " << se << "\n";*/
-    /*}*/
     std::unordered_set set(seen.begin(), seen.end());
     assert(set.find(s) == set.end() && "cycle detected");
     seen.push_back(s);
@@ -128,12 +118,6 @@ Type materializeTypeBinding(MLIRContext *context, const TypeBinding &binding) {
   return m.materializeTypeBinding(binding);
 }
 
-void spaces(size_t n) {
-  for (size_t i = 0; i < n; i++) {
-    llvm::dbgs() << "|  ";
-  }
-}
-
 /// Materializes a type binding after replacing generic parameters that are in scope with the actual
 /// instantiated type.
 Type specializeAndMaterializeTypeBinding(
@@ -142,7 +126,7 @@ Type specializeAndMaterializeTypeBinding(
   // If the scope is empty or the binding we are specializing is not generic then there are no type
   // variables.
   if (scope.empty() || !binding.isGeneric()) {
-    _LLVM_DEBUG(binding.print(llvm::dbgs()); llvm::dbgs() << ": no specialization needed\n";)
+    LLVM_DEBUG(llvm::dbgs() << binding << ": no specialization needed\n");
     return materializeTypeBinding(ctx, binding);
   }
 
@@ -151,7 +135,7 @@ Type specializeAndMaterializeTypeBinding(
   ParamsScopeStack scopeStack(scope);
   auto result = zhl::specializeTypeBinding(&copy, scopeStack);
   if (failed(result)) {
-    _LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << binding << "\n";)
+    LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << binding << "\n");
     return nullptr;
   }
 
@@ -166,21 +150,21 @@ FunctionType materializeTypeBindingConstructor(OpBuilder &builder, const TypeBin
   std::vector<Type> args;
   auto retType = specializeAndMaterializeTypeBinding(builder.getContext(), binding, genericParams);
   if (!retType) {
-    _LLVM_DEBUG(llvm::dbgs() << "failed to materialize the return type for " << binding << "\n";)
+    LLVM_DEBUG(llvm::dbgs() << "failed to materialize the return type for " << binding << "\n");
     return nullptr;
   }
 
-  _LLVM_DEBUG(llvm::dbgs() << "For binding " << binding << " constructor types are: \n";)
+  LLVM_DEBUG(llvm::dbgs() << "For binding " << binding << " constructor types are: \n");
   auto &params = binding.getConstructorParams();
   std::transform(params.begin(), params.end(), std::back_inserter(args), [&](auto &argBinding) {
-    _LLVM_DEBUG(llvm::dbgs() << "|  " << argBinding << "\n";)
+    LLVM_DEBUG(llvm::dbgs() << "|  " << argBinding << "\n");
     auto materializedType =
         specializeAndMaterializeTypeBinding(builder.getContext(), argBinding, genericParams);
-    _LLVM_DEBUG(llvm::dbgs() << "Materialized to " << materializedType << "\n";)
+    LLVM_DEBUG(llvm::dbgs() << "Materialized to " << materializedType << "\n");
     return materializedType;
   });
   if (std::any_of(args.begin(), args.end(), [](Type t) { return !t; })) {
-    _LLVM_DEBUG(llvm::dbgs() << "failed to materialize an argument type for " << binding << "\n";)
+    LLVM_DEBUG(llvm::dbgs() << "Failed to materialize an argument type for " << binding << "\n");
     return nullptr;
   }
 
