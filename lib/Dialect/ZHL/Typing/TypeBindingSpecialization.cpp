@@ -7,9 +7,6 @@
 using namespace mlir;
 using namespace zhl;
 
-// Copied from Materialize.cpp
-// TODO: Unify both implementations if specialization is still necessary in Materialize.cpp
-
 // TODO: Use LLVM debug mechanism, but that requires a Debug build of LLVM
 #define ENABLE_DEBUG
 #ifdef ENABLE_DEBUG
