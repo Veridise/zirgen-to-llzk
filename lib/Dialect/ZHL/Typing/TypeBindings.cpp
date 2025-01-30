@@ -1,4 +1,5 @@
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
+#include <cassert>
 #include <iterator>
 #include <mlir/Support/LogicalResult.h>
 
@@ -33,6 +34,20 @@ void Params::printNames(llvm::raw_ostream &os, char header, char footer) const {
 
 void Params::printParams(llvm::raw_ostream &os, char header, char footer) const {
   print<TypeBinding>(params, os, [&](const auto &e) { e.print(os); }, header, footer);
+}
+
+void Params::printMapping(llvm::raw_ostream &os) const {
+  os << "{ ";
+  size_t c = 1;
+  size_t siz = params.size();
+  for (size_t i = 0; i < siz; i++) {
+    os << names[i] << ": " << params.at(i);
+    if (c < siz) {
+      os << ", ";
+    }
+    c++;
+  }
+  os << " }";
 }
 
 template <typename Elt>
@@ -90,8 +105,7 @@ mlir::LogicalResult zhl::TypeBinding::subtypeOf(const TypeBinding &other) const 
     /*llvm::dbgs() << "Yes because is the bottom type\n";*/
     return mlir::success();
   }
-  // TODO: Proper equality function
-  if (getName() == other.getName()) {
+  if (*this == other) {
     /*llvm::dbgs() << "Yes because they have the same name\n";*/
     return mlir::success();
   }
@@ -158,6 +172,56 @@ zhl::TypeBinding::TypeBinding(
 
 zhl::TypeBinding::TypeBinding(mlir::Location loc)
     : builtin(true), name("Component"), loc(loc), superType(nullptr) {}
+
+zhl::TypeBinding::TypeBinding(const TypeBinding &other)
+    : variadic(other.variadic), specialized(other.specialized),
+      selfConstructor(other.selfConstructor), builtin(other.builtin), name(other.name),
+      loc(other.loc), constVal(other.constVal), genericParamName(other.genericParamName),
+      superType(other.superType), members(other.members), genericParams(other.genericParams),
+      constructorParams(other.constructorParams) {}
+
+zhl::TypeBinding::TypeBinding(TypeBinding &&other)
+    : variadic(std::move(other.variadic)), specialized(std::move(other.specialized)),
+      selfConstructor(std::move(other.selfConstructor)), builtin(std::move(other.builtin)),
+      name(std::move(other.name)), loc(std::move(other.loc)), constVal(std::move(other.constVal)),
+      genericParamName(std::move(other.genericParamName)), superType(std::move(other.superType)),
+      members(std::move(other.members)), genericParams(std::move(other.genericParams)),
+      constructorParams(std::move(other.constructorParams)) {}
+
+zhl::TypeBinding &zhl::TypeBinding::operator=(const TypeBinding &other) {
+  variadic = other.variadic;
+  specialized = other.specialized;
+  selfConstructor = other.selfConstructor;
+  builtin = other.builtin;
+  name = other.name;
+  loc = other.loc;
+  constVal = other.constVal;
+  genericParamName = other.genericParamName;
+  superType = other.superType;
+  members = other.members;
+  genericParams = other.genericParams;
+  constructorParams = other.constructorParams;
+  return *this;
+}
+
+zhl::TypeBinding &zhl::TypeBinding::operator=(TypeBinding &&other) {
+  if (this != &other) {
+    variadic = std::move(other.variadic);
+    specialized = std::move(other.specialized);
+    selfConstructor = std::move(other.selfConstructor);
+    builtin = std::move(other.builtin);
+    name = std::move(other.name);
+    loc = std::move(other.loc);
+    constVal = std::move(other.constVal);
+    genericParamName = std::move(other.genericParamName);
+    superType = std::move(other.superType);
+    members = std::move(other.members);
+    genericParams = std::move(other.genericParams);
+    constructorParams = std::move(other.constructorParams);
+  }
+  return *this;
+}
+
 zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
     print(llvm::dbgs());
@@ -205,30 +269,6 @@ zhl::TypeBinding::getArrayElement(std::function<mlir::InFlightDiagnostic()> emit
   return genericParams.getParam(0);
 }
 
-mlir::FailureOr<TypeBinding> zhl::TypeBinding::specialize(
-    std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params
-) const {
-  if (specialized) {
-    return emitError() << "can't respecialize type '" << getName() << "'";
-  }
-  if (genericParams.size() == 0) {
-    return emitError() << "type '" << name << "' is not generic";
-  }
-  if (genericParams.size() != params.size()) {
-    return emitError() << "wrong number of specialization parameters. Expected "
-                       << genericParams.size() << " and got " << params.size();
-  }
-  ParamsMap generics;
-  for (unsigned i = 0; i < params.size(); i++) {
-    // TODO: Validation
-    generics.insert({{genericParams.getName(i), i}, params[i]});
-  }
-
-  TypeBinding specializedBinding(name, loc, *superType, generics, constructorParams, members);
-  specializedBinding.specialized = true;
-  return variadic ? WrapVariadic(specializedBinding) : specializedBinding;
-}
-
 zhl::TypeBinding zhl::TypeBinding::WrapVariadic(const TypeBinding &t) {
   TypeBinding w = t;
   w.variadic = true;
@@ -244,30 +284,96 @@ std::vector<mlir::Location> TypeBinding::getConstructorParamLocations() const {
   return locs;
 }
 
-const Params &TypeBinding::getConstructorParams() const { return constructorParams; }
+bool Params::operator==(const Params &other) const {
+  return params == other.params && names == other.names;
+}
 
-void zhl::TypeBinding::print(llvm::raw_ostream &os) const {
+bool TypeBinding::operator==(const TypeBinding &other) const {
+  bool superTypeIsEqual;
+  if (superType == nullptr && other.superType == nullptr) {
+    superTypeIsEqual = true;
+  } else if (superType == nullptr || other.superType == nullptr) {
+    superTypeIsEqual = false;
+  } else {
+    superTypeIsEqual = *superType == *other.superType;
+  }
+
+  return superTypeIsEqual && variadic == other.variadic && specialized == other.specialized &&
+         selfConstructor == other.selfConstructor && builtin == other.builtin &&
+         name == other.name && /*loc == other.loc &&*/ constVal == other.constVal &&
+         genericParamName == other.genericParamName && members == other.members &&
+         genericParams == other.genericParams && constructorParams == other.constructorParams;
+}
+
+const Params &TypeBinding::getConstructorParams() const { return constructorParams; }
+Params &TypeBinding::getConstructorParams() { return constructorParams; }
+
+void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   if (isConst()) {
     if (constVal.has_value()) {
       os << *constVal;
     } else {
       os << "?";
     }
-    return;
-  }
-  if (isGenericParam()) {
+  } else if (isGenericParam()) {
     os << *genericParamName;
-    return;
-  }
-  os << name;
-  if (specialized) {
-    genericParams.printParams(os);
   } else {
-    genericParams.printNames(os);
+    os << name;
+    if (specialized) {
+      genericParams.printParams(os);
+    } else {
+      genericParams.printNames(os);
+    }
+    if (fullPrintout) {
+      constructorParams.printParams(os, '(', ')');
+    }
+    if (variadic) {
+      os << "...";
+    }
   }
-  constructorParams.printParams(os, '(', ')');
-  if (variadic) {
-    os << "...";
+  if (fullPrintout) {
+    os << " { ";
+    if (variadic) {
+      os << "variadic ";
+    }
+    if (specialized) {
+      os << "specialized ";
+    }
+    if (selfConstructor) {
+      os << "selfConstructor ";
+    }
+    if (builtin) {
+      os << "builtin ";
+    }
+    if (constVal.has_value()) {
+      os << "const(" << *constVal << ") ";
+    }
+    if (genericParamName.has_value()) {
+      os << "genericParam(" << *genericParamName << ") ";
+    }
+    os << "}";
+    if (!members.empty()) {
+      os << " members {";
+      size_t c = 1;
+      size_t siz = members.size();
+      for (auto &[memberName, type] : members) {
+        os << memberName << ": ";
+        if (type.has_value()) {
+          os << *type;
+        } else {
+          os << "⊥";
+        }
+        if (c < siz) {
+          os << ", ";
+        }
+        c++;
+      }
+      os << " }";
+    }
+    if (hasSuperType()) {
+      os << " :> ";
+      getSuperType().print(os, fullPrintout);
+    }
   }
 }
 
@@ -298,6 +404,11 @@ bool zhl::TypeBinding::isKnownConst() const { return isConst() && constVal.has_v
 bool TypeBinding::isGeneric() const { return genericParams.size() > 0; }
 
 bool TypeBinding::isSpecialized() const { return !isGeneric() || specialized; }
+
+void TypeBinding::markAsSpecialized() {
+  assert(isGeneric());
+  specialized = true;
+}
 
 ArrayRef<std::string> TypeBinding::getGenericParamNames() const { return genericParams.getNames(); }
 
@@ -370,8 +481,8 @@ const zhl::TypeBinding &zhl::TypeBindings::Manage(const zhl::TypeBinding &bindin
   return managedBindings.back();
 }
 
-TypeBindings::TypeBindings(OpBuilder &builder)
-    : unk(builder.getUnknownLoc()), bottom(TypeBinding(BOTTOM, unk, Component())) {
+TypeBindings::TypeBindings(Location defaultLoc)
+    : unk(defaultLoc), bottom(TypeBinding(BOTTOM, unk, Component())) {
   (void)Component();
 }
 void zhl::TypeBinding::selfConstructs() {
@@ -386,6 +497,7 @@ void zhl::TypeBinding::selfConstructs() {
   constructorParams = map;
 }
 const zhl::MembersMap &zhl::TypeBinding::getMembers() const { return members; }
+zhl::MembersMap &zhl::TypeBinding::getMembers() { return members; }
 mlir::Location zhl::TypeBinding::getLocation() const { return loc; }
 const zhl::TypeBinding &zhl::TypeBinding::getSuperType() const {
   assert(superType != nullptr);
