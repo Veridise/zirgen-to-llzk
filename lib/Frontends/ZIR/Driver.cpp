@@ -238,8 +238,8 @@ LogicalResult Driver::run() {
   configureLoweringPipeline();
   pm.dump();
   if (failed(pm.run(*mod))) {
-    llvm::errs() << "an internal compiler error ocurred while lowering this module:\n";
-    // mod->print(llvm::errs());
+    llvm::errs() << "An internal compiler error ocurred while lowering this module";
+    DEBUG_WITH_TYPE("zir-driver-dump-on-error", llvm::errs() << ":\n"; mod->print(llvm::errs()));
     return failure();
   }
 
