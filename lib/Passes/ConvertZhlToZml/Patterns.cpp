@@ -967,11 +967,15 @@ mlir::LogicalResult ZhlSuperLoweringInMap::matchAndRewrite(
   if (!loopOriginalOp || loopOriginalOp != rewriter.getStringAttr("map")) {
     return mlir::failure();
   }
+  auto value = getCastedValue(adaptor.getValue(), rewriter);
+  if (failed(value)) {
+    return op->emitError() << "failed to type check super value";
+  }
 
   auto iv = loopOp.getInductionVar();
   auto arr = loopOp.getRegionIterArgs().front();
 
-  rewriter.create<Zmir::WriteArrayOp>(op.getLoc(), arr, iv, adaptor.getValue());
+  rewriter.create<Zmir::WriteArrayOp>(op.getLoc(), arr, iv, *value);
   rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, loopOp.getRegionIterArgs());
 
   return mlir::success();
@@ -1054,6 +1058,10 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
                              << constructorType.getInputs().size() << " arguments";
   }
 
+  auto init = getCastedValue(adaptor.getInit(), rewriter);
+  if (failed(init)) {
+    return op->emitError() << "failed to type cast init value";
+  }
   auto itType = Zmir::materializeTypeBinding(getContext(), *innerInputBinding);
 
   auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
@@ -1064,7 +1072,7 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), *arrValue);
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(adaptor.getInit()),
+      op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(*init),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     mlir::Value lhs =
         builder.create<Zmir::ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv));
@@ -1078,8 +1086,8 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
     auto ref = builder.create<Zmir::ConstructorRefOp>(loc, constructorType, accBinding->getName());
     auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, mlir::ValueRange({lhs, rhs}));
     mlir::Value acc = call.getResult(0);
-    if (acc.getType() != adaptor.getInit().getType()) {
-      acc = builder.create<Zmir::SuperCoerceOp>(loc, adaptor.getInit().getType(), acc);
+    if (acc.getType() != init->getType()) {
+      acc = builder.create<Zmir::SuperCoerceOp>(loc, init->getType(), acc);
     }
     builder.create<mlir::scf::YieldOp>(loc, acc);
   }
