@@ -209,7 +209,7 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
   // TODO: Validation that the inner type of the array is a subtype of the first argument of
   // operands[2]
   // TODO: Validation that the init type is a subtype of the second arguments of operands[2]
-  return operands[2];
+  return operands[1];
 }
 mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
     typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
