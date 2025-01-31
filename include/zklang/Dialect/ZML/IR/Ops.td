@@ -161,7 +161,7 @@ def NopOp : ZmirOp<"nop", [Pure]> {
   let arguments = (ins Variadic<AnyZmirType>:$ins);
   let results = (outs Variadic<AnyZmirType>:$outs);
 
-  let assemblyFormat = "$ins `:` type($ins) `->` type($outs) attr-dict";
+  let assemblyFormat = "($ins `:` type($ins)^ `->`)? type($outs) attr-dict";
 }
 
 def GetSelfOp : ZmirOp<"self", [Pure]> {
@@ -202,9 +202,8 @@ def ConstrainCallOp : ZmirOp<"constrain_call"> {
   let summary = "calls the constrain function";
 
   let arguments = (ins TypeVarOr<Component>:$self, Variadic<AnyType>:$args);
-
   let assemblyFormat = [{
-    $self `(` $args `)` `:` `(` type($self) `,` type($args) `)` attr-dict
+    $self `(` $args `)` `:`  type($self) (`,` type($args)^ )?  attr-dict
   }];
 }
 

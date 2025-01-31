@@ -35,7 +35,7 @@ def Component : ZmirType<"Component", "comp"> {
       OptionalParameter<"mlir::Type">:$superType,
       OptionalArrayRefParameter<"::mlir::Attribute">:$params, "bool":$builtin);
   let assemblyFormat = [{
-   `<` $name $builtin (`<` $params^ `>`)?(`:``>`$superType^)?  `>` }];
+   `<` $name $builtin (`<` $params^ `>`)?(`:` $superType^)?  `>` }];
 
   let extraClassDeclaration = [{
 
