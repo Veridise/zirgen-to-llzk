@@ -1,5 +1,6 @@
 #include "zklang/Passes/ConvertZhlToZml/Helpers.h"
 #include "zklang/Dialect/ZML/IR/Ops.h"
+#include "zklang/Dialect/ZML/Typing/Materialize.h"
 
 using namespace mlir;
 using namespace zkc::Zmir;
@@ -54,5 +55,60 @@ mlir::Operation *storeValueInTemporary(
   // Read the temporary back to a SSA value
   return rewriter.create<Zmir::ReadFieldOp>(loc, fieldType, self, name);
 }
+
+mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root) {
+  auto calleeComp = root.lookupSymbol<Zmir::ComponentInterface>(name);
+  if (calleeComp) {
+    return calleeComp;
+  }
+
+  // Zhl Component ops don't declare its symbols in the symbol table
+  for (auto zhlOp : root.getOps<zirgen::Zhl::ComponentOp>()) {
+    if (zhlOp.getName() == name) {
+      return zhlOp;
+    }
+  }
+  return nullptr;
+}
+
+bool calleeIsBuiltin(mlir::Operation *op) {
+  if (auto zmlOp = mlir::dyn_cast<Zmir::ComponentInterface>(op)) {
+    return zmlOp.getBuiltin();
+  }
+  return false;
+}
+
+mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
+    mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
+    mlir::OpBuilder &builder
+) {
+  auto binding = typeAnalysis.getType(value);
+  if (failed(binding)) {
+    return op->emitError() << "failed to type check";
+  }
+  auto rootModule = op->getParentOfType<mlir::ModuleOp>();
+  auto *calleeComp = findCallee(binding->getName(), rootModule);
+  if (!calleeComp) {
+    return op->emitError() << "could not find component with name " << binding->getName();
+  }
+  auto constructorType = Zmir::materializeTypeBindingConstructor(builder, *binding);
+
+  return CtorCallBuilder(constructorType, *binding, calleeIsBuiltin(calleeComp));
+}
+
+mlir::Value
+CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args) {
+  auto ref =
+      builder.create<Zmir::ConstructorRefOp>(loc, ctorType, compBinding.getName(), isBuiltin);
+  auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
+  return call.getResult(0);
+}
+
+mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }
+
+CtorCallBuilder::CtorCallBuilder(
+    mlir::FunctionType type, const zhl::TypeBinding &binding, bool builtin
+)
+    : ctorType(type), compBinding(binding), isBuiltin(builtin) {}
 
 } // namespace zkc
