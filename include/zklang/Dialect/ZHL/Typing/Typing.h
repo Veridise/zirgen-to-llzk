@@ -9,6 +9,7 @@ namespace zhl {
 class TypingRule {
 public:
   explicit TypingRule(TypeBindings &bindings);
+  virtual ~TypingRule() = default;
 
   TypeBindings &getBindings() const;
 
