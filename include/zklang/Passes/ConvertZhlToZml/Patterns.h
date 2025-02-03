@@ -4,6 +4,7 @@
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZHL/Typing/Analysis.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
+#include "zklang/Passes/ConvertZhlToZml/Helpers.h"
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
@@ -58,10 +59,16 @@ public:
     if (mlir::failed(binding)) {
       return mlir::failure();
     }
-    auto materialized = Zmir::materializeTypeBinding(builder.getContext(), *binding);
-    if (!materialized) {
-      return mlir::failure();
-    }
+    return getCastedValue(value, *binding, builder, super);
+  }
+
+  /// A non-failing version that takes a binding as additional parameter
+  mlir::Value getCastedValue(
+      mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+      mlir::Type super = nullptr
+  ) const {
+    auto materialized = Zmir::materializeTypeBinding(builder.getContext(), binding);
+    assert(materialized);
     if (value.getType() == materialized) {
       return value;
     }
@@ -73,6 +80,11 @@ public:
       result = builder.create<Zmir::SuperCoerceOp>(value.getLoc(), super, result);
     }
     return result;
+  }
+
+  mlir::FailureOr<CtorCallBuilder>
+  makeCtorCallBuilder(mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder) {
+    return CtorCallBuilder::Make(op, value, *typeAnalysis, builder);
   }
 
 private:
@@ -127,8 +139,6 @@ private:
 
   mlir::Value
   prepareArgument(mlir::Value, mlir::Type, mlir::Location, mlir::ConversionPatternRewriter &) const;
-
-  mlir::FailureOr<mlir::Type> getTypeFromName(mlir::StringRef) const;
 };
 
 /// Converts `zhl.constrain` ops to `zmir.constrain` ones.

@@ -5,6 +5,7 @@
 #include "zklang/Dialect/ZML/IR/Ops.h"
 #include <cstdint>
 #include <vector>
+#include <zklang/Dialect/ZHL/Typing/Analysis.h>
 
 namespace zkc {
 
@@ -31,5 +32,34 @@ mlir::Operation *storeValueInTemporary(
     mlir::Location loc, Zmir::ComponentOp callerComp, mlir::Type fieldType, mlir::Value value,
     mlir::ConversionPatternRewriter &rewriter
 );
+
+/// Finds the definition of the callee component. If the
+/// component was defined before the current operation wrt the physical order of
+/// the file then its defined by a ZML ComponentInterface op, if it hasn't been
+/// converted yet it is still a ZHL Component op. If the name could not be found
+/// in either form returns nullptr.
+mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root);
+
+/// Returns true if the operation is a component and has the builtin attribute
+bool calleeIsBuiltin(mlir::Operation *op);
+
+/// Helper for creating the ops that represent the call to a component's constructor
+class CtorCallBuilder {
+public:
+  static mlir::FailureOr<CtorCallBuilder> Make(
+      mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
+      mlir::OpBuilder &builder
+  );
+
+  mlir::Value build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args);
+  mlir::FunctionType getCtorType() const;
+
+private:
+  CtorCallBuilder(mlir::FunctionType type, const zhl::TypeBinding &binding, bool builtin);
+
+  mlir::FunctionType ctorType;
+  const zhl::TypeBinding compBinding;
+  bool isBuiltin;
+};
 
 } // namespace zkc
