@@ -96,7 +96,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
     message(WARNING "Gcov reports are not supported by the test environment.")
     message(WARNING "Set ZKLANG_FORCE_GCC_COVERAGE to enable coverage in GCC.")
     if(ZKLANG_FORCE_GCC_COVERAGE)
-      add_compile_options(--coverage -O0 -g)
+      add_compile_options(--coverage -g)
       add_link_options(--coverage)
     endif()
   else()
@@ -106,12 +106,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
     )
   endif()
 
-  add_compile_options(-O0 -g)
+  add_compile_options(-g)
 endif()
 
 
 # Temporary arrangement for enabling ASAN on the "debug" nix derivations
-if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
   # NOTE: undefined behavior sanitizer ("undefined") has been removed due to its
   # poor interaction with gtest fixtures and other standard MLIR/LLVM
   # operations.

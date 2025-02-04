@@ -1,8 +1,13 @@
 #include "zklang/Dialect/ZHL/Typing/Typing.h"
 #include "zklang/Dialect/ZHL/Typing/Rules.h"
+#include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringSet.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/OpBindings.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 using namespace mlir;
 using namespace zirgen::Zhl;
@@ -80,6 +85,37 @@ inline void zip(In1 begin1, In1 end1, In2 begin2, Out out) {
   std::transform(begin1, end1, begin2, out, [](auto lhs, auto rhs) { return std::pair(lhs, rhs); });
 }
 
+FailureOr<TypeBinding> applyRule(
+    Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules,
+    const TypingRule &rule, ArrayRef<TypeBinding> operands
+) {
+  // Check if the operation has regions and evaluate them first
+  auto regions = op->getRegions();
+  BlockScopesGuard regionScopes(scope);
+
+  if (!std::all_of(regions.begin(), regions.end(), [&](auto &region) {
+    auto valueBindings =
+        rule.bindRegionArguments(ValueRange(region.getArguments()), op, operands, scope);
+    if (failed(valueBindings)) {
+      return false;
+    }
+    for (auto [value, type] : llvm::zip_equal(
+             mlir::iterator_range(region.args_begin(), region.args_end()), *valueBindings
+         )) {
+      (void)bindings.addValue(value, type);
+    }
+    return succeeded(typeCheckRegion(region, regionScopes.get(), rules, bindings));
+  })) {
+    return failure();
+  }
+
+  auto checkResult = rule.typeCheck(op, operands, scope, regionScopes);
+  if (succeeded(checkResult)) {
+    return bindings.add(op, checkResult);
+  }
+  return failure();
+}
+
 FailureOr<TypeBinding> typeCheckOp(
     Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules
 ) {
@@ -91,47 +127,20 @@ FailureOr<TypeBinding> typeCheckOp(
   if (failed(operands)) {
     return failure();
   }
-  // Check if the operation has regions and evaluate them first
-  auto regions = op->getRegions();
-  auto nRegions = op->getNumRegions();
-  BlockScopesGuard regionScopes(scope);
-  bool regionCheckFailed = false;
-  for (unsigned i = 0; i < nRegions; i++) {
-    for (auto &rule : rules) {
-      if (failed(rule->match(op))) {
-        continue;
-      }
-
-      auto valueBindings =
-          rule->bindRegionArguments(ValueRange(regions[i].getArguments()), op, *operands, scope);
-      if (failed(valueBindings)) {
-        return failure();
-      }
-      assert(valueBindings->size() == regions[i].getNumArguments());
-      std::vector<std::pair<Value, TypeBinding>> zipped;
-      zip(regions[i].args_begin(), regions[i].args_end(), valueBindings->begin(),
-          std::back_inserter(zipped));
-      for (auto &[value, type] : zipped) {
-        (void)bindings.addValue(value, type);
-      }
-      break;
-    }
-
-    regionCheckFailed = regionCheckFailed ||
-                        failed(typeCheckRegion(regions[i], regionScopes.get(), rules, bindings));
-  }
-  if (regionCheckFailed) {
-    return failure();
-  }
-
   for (auto &rule : rules) {
     if (failed(rule->match(op))) {
       continue;
     }
-
-    auto checkResult = rule->typeCheck(op, *operands, scope, regionScopes);
-    if (succeeded(checkResult)) {
-      return bindings.add(op, checkResult);
+    FailureOr<TypeBinding> ruleResult;
+    auto frame = rule->allocate(scope.getCurrentFrame());
+    if (succeeded(frame)) {
+      FrameScope frameScope(scope, *frame);
+      ruleResult = applyRule(op, bindings, frameScope, rules, *rule, *operands);
+    } else {
+      ruleResult = applyRule(op, bindings, scope, rules, *rule, *operands);
+    }
+    if (succeeded(ruleResult)) {
+      return ruleResult;
     }
   }
   return bindings.add(

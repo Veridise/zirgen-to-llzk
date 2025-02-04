@@ -27,7 +27,7 @@ namespace {
 
 class DelegatedImpl : public zhl::ZIRTypeAnalysis::Impl {
 public:
-  DelegatedImpl(ZIRTypeAnalysis &delegate) : delegate(&delegate) {}
+  DelegatedImpl(ZIRTypeAnalysis &analysis) : delegate(&analysis) {}
 
   const mlir::FailureOr<TypeBinding> &getType(mlir::Operation *op) const final {
     return delegate->getType(op);

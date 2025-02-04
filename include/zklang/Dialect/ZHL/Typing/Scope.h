@@ -2,6 +2,8 @@
 
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
+#include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
 
 namespace zhl {
 
@@ -18,9 +20,20 @@ public:
   virtual void declareSuperType(TypeBinding) = 0;
   virtual zirgen::Zhl::ComponentOp getOp() const = 0;
   virtual mlir::FailureOr<TypeBinding> getSuperType() const = 0;
+  virtual Frame &getCurrentFrame() = 0;
 };
 
-class ComponentScope : public Scope {
+/// Mixin that implements the logic for defining members
+class LexicalScopeImpl {
+protected:
+  void declareMemberImpl(mlir::StringRef);
+  void declareMemberImpl(mlir::StringRef, TypeBinding);
+  bool memberDeclaredWithTypeImpl(mlir::StringRef);
+
+  MembersMap members;
+};
+
+class ComponentScope : public Scope, LexicalScopeImpl {
 public:
   ComponentScope(zirgen::Zhl::ComponentOp component, TypeBindings &bindings);
   ~ComponentScope() override;
@@ -44,22 +57,51 @@ public:
 
   mlir::FailureOr<TypeBinding> getSuperType() const override;
 
+  Frame &getCurrentFrame() override;
+
 private:
   TypeBindings *bindings;
   zirgen::Zhl::ComponentOp component;
   ParamsMap constructorParams;
   ParamsMap genericParams;
-  MembersMap members;
+  Frame frame;
   mlir::FailureOr<TypeBinding> superType;
 };
 
-class BlockScope : public Scope {
+/// A scope that exists inside another
+class ChildScope : public Scope {
+public:
+  explicit ChildScope(Scope &);
+  void declareGenericParam(mlir::StringRef, uint64_t, TypeBinding) override;
+  void declareConstructorParam(mlir::StringRef, uint64_t, TypeBinding) override;
+  void declareMember(mlir::StringRef) override;
+  void declareMember(mlir::StringRef, TypeBinding) override;
+  bool memberDeclaredWithType(mlir::StringRef) override;
+  void declareSuperType(TypeBinding) override;
+  zirgen::Zhl::ComponentOp getOp() const override;
+  mlir::FailureOr<TypeBinding> getSuperType() const override;
+  Frame &getCurrentFrame() override;
+
+private:
+  Scope *parent;
+};
+
+/// A scope that allocates a new memory frame
+class FrameScope : public ChildScope {
+public:
+  explicit FrameScope(Scope &, Frame);
+
+  Frame &getCurrentFrame() override;
+
+private:
+  Frame frame;
+};
+
+/// Enters a new lexical scope where members can also be defined.
+/// It has it's own super type.
+class BlockScope : public ChildScope, LexicalScopeImpl {
 public:
   explicit BlockScope(Scope &);
-
-  void declareGenericParam(mlir::StringRef name, uint64_t index, TypeBinding type) override;
-
-  void declareConstructorParam(mlir::StringRef name, uint64_t index, TypeBinding type) override;
 
   void declareMember(mlir::StringRef name) override;
 
@@ -69,12 +111,10 @@ public:
   void declareMember(mlir::StringRef name, TypeBinding type) override;
 
   bool memberDeclaredWithType(mlir::StringRef name) override;
-  zirgen::Zhl::ComponentOp getOp() const override;
 
   mlir::FailureOr<TypeBinding> getSuperType() const override;
 
 private:
-  Scope *parent;
   mlir::FailureOr<TypeBinding> superType;
 };
 

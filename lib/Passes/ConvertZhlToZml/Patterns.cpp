@@ -1,4 +1,5 @@
 #include "zklang/Passes/ConvertZhlToZml/Patterns.h"
+#include "zklang/Dialect/ZHL/Typing/Frame.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include "zklang/Dialect/ZML/IR/Builder.h"
 #include "zklang/Dialect/ZML/IR/OpInterfaces.h"
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <llvm/Support/Casting.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexAttrs.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
@@ -26,6 +28,9 @@
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <vector>
+#include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
+#include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
+#include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
 
 using namespace zirgen;
 using namespace zkc;
@@ -83,40 +88,44 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 /// ZhlConstructLowering
 ///////////////////////////////////////////////////////////
 
+inline bool validArgCount(bool isVariadic, size_t argCount, size_t formalsCount) {
+  if (isVariadic) {
+    // For variadics it's only valid to have from formalsCount-1 arguments and onwards.
+    return argCount >= formalsCount - 1;
+  }
+  // For non variadics the number of arguments must be equal to the number of formals
+  return argCount == formalsCount;
+}
+
+inline bool isVariadic(mlir::ArrayRef<mlir::Type> ctorFormals) {
+  return !ctorFormals.empty() && mlir::isa<Zmir::VarArgsType>(ctorFormals.back());
+}
+
+inline bool isVariadic(mlir::FunctionType fnType) { return isVariadic(fnType.getInputs()); }
+
 mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op.emitOpError("failed to type check");
+  auto ctor = makeCtorCallBuilder(op, op, rewriter);
+  if (failed(ctor)) {
+    return failure(); // makeCtorCallBuilder emits an error message already
   }
+  auto &binding = ctor->getBinding();
+  auto constructorType = ctor->getCtorType();
+  auto ctorFormalsCount = constructorType.getInputs().size();
 
-  auto callerComp = op->getParentOfType<Zmir::ComponentOp>();
-  assert(callerComp);
-  auto *calleeComp = findCallee(binding->getName(), op->getParentOfType<mlir::ModuleOp>());
-  if (!calleeComp) {
-    return op->emitError() << "could not find component with name " << binding->getName();
-  }
-
-  /*auto constructorTypes = calleeComp.getBodyFunc().getFunctionType().getInputs();*/
-  auto constructorType = Zmir::materializeTypeBindingConstructor(rewriter, *binding);
-  {
-    auto constructorTypes = constructorType.getInputs();
-    bool isVariadic =
-        !constructorTypes.empty() && mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
+  if (!validArgCount(isVariadic(constructorType), adaptor.getArgs().size(), ctorFormalsCount)) {
     // Depending if it's variadic or not the message changes a bit.
-    std::string expectingNArgsMsg = isVariadic ? ", was expecting at least " : ", was expecting ";
-
-    if (adaptor.getArgs().size() < constructorTypes.size() ||
-        (!isVariadic && adaptor.getArgs().size() > constructorTypes.size())) {
-      return op->emitOpError()
-          .append(
-              "incorrect number of arguments for component ", binding->getName(), expectingNArgsMsg,
-              constructorTypes.size(), " arguments and got ", adaptor.getArgs().size()
-          )
-          .attachNote(calleeComp->getLoc())
-          .append("component declared here");
-    }
+    StringRef expectingNArgsMsg =
+        isVariadic(constructorType) ? ", was expecting at least " : ", was expecting ";
+    auto minArgCount = isVariadic(constructorType) ? ctorFormalsCount - 1 : ctorFormalsCount;
+    return op->emitOpError()
+        .append(
+            "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
+            minArgCount, " arguments but got ", adaptor.getArgs().size()
+        )
+        .attachNote(ctor->getCalleeComp()->getLoc())
+        .append("component declared here");
   }
 
   std::vector<mlir::Value> preparedArguments;
@@ -124,47 +133,61 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
       adaptor.getArgs(), constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments
   );
 
-  auto funcPtr = rewriter.create<Zmir::ConstructorRefOp>(
-      op.getLoc(), mlir::SymbolRefAttr::get(rewriter.getStringAttr(binding->getName())),
-      constructorType, calleeIsBuiltin(calleeComp)
-  );
-  auto call = rewriter.create<mlir::func::CallIndirectOp>(op->getLoc(), funcPtr, preparedArguments);
-
-  auto result = storeValueInTemporary(
-      op.getLoc(), callerComp, constructorType.getResult(0), call.getResult(0), rewriter
-  );
-
+  auto result = ctor->build(rewriter, op.getLoc(), preparedArguments);
   rewriter.replaceOp(op, result);
-
-  rewriter.create<Zmir::ConstrainCallOp>(
-      op->getLoc(), result->getResult(0), ValueRange(preparedArguments)
-  );
   return mlir::success();
+}
+
+mlir::ValueRange::iterator
+computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> constructorTypes) {
+  if (!isVariadic(constructorTypes)) {
+    return args.end();
+  }
+
+  // If the call does not have any varargs then there are less elements in `args` than there is in
+  // `constructorTypes`. This comparison is safe because the call has already been type checked by
+  // this point.
+  if (args.size() < constructorTypes.size()) {
+    return args.end();
+  }
+
+  // Compute how many arguments are var-args and substract that amount to the number of arguments to
+  // get the offset from args.begin() where the var-args start.
+  auto A = args.size();
+  auto C = constructorTypes.size();
+  auto offset = A - (A - C + 1);
+  return args.begin() + offset;
 }
 
 void ZhlConstructLowering::prepareArguments(
     mlir::ValueRange args, mlir::ArrayRef<mlir::Type> constructorTypes, mlir::Location loc,
     mlir::ConversionPatternRewriter &rewriter, std::vector<mlir::Value> &preparedArgs
 ) const {
-  bool isVariadic =
-      !constructorTypes.empty() && mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
 
   preparedArgs.clear();
+  preparedArgs.reserve(constructorTypes.size());
 
-  auto argsEnd = isVariadic ? args.begin() + (args.size() - constructorTypes.size()) : args.end();
+  // Compute the point where the normal arguments end and the var-args begin
+  auto argsEnd = computeVarArgsSplice(args, constructorTypes);
+  // Prepare the arguments up to the splice point. These arguments are passed as is since they are
+  // normal arguments.
   std::transform(
       args.begin(), argsEnd, constructorTypes.begin(), std::back_inserter(preparedArgs),
       [&](mlir::Value v, mlir::Type t) { return prepareArgument(v, t, loc, rewriter); }
   );
-  if (isVariadic) {
+  if (isVariadic(constructorTypes)) {
     std::vector<mlir::Value> vargs;
     auto varType = mlir::dyn_cast<Zmir::VarArgsType>(constructorTypes.back());
     assert(varType && "expecting a var args type");
 
+    // If there aren't any arguments left to prepare then argsEnd == args.end() and this call is a
+    // no-op.
     std::transform(argsEnd, args.end(), std::back_inserter(vargs), [&](mlir::Value v) {
       return prepareArgument(v, varType.getInner(), loc, rewriter);
     });
 
+    // Regardless of what std::transform does above add the VarArgsOp to make sure we have the
+    // correct number of arguments.
     auto va = rewriter.create<Zmir::VarArgsOp>(loc, constructorTypes.back(), vargs);
     preparedArgs.push_back(va);
   }
@@ -360,28 +383,52 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
 ) const {
   auto binding = getType(op);
   if (mlir::failed(binding)) {
-    return op->emitOpError() << "failed to type check";
+    return op->emitError() << "failed to type check";
+  }
+  auto declrBinding = getType(op.getDeclaration());
+  if (failed(declrBinding)) {
+    return op->emitError() << "failed to type check declaration expression";
+  }
+  auto exprBinding = getType(op.getDefinition());
+  if (failed(exprBinding)) {
+    return op->emitError() << "failed to type check definition expression";
+  }
+  ComponentSlot *slot = nullptr;
+  if (binding->getSlot()) {
+    if (auto *thisSlot = dyn_cast<ComponentSlot>(binding->getSlot())) {
+      slot = thisSlot;
+    }
+  } else if (declrBinding->getSlot()) {
+    if (auto *declrSlot = dyn_cast<ComponentSlot>(declrBinding->getSlot())) {
+      slot = declrSlot;
+    }
   }
 
-  Zhl::DeclarationOp declr = op.getDeclaration().getDefiningOp<Zhl::DeclarationOp>();
-  if (!declr) {
-    return op.emitOpError("does not depend on a declaration");
-  }
-  auto name = declr.getMemberAttr();
-
-  auto comp = op->getParentOfType<Zmir::ComponentOp>();
+  auto comp = op->getParentOfType<Zmir::ComponentInterface>();
   assert(comp);
 
   mlir::Value value = adaptor.getDefinition();
-  mlir::Type target = Zmir::materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != target) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), target, value);
-    value = cast.getResult(0);
+
+  // If the binding of this op has a slot then it is responsible of creating it.
+  // Otherwise, check if the declaration's binding has a slot. If it does create it here.
+  // Wrap the value around a SuperCoerceOp.
+  // If a slot is created here then replace all the uses of the definition expression with the
+  // result of writing and reading from the slot. Then remove this op.
+
+  if (slot) {
+    auto slotName = createSlot(slot, rewriter, comp, op.getLoc());
+    mlir::Type slotType = Zmir::materializeTypeBinding(getContext(), slot->getBinding());
+    SmallVector<Operation *, 2> castOps;
+    Value result = getCastedValue(value, *exprBinding, rewriter, castOps, slotType);
+    result = storeAndLoadSlot(result, slotName, slotType, op.getLoc(), comp.getType(), rewriter);
+    if (castOps.empty()) {
+      rewriter.replaceAllUsesWith(value, result);
+    } else {
+      rewriter.replaceAllUsesExcept(value, result, castOps.front());
+    }
   }
 
-  auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
-  auto writeOp = rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, name, value);
-  maybeAnnotateConstructorCallWithField(writeOp, value);
+  rewriter.eraseOp(op);
   return mlir::success();
 }
 
@@ -704,6 +751,19 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
 /// ZhlCompToZmirCompPattern
 ///////////////////////////////////////////////////////////
 
+void createFieldsFromFrame(Frame frame) {
+  for (auto &slot : frame) {
+    if (auto *arraySlot = llvm::dyn_cast<ArrayFrame>(&slot)) {
+      createFieldsFromFrame(arraySlot->getFrame());
+    } else if (auto *innerFrame = llvm::dyn_cast<InnerFrame>(&slot)) {
+      createFieldsFromFrame(innerFrame->getFrame());
+
+    } else if (auto *compSlot = llvm::dyn_cast<ComponentSlot>(&slot)) {
+      llvm::dbgs() << "Slot " << compSlot->getSlotName() << ": " << compSlot->getBinding() << "\n";
+    }
+  }
+}
+
 mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     zirgen::Zhl::ComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -712,6 +772,7 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     return op->emitOpError() << "could not be lowered because its type could not be infered";
   }
 
+  createFieldsFromFrame(name->getFrame());
   Zmir::ComponentBuilder builder;
   auto genericNames = name->getGenericParamNames();
   builder.name(name->getName())
@@ -727,9 +788,9 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     if (!binding.has_value()) {
       return op->emitOpError() << "failed to type check component member '" << fieldName << "'";
     }
-    builder.field(
-        fieldName, Zmir::materializeTypeBinding(getContext(), *binding), binding->getLocation()
-    );
+    // builder.field(
+    //     fieldName, Zmir::materializeTypeBinding(getContext(), *binding), binding->getLocation()
+    // );
   }
   auto &super = name->getSuperType();
   builder.field("$super", Zmir::materializeTypeBinding(getContext(), super));

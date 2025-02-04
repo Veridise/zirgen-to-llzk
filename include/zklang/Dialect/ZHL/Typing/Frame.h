@@ -1,0 +1,41 @@
+#pragma once
+
+#include "zklang/Dialect/ZHL/Typing/FrameInfo.h"
+#include <llvm/ADT/simple_ilist.h>
+#include <memory>
+
+namespace zhl {
+
+class FrameSlot;
+class TypeBinding;
+
+// Represents the memory used by a component. Collects slots that contain
+// components or other frames. This information is later used to generate
+// field reads and writes in the LLZK structs for the operations that are
+// needed in the constrain function but cannot be generated there.
+class Frame {
+public:
+  Frame();
+  Frame(const Frame &);
+  Frame(Frame &&) = delete;
+  Frame &operator=(const Frame &);
+  Frame &operator=(Frame &&) = delete;
+
+  template <typename Slot, typename... Args> Slot *allocateSlot(Args &&...args) {
+    return static_cast<Slot *>(info->allocateSlot<Slot, Args...>(std::forward<Args>(args)..., *this)
+    );
+  }
+
+  detail::FrameInfo::SlotsList::iterator begin();
+  detail::FrameInfo::SlotsList::const_iterator begin() const;
+  detail::FrameInfo::SlotsList::iterator end();
+  detail::FrameInfo::SlotsList::const_iterator end() const;
+
+  friend FrameSlot;
+
+private:
+  // A pointer to the unique information about the frame
+  std::shared_ptr<detail::FrameInfo> info;
+};
+
+} // namespace zhl

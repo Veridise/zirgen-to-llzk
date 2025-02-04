@@ -42,15 +42,42 @@ public:
   /// If the super type is specified generates an additional SuperCoerceOp
   /// fromt the binding's type to the super type.
   /// Assumes the operation has only one result.
-  mlir::FailureOr<mlir::Value>
-  getCastedValue(mlir::Operation *op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+  mlir::FailureOr<mlir::Value> getCastedValue(
+      mlir::Operation *op, mlir::OpBuilder &builder,
+      mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
+  ) const {
     assert(op->getNumResults() == 1);
     return getCastedValue(op->getResult(0), builder, super);
   }
 
   mlir::FailureOr<mlir::Value>
-  getCastedValue(Op op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+  getCastedValue(mlir::Operation *op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    mlir::SmallVector<mlir::Operation *, 2> genOps;
+    return getCastedValue(op, builder, genOps, super);
+  }
+
+  mlir::FailureOr<mlir::Value> getCastedValue(
+      Op op, mlir::OpBuilder &builder, mlir::SmallVector<mlir::Operation *, 2> &generatedOps,
+      mlir::Type super = nullptr
+  ) const {
     return getCastedValue(op.getOperation(), builder, super);
+  }
+
+  mlir::FailureOr<mlir::Value>
+  getCastedValue(Op op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+    return getCastedValue(op.getOperation(), builder, generatedOps, super);
+  }
+
+  mlir::FailureOr<mlir::Value> getCastedValue(
+      mlir::Value value, mlir::OpBuilder &builder,
+      mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
+  ) const {
+    auto binding = getType(value);
+    if (mlir::failed(binding)) {
+      return mlir::failure();
+    }
+    return getCastedValue(value, *binding, builder, generatedOps, super);
   }
 
   mlir::FailureOr<mlir::Value>
@@ -59,13 +86,14 @@ public:
     if (mlir::failed(binding)) {
       return mlir::failure();
     }
-    return getCastedValue(value, *binding, builder, super);
+    mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+    return getCastedValue(value, *binding, builder, generatedOps, super);
   }
 
   /// A non-failing version that takes a binding as additional parameter
   mlir::Value getCastedValue(
       mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
-      mlir::Type super = nullptr
+      mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
   ) const {
     auto materialized = Zmir::materializeTypeBinding(builder.getContext(), binding);
     assert(materialized);
@@ -75,15 +103,27 @@ public:
     auto cast = builder.create<mlir::UnrealizedConversionCastOp>(
         value.getLoc(), mlir::TypeRange(materialized), mlir::ValueRange(value)
     );
+    generatedOps.push_back(cast.getOperation());
+
     mlir::Value result = cast.getResult(0);
     if (super && super != materialized) {
-      result = builder.create<Zmir::SuperCoerceOp>(value.getLoc(), super, result);
+      auto coerce = builder.create<Zmir::SuperCoerceOp>(value.getLoc(), super, result);
+      generatedOps.push_back(coerce.getOperation());
+      result = coerce;
     }
     return result;
   }
 
+  mlir::Value getCastedValue(
+      mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+      mlir::Type super = nullptr
+  ) const {
+    mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+    return getCastedValue(value, binding, builder, generatedOps, super);
+  }
+
   mlir::FailureOr<CtorCallBuilder>
-  makeCtorCallBuilder(mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder) {
+  makeCtorCallBuilder(mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder) const {
     return CtorCallBuilder::Make(op, value, *typeAnalysis, builder);
   }
 
