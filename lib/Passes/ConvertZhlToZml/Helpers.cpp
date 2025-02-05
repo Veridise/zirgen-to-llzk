@@ -3,12 +3,14 @@
 #include "zklang/Dialect/ZML/Typing/Materialize.h"
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 
 using namespace mlir;
 using namespace zkc::Zmir;
+using namespace zhl;
 
 namespace zkc {
 
@@ -111,6 +113,28 @@ Value storeAndLoadSlot(
   return builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
 }
 
+Value storeAndLoadArraySlot(
+    Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc, Type compType,
+    OpBuilder &builder, mlir::ValueRange ivs
+) {
+
+  auto self = builder.create<Zmir::GetSelfOp>(loc, compType);
+
+  // Read the array from the slot field
+  auto arrayData = builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
+  // Write into the array the value
+  builder.create<Zmir::WriteArrayOp>(loc, arrayData, ivs, value, true);
+
+  // Write the array back into the field
+  builder.create<Zmir::WriteFieldOp>(loc, self, slotName, arrayData);
+
+  // Read the array back to a SSA value
+  auto arrayDataBis = builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
+
+  // Read the value we wrote into the array back to a SSA value
+  return builder.create<Zmir::ReadArrayOp>(loc, value.getType(), arrayDataBis, ivs);
+}
+
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
     mlir::OpBuilder &builder
@@ -132,27 +156,63 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   );
 }
 
+TypeBinding unwrapArrayNTimes(
+    const TypeBinding &type, size_t count, std::function<mlir::InFlightDiagnostic()> emitError
+) {
+  if (count == 0) {
+    return type;
+  }
+  assert(type.isArray());
+  auto inner = type.getArrayElement(emitError);
+  assert(succeeded(inner));
+  return unwrapArrayNTimes(*inner, count - 1, emitError);
+}
+
 mlir::Value
 CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args) {
+  auto buildPrologue = [&](mlir::Value v) {
+    builder.create<Zmir::ConstrainCallOp>(loc, v, args);
+    return v;
+  };
+
   auto ref =
       builder.create<Zmir::ConstructorRefOp>(loc, ctorType, compBinding.getName(), isBuiltin);
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
-  if (compBinding.getSlot()) {
-    auto compSlot = mlir::dyn_cast<zhl::ComponentSlot>(compBinding.getSlot());
-    assert(compSlot && "Cannot construct a component over a non-component slot");
 
-    auto slotType = Zmir::materializeTypeBinding(builder.getContext(), compSlot->getBinding());
+  if (!compBinding.getSlot()) {
+    return buildPrologue(compValue);
+  }
+
+  auto compSlot = mlir::cast<zhl::ComponentSlot>(compBinding.getSlot());
+  auto compSlotBinding = compSlot->getBinding();
+  auto compSlotIVs = compSlot->collectIVs();
+
+  // Create the field
+  auto name = createSlot(compSlot, builder, callerComponentOp, loc);
+
+  auto slotType = Zmir::materializeTypeBinding(builder.getContext(), compSlotBinding);
+
+  if (compSlotIVs.empty()) {
     assert(
         slotType == compValue.getType() && "result of construction and slot type must be the same"
     );
-    // Create the field
-    auto name = createSlot(compSlot, builder, callerComponentOp, loc);
     compValue =
         storeAndLoadSlot(compValue, name, slotType, loc, callerComponentOp.getType(), builder);
+  } else {
+    auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size(), [&]() {
+      return callerComponentOp->emitError();
+    });
+    auto unwrappedType = Zmir::materializeTypeBinding(builder.getContext(), unwrappedBinding);
+    assert(
+        unwrappedType == compValue.getType() &&
+        "result of construction and slot inner array type must be the same"
+    );
+    compValue = storeAndLoadArraySlot(
+        compValue, name, slotType, loc, callerComponentOp.getType(), builder, compSlotIVs
+    );
   }
-  builder.create<Zmir::ConstrainCallOp>(loc, compValue, args);
-  return compValue;
+  return buildPrologue(compValue);
 }
 
 mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }

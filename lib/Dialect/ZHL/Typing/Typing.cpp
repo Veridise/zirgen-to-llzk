@@ -109,11 +109,25 @@ FailureOr<TypeBinding> applyRule(
     return failure();
   }
 
-  auto checkResult = rule.typeCheck(op, operands, scope, regionScopes);
-  if (succeeded(checkResult)) {
-    return bindings.add(op, checkResult);
+  return rule.typeCheck(op, operands, scope, regionScopes);
+}
+
+/// Handles the creation of the frame and linking it to the generated type binding if it succeeded.
+FailureOr<TypeBinding> applyRuleWithFrame(
+    Frame frame, Operation *op, ZhlOpBindings &bindings, Scope &scope,
+    const FrozenTypingRuleSet &rules, const TypingRule &rule, ArrayRef<TypeBinding> operands
+) {
+  FrameScope frameScope(scope, frame);
+  // Typecheck normally using a scope with the frame
+  auto result = applyRule(op, bindings, frameScope, rules, rule, operands);
+
+  if (failed(result)) {
+    return failure();
   }
-  return failure();
+  // XXX: I may need to do more than a copy but we will see.
+  auto finalBinding = result->ReplaceFrame(frame);
+  finalBinding.markSlot(frame.getParentSlot());
+  return finalBinding;
 }
 
 FailureOr<TypeBinding> typeCheckOp(
@@ -131,16 +145,13 @@ FailureOr<TypeBinding> typeCheckOp(
     if (failed(rule->match(op))) {
       continue;
     }
-    FailureOr<TypeBinding> ruleResult;
     auto frame = rule->allocate(scope.getCurrentFrame());
-    if (succeeded(frame)) {
-      FrameScope frameScope(scope, *frame);
-      ruleResult = applyRule(op, bindings, frameScope, rules, *rule, *operands);
-    } else {
-      ruleResult = applyRule(op, bindings, scope, rules, *rule, *operands);
-    }
+    FailureOr<TypeBinding> ruleResult =
+        succeeded(frame) ? applyRuleWithFrame(*frame, op, bindings, scope, rules, *rule, *operands)
+                         : applyRule(op, bindings, scope, rules, *rule, *operands);
+
     if (succeeded(ruleResult)) {
-      return ruleResult;
+      return bindings.add(op, ruleResult);
     }
   }
   return bindings.add(

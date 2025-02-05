@@ -152,6 +152,7 @@ public:
       uint64_t value, mlir::Location loc, const TypeBindings &bindings, bool isBuiltin = false
   );
   TypeBinding WithUpdatedLocation(mlir::Location loc) const;
+  TypeBinding ReplaceFrame(Frame) const;
 
   static TypeBinding WrapVariadic(const TypeBinding &t);
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name);

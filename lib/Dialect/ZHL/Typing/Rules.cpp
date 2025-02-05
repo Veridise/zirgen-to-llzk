@@ -69,7 +69,7 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
   auto component = operands[0];
-  scope.getCurrentFrame().allocateSlot<ComponentSlot>(component);
+  scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
   return component;
 }
 mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
@@ -109,7 +109,7 @@ mlir::FailureOr<TypeBinding> DeclareTypingRule::
   scope.declareMember(op.getMember(), operands[0]);
   auto binding = operands[0]; // Make a copy for marking the slot
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(
-      binding, op.getMember()
+      getBindings(), binding, op.getMember()
   ); // Allocate a named slot with the declared type
   return binding;
 }
@@ -240,8 +240,8 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
   if (declSlot && exprSlot) {
     auto *declCompSlot = mlir::cast<ComponentSlot>(declSlot);
     auto *exprCompSlot = mlir::cast<ComponentSlot>(exprSlot);
-    auto &declBinding = declCompSlot->getBinding();
-    auto &exprBinding = exprCompSlot->getBinding();
+    auto declBinding = declCompSlot->getBinding();
+    auto exprBinding = exprCompSlot->getBinding();
 
     // Case 2: The result is a copy of the type binding of the expression op. The slot of the
     // expression op is renamed to the member's name. The type binding returned by
@@ -275,7 +275,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
   // Case 5: Allocate a slot of the type binding of the expression and the name of the member.
   // Return a type binding that links to the allocated slot.
   auto binding = operands[1];
-  scope.getCurrentFrame().allocateSlot<ComponentSlot>(binding, decl->getMember());
+  scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), binding, decl->getMember());
   scope.declareMember(decl->getMember(), binding);
   return binding;
 }
@@ -330,17 +330,17 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
   auto commonType = std::reduce(
       operands.drop_front().begin(), operands.end(), operands.front(),
       [](auto a, auto b) {
-    llvm::dbgs() << "a = ";
-    a.print(llvm::dbgs());
-    llvm::dbgs() << ", b = ";
-    b.print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    // llvm::dbgs() << "a = ";
+    // a.print(llvm::dbgs());
+    // llvm::dbgs() << ", b = ";
+    // b.print(llvm::dbgs());
+    // llvm::dbgs() << "\n";
     return a.commonSupertypeWith(b);
   }
   );
-  llvm::dbgs() << "final common type = ";
-  commonType.print(llvm::dbgs());
-  llvm::dbgs() << "\n";
+  // llvm::dbgs() << "final common type = ";
+  // commonType.print(llvm::dbgs());
+  // llvm::dbgs() << "\n";
 
   return getBindings().Array(commonType, operands.size());
 }

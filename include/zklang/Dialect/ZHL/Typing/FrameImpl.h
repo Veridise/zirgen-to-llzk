@@ -7,12 +7,10 @@
 namespace zhl {
 namespace detail {
 
-template <typename Slot, typename... Args>
-FrameSlot *FrameInfo::allocateSlot(Args &&...args, Frame &parent) {
+template <typename Slot, typename... Args> FrameSlot *FrameInfo::allocateSlot(Args &&...args) {
   FrameSlot *slot = new Slot(std::forward<Args>(args)...);
-  llvm::dbgs() << "Slot: " << slot << "\n";
-  llvm::dbgs() << "Slots empty? " << slots.empty() << "\n";
   slots.push_back(*slot);
+  slot->setParent(this);
   return slot;
 }
 

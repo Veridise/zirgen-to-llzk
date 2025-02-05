@@ -844,29 +844,30 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   );
 
   auto arrAlloc = rewriter.create<Zmir::AllocArrayOp>(op.getLoc(), type);
-  rewriter.replaceOp(
-      op, storeValueInTemporary(
-              op.getLoc(), op->getParentOfType<Zmir::ComponentOp>(), type, arrAlloc, rewriter
-          )
-  );
+  // rewriter.replaceOp(
+  //     op, storeValueInTemporary(
+  //             op.getLoc(), op->getParentOfType<Zmir::ComponentOp>(), type, arrAlloc, rewriter
+  //         )
+  // );
   // Create a for loop op using the operands as bounds
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto start = rewriter.create<Zmir::ValToIndexOp>(op.getStart().getLoc(), startVal);
   auto end = rewriter.create<Zmir::ValToIndexOp>(op.getEnd().getLoc(), endVal);
-  rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), start, end, one, mlir::ValueRange(),
-      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange) {
+  auto loop = rewriter.create<mlir::scf::ForOp>(
+      op.getLoc(), start, end, one, mlir::ValueRange(arrAlloc),
+      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     auto conv = builder.create<Zmir::IndexToValOp>(loc, innerType, iv);
-    builder.create<Zmir::WriteArrayOp>(loc, arrAlloc, iv, conv);
-    builder.create<mlir::scf::YieldOp>(loc);
+    builder.create<Zmir::WriteArrayOp>(loc, args[0], iv, conv);
+    builder.create<mlir::scf::YieldOp>(loc, args[0]);
   }
   );
+  rewriter.replaceOp(op, loop);
 
   return mlir::success();
 }
 
 ///////////////////////////////////////////////////////////
-/// ZhlRangeOpLowering
+/// ZhlMapOpLowering
 ///////////////////////////////////////////////////////////
 
 mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
@@ -879,6 +880,9 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   if (!binding->isArray()) {
     return op->emitOpError() << "was expecting 'Array' but got '" << binding->getName() << "'";
   }
+  assert(binding->getSlot());
+  auto *arrayFrame = cast<ArrayFrame>(binding->getSlot());
+
   auto inputBinding = getType(op.getArray());
   if (mlir::failed(inputBinding)) {
     return op->emitOpError() << "failed to type check input";
@@ -905,6 +909,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
+    arrayFrame->setInductionVar(iv);
     auto itVal = builder.create<Zmir::ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv));
     // Cast it to a zhl Expr type for the block inlining
     auto itValCast = builder.create<mlir::UnrealizedConversionCastOp>(
@@ -1020,6 +1025,8 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
     return op->emitOpError() << "failed to type check";
   }
 
+  assert(binding->getSlot());
+  auto *arrayFrame = cast<ArrayFrame>(binding->getSlot());
   auto inputBinding = getType(op.getArray());
   if (mlir::failed(inputBinding)) {
     return op->emitOpError() << "failed to type check input";
@@ -1070,6 +1077,7 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(*init),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
+    arrayFrame->setInductionVar(iv);
     mlir::Value lhs = maybeSuperCoerce(
         builder.create<Zmir::ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv)),
         constructorType.getInput(0)

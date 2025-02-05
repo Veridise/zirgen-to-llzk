@@ -283,7 +283,7 @@ def WriteArrayOp : ZmirOp<"write_array"> {
   let summary = "write data into an array";
 
   let arguments = (ins TypeVarOr<Component>:$array, Variadic<AnyType>:$indices,
-      AnyZmirType:$value);
+      AnyZmirType:$value, UnitAttr:$computeOnly);
   let assemblyFormat = [{
     $array `[` $indices `]` `=` $value attr-dict `:` type($array) `[` type($indices) `]` `,` type($value)
   }];

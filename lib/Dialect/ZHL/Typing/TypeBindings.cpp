@@ -1,5 +1,6 @@
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <iterator>
+#include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
@@ -104,6 +105,11 @@ mlir::LogicalResult zhl::TypeBinding::subtypeOf(const TypeBinding &other) const 
   // TODO: Proper equality function
   if (getName() == other.getName()) {
     /*llvm::dbgs() << "Yes because they have the same name\n";*/
+    // FIXME: Quick hack until I merge since we lack proper equality comparisons and that affects
+    // consts
+    if (name == CONST) {
+      return failure(); // Constants are not subtypes of each other.
+    }
     return mlir::success();
   }
 
@@ -172,23 +178,24 @@ zhl::TypeBinding::TypeBinding(
 
 zhl::TypeBinding::TypeBinding(mlir::Location loc)
     : builtin(true), name("Component"), loc(loc), superType(nullptr) {}
+
 zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
     print(llvm::dbgs());
-    llvm::dbgs() << " is a sub type of ";
+    llvm::dbgs() << " (this) is a sub type of ";
     other.print(llvm::dbgs());
     llvm::dbgs() << " and thus we return ";
     other.print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    llvm::dbgs() << " (other)\n";
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
     other.print(llvm::dbgs());
-    llvm::dbgs() << " is a sub type of ";
+    llvm::dbgs() << " (other) is a sub type of ";
     print(llvm::dbgs());
     llvm::dbgs() << " and thus we return ";
     print(llvm::dbgs());
-    llvm::dbgs() << "\n";
+    llvm::dbgs() << " (this)\n";
     return *this;
   }
 
@@ -251,6 +258,12 @@ zhl::TypeBinding zhl::TypeBinding::WrapVariadic(const TypeBinding &t) {
   return w;
 }
 
+TypeBinding TypeBinding::ReplaceFrame(Frame newFrame) const {
+  auto copy = *this;
+  copy.frame = newFrame;
+  return copy;
+}
+
 std::vector<mlir::Location> TypeBinding::getConstructorParamLocations() const {
   std::vector<mlir::Location> locs;
   std::transform(
@@ -309,6 +322,7 @@ bool zhl::TypeBinding::isArray() const {
 bool zhl::TypeBinding::isBuiltin() const { return builtin; }
 
 bool zhl::TypeBinding::isConst() const { return name == CONST; }
+
 bool zhl::TypeBinding::isKnownConst() const { return isConst() && constVal.has_value(); }
 
 bool TypeBinding::isGeneric() const { return genericParams.size() > 0; }

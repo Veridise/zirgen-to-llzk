@@ -1,0 +1,3 @@
+component Top() {
+  (for i : 1..10 { Reg(i)})[0] = 1;
+}

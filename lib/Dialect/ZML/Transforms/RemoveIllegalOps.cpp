@@ -189,9 +189,13 @@ class RemoveIllegalConstrainOpsPass
   void setLegality(ConversionTarget &target) override {
     target.addIllegalOp<
         WriteFieldOp,
-        GetSelfOp, // Gets transformed into llzk.new_struct
-        BitAndOp, InvOp, WriteArrayOp, AllocArrayOp, NewArrayOp>();
+        GetSelfOp,      // Gets transformed into llzk.new_struct
+        BitAndOp, InvOp //, WriteArrayOp, AllocArrayOp, NewArrayOp
+        >();
     target.addIllegalOp<func::CallIndirectOp>(); // Gets transformed into a call to @compute
+    target.addDynamicallyLegalOp<WriteArrayOp>([](WriteArrayOp writeArrOp) {
+      return !writeArrOp.getComputeOnly();
+    });
   }
 
   void addPatterns(RewritePatternSet &patterns) override {
