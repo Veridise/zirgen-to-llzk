@@ -3,6 +3,7 @@
 #include "zklang/Dialect/ZML/Typing/Materialize.h"
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/Operation.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
@@ -56,7 +57,7 @@ mlir::Operation *storeValueInTemporary(
   // Create the field
   auto name = createTempField(loc, fieldType, rewriter, callerComp);
   // Write the construction in a temporary
-  auto self = rewriter.create<Zmir::GetSelfOp>(loc, callerComp.getType());
+  auto self = rewriter.create<Zmir::SelfOp>(loc, callerComp.getType());
   rewriter.create<Zmir::WriteFieldOp>(loc, self, name, value);
 
   // Read the temporary back to a SSA value
@@ -103,10 +104,9 @@ FlatSymbolRefAttr createSlot(
 
 Value storeAndLoadSlot(
     Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc, Type compType,
-    OpBuilder &builder
+    OpBuilder &builder, Value self
 ) {
   // Write the construction in a temporary
-  auto self = builder.create<Zmir::GetSelfOp>(loc, compType);
   builder.create<Zmir::WriteFieldOp>(loc, self, slotName, value);
 
   // Read the temporary back to a SSA value
@@ -115,11 +115,8 @@ Value storeAndLoadSlot(
 
 Value storeAndLoadArraySlot(
     Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc, Type compType,
-    OpBuilder &builder, mlir::ValueRange ivs
+    OpBuilder &builder, mlir::ValueRange ivs, Value self
 ) {
-
-  auto self = builder.create<Zmir::GetSelfOp>(loc, compType);
-
   // Read the array from the slot field
   auto arrayData = builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
   // Write into the array the value
@@ -137,22 +134,30 @@ Value storeAndLoadArraySlot(
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
-    mlir::OpBuilder &builder
+    mlir::OpBuilder &builder, mlir::Value self
 ) {
   auto binding = typeAnalysis.getType(value);
   if (failed(binding)) {
     return op->emitError() << "failed to type check";
   }
+
+  return Make(op, value, *binding, builder, self);
+}
+
+mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
+    mlir::Operation *op, mlir::Value value, const zhl::TypeBinding &binding,
+    mlir::OpBuilder &builder, mlir::Value self
+) {
   auto rootModule = op->getParentOfType<mlir::ModuleOp>();
-  auto *calleeComp = findCallee(binding->getName(), rootModule);
+  auto *calleeComp = findCallee(binding.getName(), rootModule);
   if (!calleeComp) {
-    return op->emitError() << "could not find component with name " << binding->getName();
+    return op->emitError() << "could not find component with name " << binding.getName();
   }
-  auto constructorType = Zmir::materializeTypeBindingConstructor(builder, *binding);
+  auto constructorType = Zmir::materializeTypeBindingConstructor(builder, binding);
 
   return CtorCallBuilder(
-      constructorType, *binding, mlir::dyn_cast<Zmir::ComponentInterface>(calleeComp),
-      op->getParentOfType<Zmir::ComponentInterface>(), calleeIsBuiltin(calleeComp)
+      constructorType, binding, mlir::dyn_cast<Zmir::ComponentInterface>(calleeComp),
+      op->getParentOfType<Zmir::ComponentInterface>(), self, calleeIsBuiltin(calleeComp)
   );
 }
 
@@ -197,8 +202,9 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
     assert(
         slotType == compValue.getType() && "result of construction and slot type must be the same"
     );
-    compValue =
-        storeAndLoadSlot(compValue, name, slotType, loc, callerComponentOp.getType(), builder);
+    compValue = storeAndLoadSlot(
+        compValue, name, slotType, loc, callerComponentOp.getType(), builder, self
+    );
   } else {
     auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size(), [&]() {
       return callerComponentOp->emitError();
@@ -209,7 +215,7 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
         "result of construction and slot inner array type must be the same"
     );
     compValue = storeAndLoadArraySlot(
-        compValue, name, slotType, loc, callerComponentOp.getType(), builder, compSlotIVs
+        compValue, name, slotType, loc, callerComponentOp.getType(), builder, compSlotIVs, self
     );
   }
   return buildPrologue(compValue);
@@ -223,12 +229,13 @@ Zmir::ComponentInterface CtorCallBuilder::getCalleeComp() const { return calleeC
 
 CtorCallBuilder::CtorCallBuilder(
     mlir::FunctionType type, const zhl::TypeBinding &binding, Zmir::ComponentInterface callee,
-    Zmir::ComponentInterface caller, bool builtin
+    Zmir::ComponentInterface caller, mlir::Value selfValue, bool builtin
 )
     : ctorType(type), compBinding(binding), isBuiltin(builtin), calleeComponentOp(callee),
-      callerComponentOp(caller) {
-  assert(callee);
-  assert(caller);
+      callerComponentOp(caller), self(selfValue) {
+  assert(calleeComponentOp);
+  assert(callerComponentOp);
+  assert(self);
 }
 
 } // namespace zkc

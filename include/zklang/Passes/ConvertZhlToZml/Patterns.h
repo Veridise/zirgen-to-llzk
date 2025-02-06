@@ -124,7 +124,11 @@ public:
 
   mlir::FailureOr<CtorCallBuilder>
   makeCtorCallBuilder(mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder) const {
-    return CtorCallBuilder::Make(op, value, *typeAnalysis, builder);
+    auto selfOp = op->getParentOfType<Zmir::SelfOp>();
+    if (!selfOp) {
+      return op->emitOpError() << "is not within a self region";
+    }
+    return CtorCallBuilder::Make(op, value, *typeAnalysis, builder, selfOp.getSelfValue());
   }
 
 private:

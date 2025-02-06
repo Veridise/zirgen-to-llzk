@@ -2,6 +2,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 #include "zklang/Dialect/ZML/BuiltIns/BuiltIns.h"
+#include "llvm/Support/WithColor.h"
 
 #include "zirgen/dsl/lower.h"
 #include "zirgen/dsl/parser.h"
@@ -259,14 +260,16 @@ LogicalResult Driver::run() {
   configureLoweringPipeline();
   pm.dump();
   if (failed(pm.run(*mod))) {
-    llvm::errs() << "An internal compiler error ocurred while lowering this module.\n";
     DEBUG_WITH_TYPE("zir-driver-dump-on-error", llvm::errs() << "Module contents:\n";
                     mod->print(llvm::errs()));
+    llvm::WithColor(llvm::errs(), llvm::raw_ostream::RED, true)
+        << "An internal compiler error ocurred while lowering this module.\n";
     return failure();
   }
 
   mod->print(*dst);
 
+  llvm::WithColor(llvm::errs(), llvm::raw_ostream::GREEN) << "Success!\n";
   return success();
 }
 

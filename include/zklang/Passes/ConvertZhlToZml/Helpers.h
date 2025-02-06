@@ -54,7 +54,7 @@ mlir::FlatSymbolRefAttr createSlot(
 /// Returns the value read from the field.
 mlir::Value storeAndLoadSlot(
     mlir::Value value, mlir::FlatSymbolRefAttr slotName, mlir::Type slotType, mlir::Location loc,
-    mlir::Type compType, mlir::OpBuilder &builder
+    mlir::Type compType, mlir::OpBuilder &builder, mlir::Value
 );
 
 /// Helper for creating the ops that represent the call to a component's constructor.
@@ -64,7 +64,12 @@ class CtorCallBuilder {
 public:
   static mlir::FailureOr<CtorCallBuilder> Make(
       mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
-      mlir::OpBuilder &builder
+      mlir::OpBuilder &builder, mlir::Value self
+  );
+
+  static mlir::FailureOr<CtorCallBuilder> Make(
+      mlir::Operation *op, mlir::Value value, const zhl::TypeBinding &binding,
+      mlir::OpBuilder &builder, mlir::Value self
   );
 
   /// Generates the ops that represent the construction of a component. Fetches a reference to
@@ -82,15 +87,14 @@ public:
 private:
   CtorCallBuilder(
       mlir::FunctionType type, const zhl::TypeBinding &binding, Zmir::ComponentInterface callee,
-      Zmir::ComponentInterface caller,
-
-      bool builtin
+      Zmir::ComponentInterface caller, mlir::Value self, bool builtin
   );
 
   mlir::FunctionType ctorType;
   const zhl::TypeBinding compBinding;
   bool isBuiltin;
   Zmir::ComponentInterface calleeComponentOp, callerComponentOp;
+  mlir::Value self;
 };
 
 } // namespace zkc

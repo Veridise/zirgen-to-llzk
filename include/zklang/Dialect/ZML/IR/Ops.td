@@ -12,7 +12,7 @@ include "mlir/IR/CommonAttrConstraints.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "OpInterfaces.td"
 
-def ReturnsExpr : DeclareOpInterfaceMethods<InferTypeOpInterface>;
+// def ReturnsExpr : DeclareOpInterfaceMethods<InferTypeOpInterface>;
 
 class ZmirOp<string mnemonic, list<Trait> traits = []>
     : Op<ZmirDialect, mnemonic, traits> {}
@@ -65,6 +65,32 @@ class ComponentOpBase<string prefix, string bodyFuncName,
 def ComponentOp : ComponentOpBase<"", "body", "body"> {}
 
 def SplitComponentOp : ComponentOpBase<"split_", "compute", "constrain"> {}
+
+def SelfOp : ZmirOp<"self", [NoTerminator]> {
+  let summary = "current component scope";
+  let description = "Returns the current component after executing its content";
+
+  let results = (outs Component);
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+     $body attr-dict `:` type(results) 
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders =
+      [OpBuilder<(ins "mlir::Type":$compType,
+           CArg<"mlir::function_ref<void(mlir::OpBuilder &, mlir::Value)>",
+                "nullptr">)>,
+       OpBuilder<(ins "mlir::Type":$compType, "mlir::Region &":$region)>];
+
+  let extraClassDeclaration = [{
+    mlir::Value getSelfValue() { 
+      assert(getRegion().getNumArguments() > 0 && "self region must have one argument");
+      return getRegion().getArgument(0); 
+    }
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 //  ConstructorRefOp
@@ -162,17 +188,6 @@ def NopOp : ZmirOp<"nop", [Pure]> {
   let results = (outs Variadic<AnyZmirType>:$outs);
 
   let assemblyFormat = "($ins `:` type($ins)^ `->`)? type($outs) attr-dict";
-}
-
-def GetSelfOp : ZmirOp<"self", [Pure]> {
-  let summary = "get current component";
-  let description = "Returns the current component";
-
-  let results = (outs Component);
-
-  let assemblyFormat = [{
-     attr-dict `:` type(results)
-  }];
 }
 
 def GlobalDefOp : ZmirOp<"global", [HasParent<"::mlir::ModuleOp">]> {

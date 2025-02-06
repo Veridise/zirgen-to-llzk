@@ -21,6 +21,7 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Support/LogicalResult.h>
 #include <unordered_set>
+#include <zklang/Dialect/ZML/Utils/Patterns.h>
 
 using namespace mlir;
 using namespace zkc::Zmir;
@@ -50,16 +51,15 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   mlir::RewritePatternSet patterns(ctx);
 
   patterns.add<
-      LitValOpLowering, GetSelfOpLowering, LowerBitAnd, LowerAdd, LowerSub, LowerMul, LowerInv,
-      LowerIsz, LowerNeg, LowerConstrainOp, LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp,
-      LowerReadArrayOp, LowerAllocArrayOp, LowerArrayLengthOp, LowerIndexToValOp, LowerValToIndexOp,
-      LowerWriteArrayOp, WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp,
-      LowerMod, LowerLoadValParamOp, ComponentLowering, FieldDefOpLowering, FuncOpLowering,
-      ReturnOpLowering, CallOpLowering, CallIndirectOpLoweringInCompute,
-      CallIndirectOpLoweringInConstrain, WriteFieldOpLowering, RemoveConstructorRefOp,
-      UpdateScfForOpTypes, UpdateScfYieldOpTypes, UpdateScfExecuteRegionOpTypes>(
-      typeConverter, ctx
-  );
+      LitValOpLowering, ReplaceSelfWith<NewOp<llzk::CreateStructOp>>, LowerBitAnd, LowerAdd,
+      LowerSub, LowerMul, LowerInv, LowerIsz, LowerNeg, LowerConstrainOp, LowerReadFieldOp,
+      LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp, LowerAllocArrayOp, LowerArrayLengthOp,
+      LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp, WriteFieldOpLowering,
+      LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
+      ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, CallOpLowering,
+      CallIndirectOpLoweringInCompute, CallIndirectOpLoweringInConstrain, WriteFieldOpLowering,
+      RemoveConstructorRefOp, UpdateScfForOpTypes, UpdateScfYieldOpTypes,
+      UpdateScfExecuteRegionOpTypes>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);

@@ -39,14 +39,14 @@ mlir::LogicalResult Zmir::LitValOpLowering::matchAndRewrite(
 /// ZmirGetSelfOpLowering
 ///////////////////////////////////////////////////////////
 
-mlir::LogicalResult Zmir::GetSelfOpLowering::matchAndRewrite(
-    Zmir::GetSelfOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  rewriter.replaceOpWithNewOp<llzk::CreateStructOp>(
-      op, getTypeConverter()->convertType(op.getType())
-  );
-  return mlir::success();
-}
+// mlir::LogicalResult Zmir::GetSelfOpLowering::matchAndRewrite(
+//     Zmir::GetSelfOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+// ) const {
+//   rewriter.replaceOpWithNewOp<llzk::CreateStructOp>(
+//       op, getTypeConverter()->convertType(op.getType())
+//   );
+//   return mlir::success();
+// }
 
 mlir::LogicalResult Zmir::ComponentLowering::matchAndRewrite(
     Zmir::SplitComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter

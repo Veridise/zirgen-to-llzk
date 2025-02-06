@@ -78,6 +78,7 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
     Zhl::ConstructorParamOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto body = op->getParentOfType<mlir::func::FuncOp>();
+  llvm::dbgs() << "body = " << body << "\n";
   mlir::BlockArgument arg = body.getArgument(adaptor.getIndex());
 
   rewriter.replaceOpWithNewOp<Zmir::NopOp>(op, arg.getType(), arg);
@@ -406,6 +407,7 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
 
   auto comp = op->getParentOfType<Zmir::ComponentInterface>();
   assert(comp);
+  auto self = op->getParentOfType<Zmir::SelfOp>().getSelfValue();
 
   mlir::Value value = adaptor.getDefinition();
 
@@ -420,7 +422,8 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
     mlir::Type slotType = Zmir::materializeTypeBinding(getContext(), slot->getBinding());
     SmallVector<Operation *, 2> castOps;
     Value result = getCastedValue(value, *exprBinding, rewriter, castOps, slotType);
-    result = storeAndLoadSlot(result, slotName, slotType, op.getLoc(), comp.getType(), rewriter);
+    result =
+        storeAndLoadSlot(result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
     if (castOps.empty()) {
       rewriter.replaceAllUsesWith(value, result);
     } else {
@@ -443,30 +446,28 @@ mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
-  if (!mlir::isa<mlir::func::FuncOp>(op->getParentOp())) {
+  if (!mlir::isa<Zmir::SelfOp>(op->getParentOp())) {
     return mlir::failure();
   }
   auto comp = op->getParentOfType<Zmir::ComponentInterface>();
   assert(comp);
-  auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
-
-  mlir::Value value = adaptor.getValue();
+  auto self = op->getParentOfType<Zmir::SelfOp>().getSelfValue();
   mlir::Type target = Zmir::materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != target) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), target, value);
-    value = cast.getResult(0);
+  auto value = getCastedValue(adaptor.getValue(), rewriter, target);
+  if (mlir::failed(value)) {
+    return mlir::failure();
   }
 
-  /*createField(comp, "$super", type, rewriter, op.getLoc());*/
-  auto writeOp = rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", value);
-  maybeAnnotateConstructorCallWithField(writeOp, adaptor.getValue());
+  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", *value);
+  // maybeAnnotateConstructorCallWithField(writeOp, adaptor.getValue());
 
-  // Find the prologue and join it to the current block
-  auto *prologue = &comp.getBodyFunc().getRegion().back();
-  auto nop =
-      rewriter.create<Zmir::NopOp>(rewriter.getUnknownLoc(), mlir::TypeRange(), mlir::ValueRange());
-  rewriter.inlineBlockBefore(prologue, nop.getOperation());
-  rewriter.eraseOp(nop);
+  // // Find the prologue and join it to the current block
+  // auto *prologue = &comp.getBodyFunc().getRegion().back();
+  // auto nop =
+  //     rewriter.create<Zmir::NopOp>(rewriter.getUnknownLoc(), mlir::TypeRange(),
+  //     mlir::ValueRange());
+  // rewriter.inlineBlockBefore(prologue, nop.getOperation());
+  // rewriter.eraseOp(nop);
   return mlir::success();
 }
 

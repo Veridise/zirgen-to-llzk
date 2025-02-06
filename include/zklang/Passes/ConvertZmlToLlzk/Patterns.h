@@ -56,14 +56,14 @@ public:
   matchAndRewrite(Zmir::LitValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
-/// Converts self into a struct allocation
-class GetSelfOpLowering : public mlir::OpConversionPattern<Zmir::GetSelfOp> {
-public:
-  using OpConversionPattern<Zmir::GetSelfOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(Zmir::GetSelfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
-};
+// /// Converts self into a struct allocation
+// class GetSelfOpLowering : public mlir::OpConversionPattern<Zmir::GetSelfOp> {
+// public:
+//   using OpConversionPattern<Zmir::GetSelfOp>::OpConversionPattern;
+//
+//   mlir::LogicalResult
+//   matchAndRewrite(Zmir::GetSelfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+// };
 
 class ComponentLowering : public mlir::OpConversionPattern<SplitComponentOp> {
 public:
