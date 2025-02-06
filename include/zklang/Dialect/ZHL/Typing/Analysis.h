@@ -17,6 +17,8 @@ public:
 
   mlir::FailureOr<TypeBinding> getType(mlir::StringRef name) const;
 
+  const TypeBindings &getBindings() const;
+
   void dump() const;
 
   void print(llvm::raw_ostream &os) const;

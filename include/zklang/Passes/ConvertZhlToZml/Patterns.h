@@ -131,6 +131,8 @@ public:
     return CtorCallBuilder::Make(op, value, *typeAnalysis, builder, selfOp.getSelfValue());
   }
 
+  const zhl::TypeBindings &getTypeBindings() const { return typeAnalysis->getBindings(); }
+
 private:
   const zhl::ZIRTypeAnalysis *typeAnalysis;
 };

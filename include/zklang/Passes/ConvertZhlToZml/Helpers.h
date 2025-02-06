@@ -68,8 +68,8 @@ public:
   );
 
   static mlir::FailureOr<CtorCallBuilder> Make(
-      mlir::Operation *op, mlir::Value value, const zhl::TypeBinding &binding,
-      mlir::OpBuilder &builder, mlir::Value self
+      mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+      mlir::Value self
   );
 
   /// Generates the ops that represent the construction of a component. Fetches a reference to

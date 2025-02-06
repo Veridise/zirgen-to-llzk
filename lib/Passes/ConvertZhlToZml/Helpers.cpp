@@ -141,12 +141,11 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     return op->emitError() << "failed to type check";
   }
 
-  return Make(op, value, *binding, builder, self);
+  return Make(op, *binding, builder, self);
 }
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
-    mlir::Operation *op, mlir::Value value, const zhl::TypeBinding &binding,
-    mlir::OpBuilder &builder, mlir::Value self
+    mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self
 ) {
   auto rootModule = op->getParentOfType<mlir::ModuleOp>();
   auto *calleeComp = findCallee(binding.getName(), rootModule);

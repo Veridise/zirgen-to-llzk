@@ -1,5 +1,6 @@
 #include "zklang/Passes/ConvertZhlToZml/Patterns.h"
 #include "zklang/Dialect/ZHL/Typing/Frame.h"
+#include "zklang/Dialect/ZHL/Typing/FrameImpl.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include "zklang/Dialect/ZML/IR/Builder.h"
 #include "zklang/Dialect/ZML/IR/OpInterfaces.h"
@@ -459,15 +460,6 @@ mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
   }
 
   rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", *value);
-  // maybeAnnotateConstructorCallWithField(writeOp, adaptor.getValue());
-
-  // // Find the prologue and join it to the current block
-  // auto *prologue = &comp.getBodyFunc().getRegion().back();
-  // auto nop =
-  //     rewriter.create<Zmir::NopOp>(rewriter.getUnknownLoc(), mlir::TypeRange(),
-  //     mlir::ValueRange());
-  // rewriter.inlineBlockBefore(prologue, nop.getOperation());
-  // rewriter.eraseOp(nop);
   return mlir::success();
 }
 
@@ -1043,6 +1035,14 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   if (mlir::failed(accBinding)) {
     return op->emitOpError() << "failed to type check accumulator";
   }
+  // Allocate a component slot for the output of the accumulator.
+  auto self = op->getParentOfType<Zmir::SelfOp>().getSelfValue();
+  arrayFrame->getFrame().allocateSlot<ComponentSlot>(getTypeBindings(), *accBinding);
+
+  auto ctorBuilder = CtorCallBuilder::Make(op, *accBinding, rewriter, self);
+  if (mlir::failed(ctorBuilder)) {
+    return mlir::failure();
+  }
   auto rootModule = op->getParentOfType<mlir::ModuleOp>();
   auto *calleeComp = findCallee(accBinding->getName(), rootModule);
   if (!calleeComp) {
@@ -1086,12 +1086,14 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
 
     mlir::Value rhs = maybeSuperCoerce(args[0], constructorType.getInput(1));
 
-    auto ref = builder.create<Zmir::ConstructorRefOp>(
-        loc, constructorType, accBinding->getName(), calleeIsBuiltin(calleeComp)
-    );
-    auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, mlir::ValueRange({lhs, rhs}));
+    auto accResult = ctorBuilder->build(builder, adaptor.getType().getLoc(), {lhs, rhs});
+    // auto ref = builder.create<Zmir::ConstructorRefOp>(
+    //     loc, constructorType, accBinding->getName(), calleeIsBuiltin(calleeComp)
+    // );
+    // auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, mlir::ValueRange({lhs,
+    // rhs}));
 
-    builder.create<mlir::scf::YieldOp>(loc, maybeSuperCoerce(call.getResult(0), init->getType()));
+    builder.create<mlir::scf::YieldOp>(loc, maybeSuperCoerce(accResult, init->getType()));
   }
   );
 
