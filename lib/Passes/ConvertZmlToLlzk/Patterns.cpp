@@ -8,9 +8,13 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
 #include <unordered_set>
 #include <vector>
 
@@ -253,7 +257,7 @@ mlir::LogicalResult Zmir::CallIndirectOpLoweringInCompute::matchAndRewrite(
   llvm::SmallVector<mlir::Type> types;
   auto convRes = getTypeConverter()->convertTypes(op.getResultTypes(), types);
   if (mlir::failed(convRes)) {
-    return op->emitError("failed to transform zmir types into zkir types");
+    return op->emitError("failed to transform zml types into llzk types");
   }
   mlir::ValueRange args(
       mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
@@ -314,6 +318,9 @@ mlir::LogicalResult Zmir::WriteFieldOpLowering::matchAndRewrite(
 mlir::LogicalResult Zmir::RemoveConstructorRefOp::matchAndRewrite(
     Zmir::ConstructorRefOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
+  // Replace with a no-op to maintain the use-def chains consistency
+  // rewriter.replaceOpWithNewOp<Zmir::NopOp>(op, TypeRange({op.getResult().getType()}),
+  // ValueRange());
   rewriter.eraseOp(op);
   return mlir::success();
 }
@@ -420,7 +427,7 @@ mlir::LogicalResult Zmir::LowerIndexToValOp::matchAndRewrite(
     Zmir::IndexToValOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   rewriter.replaceOpWithNewOp<llzk::IntToFeltOp>(
-      op, mlir::IndexType::get(getContext()), adaptor.getIndex()
+      op, llzk::FeltType::get(getContext()), adaptor.getIndex()
   );
 
   return mlir::success();
@@ -445,6 +452,107 @@ mlir::LogicalResult Zmir::LowerWriteArrayOp::matchAndRewrite(
   rewriter.replaceOpWithNewOp<llzk::WriteArrayOp>(
       op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
   );
+
+  return mlir::success();
+}
+
+Zmir::LegalizeOpTypes::LegalizeOpTypes(
+    const mlir::TypeConverter &typeConverter, mlir::StringRef opName, mlir::MLIRContext *context
+)
+    : ConversionPattern(typeConverter, opName, 1, context) {}
+
+mlir::LogicalResult Zmir::LegalizeOpTypes::matchAndRewrite(
+    mlir::Operation *op, mlir::ArrayRef<mlir::Value>, mlir::ConversionPatternRewriter &rewriter
+) const {
+
+  for (auto &region : op->getRegions()) {
+    TypeConverter::SignatureConversion entrySigConv(region.getNumArguments());
+    if (mlir::failed(
+            getTypeConverter()->convertSignatureArgs(region.getArgumentTypes(), entrySigConv)
+        ) ||
+        mlir::failed(rewriter.convertRegionTypes(&region, *getTypeConverter(), &entrySigConv))) {
+      return mlir::failure();
+    }
+  }
+
+  mlir::SmallVector<mlir::Type, 1> newResults;
+  if (mlir::failed(getTypeConverter()->convertTypes(op->getResultTypes(), newResults))) {
+    return mlir::failure();
+  }
+
+  mlir::SmallVector<mlir::Type, 1> newOperands;
+  if (mlir::failed(getTypeConverter()->convertTypes(op->getOperandTypes(), newOperands))) {
+    return mlir::failure();
+  }
+
+  rewriter.modifyOpInPlace(op, [&] {
+    for (auto [result, newType] : llvm::zip_equal(op->getResults(), newResults)) {
+      result.setType(newType);
+    }
+
+    for (auto [operand, newType] : llvm::zip_equal(op->getOperands(), newOperands)) {
+      operand.setType(newType);
+    }
+  });
+
+  llvm::dbgs() << *op;
+  // Make sure we are not missing anything
+  assert(getTypeConverter()->isLegal(op) && "some element of the op was not properly updated");
+
+  return success();
+}
+
+mlir::LogicalResult Zmir::UpdateScfForOpTypes::matchAndRewrite(
+    mlir::scf::ForOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+
+  auto initArgs = adaptor.getInitArgs();
+  rewriter.replaceOpWithNewOp<mlir::scf::ForOp>(
+      op, adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep(), initArgs,
+      [&](mlir::OpBuilder &, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
+    mlir::SmallVector<mlir::Value> allArgs({iv}), finalArgs;
+
+    // To avoid redundant casts that cannot be reconciled only make a cast if the types difer
+    allArgs.insert(allArgs.end(), args.begin(), args.end());
+    for (auto [arg, origType] :
+         llvm::zip_equal(allArgs, op.getRegion().front().getArgumentTypes())) {
+      if (arg.getType() == origType) {
+        finalArgs.push_back(arg);
+      } else {
+        auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, origType, arg);
+        finalArgs.push_back(cast.getResult(0));
+      }
+    }
+
+    auto loopPrologue = rewriter.getInsertionBlock();
+
+    rewriter.inlineBlockBefore(
+        &op.getRegion().front(), loopPrologue, loopPrologue->end(), finalArgs
+    );
+  }
+  );
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::UpdateScfYieldOpTypes::matchAndRewrite(
+    mlir::scf::YieldOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, adaptor.getOperands());
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::UpdateScfExecuteRegionOpTypes::matchAndRewrite(
+    mlir::scf::ExecuteRegionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+  SmallVector<Type> newTypes;
+  if (mlir::failed(getTypeConverter()->convertTypes(op.getResultTypes(), newTypes))) {
+    return mlir::failure();
+  }
+  auto exec = rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, newTypes);
+  rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
 
   return mlir::success();
 }

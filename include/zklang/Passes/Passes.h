@@ -19,8 +19,8 @@ template <typename Op> using OpPass = std::unique_ptr<mlir::OperationPass<Op>>;
 OpPass<mlir::ModuleOp> createStripTestsPass();
 OpPass<mlir::ModuleOp> createStripDirectivesPass();
 OpPass<mlir::ModuleOp> createConvertZhlToZmirPass();
-OpPass<llzk::StructDefOp> createConvertZmirToLlzkPass();
-OpPass<mlir::ModuleOp> createConvertZmirComponentsToLlzkPass();
+OpPass<mlir::ModuleOp> createConvertZmlToLlzkPass();
+OpPass<mlir::ModuleOp> createInjectLlzkModAttrsPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

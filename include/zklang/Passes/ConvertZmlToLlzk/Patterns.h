@@ -4,11 +4,48 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZML/IR/Ops.h"
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 
 namespace zkc::Zmir {
+
+class LegalizeOpTypes : public mlir::ConversionPattern {
+public:
+  LegalizeOpTypes(
+      const mlir::TypeConverter &typeConverter, mlir::StringRef, mlir::MLIRContext *context
+  );
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *, mlir::ArrayRef<mlir::Value>, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
+class UpdateScfForOpTypes : public mlir::OpConversionPattern<mlir::scf::ForOp> {
+public:
+  using OpConversionPattern<mlir::scf::ForOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::ForOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class UpdateScfYieldOpTypes : public mlir::OpConversionPattern<mlir::scf::YieldOp> {
+public:
+  using OpConversionPattern<mlir::scf::YieldOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::YieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class UpdateScfExecuteRegionOpTypes : public mlir::OpConversionPattern<mlir::scf::ExecuteRegionOp> {
+public:
+  using OpConversionPattern<mlir::scf::ExecuteRegionOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::ExecuteRegionOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
 
 /// Lowers literal Vals
 class LitValOpLowering : public mlir::OpConversionPattern<Zmir::LitValOp> {

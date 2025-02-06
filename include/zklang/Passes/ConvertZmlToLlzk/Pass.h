@@ -14,12 +14,11 @@
 
 namespace zkc {
 
-class ConvertZmirToLlzkPass : public ConvertZmirToLlzkBase<ConvertZmirToLlzkPass> {
+class ConvertZmlToLlzkPass : public ConvertZmlToLlzkBase<ConvertZmlToLlzkPass> {
   void runOnOperation() override;
 };
 
-class ConvertZmirComponentsToLlzkPass
-    : public ConvertZmirComponentsToLlzkBase<ConvertZmirComponentsToLlzkPass> {
+class InjectLlzkModAttrsPass : public InjectLlzkModAttrsBase<InjectLlzkModAttrsPass> {
   void runOnOperation() override;
 };
 
