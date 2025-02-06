@@ -1,1 +1,12 @@
-target_sources(ZIRC PRIVATE Analysis.cpp OpBindings.cpp PrintTypeBindings.cpp Rules.cpp Scope.cpp TypeBindings.cpp Typing.cpp Frame.cpp)
+target_sources(ZIRC PRIVATE 
+  Analysis.cpp 
+  OpBindings.cpp 
+  PrintTypeBindings.cpp 
+  Rules.cpp 
+  Scope.cpp 
+  TypeBindings.cpp 
+  TypeBindingSpecialization.cpp 
+  Typing.cpp 
+  Frame.cpp
+)
+
