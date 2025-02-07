@@ -12,8 +12,6 @@ include "mlir/IR/CommonAttrConstraints.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "OpInterfaces.td"
 
-// def ReturnsExpr : DeclareOpInterfaceMethods<InferTypeOpInterface>;
-
 class ZmirOp<string mnemonic, list<Trait> traits = []>
     : Op<ZmirDialect, mnemonic, traits> {}
 

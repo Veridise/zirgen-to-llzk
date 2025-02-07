@@ -11,7 +11,6 @@ namespace detail {
 
 class FrameInfo {
 public:
-  // FrameInfo();
   ~FrameInfo();
   template <typename Slot, typename... Args> FrameSlot *allocateSlot(Args &&...args);
 

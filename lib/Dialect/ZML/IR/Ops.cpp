@@ -15,7 +15,6 @@
 #include <mlir/Interfaces/FunctionImplementation.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
-#include <string_view>
 
 // TableGen'd implementation files
 #define GET_OP_CLASSES
@@ -50,8 +49,6 @@ void SelfOp::build(
   state.addTypes(compType);
   auto *region = state.addRegion();
   region->takeBody(movedRegion);
-  // mlir::IRMapping mapper;
-  // regionToCopy.cloneInto(region, mapper);
   assert(region->hasOneBlock());
   region->addArgument(compType, state.location);
 }

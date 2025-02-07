@@ -1,5 +1,4 @@
 #include "zklang/Dialect/ZML/IR/Builder.h"
-#include <mlir/IR/IRMapping.h>
 
 namespace zkc::Zmir {
 
@@ -40,7 +39,6 @@ void ComponentBuilder::Ctx::checkRequirements() {
   assert(body != nullptr);
   assert(loc.has_value());
   assert(!compName.empty());
-  /*assert(isGeneric() != typeParams.empty());*/
   assert(isBuiltin == compAttrs.empty());
 }
 
@@ -161,12 +159,10 @@ void ComponentBuilder::TakeRegion::set(ComponentOp op, Ctx &ctx, mlir::OpBuilder
   assert(bodyOp.getRegion().hasOneBlock());
   entryBlock.addArguments(ctx.constructorType.getInputs(), ctx.argLocs);
 
-  llvm::dbgs() << bodyOp << "\n";
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(&entryBlock);
 
   auto self = builder.create<zkc::Zmir::SelfOp>(op.getLoc(), op.getType(), *body);
-
   builder.create<mlir::func::ReturnOp>(self.getLoc(), mlir::ValueRange({self}));
 }
 

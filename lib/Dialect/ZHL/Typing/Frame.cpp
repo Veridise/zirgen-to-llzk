@@ -75,10 +75,6 @@ mlir::Value ArrayFrame::getInductionVar() const {
 
 namespace detail {
 
-// FrameInfo::FrameInfo() {
-//   assert(slots.end()->isKnownSentinel());
-//   // slots.end()->setParent(this);
-// }
 FrameInfo::~FrameInfo() { slots.clearAndDispose(std::default_delete<FrameSlot>()); }
 
 FrameInfo::SlotsList::iterator FrameInfo::begin() { return slots.begin(); }

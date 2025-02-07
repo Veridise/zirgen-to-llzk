@@ -246,9 +246,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // Case 2: The result is a copy of the type binding of the expression op. The slot of the
     // expression op is renamed to the member's name. The type binding returned by
     // this rule does not link to a slot since the expression op already does.
-    // FIXME: Change it to proper equality after merging since the implementation for that is
-    // already in the main branch
-    if (declBinding.getName() == exprBinding.getName()) {
+    if (declBinding == exprBinding) {
       exprSlot->rename(decl->getMember());
       scope.declareMember(decl->getMember(), operands[1]);
       return copyWithoutSlot(operands[1]);
@@ -329,18 +327,8 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
 
   auto commonType = std::reduce(
       operands.drop_front().begin(), operands.end(), operands.front(),
-      [](auto a, auto b) {
-    // llvm::dbgs() << "a = ";
-    // a.print(llvm::dbgs());
-    // llvm::dbgs() << ", b = ";
-    // b.print(llvm::dbgs());
-    // llvm::dbgs() << "\n";
-    return a.commonSupertypeWith(b);
-  }
+      [](auto a, auto b) { return a.commonSupertypeWith(b); }
   );
-  // llvm::dbgs() << "final common type = ";
-  // commonType.print(llvm::dbgs());
-  // llvm::dbgs() << "\n";
 
   return getBindings().Array(commonType, operands.size());
 }
@@ -376,10 +364,6 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
   // TODO: Validation that the inner type of the array is a subtype of the first argument of
   // operands[2]
   // TODO: Validation that the init type is a subtype of the second arguments of operands[2]
-  // TODO: The reduce op needs to create an array frame inside the current frame
-  //       where it can hold the intermediate results of the reduce loop.
-  //       This way if the accumulation operation is a complex component with constrains the loop
-  //       will be able to call the constrain call of each intermediate step.
   return operands[1];
 }
 
@@ -404,7 +388,6 @@ FailureOr<TypeBinding> BlockTypeRule::typeCheck(
     return failure();
   }
 
-  // TODO: Allocate a frame inside the current frame
   auto super = regionScopes[0]->getSuperType();
   if (failed(super)) {
     return op->emitOpError() << "could not deduce type of block because couldn't get super type";
@@ -441,7 +424,6 @@ FailureOr<Frame> SwitchTypeRule::allocate(Frame) const {
 FailureOr<TypeBinding> MapTypeRule::typeCheck(
     MapOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *> regionScopes
 ) const {
-  // TODO: Allocate an array frame for holding all the stuff happening inside the loop
   if (regionScopes.size() != 1) {
     return op->emitError() << "was expecting to have only one region";
   }

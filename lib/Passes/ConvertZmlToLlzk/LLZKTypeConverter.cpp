@@ -1,7 +1,6 @@
 
 #include "zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h"
 #include "llzk/Dialect/LLZK/IR/Types.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
 #include "zklang/Dialect/ZML/IR/Types.h"
 #include <algorithm>
 #include <iterator>
@@ -62,34 +61,14 @@ mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   return sym;
 }
 
-llzk::LLZKTypeConverter::LLZKTypeConverter(mlir::Operation *stRoot)
-    : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz"}),
-      symbolTableRoot(stRoot) {
+llzk::LLZKTypeConverter::LLZKTypeConverter()
+    : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz"}) {
 
   addConversion([](mlir::Type t) { return t; });
 
   // Conversions from ZML to LLZK
 
   addConversion([&](Zmir::ComponentType t) -> mlir::Type {
-    // if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
-    //     t.getBuiltin()) {
-    //   return llzk::FeltType::get(t.getContext());
-    // }
-    // if (t.getName().getValue() == "String") {
-    //   return llzk::StringType::get(t.getContext());
-    // }
-    // if (t.getName().getValue() == "Array") {
-    //   assert(t.getParams().size() == 2);
-    //   auto typeAttr = t.getParams()[0];
-    //   auto sizeAttr = t.getParams()[1];
-    //   // TODO Group together arrays of arrays
-    //   if (arrayLenIsKnown(sizeAttr)) {
-    //     return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSize(sizeAttr)});
-    //   } else {
-    //     return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)),
-    //     {getSizeSym(sizeAttr)});
-    //   }
-    // }
     llvm::SmallVector<mlir::Attribute> convertedAttrs;
     convertParamAttrs(t.getParams(), convertedAttrs, *this);
     return llzk::StructType::get(
@@ -135,30 +114,6 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(mlir::Operation *stRoot)
   addConversion([](Zmir::TypeVarType t) {
     return llzk::TypeVarType::get(t.getContext(), t.getName());
   });
-
-  // XXX: This may not be necessary
-  // Conversions from LLZK to ZML
-
-  // addConversion([&](llzk::StructType t) -> std::optional<mlir::Type> {
-  //   auto lookupResult = t.getDefinition(stc, symbolTableRoot);
-  //   if (mlir::failed(lookupResult)) {
-  //     return std::nullopt;
-  //   }
-  //   auto fieldDef =
-  //       lookupResult->get().getFieldDef(mlir::StringAttr::get(t.getContext(), "$super"));
-  //   if (!fieldDef) {
-  //     return std::nullopt;
-  //   }
-  //   auto superType = convertType(fieldDef.getType());
-  //   return Zmir::ComponentType::get(
-  //       t.getContext(), t.getNameRef().getLeafReference(), superType, t.getParams(), false
-  //   );
-  // });
-
-  // TODO llzk::FeltType -> Zmir::ComponentType
-  // TODO llzk::StringType -> Zmir::ComponentType
-  // TODO llzk::ArrayType -> Zmir::ComponentType
-  // TODO llzk::TypeVarType -> Zmir.TypeVarType
 
   addSourceMaterialization(unrealizedCastMaterialization);
   addTargetMaterialization(unrealizedCastMaterialization);

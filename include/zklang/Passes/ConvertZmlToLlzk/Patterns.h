@@ -2,7 +2,6 @@
 
 #include "llzk/Dialect/LLZK/IR/Ops.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZML/IR/Ops.h"
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
@@ -10,17 +9,6 @@
 #include <mlir/Support/LLVM.h>
 
 namespace zkc::Zmir {
-
-class LegalizeOpTypes : public mlir::ConversionPattern {
-public:
-  LegalizeOpTypes(
-      const mlir::TypeConverter &typeConverter, mlir::StringRef, mlir::MLIRContext *context
-  );
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::Operation *, mlir::ArrayRef<mlir::Value>, mlir::ConversionPatternRewriter &)
-      const override;
-};
 
 class UpdateScfForOpTypes : public mlir::OpConversionPattern<mlir::scf::ForOp> {
 public:
@@ -55,15 +43,6 @@ public:
   mlir::LogicalResult
   matchAndRewrite(Zmir::LitValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
-
-// /// Converts self into a struct allocation
-// class GetSelfOpLowering : public mlir::OpConversionPattern<Zmir::GetSelfOp> {
-// public:
-//   using OpConversionPattern<Zmir::GetSelfOp>::OpConversionPattern;
-//
-//   mlir::LogicalResult
-//   matchAndRewrite(Zmir::GetSelfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
-// };
 
 class ComponentLowering : public mlir::OpConversionPattern<SplitComponentOp> {
 public:
@@ -108,17 +87,6 @@ public:
 };
 
 class CallIndirectOpLoweringInCompute
-    : public mlir::OpConversionPattern<mlir::func::CallIndirectOp> {
-
-public:
-  using OpConversionPattern<mlir::func::CallIndirectOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor, mlir::ConversionPatternRewriter &)
-      const override;
-};
-
-class CallIndirectOpLoweringInConstrain
     : public mlir::OpConversionPattern<mlir::func::CallIndirectOp> {
 
 public:

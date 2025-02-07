@@ -32,20 +32,7 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   auto op = getOperation();
 
   mlir::MLIRContext *ctx = op->getContext();
-  // mlir::ModuleOp mod = op->getParentOfType<mlir::ModuleOp>();
-  // if (mod->hasAttrOfType<mlir::ArrayAttr>("builtinOverrideSet")) {
-  //   auto attrSet = mod->getAttrOfType<mlir::ArrayAttr>("builtinOverrideSet");
-  //   std::transform(
-  //       attrSet.begin(), attrSet.end(), std::inserter(builtinOverrideSet,
-  //       builtinOverrideSet.end()),
-  //       [](auto attr) {
-  //     auto strAttr = mlir::dyn_cast<mlir::StringAttr>(attr);
-  //     assert(strAttr && "attribute elements in builtinOverrideSet must be strings");
-  //     return strAttr.getValue();
-  //   }
-  //   );
-  // }
-  llzk::LLZKTypeConverter typeConverter(op);
+  llzk::LLZKTypeConverter typeConverter;
 
   // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
@@ -57,14 +44,14 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp, WriteFieldOpLowering,
       LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
       ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, CallOpLowering,
-      CallIndirectOpLoweringInCompute, CallIndirectOpLoweringInConstrain, WriteFieldOpLowering,
-      RemoveConstructorRefOp, UpdateScfForOpTypes, UpdateScfYieldOpTypes,
-      UpdateScfExecuteRegionOpTypes>(typeConverter, ctx);
+      CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
+      UpdateScfForOpTypes, UpdateScfYieldOpTypes, UpdateScfExecuteRegionOpTypes>(
+      typeConverter, ctx
+  );
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<
-      llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect /*, scf::SCFDialect*/>();
+  target.addLegalDialect<llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
   target.addIllegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
 
@@ -72,12 +59,6 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   target.addDynamicallyLegalDialect<scf::SCFDialect>([&](Operation *scfOp) {
     return typeConverter.isLegal(scfOp);
   });
-
-  // target.addIllegalOp<
-  //     LitValOp, GetSelfOp, BitAndOp, AddOp, SubOp, MulOp, ModOp, InvOp, IsZeroOp, NegOp,
-  //     ReadFieldOp, ConstrainOp, InRangeOp, NewArrayOp, ReadArrayOp, AllocArrayOp, GetArrayLenOp,
-  //     IndexToValOp, ValToIndexOp, WriteArrayOp, WriteFieldOp, ConstrainCallOp, NopOp,
-  //     SuperCoerceOp, LoadValParamOp>();
 
   // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
@@ -95,45 +76,6 @@ void InjectLlzkModAttrsPass::runOnOperation() {
       llzk::LANG_ATTR_NAME,
       mlir::StringAttr::get(&getContext(), llzk::LLZKDialect::getDialectNamespace())
   );
-
-  // std::unordered_set<std::string_view> builtinOverrideSet;
-  // if (mlir::isa<mlir::ModuleOp>(op) && op->hasAttrOfType<mlir::ArrayAttr>("builtinOverrideSet"))
-  // {
-  //   auto attrSet = op->getAttrOfType<mlir::ArrayAttr>("builtinOverrideSet");
-  //   std::transform(
-  //       attrSet.begin(), attrSet.end(), std::inserter(builtinOverrideSet,
-  //       builtinOverrideSet.end()),
-  //       [](auto attr) {
-  //     auto strAttr = mlir::dyn_cast<mlir::StringAttr>(attr);
-  //     assert(strAttr && "attribute elements in builtinOverrideSet must be strings");
-  //     return strAttr.getValue();
-  //   }
-  //   );
-  // }
-  // mlir::MLIRContext *ctx = op->getContext();
-  // llzk::LLZKTypeConverter typeConverter(builtinOverrideSet);
-  // // Init patterns for this transformation
-  // mlir::RewritePatternSet patterns(ctx);
-  //
-  // patterns.add<
-  //     ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, CallOpLowering,
-  //     CallIndirectOpLoweringInCompute, CallIndirectOpLoweringInConstrain, WriteFieldOpLowering,
-  //     RemoveConstructorRefOp>(typeConverter, ctx);
-  //
-  // // Set conversion target
-  // mlir::ConversionTarget target(*ctx);
-  // target.addLegalDialect<
-  //     zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, llzk::LLZKDialect,
-  //     mlir::arith::ArithDialect, index::IndexDialect, scf::SCFDialect>();
-  // target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
-  //
-  // target.addIllegalOp<
-  //     ComponentOp, SplitComponentOp, FieldDefOp, func::FuncOp, func::ReturnOp, func::CallOp,
-  //     func::CallIndirectOp, WriteFieldOp, ConstructorRefOp>();
-  // // Call partialTransformation
-  // if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
-  //   signalPassFailure();
-  // }
 }
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createInjectLlzkModAttrsPass() {

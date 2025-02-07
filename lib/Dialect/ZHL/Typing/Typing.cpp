@@ -124,7 +124,6 @@ FailureOr<TypeBinding> applyRuleWithFrame(
   if (failed(result)) {
     return failure();
   }
-  // XXX: I may need to do more than a copy but we will see.
   auto finalBinding = result->ReplaceFrame(frame);
   finalBinding.markSlot(frame.getParentSlot());
   return finalBinding;

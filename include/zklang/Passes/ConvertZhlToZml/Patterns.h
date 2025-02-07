@@ -40,7 +40,7 @@ public:
   /// Extracts the binding from the input value/operation and creates a
   /// cast of the value into the type materialized from the binding.
   /// If the super type is specified generates an additional SuperCoerceOp
-  /// fromt the binding's type to the super type.
+  /// from the binding's type to the super type.
   /// Assumes the operation has only one result.
   mlir::FailureOr<mlir::Value> getCastedValue(
       mlir::Operation *op, mlir::OpBuilder &builder,

@@ -8,12 +8,10 @@ namespace llzk {
 
 class LLZKTypeConverter : public mlir::TypeConverter {
 public:
-  LLZKTypeConverter(mlir::Operation *);
+  LLZKTypeConverter();
 
 private:
   std::unordered_set<std::string_view> feltEquivalentTypes;
-  mlir::Operation *symbolTableRoot;
-  mlir::SymbolTableCollection stc;
 };
 
 } // namespace llzk
