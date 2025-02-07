@@ -106,7 +106,7 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyForArrays) {
   auto &Arr = bindings.Get("Array");
   TypeBinding ExpectedSpecializedArray(
       "Array", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}, {{"N", 1}, Const10}}),
-      zhl::ParamsMap(), zhl::MembersMap(), true
+      zhl::ParamsMap(), zhl::MembersMap(), Frame(), true
   );
   ExpectedSpecializedArray.markAsSpecialized();
   ExpectedSpecializedArray.selfConstructs();

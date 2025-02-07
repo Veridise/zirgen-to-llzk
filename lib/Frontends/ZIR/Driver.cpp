@@ -140,7 +140,7 @@ Driver::Driver(int &argc, char **&argv)
 
 void Driver::configureLoweringPipeline() {
   pm.clear();
-  if (emitAction >= Action::PrintLlzk) {
+  if (emitAction >= Action::PrintLlzk || emitAction == Action::None) {
     pm.addPass(zkc::createInjectLlzkModAttrsPass());
   }
   pm.addPass(zkc::createStripTestsPass());

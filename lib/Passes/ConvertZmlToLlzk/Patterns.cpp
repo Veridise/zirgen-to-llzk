@@ -154,8 +154,8 @@ LogicalResult Zmir::LowerNopOp::matchAndRewrite(
   return success();
 }
 
-static std::unordered_set<std::string_view> feltEquivalentTypes{"Val", "Add",    "Sub",
-                                                                "Mul", "BitAnd", "Inv"};
+static std::unordered_set<std::string_view> feltEquivalentTypes{"Val",    "Add", "Sub", "Mul",
+                                                                "BitAnd", "Inv", "Isz"};
 
 LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
     Zmir::SuperCoerceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
@@ -164,7 +164,8 @@ LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
   auto opChain = adaptor.getComponent();
   auto tc = getTypeConverter();
   while (t != op.getResult().getType()) {
-    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end()) {
+    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
+        t.getBuiltin()) {
       // This type will get converted to a felt so there is not need to extract the super value any
       // longer.
       break;
