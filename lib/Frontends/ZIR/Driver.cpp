@@ -146,7 +146,7 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zkc::createStripTestsPass());
   pm.addPass(zkc::Zmir::createInjectBuiltInsPass());
   pm.addPass(zkc::createConvertZhlToZmirPass());
-  // pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
 
   if (emitAction == Action::PrintZML) {
     return;
