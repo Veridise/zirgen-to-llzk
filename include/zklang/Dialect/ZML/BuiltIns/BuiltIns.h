@@ -13,8 +13,16 @@ void addBuiltins(mlir::OpBuilder &, const std::unordered_set<std::string_view> &
 mlir::Operation *getBuiltInOp(mlir::StringRef);
 
 static const std::unordered_set<std::string> BuiltInComponentNames = {
-    "BitAnd", "Add", "Sub", "Mul", "Inv", "Isz", "Neg", "Val", "String", "Array", "Mod"
+    "BitAnd", "Add", "Sub", "Mul", "Inv", "Isz", "Neg", "Val", "String", "Array", "Mod", "InRange"
 };
+
+static const std::unordered_set<std::string_view> BuiltinsDontNeedAlloc = {"Add",    "Sub", "Mul",
+                                                                           "Isz",    "Neg", "Mod",
+                                                                           "InRange"};
+
+inline bool isBuiltinDontNeedAlloc(std::string_view name) {
+  return BuiltinsDontNeedAlloc.find(name) != BuiltinsDontNeedAlloc.end();
+}
 
 static const char BitAndStr[] = "BitAnd";
 static const char AddStr[] = "Add";
@@ -28,6 +36,7 @@ static const char StrStr[] = "String";
 static const char ComponentStr[] = "Component";
 static const char ArrayStr[] = "Array";
 static const char ModStr[] = "Mod";
+static const char InRangeStr[] = "InRange";
 
 // Taken from zirgen
 // Builtins that are defined using the DSL.

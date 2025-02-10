@@ -156,7 +156,7 @@ LogicalResult Zmir::LowerNopOp::matchAndRewrite(
 }
 
 static std::unordered_set<std::string_view> feltEquivalentTypes{"Val",    "Add", "Sub", "Mul",
-                                                                "BitAnd", "Inv", "Isz"};
+                                                                "BitAnd", "Inv", "Isz", "InRange"};
 
 LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
     Zmir::SuperCoerceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
@@ -296,9 +296,10 @@ mlir::LogicalResult Zmir::LowerInRangeOp::matchAndRewrite(
       op.getLoc(), llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::LT),
       adaptor.getMid(), adaptor.getHigh()
   );
-  auto mul = rewriter.create<mlir::arith::MulIOp>(op.getLoc(), le, lt);
-  auto conv = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), mul);
-  rewriter.replaceOp(op, conv);
+  auto convLe = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), le);
+  auto convLt = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), lt);
+  auto mul = rewriter.create<llzk::MulFeltOp>(op.getLoc(), convLe, convLt);
+  rewriter.replaceOp(op, mul);
 
   return mlir::success();
 }

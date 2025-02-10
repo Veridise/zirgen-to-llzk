@@ -374,7 +374,7 @@ def LoadValParamOp : ZmirOp<"load_param"> {
 
 ///////////////////// Builtin Ops /////////////////////
 
-def InRangeOp : ZmirOp<"in_range", [Pure, SameOperandsAndResultType]> {
+def InRangeOp : ZmirOp<"in_range", [Pure]> {
   let summary = "checks if value is within range";
   let arguments = (ins Component:$low, Component:$mid, Component:$high);
   let results = (outs Component:$out);

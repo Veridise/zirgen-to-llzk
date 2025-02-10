@@ -8,6 +8,7 @@
 #include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
+#include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 
 namespace zhl {
 
@@ -27,15 +28,10 @@ mlir::FailureOr<TypeBinding> StringTypingRule::
 mlir::FailureOr<TypeBinding> GlobalTypingRule::
     typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  llvm::dbgs() << "Typechecking " << op << "\n";
   auto binding = getBindings().MaybeGet(op.getName());
   if (mlir::failed(binding)) {
-    llvm::dbgs() << "Failed to obtain a binding for " << op.getName() << "\n";
     return op->emitError() << "type '" << op.getName() << "' was not found";
   }
-  llvm::dbgs() << "Found binding for " << op.getName() << ": ";
-  binding->print(llvm::dbgs());
-  llvm::dbgs() << "\n";
   return binding;
 }
 mlir::FailureOr<TypeBinding> ParameterTypingRule::
@@ -68,6 +64,9 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       Meaning, any builtin that was not overriden and that will lower to a llzk operation that
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
+  if (zkc::Zmir::isBuiltinDontNeedAlloc(operands[0].getName()) && operands[0].isBuiltin()) {
+    return operands[0];
+  }
   auto component = operands[0];
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
   return component;
