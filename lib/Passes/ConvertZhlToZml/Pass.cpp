@@ -13,6 +13,7 @@
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
 #include <memory>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
@@ -55,7 +56,7 @@ void ConvertZhlToZmirPass::runOnOperation() {
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<
       zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, mlir::scf::SCFDialect,
-      mlir::index::IndexDialect, zirgen::Zhl::ZhlDialect>();
+      mlir::index::IndexDialect, zirgen::Zhl::ZhlDialect, mlir::arith::ArithDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
   target.addIllegalOp<
       zirgen::Zhl::ComponentOp, zirgen::Zhl::ConstructorParamOp, zirgen::Zhl::LiteralOp,

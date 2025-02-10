@@ -28,6 +28,7 @@
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <mlir/Transforms/DialectConversion.h>
 #include <vector>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
@@ -154,7 +155,6 @@ computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> construc
 
   // Compute how many arguments are var-args and substract that amount to the number of arguments to
   // get the offset from args.begin() where the var-args start.
-  auto A = args.size();
   auto C = constructorTypes.size();
   auto offset = C - 1;
   return args.begin() + offset;
@@ -999,21 +999,71 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   return mlir::success();
 }
 
-/// Builds an if-then-else chain with each region of the switch op.
-/// The regions are inserted in the opposite order because the condition
-/// used in the `scf.if` op is the inverse of the condition used in ZIR.
-Operation *buildIfThenElseChain(
-    RegionRange::iterator region_begin, RegionRange::iterator region_end,
-    ConversionPatternRewriter &rewriter, int idx, Value selector, Type retType
-) {
+Value createNthCond(unsigned int idx, Value selector, OpBuilder &rewriter) {
   auto val = Zmir::ComponentType::Val(rewriter.getContext());
+  // Load the selector value from the array
+  auto nth = rewriter.create<Zmir::LitValOp>(selector.getLoc(), val, idx);
+  auto item = rewriter.create<Zmir::ReadArrayOp>(selector.getLoc(), val, selector, ValueRange(nth));
+
+  // Check if the value is equal to 1 (by converting it into a boolean)
+  return rewriter.create<Zmir::ValToI1Op>(selector.getLoc(), item);
+}
+
+/// Inlines a switch arm region. The region must have only 1 block.
+void inlineRegion(
+    Region *region, Block &dest, Block::iterator it, ConversionPatternRewriter &rewriter
+) {
+  assert(region->getBlocks().size() == 1);
+  rewriter.inlineBlockBefore(&region->front(), &dest, it);
+}
+
+/// Builds an if-then-else chain with each region of the switch op.
+void buildIfThenElseChain(
+    RegionRange::iterator region_begin, RegionRange::iterator region_end,
+    ValueRange::iterator conds, Block &dest, Block::iterator destIt,
+    ConversionPatternRewriter &rewriter, Type retType
+) {
+  Value cond = *conds;
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(&dest, destIt);
+  if (std::next(region_begin) == region_end) {
+    // If the region is the last one then we do
+    // assert(%cond_i);
+    // // copy the n-th region
+    rewriter.create<Zmir::AssertOp>(cond.getLoc(), cond);
+    inlineRegion(*region_begin, dest, rewriter.getInsertionPoint(), rewriter);
+    return;
+  }
+  // If the region is not the last one then we do
+  // %0 = scf.if (%cond_i) {
+  //  // copy the n-th region here
+  // } else {
+  //  // call resursive
+  // }
+
+  auto ifOp = rewriter.create<scf::IfOp>(cond.getLoc(), retType, cond, true, true);
+  inlineRegion(
+      *region_begin, ifOp.getThenRegion().front(), ifOp.getThenRegion().front().end(), rewriter
+  );
+  buildIfThenElseChain(
+      std::next(region_begin), region_end, std::next(conds), ifOp.getElseRegion().front(),
+      ifOp.getElseRegion().front().end(), rewriter, retType
+  );
+  rewriter.create<scf::YieldOp>(ifOp.getLoc(), ifOp.getResults());
+
+#if 0
+  std::next();
+  auto val = Zmir::ComponentType::Val(rewriter.getContext());
+  auto current_region = region_begin++;
+  bool nextIsLast = region_begin != region_end;
 
   // If we reach the end we only generate the final assert.
-  if (region_begin == region_end) {
-    auto zero = rewriter.create<Zmir::LitValOp>(rewriter.getUnknownLoc(), val, 0);
-    return rewriter.create<Zmir::AssertOp>(rewriter.getUnknownLoc(), retType, zero);
-  }
-  auto region = *region_begin;
+  // if (region_begin == region_end) {
+  //
+  //   auto zero = rewriter.create<Zmir::LitValOp>(rewriter.getUnknownLoc(), val, 0);
+  //   return rewriter.create<Zmir::AssertOp>(rewriter.getUnknownLoc(), retType, zero);
+  // }
+  auto region = *current_region;
 
   // Test if the nth element of the selector is zero.
   auto nth = rewriter.create<Zmir::LitValOp>(rewriter.getUnknownLoc(), val, idx);
@@ -1032,7 +1082,9 @@ Operation *buildIfThenElseChain(
 
   // If it's zero then we execute the then branch that recursively contains the pending regions to
   // check.
-  {
+  if (nextIsLast) {
+
+  } else {
     auto &thenBlock = ifOp.getThenRegion().front();
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(&thenBlock);
@@ -1048,6 +1100,7 @@ Operation *buildIfThenElseChain(
     rewriter.create<scf::YieldOp>(chainOp->getLoc(), chain);
   }
   return ifOp;
+#endif
 }
 
 LogicalResult ZhlSwitchLowering::matchAndRewrite(
@@ -1060,25 +1113,25 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
   auto arrType = Zmir::ComponentType::Array(
       getContext(), Zmir::ComponentType::Val(getContext()), op.getNumRegions()
   );
-  auto selector = adaptor.getSelector();
-  auto selectorBinding = getType(op.getSelector());
-  if (failed(selectorBinding)) {
+  auto selector = getCastedValue(adaptor.getSelector(), rewriter, arrType);
+  if (failed(selector)) {
     return op->emitOpError() << "failed to type check selector";
   }
-  auto selectorType = Zmir::materializeTypeBinding(getContext(), *selectorBinding);
-  if (selector.getType() != selectorType) {
-    selector =
-        rewriter.create<Zmir::SuperCoerceOp>(op.getSelector().getLoc(), selectorType, selector);
+  SmallVector<Value> conds;
+  conds.reserve(op.getNumRegions());
+  for (unsigned int n = 0; n < op.getNumRegions(); n++) {
+    conds.push_back(createNthCond(n, *selector, rewriter));
   }
-  if (selector.getType() != arrType) {
-    selector = rewriter.create<Zmir::SuperCoerceOp>(op.getSelector().getLoc(), arrType, selector);
-  }
+  ValueRange condsRange(conds);
 
   auto retType = Zmir::materializeTypeBinding(getContext(), *binding);
   RegionRange regions = op.getRegions();
-  auto chain = buildIfThenElseChain(regions.begin(), regions.end(), rewriter, 0, selector, retType);
+  auto execRegion = rewriter.replaceOpWithNewOp<scf::ExecuteRegionOp>(op, retType);
 
-  rewriter.replaceOp(op.getOperation(), chain);
+  auto &block = execRegion.getRegion().emplaceBlock();
+  buildIfThenElseChain(
+      regions.begin(), regions.end(), condsRange.begin(), block, block.end(), rewriter, retType
+  );
 
   return success();
 }

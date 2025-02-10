@@ -14,6 +14,7 @@
 #include <cassert>
 #include <iterator>
 #include <llvm/Support/Debug.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 #include <unordered_set>
@@ -86,7 +87,8 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect>();
+        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
+        arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
     // Return types may change so we need to adjust the return ops

@@ -358,10 +358,9 @@ def LitStrOp : ZmirOp<"string"> {
 def AssertOp : ZmirOp<"assert"> {
   let summary = "assert";
   let arguments = (ins AnyType:$cond);
-  let results = (outs TypeVarOr<Component>:$comp);
 
   let assemblyFormat = [{
-    $cond  `:` type($cond) `,` type($comp) attr-dict 
+    $cond  `:` type($cond)  attr-dict 
     }];
 }
 

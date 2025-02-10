@@ -15,6 +15,7 @@
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <mlir/Transforms/DialectConversion.h>
 #include <unordered_set>
 #include <vector>
 
@@ -440,6 +441,28 @@ mlir::LogicalResult Zmir::UpdateScfYieldOpTypes::matchAndRewrite(
   return mlir::success();
 }
 
+LogicalResult Zmir::UpdateScfIfOpTypes::matchAndRewrite(
+    scf::IfOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  SmallVector<Type, 1> newTypes;
+  if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), newTypes))) {
+    return failure();
+  }
+  auto newIf =
+      rewriter.replaceOpWithNewOp<scf::IfOp>(op, newTypes, adaptor.getCondition(), true, true);
+  {
+    OpBuilder::InsertionGuard guard(rewriter);
+    auto &thenBlock = newIf.getThenRegion().front();
+    rewriter.inlineBlockBefore(&op.getThenRegion().front(), &thenBlock, thenBlock.end());
+  }
+  {
+    OpBuilder::InsertionGuard guard(rewriter);
+    auto &elseBlock = newIf.getElseRegion().front();
+    rewriter.inlineBlockBefore(&op.getElseRegion().front(), &elseBlock, elseBlock.end());
+  }
+  return success();
+}
+
 mlir::LogicalResult Zmir::UpdateScfExecuteRegionOpTypes::matchAndRewrite(
     mlir::scf::ExecuteRegionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -451,4 +474,25 @@ mlir::LogicalResult Zmir::UpdateScfExecuteRegionOpTypes::matchAndRewrite(
   rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
 
   return mlir::success();
+}
+
+LogicalResult Zmir::ValToI1OpLowering::matchAndRewrite(
+    Zmir::ValToI1Op op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  auto zero = rewriter.create<llzk::FeltConstantOp>(
+      op.getLoc(), llzk::FeltType::get(getContext()),
+      llzk::FeltConstAttr::get(getContext(), APInt(1, 0))
+  );
+  rewriter.replaceOpWithNewOp<llzk::CmpOp>(
+      op, llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::NE),
+      adaptor.getVal(), zero
+  );
+  return success();
+}
+
+LogicalResult Zmir::AssertOpLowering::matchAndRewrite(
+    Zmir::AssertOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  rewriter.replaceOpWithNewOp<llzk::AssertOp>(op, adaptor.getCond(), rewriter.getStringAttr(""));
+  return success();
 }

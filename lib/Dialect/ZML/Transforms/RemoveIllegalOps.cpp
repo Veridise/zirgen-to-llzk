@@ -11,6 +11,7 @@
 #include "zklang/Dialect/ZML/Utils/Patterns.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
@@ -37,7 +38,7 @@ template <typename Impl, typename Base> class RemoveIllegalOpsCommon : public Ba
     mlir::ConversionTarget target(Base::getContext());
     target.addLegalDialect<
         zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect,
-        mlir::index::IndexDialect, mlir::scf::SCFDialect>();
+        mlir::index::IndexDialect, mlir::scf::SCFDialect, arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp>();
     setLegality(target);
 
