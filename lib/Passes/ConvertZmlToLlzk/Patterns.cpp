@@ -155,6 +155,9 @@ LogicalResult Zmir::LowerNopOp::matchAndRewrite(
   return success();
 }
 
+// Set of the builtins (by name) that are converted to a LLZK felt. Used for shortcircuiting the
+// lowering of SuperCoerceOp and for removing the calls to @constrain that point to structs that get
+// removed during lowering because the implementation of these types gets removed.
 static std::unordered_set<std::string_view> feltEquivalentTypes{"Val",    "Add", "Sub", "Mul",
                                                                 "BitAnd", "Inv", "Isz", "InRange"};
 
