@@ -1027,19 +1027,10 @@ void buildIfThenElseChain(
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(&dest, destIt);
   if (std::next(region_begin) == region_end) {
-    // If the region is the last one then we do
-    // assert(%cond_i);
-    // // copy the n-th region
     rewriter.create<Zmir::AssertOp>(cond.getLoc(), cond);
     inlineRegion(*region_begin, dest, rewriter.getInsertionPoint(), rewriter);
     return;
   }
-  // If the region is not the last one then we do
-  // %0 = scf.if (%cond_i) {
-  //  // copy the n-th region here
-  // } else {
-  //  // call resursive
-  // }
 
   auto ifOp = rewriter.create<scf::IfOp>(cond.getLoc(), retType, cond, true, true);
   inlineRegion(
@@ -1050,57 +1041,6 @@ void buildIfThenElseChain(
       ifOp.getElseRegion().front().end(), rewriter, retType
   );
   rewriter.create<scf::YieldOp>(ifOp.getLoc(), ifOp.getResults());
-
-#if 0
-  std::next();
-  auto val = Zmir::ComponentType::Val(rewriter.getContext());
-  auto current_region = region_begin++;
-  bool nextIsLast = region_begin != region_end;
-
-  // If we reach the end we only generate the final assert.
-  // if (region_begin == region_end) {
-  //
-  //   auto zero = rewriter.create<Zmir::LitValOp>(rewriter.getUnknownLoc(), val, 0);
-  //   return rewriter.create<Zmir::AssertOp>(rewriter.getUnknownLoc(), retType, zero);
-  // }
-  auto region = *current_region;
-
-  // Test if the nth element of the selector is zero.
-  auto nth = rewriter.create<Zmir::LitValOp>(rewriter.getUnknownLoc(), val, idx);
-  auto item = rewriter.create<Zmir::ReadArrayOp>(region->getLoc(), val, selector, ValueRange(nth));
-  auto isz = rewriter.create<Zmir::IsZeroOp>(region->getLoc(), val, item);
-  auto toBool = rewriter.create<Zmir::ValToI1Op>(region->getLoc(), isz);
-  auto ifOp = rewriter.create<scf::IfOp>(region->getLoc(), retType, toBool, true, true);
-
-  // If it's not zero then we execute the code of the nth region that has been copied to the else
-  // branch.
-  {
-    auto &elseBlock = ifOp.getElseRegion().front();
-    assert(region->getBlocks().size() == 1);
-    rewriter.inlineBlockBefore(&region->front(), &elseBlock, elseBlock.end());
-  }
-
-  // If it's zero then we execute the then branch that recursively contains the pending regions to
-  // check.
-  if (nextIsLast) {
-
-  } else {
-    auto &thenBlock = ifOp.getThenRegion().front();
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(&thenBlock);
-
-    ++region_begin;
-    auto chainOp =
-        buildIfThenElseChain(region_begin, region_end, rewriter, idx + 1, selector, retType);
-    assert(chainOp->getNumResults() == 1);
-    Value chain = chainOp->getResult(0);
-    if (chain.getType() != retType) {
-      chain = rewriter.create<Zmir::SuperCoerceOp>(chainOp->getLoc(), retType, chain);
-    }
-    rewriter.create<scf::YieldOp>(chainOp->getLoc(), chain);
-  }
-  return ifOp;
-#endif
 }
 
 LogicalResult ZhlSwitchLowering::matchAndRewrite(
