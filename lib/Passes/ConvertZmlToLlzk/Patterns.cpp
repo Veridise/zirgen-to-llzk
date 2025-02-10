@@ -168,8 +168,8 @@ LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
   auto opChain = adaptor.getComponent();
   auto tc = getTypeConverter();
   while (t != op.getResult().getType()) {
-    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
-        t.getBuiltin()) {
+    if (t.getBuiltin() &&
+        feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end()) {
       // This type will get converted to a felt so there is not need to extract the super value any
       // longer.
       break;
@@ -204,7 +204,8 @@ LogicalResult Zmir::LowerConstrainCallOp::matchAndRewrite(
     return op->emitOpError() << "was expecting a component type but got " << compType;
   }
   auto compName = comp.getName().getAttr();
-  if (feltEquivalentTypes.find(compName.getValue()) != feltEquivalentTypes.end()) {
+  if (comp.getBuiltin() &&
+      feltEquivalentTypes.find(compName.getValue()) != feltEquivalentTypes.end()) {
     rewriter.eraseOp(op);
     return success();
   }
