@@ -10,6 +10,7 @@
 #include "zklang/Dialect/ZML/Transforms/PassDetail.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 
@@ -211,7 +212,8 @@ class SplitComponentBodyPass : public SplitComponentBodyBase<SplitComponentBodyP
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect>();
+        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
+        arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
     target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
     target.addIllegalOp<Zmir::ComponentOp>();

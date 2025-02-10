@@ -45,9 +45,8 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
       ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, CallOpLowering,
       CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
-      UpdateScfForOpTypes, UpdateScfYieldOpTypes, UpdateScfExecuteRegionOpTypes>(
-      typeConverter, ctx
-  );
+      UpdateScfForOpTypes, UpdateScfYieldOpTypes, UpdateScfExecuteRegionOpTypes, UpdateScfIfOpTypes,
+      ValToI1OpLowering, AssertOpLowering>(typeConverter, ctx);
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);

@@ -14,6 +14,7 @@
 #include <cassert>
 #include <iterator>
 #include <llvm/Support/Debug.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 #include <unordered_set>
@@ -55,21 +56,12 @@ using ValPattern = RemoveBuiltIn<ValStr, Zmir::ComponentOp>;
 using StringPattern = RemoveBuiltIn<StrStr, Zmir::ComponentOp>;
 using ComponentPattern = RemoveBuiltIn<ComponentStr, Zmir::ComponentOp>;
 using ArrayPattern = RemoveBuiltIn<ArrayStr, Zmir::ComponentOp>;
+using InRangePattern = RemoveBuiltIn<InRangeStr, Zmir::ComponentOp>;
 
 namespace {
 class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
 
   void runOnOperation() override {
-    std::unordered_set<std::string> componentsToRemoveSet(
-        componentsToRemove.begin(), componentsToRemove.end()
-    );
-
-    /*std::transform(*/
-    /*    componentsToRemove.begin(), componentsToRemove.end(),*/
-    /*    std::inserter(componentsToRemoveSet, componentsToRemoveSet.begin()),*/
-    /*    [](auto &s) { return s.str(); }*/
-    /*);*/
-
     auto op = getOperation();
 
     Zmir::ZMIRTypeConverter typeConverter;
@@ -78,28 +70,20 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
 
     patterns.add<
         BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern, IszPattern, NegPattern,
-        ModPattern, ValPattern, StringPattern, ArrayPattern>(typeConverter, ctx);
-    /*fillPatterns<*/
-    /*    BitAndStr, AddStr, SubStr, MulStr, InvStr, IszStr, NegStr, ValStr, StringStr,*/
-    /*    llzk::StructDefOp>(patterns, typeConverter, ctx);*/
+        ModPattern, ValPattern, StringPattern, ArrayPattern, InRangePattern>(typeConverter, ctx);
 
-    // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect>();
+        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
+        arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
-    // Return types may change so we need to adjust the return ops
     target.addDynamicallyLegalOp<Zmir::ComponentOp>([&](Zmir::ComponentOp op) {
       auto found = BuiltInComponentNames.find(op.getName().str()) != BuiltInComponentNames.end();
-      auto isTarget =
-          componentsToRemoveSet.find(op.getName().str()) != componentsToRemoveSet.end() ||
-          componentsToRemoveSet.empty();
       auto markedBuiltIn = op.getBuiltin();
-      return !(found && isTarget && markedBuiltIn);
+      return !(found && markedBuiltIn);
     });
 
-    // Call partialTransformation
     if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
       signalPassFailure();
     }

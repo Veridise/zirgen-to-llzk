@@ -35,6 +35,14 @@ public:
       const override;
 };
 
+class UpdateScfIfOpTypes : public mlir::OpConversionPattern<mlir::scf::IfOp> {
+public:
+  using OpConversionPattern<mlir::scf::IfOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 /// Lowers literal Vals
 class LitValOpLowering : public mlir::OpConversionPattern<Zmir::LitValOp> {
 public:
@@ -144,6 +152,22 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(IsZeroOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class ValToI1OpLowering : public mlir::OpConversionPattern<ValToI1Op> {
+public:
+  using mlir::OpConversionPattern<ValToI1Op>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(ValToI1Op, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class AssertOpLowering : public mlir::OpConversionPattern<AssertOp> {
+public:
+  using mlir::OpConversionPattern<AssertOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(AssertOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerReadFieldOp : public mlir::OpConversionPattern<ReadFieldOp> {

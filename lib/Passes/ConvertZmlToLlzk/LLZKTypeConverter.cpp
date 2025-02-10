@@ -62,7 +62,7 @@ mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
 }
 
 llzk::LLZKTypeConverter::LLZKTypeConverter()
-    : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz"}) {
+    : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz", "InRange"}) {
 
   addConversion([](mlir::Type t) { return t; });
 

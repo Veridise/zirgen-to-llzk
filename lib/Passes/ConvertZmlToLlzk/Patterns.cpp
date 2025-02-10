@@ -15,6 +15,7 @@
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <mlir/Transforms/DialectConversion.h>
 #include <unordered_set>
 #include <vector>
 
@@ -154,8 +155,11 @@ LogicalResult Zmir::LowerNopOp::matchAndRewrite(
   return success();
 }
 
+// Set of the builtins (by name) that are converted to a LLZK felt. Used for shortcircuiting the
+// lowering of SuperCoerceOp and for removing the calls to @constrain that point to structs that get
+// removed during lowering because the implementation of these types gets removed.
 static std::unordered_set<std::string_view> feltEquivalentTypes{"Val",    "Add", "Sub", "Mul",
-                                                                "BitAnd", "Inv", "Isz"};
+                                                                "BitAnd", "Inv", "Isz", "InRange"};
 
 LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
     Zmir::SuperCoerceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
@@ -164,8 +168,8 @@ LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
   auto opChain = adaptor.getComponent();
   auto tc = getTypeConverter();
   while (t != op.getResult().getType()) {
-    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
-        t.getBuiltin()) {
+    if (t.getBuiltin() &&
+        feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end()) {
       // This type will get converted to a felt so there is not need to extract the super value any
       // longer.
       break;
@@ -200,7 +204,8 @@ LogicalResult Zmir::LowerConstrainCallOp::matchAndRewrite(
     return op->emitOpError() << "was expecting a component type but got " << compType;
   }
   auto compName = comp.getName().getAttr();
-  if (feltEquivalentTypes.find(compName.getValue()) != feltEquivalentTypes.end()) {
+  if (comp.getBuiltin() &&
+      feltEquivalentTypes.find(compName.getValue()) != feltEquivalentTypes.end()) {
     rewriter.eraseOp(op);
     return success();
   }
@@ -295,9 +300,10 @@ mlir::LogicalResult Zmir::LowerInRangeOp::matchAndRewrite(
       op.getLoc(), llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::LT),
       adaptor.getMid(), adaptor.getHigh()
   );
-  auto mul = rewriter.create<mlir::arith::MulIOp>(op.getLoc(), le, lt);
-  auto conv = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), mul);
-  rewriter.replaceOp(op, conv);
+  auto convLe = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), le);
+  auto convLt = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), lt);
+  auto mul = rewriter.create<llzk::MulFeltOp>(op.getLoc(), convLe, convLt);
+  rewriter.replaceOp(op, mul);
 
   return mlir::success();
 }
@@ -440,6 +446,28 @@ mlir::LogicalResult Zmir::UpdateScfYieldOpTypes::matchAndRewrite(
   return mlir::success();
 }
 
+LogicalResult Zmir::UpdateScfIfOpTypes::matchAndRewrite(
+    scf::IfOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  SmallVector<Type, 1> newTypes;
+  if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), newTypes))) {
+    return failure();
+  }
+  auto newIf =
+      rewriter.replaceOpWithNewOp<scf::IfOp>(op, newTypes, adaptor.getCondition(), true, true);
+  {
+    OpBuilder::InsertionGuard guard(rewriter);
+    auto &thenBlock = newIf.getThenRegion().front();
+    rewriter.inlineBlockBefore(&op.getThenRegion().front(), &thenBlock, thenBlock.end());
+  }
+  {
+    OpBuilder::InsertionGuard guard(rewriter);
+    auto &elseBlock = newIf.getElseRegion().front();
+    rewriter.inlineBlockBefore(&op.getElseRegion().front(), &elseBlock, elseBlock.end());
+  }
+  return success();
+}
+
 mlir::LogicalResult Zmir::UpdateScfExecuteRegionOpTypes::matchAndRewrite(
     mlir::scf::ExecuteRegionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -451,4 +479,25 @@ mlir::LogicalResult Zmir::UpdateScfExecuteRegionOpTypes::matchAndRewrite(
   rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
 
   return mlir::success();
+}
+
+LogicalResult Zmir::ValToI1OpLowering::matchAndRewrite(
+    Zmir::ValToI1Op op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  auto zero = rewriter.create<llzk::FeltConstantOp>(
+      op.getLoc(), llzk::FeltType::get(getContext()),
+      llzk::FeltConstAttr::get(getContext(), APInt(1, 0))
+  );
+  rewriter.replaceOpWithNewOp<llzk::CmpOp>(
+      op, llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::NE),
+      adaptor.getVal(), zero
+  );
+  return success();
+}
+
+LogicalResult Zmir::AssertOpLowering::matchAndRewrite(
+    Zmir::AssertOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  rewriter.replaceOpWithNewOp<llzk::AssertOp>(op, adaptor.getCond(), rewriter.getStringAttr(""));
+  return success();
 }

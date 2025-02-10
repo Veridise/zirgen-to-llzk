@@ -12,6 +12,7 @@
 #include "zklang/Dialect/ZML/Typing/ZMIRTypeConverter.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 #include <unordered_set>
@@ -110,6 +111,7 @@ using ModPattern = ReplaceConstructorCallWithBuiltIn<Zmir::ModOp, ModStr>;
 using InvPattern = ReplaceConstructorCallWithBuiltIn<Zmir::InvOp, InvStr>;
 using IszPattern = ReplaceConstructorCallWithBuiltIn<Zmir::IsZeroOp, IszStr>;
 using NegPattern = ReplaceConstructorCallWithBuiltIn<Zmir::NegOp, NegStr>;
+using InRangePattern = ReplaceConstructorCallWithBuiltIn<Zmir::InRangeOp, InRangeStr>;
 
 namespace {
 class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
@@ -123,13 +125,13 @@ class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
 
     patterns.add<
         BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern, IszPattern, NegPattern,
-        ModPattern, RemoveConstructorRef>(typeConverter, ctx);
+        ModPattern, InRangePattern, RemoveConstructorRef>(typeConverter, ctx);
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
         zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, mlir::index::IndexDialect,
-        mlir::scf::SCFDialect>();
+        mlir::scf::SCFDialect, mlir::arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
     target.addDynamicallyLegalOp<func::CallIndirectOp>(isLegalCallIndirect);
