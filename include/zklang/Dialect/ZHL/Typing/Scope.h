@@ -98,7 +98,7 @@ private:
 };
 
 /// Enters a new lexical scope where members can also be defined.
-/// It has it's own super type.
+/// It has its own super type.
 class BlockScope : public ChildScope, LexicalScopeImpl {
 public:
   explicit BlockScope(Scope &);

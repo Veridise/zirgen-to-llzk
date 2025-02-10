@@ -156,7 +156,7 @@ computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> construc
   // get the offset from args.begin() where the var-args start.
   auto A = args.size();
   auto C = constructorTypes.size();
-  auto offset = A - (A - C + 1);
+  auto offset = C - 1;
   return args.begin() + offset;
 }
 

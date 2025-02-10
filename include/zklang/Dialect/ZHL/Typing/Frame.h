@@ -32,7 +32,7 @@ public:
 
   // The frame information forms a tree of slots.
   // Thus, each frame may be contained inside a slot of a frame in an upper level of the hierarchy.
-  // Once set, ovewriting the parent is considered a bug.
+  // Once set, overwriting the parent is considered a bug.
   void setParentSlot(FrameSlot *);
   FrameSlot *getParentSlot() const;
 

@@ -25,7 +25,7 @@ public:
       const = 0;
 
   /// Returns a new inner frame slot in the frame if the operations needs to allocate one. By
-  /// default returns failure(), signifying that the op does not need to allocate a whole frame.
+  /// default returns failure(), signifying that the op does not need to allocate a frame.
   virtual mlir::FailureOr<Frame> allocate(Frame) const { return mlir::failure(); }
 
 private:

@@ -21,7 +21,7 @@ mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root) {
     return calleeComp;
   }
 
-  // Zhl Component ops don't declare its symbols in the symbol table
+  // Zhl Component ops don't declare their symbols in the symbol table
   for (auto zhlOp : root.getOps<zirgen::Zhl::ComponentOp>()) {
     if (zhlOp.getName() == name) {
       return zhlOp;

@@ -11,8 +11,8 @@
 namespace zkc {
 
 /// Finds the definition of the callee component. If the
-/// component was defined before the current operation wrt the physical order of
-/// the file then its defined by a ZML ComponentInterface op, if it hasn't been
+/// component was defined before the current operation w.r.t. the physical order of
+/// the file then it's defined by a ZML ComponentInterface op, if it hasn't been
 /// converted yet it is still a ZHL Component op. If the name could not be found
 /// in either form returns nullptr.
 mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root);
