@@ -186,12 +186,11 @@ private:
   std::optional<uint64_t> constVal;
   std::optional<llvm::StringRef> genericParamName;
   TypeBinding *superType;
-  MembersMap members; // TODO: Replace with the Frame API?
+  MembersMap members;
   Params genericParams;
   Params constructorParams;
   Frame frame;
   FrameSlot *slot = nullptr;
-
 };
 
 class TypeBindings {

@@ -41,12 +41,14 @@ public:
   /// cast of the value into the type materialized from the binding.
   /// If the super type is specified generates an additional SuperCoerceOp
   /// from the binding's type to the super type.
-  /// Assumes the operation has only one result.
+  /// REQUIRES that the operation has one result only.
   mlir::FailureOr<mlir::Value> getCastedValue(
       mlir::Operation *op, mlir::OpBuilder &builder,
       mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
   ) const {
-    assert(op->getNumResults() == 1);
+    assert(
+        op->getNumResults() == 1 && "casting helper can only work with operations with 1 result"
+    );
     return getCastedValue(op->getResult(0), builder, super);
   }
 

@@ -83,7 +83,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
     assert(t.getParams().size() == 2);
     auto typeAttr = t.getParams()[0];
     auto sizeAttr = t.getParams()[1];
-    // TODO Group together arrays of arrays
+    // TODO(LLZK-173) Group together arrays of arrays
     if (arrayLenIsKnown(sizeAttr)) {
       return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSize(sizeAttr)});
     } else {

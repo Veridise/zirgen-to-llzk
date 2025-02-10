@@ -9,6 +9,7 @@ class FrameSlot;
 
 namespace detail {
 
+/// Inner implementation of a Frame. It is shared via a pointer by a group a Frame instances.
 class FrameInfo {
 public:
   ~FrameInfo();

@@ -4,8 +4,15 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Transforms/DialectConversion.h>
 
+/*
+ * Common patterns or templates thereof used by several passes grouped here together
+ * to avoid duplicating code.
+ */
+
 namespace zkc::Zmir {
 
+/// A strategy for ReplaceSelfWith that replaces the op's result with
+/// a Value coming from the N-th argument of the parent.
 template <int ArgN, typename Parent = mlir::func::FuncOp> class Arg {
 public:
   template <typename Op>
@@ -16,6 +23,9 @@ public:
   }
 };
 
+/// A strategy for ReplaceSelfWith that replaces the op with a new one.
+/// This new op must return the same amount of values.
+/// Known limitations: The new operation cannot have any operands.
 template <typename Op> class NewOp {
 public:
   template <typename InOp>
@@ -30,6 +40,9 @@ public:
   }
 };
 
+/// A pattern for replacing ZML's SelfOp with another Value or Operation. The exact behavior of the
+/// replacement is defined by the Strategy type. All ops defined inside the SelfOp's region are
+/// hoisted out before removing the op.
 template <typename Strategy> class ReplaceSelfWith : public mlir::OpConversionPattern<SelfOp> {
   static_assert(std::is_default_constructible_v<Strategy>);
 
