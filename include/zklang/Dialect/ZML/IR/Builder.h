@@ -63,8 +63,6 @@ private:
     void set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const override;
 
   private:
-    void fillEpilogue(mlir::Block *block, ComponentOp op, mlir::OpBuilder &builder) const;
-
     mlir::Region *body = nullptr;
   };
 

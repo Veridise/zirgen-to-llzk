@@ -15,6 +15,8 @@
 #include <mlir/Support/LogicalResult.h>
 #include <string_view>
 #include <unordered_map>
+#include <zklang/Dialect/ZHL/Typing/Frame.h>
+#include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 
 namespace zhl {
 
@@ -73,92 +75,6 @@ private:
 
   ParamsList params;
   ParamNames names;
-};
-
-/// Interface for the different types of bindings
-class TypeBindingImpl {
-public:
-  virtual ~TypeBindingImpl() = default;
-  virtual std::string_view getName() const = 0;
-};
-
-/// The root Component
-class ComponentRoot : public TypeBindingImpl {
-public:
-  virtual std::string_view getName() const override { return "Component"; }
-};
-
-enum class TrivialTypes { Val, String, Array };
-
-/// Represents the trivial types Val, String, Array, etc.
-class TrivialType : public TypeBindingImpl {
-public:
-  virtual std::string_view getName() const override {
-    switch (type) {
-    case zhl::TrivialTypes::Val:
-      return "Val";
-    case zhl::TrivialTypes::String:
-      return "String";
-    case zhl::TrivialTypes::Array:
-      return "Array";
-    }
-  }
-
-private:
-  TrivialTypes type;
-};
-
-/// Represents the bottom type that is a subtype of any other.
-class BottomType : public TypeBindingImpl {
-public:
-  virtual std::string_view getName() const override { return BOTTOM; }
-};
-
-/// Represents the type of a component.
-class NamedBinding : public TypeBindingImpl {
-public:
-  virtual std::string_view getName() const override { return name; }
-
-private:
-  std::string name;
-  MembersMap members;
-  Params genericParams;
-  Params constructorParams;
-  const TypeBinding *superType;
-};
-
-/// Represents a type variable.
-class TypeVariable : public TypeBindingImpl {
-public:
-  virtual std::string_view getName() const override { return varName; }
-
-private:
-  std::string varName;
-};
-
-/// Represents a constant Val.
-class ConstVal : public TypeBindingImpl {
-public:
-  virtual std::string_view getName() const override { return valueStrRepr; }
-
-private:
-  uint64_t value;
-  std::string valueStrRepr;
-};
-
-/// Represents a constant Val whose actual value is unknown.
-class UnkConstVal : public TypeBindingImpl {
-public:
-  virtual std::string_view getName() const override {
-    if (varName.has_value()) {
-      return *varName;
-    } else {
-      return "?";
-    }
-  }
-
-private:
-  std::optional<std::string> varName;
 };
 
 /// Binding to a ZIR type
@@ -224,31 +140,39 @@ public:
   TypeBinding &operator=(TypeBinding &&);
   TypeBinding(mlir::Location);
   TypeBinding(
-      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, bool isBuiltin = false
+      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, Frame frame = Frame(),
+      bool isBuiltin = false
   );
   TypeBinding(
       llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-      ParamsMap t_genericParams, bool isBuiltin = false
+      ParamsMap t_genericParams, Frame frame = Frame(), bool isBuiltin = false
   );
   TypeBinding(
       llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
       ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members,
-      bool isBuiltin = false
+      Frame frame = Frame(), bool isBuiltin = false
   );
   TypeBinding(
       uint64_t value, mlir::Location loc, const TypeBindings &bindings, bool isBuiltin = false
   );
   TypeBinding WithUpdatedLocation(mlir::Location loc) const;
+  TypeBinding ReplaceFrame(Frame) const;
 
   static TypeBinding WrapVariadic(const TypeBinding &t);
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name);
 
   friend TypeBindings;
+  friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const zhl::TypeBinding &b);
 
   void selfConstructs();
   void markAsSpecialized();
 
   bool operator==(const TypeBinding &) const;
+
+  void markSlot(FrameSlot *);
+  FrameSlot *getSlot() const;
+
+  Frame getFrame() const;
 
 private:
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
@@ -265,11 +189,8 @@ private:
   MembersMap members;
   Params genericParams;
   Params constructorParams;
-
-  // TODO: This class is starting to get unwieldy. I plan to refactor it to a more flexible model
-  // but currently we don't have enough tests about this class to prove that I didn't break anything
-  // during refactoring.
-  // std::shared_ptr<TypeBindingImpl> impl;
+  Frame frame;
+  FrameSlot *slot = nullptr;
 };
 
 class TypeBindings {
@@ -307,7 +228,7 @@ public:
   const TypeBinding &CreateBuiltin(std::string_view name, mlir::Location loc, Args &&...args) {
     llvm::dbgs() << "Creating binding with name " << name << "\n";
     assert(bindings.find(name) == bindings.end() && "double binding write");
-    bindings.emplace(name, TypeBinding(name, loc, std::forward<Args>(args)..., true));
+    bindings.emplace(name, TypeBinding(name, loc, std::forward<Args>(args)..., Frame(), true));
     return bindings.at(name);
   }
 

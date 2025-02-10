@@ -3,12 +3,14 @@
 #include "OpBindings.h"
 #include "Scope.h"
 #include "TypeBindings.h"
+#include <zklang/Dialect/ZHL/Typing/Frame.h>
 
 namespace zhl {
 
 class TypingRule {
 public:
   explicit TypingRule(TypeBindings &bindings);
+  virtual ~TypingRule() = default;
 
   TypeBindings &getBindings() const;
 
@@ -21,6 +23,10 @@ public:
   virtual mlir::FailureOr<std::vector<TypeBinding>>
   bindRegionArguments(mlir::ValueRange, mlir::Operation *, mlir::ArrayRef<TypeBinding>, Scope &)
       const = 0;
+
+  /// Returns a new inner frame slot in the frame if the operations needs to allocate one. By
+  /// default returns failure(), signifying that the op does not need to allocate a frame.
+  virtual mlir::FailureOr<Frame> allocate(Frame) const { return mlir::failure(); }
 
 private:
   TypeBindings *bindings;

@@ -58,15 +58,6 @@ def RemoveIllegalComputeOps : RemoveIllegalOps<"Compute"> {}
 
 def RemoveIllegalConstrainOps : RemoveIllegalOps<"Constrain"> {}
 
-def InsertTemporaries : Pass<"insert-temporaries", "zkc::Zmir::ComponentOp"> {
-  let summary = "creates fields for temporary values generated from "
-                "constructor calls that do not write into a field";
-
-  let constructor = "zkc::Zmir::createInsertTemporariesPass()";
-
-  let dependentDialects = ["zkc::Zmir::ZmirDialect", "mlir::func::FuncDialect"];
-}
-
 def LegalizeTypes : Pass<"legalize-types", "zkc::Zmir::ComponentOp"> {
   let summary = "removes pending types";
 

@@ -8,9 +8,13 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
 #include <unordered_set>
 #include <vector>
 
@@ -31,23 +35,9 @@ mlir::LogicalResult Zmir::LitValOpLowering::matchAndRewrite(
   return mlir::success();
 }
 
-///////////////////////////////////////////////////////////
-/// ZmirGetSelfOpLowering
-///////////////////////////////////////////////////////////
-
-mlir::LogicalResult Zmir::GetSelfOpLowering::matchAndRewrite(
-    Zmir::GetSelfOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  rewriter.replaceOpWithNewOp<llzk::CreateStructOp>(
-      op, getTypeConverter()->convertType(op.getType())
-  );
-  return mlir::success();
-}
-
 mlir::LogicalResult Zmir::ComponentLowering::matchAndRewrite(
     Zmir::SplitComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  // TODO type parameters
   auto newOp = rewriter.replaceOpWithNewOp<llzk::StructDefOp>(
       op, op.getNameAttr(), op.getParams().has_value() ? *op.getParams() : rewriter.getArrayAttr({})
   );
@@ -71,7 +61,6 @@ mlir::LogicalResult Zmir::ComponentLowering::matchAndRewrite(
         rewriter.clone(*funcOp.getOperation());
       }
     }
-    // TODO: Extra stuff in the component needs to go outside into the module
     rewriter.clone(*op.getBodyFunc());
     rewriter.clone(*op.getConstrainFunc());
   }
@@ -88,7 +77,7 @@ mlir::LogicalResult Zmir::FieldDefOpLowering::matchAndRewrite(
 }
 
 /// Inspired by FuncOp::cloneInto
-void cloneAttrsIntoZkirFunc(mlir::func::FuncOp src, llzk::FuncOp dest) {
+void cloneAttrsIntoLlzkFunc(mlir::func::FuncOp src, llzk::FuncOp dest) {
   // Add the attributes of this function to dest (except visibility unless is
   // extern).
   llvm::MapVector<mlir::StringAttr, mlir::Attribute> newAttrMap;
@@ -96,8 +85,6 @@ void cloneAttrsIntoZkirFunc(mlir::func::FuncOp src, llzk::FuncOp dest) {
     newAttrMap.insert({attr.getName(), attr.getValue()});
   }
   for (const auto &attr : src->getAttrs()) {
-    /*if (attr.getName() == "sym_visibility")*/
-    /*  continue;*/
     newAttrMap.insert({attr.getName(), attr.getValue()});
   }
 
@@ -130,7 +117,7 @@ mlir::LogicalResult Zmir::FuncOpLowering::matchAndRewrite(
       mlir::FunctionType::get(rewriter.getContext(), result.getConvertedTypes(), newResults);
 
   auto newFuncOp = rewriter.replaceOpWithNewOp<llzk::FuncOp>(op, op.getNameAttr(), newType);
-  cloneAttrsIntoZkirFunc(op, newFuncOp);
+  cloneAttrsIntoLlzkFunc(op, newFuncOp);
   newFuncOp.getRegion().takeBody(op.getRegion());
   return mlir::success();
 }
@@ -149,7 +136,7 @@ mlir::LogicalResult Zmir::CallOpLowering::matchAndRewrite(
 
   auto convRes = getTypeConverter()->convertTypes(op.getCalleeType().getResults(), results);
   if (mlir::failed(convRes)) {
-    return op->emitError("failed to transform zmir types into zkir types");
+    return op->emitError("failed to transform zml types into llzk types");
   }
   rewriter.replaceOpWithNewOp<llzk::CallOp>(
       op, adaptor.getCallee(), results, adaptor.getOperands()
@@ -167,8 +154,8 @@ LogicalResult Zmir::LowerNopOp::matchAndRewrite(
   return success();
 }
 
-static std::unordered_set<std::string_view> feltEquivalentTypes{"Val", "Add",    "Sub",
-                                                                "Mul", "BitAnd", "Inv"};
+static std::unordered_set<std::string_view> feltEquivalentTypes{"Val",    "Add", "Sub", "Mul",
+                                                                "BitAnd", "Inv", "Isz"};
 
 LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
     Zmir::SuperCoerceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
@@ -176,8 +163,9 @@ LogicalResult Zmir::LowerSuperCoerceOp::matchAndRewrite(
   auto t = mlir::dyn_cast<Zmir::ComponentType>(op.getOperand().getType());
   auto opChain = adaptor.getComponent();
   auto tc = getTypeConverter();
-  for (uint32_t rounds = 0; t != op.getResult().getType(); rounds++) {
-    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end()) {
+  while (t != op.getResult().getType()) {
+    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
+        t.getBuiltin()) {
       // This type will get converted to a felt so there is not need to extract the super value any
       // longer.
       break;
@@ -253,52 +241,13 @@ mlir::LogicalResult Zmir::CallIndirectOpLoweringInCompute::matchAndRewrite(
   llvm::SmallVector<mlir::Type> types;
   auto convRes = getTypeConverter()->convertTypes(op.getResultTypes(), types);
   if (mlir::failed(convRes)) {
-    return op->emitError("failed to transform zmir types into zkir types");
+    return op->emitError("failed to transform zml types into llzk types");
   }
   mlir::ValueRange args(
       mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
   );
 
   rewriter.replaceOpWithNewOp<llzk::CallOp>(op, sym, types, args);
-  return mlir::success();
-}
-
-mlir::LogicalResult Zmir::CallIndirectOpLoweringInConstrain::matchAndRewrite(
-    mlir::func::CallIndirectOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto parent = op->getParentOfType<llzk::FuncOp>();
-  if (!parent || parent.getName() != "constrain") {
-    return mlir::failure(); // Don't operate on non constrain calls
-  }
-
-  if (!op->hasAttr("writes_into")) {
-    return mlir::failure();
-  }
-
-  auto field = op->getAttrOfType<mlir::StringAttr>("writes_into");
-  assert(field && "writes_into attribute exists but is not a symbol");
-
-  auto callee = mlir::dyn_cast<Zmir::ConstructorRefOp>(adaptor.getCallee().getDefiningOp());
-  assert(callee && "was expecting the callee comes from an zmir.constructor op");
-  auto constructorType = llvm::dyn_cast<mlir::FunctionType>(callee.getType());
-  assert(constructorType && "was expecting a function type");
-  assert(constructorType.getResults().size() == 1 && "constructor type must have only one output");
-  auto compType = llvm::dyn_cast<Zmir::ComponentType>(constructorType.getResults()[0]);
-
-  auto fread = rewriter.create<llzk::FieldReadOp>(
-      op.getLoc(), getTypeConverter()->convertType(compType), parent.getArgument(0), field
-  );
-  rewriter.replaceOp(op, fread);
-
-  auto comp = callee.getComponentAttr();
-  auto sym =
-      mlir::SymbolRefAttr::get(comp.getAttr(), {mlir::SymbolRefAttr::get(parent.getNameAttr())});
-
-  std::vector<mlir::Value> args;
-  args.push_back(fread);
-  args.insert(args.end(), adaptor.getOperands().begin() + 1, adaptor.getOperands().end());
-  rewriter.create<llzk::CallOp>(op.getLoc(), sym, mlir::TypeRange(), args);
-
   return mlir::success();
 }
 
@@ -420,7 +369,7 @@ mlir::LogicalResult Zmir::LowerIndexToValOp::matchAndRewrite(
     Zmir::IndexToValOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   rewriter.replaceOpWithNewOp<llzk::IntToFeltOp>(
-      op, mlir::IndexType::get(getContext()), adaptor.getIndex()
+      op, llzk::FeltType::get(getContext()), adaptor.getIndex()
   );
 
   return mlir::success();
@@ -445,6 +394,61 @@ mlir::LogicalResult Zmir::LowerWriteArrayOp::matchAndRewrite(
   rewriter.replaceOpWithNewOp<llzk::WriteArrayOp>(
       op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
   );
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::UpdateScfForOpTypes::matchAndRewrite(
+    mlir::scf::ForOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+
+  auto initArgs = adaptor.getInitArgs();
+  rewriter.replaceOpWithNewOp<mlir::scf::ForOp>(
+      op, adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep(), initArgs,
+      [&](mlir::OpBuilder &, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
+    mlir::SmallVector<mlir::Value> allArgs({iv}), finalArgs;
+
+    allArgs.insert(allArgs.end(), args.begin(), args.end());
+    for (auto [arg, origType] :
+         llvm::zip_equal(allArgs, op.getRegion().front().getArgumentTypes())) {
+      // To avoid redundant casts that cannot be reconciled only make a cast if the types difer
+      if (arg.getType() == origType) {
+        finalArgs.push_back(arg);
+      } else {
+        auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, origType, arg);
+        finalArgs.push_back(cast.getResult(0));
+      }
+    }
+
+    auto loopPrologue = rewriter.getInsertionBlock();
+
+    rewriter.inlineBlockBefore(
+        &op.getRegion().front(), loopPrologue, loopPrologue->end(), finalArgs
+    );
+  }
+  );
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::UpdateScfYieldOpTypes::matchAndRewrite(
+    mlir::scf::YieldOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, adaptor.getOperands());
+
+  return mlir::success();
+}
+
+mlir::LogicalResult Zmir::UpdateScfExecuteRegionOpTypes::matchAndRewrite(
+    mlir::scf::ExecuteRegionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+  SmallVector<Type> newTypes;
+  if (mlir::failed(getTypeConverter()->convertTypes(op.getResultTypes(), newTypes))) {
+    return mlir::failure();
+  }
+  auto exec = rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, newTypes);
+  rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
 
   return mlir::success();
 }

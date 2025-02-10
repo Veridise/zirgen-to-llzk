@@ -39,7 +39,6 @@ void ComponentBuilder::Ctx::checkRequirements() {
   assert(body != nullptr);
   assert(loc.has_value());
   assert(!compName.empty());
-  /*assert(isGeneric() != typeParams.empty());*/
   assert(isBuiltin == compAttrs.empty());
 }
 
@@ -145,32 +144,26 @@ ComponentBuilder::FillBody::FillBody(
     std::function<void(mlir::ValueRange, mlir::OpBuilder &)> delegate
 )
     : argTypes(argTypes), results(results), delegate(delegate) {}
-void ComponentBuilder::TakeRegion::fillEpilogue(
-    mlir::Block *block, ComponentOp op, mlir::OpBuilder &builder
-) const {
-  mlir::OpBuilder::InsertionGuard insertionGuard(builder);
-  builder.setInsertionPointToEnd(block);
 
-  mlir::Location unk = builder.getUnknownLoc();
-  auto self = builder.create<zkc::Zmir::GetSelfOp>(unk, op.getType());
-  builder.create<mlir::func::ReturnOp>(unk, mlir::ValueRange({self}));
-}
 void ComponentBuilder::TakeRegion::set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const {
   auto constructorAttrs = ctx.funcBodyAttrs(builder);
 
   assert(ctx.constructorType);
+  assert(body);
   auto bodyOp = builder.create<mlir::func::FuncOp>(
       *ctx.loc, op.getBodyFuncName(), ctx.constructorType, constructorAttrs
   );
-  bodyOp.getRegion().takeBody(*body);
 
   // Create arguments for the entry block (aka region arguments)
-  auto &entryBlock = bodyOp.front();
+  auto &entryBlock = bodyOp.getRegion().emplaceBlock();
+  assert(bodyOp.getRegion().hasOneBlock());
   entryBlock.addArguments(ctx.constructorType.getInputs(), ctx.argLocs);
 
-  // Fill out epilogue
-  auto *epilogue = bodyOp.addBlock();
-  fillEpilogue(epilogue, op, builder);
+  mlir::OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&entryBlock);
+
+  auto self = builder.create<zkc::Zmir::SelfOp>(op.getLoc(), op.getType(), *body);
+  builder.create<mlir::func::ReturnOp>(self.getLoc(), mlir::ValueRange({self}));
 }
 
 } // namespace zkc::Zmir

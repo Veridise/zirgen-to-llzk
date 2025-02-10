@@ -8,10 +8,13 @@
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZML/IR/Ops.h"
 #include "zklang/Dialect/ZML/Transforms/PassDetail.h"
+#include "zklang/Dialect/ZML/Utils/Patterns.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
+#include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
+#include <type_traits>
 
 using namespace mlir;
 
@@ -187,17 +190,22 @@ class RemoveIllegalConstrainOpsPass
   }
 
   void setLegality(ConversionTarget &target) override {
-    // And there's probably more
     target.addIllegalOp<
-        WriteFieldOp, GetSelfOp, BitAndOp, InvOp, WriteArrayOp, AllocArrayOp, NewArrayOp>();
-    target.addIllegalOp<func::CallIndirectOp>();
+        WriteFieldOp, ConstructorRefOp,
+        SelfOp, // Gets transformed into llzk.new_struct
+        BitAndOp, InvOp>();
+    target.addIllegalOp<func::CallIndirectOp>(); // Gets transformed into a call to @compute
+    target.addDynamicallyLegalOp<WriteArrayOp>([](WriteArrayOp writeArrOp) {
+      return !writeArrOp.getComputeOnly();
+    });
   }
 
   void addPatterns(RewritePatternSet &patterns) override {
     patterns.add<
-        ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
-        ReplaceUsesWithArg<GetSelfOp, 0>, RemoveOp<WriteArrayOp>, RemoveOp<AllocArrayOp>,
-        RemoveOp<NewArrayOp>, RemoveOp<func::CallIndirectOp>>(&getContext());
+        ReplaceWriteFieldWithRead, RemoveOp<BitAndOp>, RemoveOp<InvOp>, ReplaceSelfWith<Arg<0>>,
+        RemoveOp<WriteArrayOp>, RemoveOp<func::CallIndirectOp>, RemoveOp<ConstructorRefOp>>(
+        &getContext()
+    );
   }
 };
 

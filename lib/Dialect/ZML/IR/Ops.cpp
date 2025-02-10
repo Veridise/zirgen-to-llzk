@@ -15,7 +15,6 @@
 #include <mlir/Interfaces/FunctionImplementation.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
-#include <string_view>
 
 // TableGen'd implementation files
 #define GET_OP_CLASSES
@@ -26,6 +25,33 @@
 #include "zklang/Dialect/ZML/IR/Ops.cpp.inc"
 
 namespace zkc::Zmir {
+
+void SelfOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, mlir::Type compType,
+    mlir::function_ref<void(mlir::OpBuilder &, mlir::Value)> buildFn
+) {
+  state.addTypes(compType);
+  auto *region = state.addRegion();
+  region->emplaceBlock();
+  assert(region->hasOneBlock());
+  region->addArgument(compType, state.location);
+  if (buildFn) {
+    mlir::OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&region->front());
+    buildFn(builder, region->getArgument(0));
+  }
+}
+
+void SelfOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, mlir::Type compType,
+    mlir::Region &movedRegion
+) {
+  state.addTypes(compType);
+  auto *region = state.addRegion();
+  region->takeBody(movedRegion);
+  assert(region->hasOneBlock());
+  region->addArgument(compType, state.location);
+}
 
 void ComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name, IsBuiltIn

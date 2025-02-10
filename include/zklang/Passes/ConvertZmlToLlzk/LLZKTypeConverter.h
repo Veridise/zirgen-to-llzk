@@ -8,7 +8,7 @@ namespace llzk {
 
 class LLZKTypeConverter : public mlir::TypeConverter {
 public:
-  LLZKTypeConverter(std::unordered_set<std::string_view> builtinOverrideSet);
+  LLZKTypeConverter();
 
 private:
   std::unordered_set<std::string_view> feltEquivalentTypes;

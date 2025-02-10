@@ -1,12 +1,14 @@
 
 #include "zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h"
 #include "llzk/Dialect/LLZK/IR/Types.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
 #include "zklang/Dialect/ZML/IR/Types.h"
 #include <algorithm>
 #include <iterator>
 #include <llvm/Support/FileSystem.h>
+#include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/Types.h>
+#include <optional>
 
 using namespace zkc::Zmir;
 using namespace zkc;
@@ -59,34 +61,49 @@ mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   return sym;
 }
 
-llzk::LLZKTypeConverter::LLZKTypeConverter(std::unordered_set<std::string_view> builtinOverrideSet)
+llzk::LLZKTypeConverter::LLZKTypeConverter()
     : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz"}) {
 
   addConversion([](mlir::Type t) { return t; });
 
+  // Conversions from ZML to LLZK
+
   addConversion([&](Zmir::ComponentType t) -> mlir::Type {
-    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
-        t.getBuiltin()) {
-      return llzk::FeltType::get(t.getContext());
-    }
-    if (t.getName().getValue() == "String") {
-      return llzk::StringType::get(t.getContext());
-    }
-    if (t.getName().getValue() == "Array") {
-      assert(t.getParams().size() == 2);
-      auto typeAttr = t.getParams()[0];
-      auto sizeAttr = t.getParams()[1];
-      if (arrayLenIsKnown(sizeAttr)) {
-        return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSize(sizeAttr)});
-      } else {
-        return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSizeSym(sizeAttr)});
-      }
-    }
     llvm::SmallVector<mlir::Attribute> convertedAttrs;
     convertParamAttrs(t.getParams(), convertedAttrs, *this);
     return llzk::StructType::get(
         t.getContext(), t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs)
     );
+  });
+
+  addConversion([&](Zmir::ComponentType t) -> std::optional<mlir::Type> {
+    if (t.getName().getValue() != "Array") {
+      return std::nullopt;
+    }
+    assert(t.getParams().size() == 2);
+    auto typeAttr = t.getParams()[0];
+    auto sizeAttr = t.getParams()[1];
+    // TODO(LLZK-173) Group together arrays of arrays
+    if (arrayLenIsKnown(sizeAttr)) {
+      return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSize(sizeAttr)});
+    } else {
+      return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSizeSym(sizeAttr)});
+    }
+  });
+
+  addConversion([](Zmir::ComponentType t) -> std::optional<mlir::Type> {
+    if (t.getName().getValue() == "String") {
+      return llzk::StringType::get(t.getContext());
+    }
+    return std::nullopt;
+  });
+
+  addConversion([&](Zmir::ComponentType t) -> std::optional<mlir::Type> {
+    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
+        t.getBuiltin()) {
+      return llzk::FeltType::get(t.getContext());
+    }
+    return std::nullopt;
   });
 
   addConversion([&](Zmir::VarArgsType t) {

@@ -175,6 +175,8 @@ public:
   mlir::FailureOr<TypeBinding>
   typeCheck(zirgen::Zhl::ReduceOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
       const override;
+
+  mlir::FailureOr<Frame> allocate(Frame) const override;
 };
 
 class ConstructGlobalTypeRule : public OpTypingRule<zirgen::Zhl::ConstructGlobalOp> {
@@ -193,6 +195,8 @@ public:
   mlir::FailureOr<TypeBinding>
   typeCheck(zirgen::Zhl::BlockOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
       const override;
+
+  mlir::FailureOr<Frame> allocate(Frame) const override;
 };
 
 class SwitchTypeRule : public OpTypingRule<zirgen::Zhl::SwitchOp> {
@@ -202,6 +206,8 @@ public:
   mlir::FailureOr<TypeBinding>
   typeCheck(zirgen::Zhl::SwitchOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
       const override;
+
+  mlir::FailureOr<Frame> allocate(Frame) const override;
 };
 
 class MapTypeRule : public OpTypingRule<zirgen::Zhl::MapOp> {
@@ -215,6 +221,8 @@ public:
   mlir::FailureOr<std::vector<TypeBinding>>
   bindRegionArguments(mlir::ValueRange args, zirgen::Zhl::MapOp, mlir::ArrayRef<TypeBinding>, Scope &)
       const override;
+
+  mlir::FailureOr<Frame> allocate(Frame) const override;
 };
 
 class LookupTypeRule : public OpTypingRule<zirgen::Zhl::LookupOp> {

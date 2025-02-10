@@ -4,10 +4,14 @@
 #include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZHL/Typing/Analysis.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
+#include "zklang/Passes/ConvertZhlToZml/Helpers.h"
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
 
 namespace zkc {
 
@@ -32,6 +36,104 @@ public:
   mlir::FailureOr<zhl::TypeBinding> getType(mlir::StringRef name) const {
     return typeAnalysis->getType(name);
   }
+
+  /// Extracts the binding from the input value/operation and creates a
+  /// cast of the value into the type materialized from the binding.
+  /// If the super type is specified generates an additional SuperCoerceOp
+  /// from the binding's type to the super type.
+  /// REQUIRES that the operation has one result only.
+  mlir::FailureOr<mlir::Value> getCastedValue(
+      mlir::Operation *op, mlir::OpBuilder &builder,
+      mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
+  ) const {
+    assert(
+        op->getNumResults() == 1 && "casting helper can only work with operations with 1 result"
+    );
+    return getCastedValue(op->getResult(0), builder, super);
+  }
+
+  mlir::FailureOr<mlir::Value>
+  getCastedValue(mlir::Operation *op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    mlir::SmallVector<mlir::Operation *, 2> genOps;
+    return getCastedValue(op, builder, genOps, super);
+  }
+
+  mlir::FailureOr<mlir::Value> getCastedValue(
+      Op op, mlir::OpBuilder &builder, mlir::SmallVector<mlir::Operation *, 2> &generatedOps,
+      mlir::Type super = nullptr
+  ) const {
+    return getCastedValue(op.getOperation(), builder, super);
+  }
+
+  mlir::FailureOr<mlir::Value>
+  getCastedValue(Op op, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+    return getCastedValue(op.getOperation(), builder, generatedOps, super);
+  }
+
+  mlir::FailureOr<mlir::Value> getCastedValue(
+      mlir::Value value, mlir::OpBuilder &builder,
+      mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
+  ) const {
+    auto binding = getType(value);
+    if (mlir::failed(binding)) {
+      return mlir::failure();
+    }
+    return getCastedValue(value, *binding, builder, generatedOps, super);
+  }
+
+  mlir::FailureOr<mlir::Value>
+  getCastedValue(mlir::Value value, mlir::OpBuilder &builder, mlir::Type super = nullptr) const {
+    auto binding = getType(value);
+    if (mlir::failed(binding)) {
+      return mlir::failure();
+    }
+    mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+    return getCastedValue(value, *binding, builder, generatedOps, super);
+  }
+
+  /// A non-failing version that takes a binding as additional parameter
+  mlir::Value getCastedValue(
+      mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+      mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
+  ) const {
+    auto materialized = Zmir::materializeTypeBinding(builder.getContext(), binding);
+    assert(materialized);
+    if (value.getType() == materialized) {
+      return value;
+    }
+    auto cast = builder.create<mlir::UnrealizedConversionCastOp>(
+        value.getLoc(), mlir::TypeRange(materialized), mlir::ValueRange(value)
+    );
+    generatedOps.push_back(cast.getOperation());
+
+    mlir::Value result = cast.getResult(0);
+    if (super && super != materialized) {
+      auto coerce = builder.create<Zmir::SuperCoerceOp>(value.getLoc(), super, result);
+      generatedOps.push_back(coerce.getOperation());
+      result = coerce;
+    }
+    return result;
+  }
+
+  mlir::Value getCastedValue(
+      mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+      mlir::Type super = nullptr
+  ) const {
+    mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+    return getCastedValue(value, binding, builder, generatedOps, super);
+  }
+
+  mlir::FailureOr<CtorCallBuilder>
+  makeCtorCallBuilder(mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder) const {
+    auto selfOp = op->getParentOfType<Zmir::SelfOp>();
+    if (!selfOp) {
+      return op->emitOpError() << "is not within a self region";
+    }
+    return CtorCallBuilder::Make(op, value, *typeAnalysis, builder, selfOp.getSelfValue());
+  }
+
+  const zhl::TypeBindings &getTypeBindings() const { return typeAnalysis->getBindings(); }
 
 private:
   const zhl::ZIRTypeAnalysis *typeAnalysis;
@@ -85,8 +187,6 @@ private:
 
   mlir::Value
   prepareArgument(mlir::Value, mlir::Type, mlir::Location, mlir::ConversionPatternRewriter &) const;
-
-  mlir::FailureOr<mlir::Type> getTypeFromName(mlir::StringRef) const;
 };
 
 /// Converts `zhl.constrain` ops to `zmir.constrain` ones.

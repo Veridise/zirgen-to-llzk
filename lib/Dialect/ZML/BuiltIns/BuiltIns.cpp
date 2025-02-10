@@ -21,7 +21,7 @@ ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
       {type}, {type},
       [type = type](mlir::ValueRange args, mlir::OpBuilder &builder) {
     // Reference to self
-    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), type);
+    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), type);
     // Construct Component superType
     mlir::FunctionType constructor =
         builder.getFunctionType({}, ComponentType::Component(builder.getContext()));
@@ -53,7 +53,7 @@ template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef
                         {superType, superType}, {componentType},
                         [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
     // Reference to self
-    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
     // Do the computation
     auto op = builder.create<OpTy>(builder.getUnknownLoc(), superType, args[0], args[1]);
     // Store the result
@@ -76,7 +76,7 @@ template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringR
                         {superType}, {componentType},
                         [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
     // Reference to self
-    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
     // Do the computation
     auto op = builder.create<OpTy>(builder.getUnknownLoc(), superType, args[0]);
     // Store the result
@@ -99,7 +99,7 @@ void addInRange(mlir::OpBuilder &builder) {
                         {superType, superType, superType}, {componentType},
                         [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
     // Reference to self
-    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
+    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
     // Do the computation
     auto op =
         builder.create<InRangeOp>(builder.getUnknownLoc(), superType, args[0], args[1], args[2]);
@@ -120,9 +120,9 @@ void addComponent(mlir::OpBuilder &builder) {
                     .name("Component")
                     .fillBody(
                         args, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
-    auto op = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({op}));
+                        [&](mlir::ValueRange args, mlir::OpBuilder &b) {
+    auto op = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
+    b.create<mlir::func::ReturnOp>(b.getUnknownLoc(), mlir::ValueRange({op}));
   }
                     )
   ).build(builder);
@@ -138,14 +138,14 @@ void addNondetReg(mlir::OpBuilder &builder) {
                     .field("reg", superType)
                     .fillBody(
                         {superType}, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+                        [&](mlir::ValueRange args, mlir::OpBuilder &b) {
     // Reference to self
-    auto self = builder.create<GetSelfOp>(builder.getUnknownLoc(), componentType);
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "reg", args[0]);
+    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
+    b.create<WriteFieldOp>(b.getUnknownLoc(), self, "reg", args[0]);
     // Store the result
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", args[0]);
+    b.create<WriteFieldOp>(b.getUnknownLoc(), self, "$super", args[0]);
     // Return self
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+    b.create<mlir::func::ReturnOp>(b.getUnknownLoc(), mlir::ValueRange({self}));
   }
                     )
   ).build(builder);

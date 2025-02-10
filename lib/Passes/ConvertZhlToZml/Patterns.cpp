@@ -1,4 +1,6 @@
 #include "zklang/Passes/ConvertZhlToZml/Patterns.h"
+#include "zklang/Dialect/ZHL/Typing/Frame.h"
+#include "zklang/Dialect/ZHL/Typing/FrameImpl.h"
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include "zklang/Dialect/ZML/IR/Builder.h"
 #include "zklang/Dialect/ZML/IR/OpInterfaces.h"
@@ -13,17 +15,23 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <llvm/Support/Casting.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexAttrs.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/Region.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <vector>
+#include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
+#include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
+#include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
 
 using namespace zirgen;
 using namespace zkc;
@@ -81,67 +89,44 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 /// ZhlConstructLowering
 ///////////////////////////////////////////////////////////
 
-/// Finds the definition of the callee component. If the
-/// component was defined before the current operation wrt the physical order of
-/// the file then its defined by a ZML ComponentInterface op, if it hasn't been
-/// converted yet it is still a ZHL Component op. If the name could not be found
-/// in either form returns nullptr.
-mlir::Operation *findCallee(StringRef name, mlir::ModuleOp root) {
-  auto calleeComp = root.lookupSymbol<Zmir::ComponentInterface>(name);
-  if (calleeComp) {
-    return calleeComp;
+inline bool validArgCount(bool isVariadic, size_t argCount, size_t formalsCount) {
+  if (isVariadic) {
+    // For variadics it's only valid to have from formalsCount-1 arguments and onwards.
+    return argCount >= formalsCount - 1;
   }
-
-  // Zhl Component ops don't declare its symbols in the symbol table
-  for (auto zhlOp : root.getOps<Zhl::ComponentOp>()) {
-    if (zhlOp.getName() == name) {
-      return zhlOp;
-    }
-  }
-  return nullptr;
+  // For non variadics the number of arguments must be equal to the number of formals
+  return argCount == formalsCount;
 }
 
-bool calleeIsBuiltin(mlir::Operation *op) {
-  if (auto zmlOp = mlir::dyn_cast<Zmir::ComponentInterface>(op)) {
-    return zmlOp.getBuiltin();
-  }
-  return false;
+inline bool isVariadic(mlir::ArrayRef<mlir::Type> ctorFormals) {
+  return !ctorFormals.empty() && mlir::isa<Zmir::VarArgsType>(ctorFormals.back());
 }
+
+inline bool isVariadic(mlir::FunctionType fnType) { return isVariadic(fnType.getInputs()); }
 
 mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op.emitOpError("failed to type check");
+  auto ctor = makeCtorCallBuilder(op, op, rewriter);
+  if (failed(ctor)) {
+    return failure(); // makeCtorCallBuilder emits an error message already
   }
+  auto &binding = ctor->getBinding();
+  auto constructorType = ctor->getCtorType();
+  auto ctorFormalsCount = constructorType.getInputs().size();
 
-  auto callerComp = op->getParentOfType<Zmir::ComponentOp>();
-  assert(callerComp);
-  auto *calleeComp = findCallee(binding->getName(), op->getParentOfType<mlir::ModuleOp>());
-  if (!calleeComp) {
-    return op->emitError() << "could not find component with name " << binding->getName();
-  }
-
-  /*auto constructorTypes = calleeComp.getBodyFunc().getFunctionType().getInputs();*/
-  auto constructorType = Zmir::materializeTypeBindingConstructor(rewriter, *binding);
-  {
-    auto constructorTypes = constructorType.getInputs();
-    bool isVariadic =
-        !constructorTypes.empty() && mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
+  if (!validArgCount(isVariadic(constructorType), adaptor.getArgs().size(), ctorFormalsCount)) {
     // Depending if it's variadic or not the message changes a bit.
-    std::string expectingNArgsMsg = isVariadic ? ", was expecting at least " : ", was expecting ";
-
-    if (adaptor.getArgs().size() < constructorTypes.size() ||
-        (!isVariadic && adaptor.getArgs().size() > constructorTypes.size())) {
-      return op->emitOpError()
-          .append(
-              "incorrect number of arguments for component ", binding->getName(), expectingNArgsMsg,
-              constructorTypes.size(), " arguments and got ", adaptor.getArgs().size()
-          )
-          .attachNote(calleeComp->getLoc())
-          .append("component declared here");
-    }
+    StringRef expectingNArgsMsg =
+        isVariadic(constructorType) ? ", was expecting at least " : ", was expecting ";
+    auto minArgCount = isVariadic(constructorType) ? ctorFormalsCount - 1 : ctorFormalsCount;
+    return op->emitOpError()
+        .append(
+            "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
+            minArgCount, " arguments but got ", adaptor.getArgs().size()
+        )
+        .attachNote(ctor->getCalleeComp()->getLoc())
+        .append("component declared here");
   }
 
   std::vector<mlir::Value> preparedArguments;
@@ -149,47 +134,61 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
       adaptor.getArgs(), constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments
   );
 
-  auto funcPtr = rewriter.create<Zmir::ConstructorRefOp>(
-      op.getLoc(), mlir::SymbolRefAttr::get(rewriter.getStringAttr(binding->getName())),
-      constructorType, calleeIsBuiltin(calleeComp)
-  );
-  auto call = rewriter.create<mlir::func::CallIndirectOp>(op->getLoc(), funcPtr, preparedArguments);
-
-  auto result = storeValueInTemporary(
-      op.getLoc(), callerComp, constructorType.getResult(0), call.getResult(0), rewriter
-  );
-
+  auto result = ctor->build(rewriter, op.getLoc(), preparedArguments);
   rewriter.replaceOp(op, result);
-
-  rewriter.create<Zmir::ConstrainCallOp>(
-      op->getLoc(), result->getResult(0), ValueRange(preparedArguments)
-  );
   return mlir::success();
+}
+
+mlir::ValueRange::iterator
+computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> constructorTypes) {
+  if (!isVariadic(constructorTypes)) {
+    return args.end();
+  }
+
+  // If the call does not have any varargs then there are less elements in `args` than there is in
+  // `constructorTypes`. This comparison is safe because the call has already been type checked by
+  // this point.
+  if (args.size() < constructorTypes.size()) {
+    return args.end();
+  }
+
+  // Compute how many arguments are var-args and substract that amount to the number of arguments to
+  // get the offset from args.begin() where the var-args start.
+  auto A = args.size();
+  auto C = constructorTypes.size();
+  auto offset = C - 1;
+  return args.begin() + offset;
 }
 
 void ZhlConstructLowering::prepareArguments(
     mlir::ValueRange args, mlir::ArrayRef<mlir::Type> constructorTypes, mlir::Location loc,
     mlir::ConversionPatternRewriter &rewriter, std::vector<mlir::Value> &preparedArgs
 ) const {
-  bool isVariadic =
-      !constructorTypes.empty() && mlir::isa<Zmir::VarArgsType>(constructorTypes.back());
 
   preparedArgs.clear();
+  preparedArgs.reserve(constructorTypes.size());
 
-  auto argsEnd = isVariadic ? args.begin() + (args.size() - constructorTypes.size()) : args.end();
+  // Compute the point where the normal arguments end and the var-args begin
+  auto argsEnd = computeVarArgsSplice(args, constructorTypes);
+  // Prepare the arguments up to the splice point. These arguments are passed as is since they are
+  // normal arguments.
   std::transform(
       args.begin(), argsEnd, constructorTypes.begin(), std::back_inserter(preparedArgs),
       [&](mlir::Value v, mlir::Type t) { return prepareArgument(v, t, loc, rewriter); }
   );
-  if (isVariadic) {
+  if (isVariadic(constructorTypes)) {
     std::vector<mlir::Value> vargs;
     auto varType = mlir::dyn_cast<Zmir::VarArgsType>(constructorTypes.back());
     assert(varType && "expecting a var args type");
 
+    // If there aren't any arguments left to prepare then argsEnd == args.end() and this call is a
+    // no-op.
     std::transform(argsEnd, args.end(), std::back_inserter(vargs), [&](mlir::Value v) {
       return prepareArgument(v, varType.getInner(), loc, rewriter);
     });
 
+    // Regardless of what std::transform does above add the VarArgsOp to make sure we have the
+    // correct number of arguments.
     auto va = rewriter.create<Zmir::VarArgsOp>(loc, constructorTypes.back(), vargs);
     preparedArgs.push_back(va);
   }
@@ -215,17 +214,6 @@ mlir::Value ZhlConstructLowering::prepareArgument(
     return cast.getResult(0);
   }
   return rewriter.create<Zmir::SuperCoerceOp>(loc, expectedType, cast.getResult(0));
-}
-
-mlir::FailureOr<mlir::Type> ZhlConstructLowering::getTypeFromName(mlir::StringRef name) const {
-  // Simple algorithm for now
-  if (name == "Val") {
-    return Zmir::ValType::get(getContext());
-  } else if (name == "String") {
-    return Zmir::StringType::get(getContext());
-  } else {
-    return mlir::failure(); // For now
-  }
 }
 
 mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
@@ -353,88 +341,69 @@ inline bool opConstructsComponent(mlir::Operation *op) {
   return mlir::isa<func::CallIndirectOp>(op);
 }
 
-/// Tries to get an operation from the value written into the field.
-/// If it is then adds an attribute into the operation with the name of the
-/// field.
-/// FIXME: This is a hacky solution to a problem that probably needs some static
-/// analysis
-void maybeAnnotateConstructorCallWithField(Zmir::WriteFieldOp op, mlir::Value value) {
-  auto valueOp = value.getDefiningOp();
-  if (!valueOp) {
-    return; // The value doesn't come from an op
-  }
-  if (opConstructsComponent(valueOp)) {
-    valueOp->setAttr("writes_into", mlir::StringAttr::get(op.getContext(), op.getFieldName()));
-    return; // We are done
-  }
-
-  if (valueOp->getNumOperands() != 1) {
-    return;
-  }
-  // If the operation has only one operand try recursively
-  maybeAnnotateConstructorCallWithField(op, valueOp->getOperand(0));
-}
-
 ///////////////////////////////////////////////////////////
 /// ZhlDefinitionLowering
 ///////////////////////////////////////////////////////////
-
-void createField(
-    Zmir::ComponentInterface comp, mlir::StringRef name, mlir::Type type,
-    mlir::ConversionPatternRewriter &rewriter, mlir::Location loc
-) {
-  assert(comp);
-
-  mlir::OpBuilder::InsertionGuard guard(rewriter);
-
-  rewriter.setInsertionPointToStart(&comp.getRegion().front());
-  rewriter.create<Zmir::FieldDefOp>(loc, name, mlir::dyn_cast<Zmir::ComponentType>(type));
-}
 
 mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
     zirgen::Zhl::DefinitionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto binding = getType(op);
   if (mlir::failed(binding)) {
-    return op->emitOpError() << "failed to type check";
+    return op->emitError() << "failed to type check";
+  }
+  auto declrBinding = getType(op.getDeclaration());
+  if (failed(declrBinding)) {
+    return op->emitError() << "failed to type check declaration expression";
+  }
+  auto exprBinding = getType(op.getDefinition());
+  if (failed(exprBinding)) {
+    return op->emitError() << "failed to type check definition expression";
+  }
+  ComponentSlot *slot = nullptr;
+  if (binding->getSlot()) {
+    if (auto *thisSlot = dyn_cast<ComponentSlot>(binding->getSlot())) {
+      slot = thisSlot;
+    }
+  } else if (declrBinding->getSlot()) {
+    if (auto *declrSlot = dyn_cast<ComponentSlot>(declrBinding->getSlot())) {
+      slot = declrSlot;
+    }
   }
 
-  Zhl::DeclarationOp declr = op.getDeclaration().getDefiningOp<Zhl::DeclarationOp>();
-  if (!declr) {
-    return op.emitOpError("does not depend on a declaration");
-  }
-  auto name = declr.getMemberAttr();
-
-  auto comp = op->getParentOfType<Zmir::ComponentOp>();
+  auto comp = op->getParentOfType<Zmir::ComponentInterface>();
   assert(comp);
+  auto self = op->getParentOfType<Zmir::SelfOp>().getSelfValue();
 
   mlir::Value value = adaptor.getDefinition();
-  mlir::Type target = Zmir::materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != target) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), target, value);
-    value = cast.getResult(0);
+
+  // If the binding of this op has a slot then it is responsible of creating it.
+  // Otherwise, check if the declaration's binding has a slot. If it does create it here.
+  // Wrap the value around a SuperCoerceOp.
+  // If a slot is created here then replace all the uses of the definition expression with the
+  // result of writing and reading from the slot. Then remove this op.
+
+  if (slot) {
+    auto slotName = createSlot(slot, rewriter, comp, op.getLoc());
+    mlir::Type slotType = Zmir::materializeTypeBinding(getContext(), slot->getBinding());
+    SmallVector<Operation *, 2> castOps;
+    Value result = getCastedValue(value, *exprBinding, rewriter, castOps, slotType);
+    result =
+        storeAndLoadSlot(result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
+    if (castOps.empty()) {
+      rewriter.replaceAllUsesWith(value, result);
+    } else {
+      rewriter.replaceAllUsesExcept(value, result, castOps.front());
+    }
   }
 
-  auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
-  auto writeOp = rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, name, value);
-  maybeAnnotateConstructorCallWithField(writeOp, value);
+  rewriter.eraseOp(op);
   return mlir::success();
 }
 
 ///////////////////////////////////////////////////////////
 /// ZhlSuperLowering
 ///////////////////////////////////////////////////////////
-
-/// A best-effort check of known externs to the type
-/// they return.
-/*mlir::FailureOr<mlir::Type> deduceTypeOfKnownExtern(mlir::StringRef name, mlir::MLIRContext *ctx)
- * {*/
-/*  if (name == "Log") {*/
-/*    return Zmir::ComponentType::get(ctx, "Component");*/
-/*  }*/
-/**/
-/*  return mlir::failure();*/
-/*}*/
 
 mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
     zirgen::Zhl::SuperOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
@@ -443,30 +412,19 @@ mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
-  if (!mlir::isa<mlir::func::FuncOp>(op->getParentOp())) {
+  if (!mlir::isa<Zmir::SelfOp>(op->getParentOp())) {
     return mlir::failure();
   }
   auto comp = op->getParentOfType<Zmir::ComponentInterface>();
   assert(comp);
-  auto self = rewriter.create<Zmir::GetSelfOp>(op.getLoc(), comp.getType());
-
-  mlir::Value value = adaptor.getValue();
+  auto self = op->getParentOfType<Zmir::SelfOp>().getSelfValue();
   mlir::Type target = Zmir::materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != target) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), target, value);
-    value = cast.getResult(0);
+  auto value = getCastedValue(adaptor.getValue(), rewriter, target);
+  if (mlir::failed(value)) {
+    return mlir::failure();
   }
 
-  /*createField(comp, "$super", type, rewriter, op.getLoc());*/
-  auto writeOp = rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", value);
-  maybeAnnotateConstructorCallWithField(writeOp, adaptor.getValue());
-
-  // Find the prologue and join it to the current block
-  auto *prologue = &comp.getBodyFunc().getRegion().back();
-  auto nop =
-      rewriter.create<Zmir::NopOp>(rewriter.getUnknownLoc(), mlir::TypeRange(), mlir::ValueRange());
-  rewriter.inlineBlockBefore(prologue, nop.getOperation());
-  rewriter.eraseOp(nop);
+  rewriter.replaceOpWithNewOp<Zmir::WriteFieldOp>(op, self, "$super", *value);
   return mlir::success();
 }
 
@@ -492,42 +450,6 @@ mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
   auto attrs = externFuncAttrs(rewriter);
 
   return rewriter.create<mlir::func::FuncOp>(loc, name, type, attrs);
-}
-
-inline mlir::FailureOr<mlir::Type>
-lookupComponentNameIn(mlir::Operation *op, mlir::StringRef name) {
-  assert(op && "expected a non null operation");
-  auto sym =
-      mlir::SymbolTable::lookupNearestSymbolFrom(op, mlir::StringAttr::get(op->getContext(), name));
-  if (!sym) {
-    return mlir::failure();
-  }
-  if (auto comp = mlir::dyn_cast<Zmir::ComponentOp>(sym)) {
-    return comp.getType();
-  }
-  return mlir::failure();
-  ;
-}
-
-inline mlir::FailureOr<mlir::Type> getTypeFromName(Zhl::GlobalOp typeNameOp) {
-  auto name = typeNameOp.getName();
-  if (name == "Val") {
-    return Zmir::ValType::get(typeNameOp.getContext());
-  } else if (name == "String") {
-    return Zmir::StringType::get(typeNameOp.getContext());
-  } else {
-    auto lookupFromOp = lookupComponentNameIn(typeNameOp, name);
-    if (mlir::succeeded(lookupFromOp)) {
-      return lookupFromOp;
-    }
-
-    auto lookupFromMod = lookupComponentNameIn(typeNameOp->getParentOfType<mlir::ModuleOp>(), name);
-    if (mlir::succeeded(lookupFromMod)) {
-      return lookupFromMod;
-    }
-
-    return typeNameOp.emitError() << "type " << name << " not found";
-  }
 }
 
 mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
@@ -735,25 +657,10 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
       adaptor.getElements().begin(), adaptor.getElements().end(), argBindings.begin(),
       std::back_inserter(args),
       [&](auto element, auto eltBinding) -> Value {
-    auto bindingType = Zmir::materializeTypeBinding(getContext(), *eltBinding);
-    if (element.getType() == bindingType) {
-      return element;
-    }
-
-    auto cast =
-        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), bindingType, element);
-    if (cast.getResult(0).getType() == elementType) {
-      return cast.getResult(0);
-    }
-    return rewriter.create<Zmir::SuperCoerceOp>(op.getLoc(), elementType, cast.getResult(0));
+    return getCastedValue(element, *eltBinding, rewriter, elementType);
   }
   );
-  auto arr = rewriter.create<Zmir::NewArrayOp>(op.getLoc(), arrayType, args);
-  rewriter.replaceOp(
-      op, storeValueInTemporary(
-              op.getLoc(), op->getParentOfType<Zmir::ComponentOp>(), arrayType, arr, rewriter
-          )
-  );
+  rewriter.replaceOpWithNewOp<Zmir::NewArrayOp>(op, arrayType, args);
   return mlir::success();
 }
 
@@ -784,9 +691,6 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     if (!binding.has_value()) {
       return op->emitOpError() << "failed to type check component member '" << fieldName << "'";
     }
-    builder.field(
-        fieldName, Zmir::materializeTypeBinding(getContext(), *binding), binding->getLocation()
-    );
   }
   auto &super = name->getSuperType();
   builder.field("$super", Zmir::materializeTypeBinding(getContext(), super));
@@ -831,69 +735,36 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
     return mlir::failure();
   }
   auto innerType = Zmir::materializeTypeBinding(getContext(), *innerBinding);
-  auto startType = Zmir::materializeTypeBinding(getContext(), *startBinding);
-  Value startVal = adaptor.getStart();
-  if (startType != startVal.getType()) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(
-        startVal.getLoc(), TypeRange(startType), ValueRange(startVal)
-    );
-    startVal = cast.getResult(0);
-  }
-  if (startVal.getType() != Zmir::ComponentType::Val(getContext())) {
-    startVal = rewriter.create<Zmir::SuperCoerceOp>(
-        startVal.getLoc(), Zmir::ComponentType::Val(getContext()), startVal
-    );
-  }
-  auto endType = Zmir::materializeTypeBinding(getContext(), *endBinding);
-  Value endVal = adaptor.getEnd();
-  if (endType != endVal.getType()) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(
-        endVal.getLoc(), TypeRange(endType), ValueRange(endVal)
-    );
-    endVal = cast.getResult(0);
-  }
-  if (endVal.getType() != Zmir::ComponentType::Val(getContext())) {
-    endVal = rewriter.create<Zmir::SuperCoerceOp>(
-        endVal.getLoc(), Zmir::ComponentType::Val(getContext()), endVal
-    );
-  }
-  auto arrAlloc = rewriter.replaceOpWithNewOp<Zmir::AllocArrayOp>(op, type);
+  Value startVal = getCastedValue(
+      adaptor.getStart(), *startBinding, rewriter, Zmir::ComponentType::Val(getContext())
+  );
+
+  Value endVal = getCastedValue(
+      adaptor.getEnd(), *endBinding, rewriter, Zmir::ComponentType::Val(getContext())
+  );
+
+  auto arrAlloc = rewriter.create<Zmir::AllocArrayOp>(op.getLoc(), type);
+
   // Create a for loop op using the operands as bounds
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto start = rewriter.create<Zmir::ValToIndexOp>(op.getStart().getLoc(), startVal);
   auto end = rewriter.create<Zmir::ValToIndexOp>(op.getEnd().getLoc(), endVal);
-  rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), start, end, one, mlir::ValueRange(),
-      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange) {
+  auto loop = rewriter.create<mlir::scf::ForOp>(
+      op.getLoc(), start, end, one, mlir::ValueRange(arrAlloc),
+      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     auto conv = builder.create<Zmir::IndexToValOp>(loc, innerType, iv);
-    builder.create<Zmir::WriteArrayOp>(loc, arrAlloc, iv, conv);
-    builder.create<mlir::scf::YieldOp>(loc);
+    builder.create<Zmir::WriteArrayOp>(loc, args[0], iv, conv);
+    builder.create<mlir::scf::YieldOp>(loc, args[0]);
   }
   );
+  rewriter.replaceOp(op, loop);
 
   return mlir::success();
 }
 
 ///////////////////////////////////////////////////////////
-/// ZhlRangeOpLowering
+/// ZhlMapOpLowering
 ///////////////////////////////////////////////////////////
-
-inline mlir::Type tryGetArrayInnerType(mlir::Type type) {
-  if (auto a = mlir::dyn_cast<Zmir::ArrayType>(type)) {
-    return a.getInnerType();
-  }
-  return Zmir::PendingType::get(type.getContext());
-}
-
-inline Zmir::ArrayType resultArrayType(
-    mlir::Type inner, int64_t size, mlir::MLIRContext *ctx,
-    mlir::ConversionPatternRewriter &rewriter
-) {
-  if (size >= 0) {
-    return Zmir::BoundedArrayType::get(ctx, inner, rewriter.getIndexAttr(size));
-  }
-  return Zmir::UnboundedArrayType::get(ctx, inner);
-}
 
 mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     Zhl::MapOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
@@ -905,6 +776,9 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   if (!binding->isArray()) {
     return op->emitOpError() << "was expecting 'Array' but got '" << binding->getName() << "'";
   }
+  assert(binding->getSlot());
+  auto *arrayFrame = cast<ArrayFrame>(binding->getSlot());
+
   auto inputBinding = getType(op.getArray());
   if (mlir::failed(inputBinding)) {
     return op->emitOpError() << "failed to type check input";
@@ -920,17 +794,19 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   auto itType = Zmir::materializeTypeBinding(getContext(), *innerInputBinding);
   auto outputType = Zmir::materializeTypeBinding(getContext(), *binding);
 
-  auto arrValue = adaptor.getArray();
+  auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
+  assert(succeeded(arrValue) && "this binding was validated above");
 
   auto arrAlloc = rewriter.create<Zmir::AllocArrayOp>(op.getLoc(), outputType);
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
-  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), adaptor.getArray());
+  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), *arrValue);
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
-    auto itVal = builder.create<Zmir::ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv));
+    arrayFrame->setInductionVar(iv);
+    auto itVal = builder.create<Zmir::ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv));
     // Cast it to a zhl Expr type for the block inlining
     auto itValCast = builder.create<mlir::UnrealizedConversionCastOp>(
         loc, mlir::TypeRange(Zhl::ExprType::get(getContext())), mlir::ValueRange(itVal)
@@ -977,11 +853,15 @@ mlir::LogicalResult ZhlSuperLoweringInMap::matchAndRewrite(
   if (!loopOriginalOp || loopOriginalOp != rewriter.getStringAttr("map")) {
     return mlir::failure();
   }
+  auto value = getCastedValue(adaptor.getValue(), rewriter);
+  if (failed(value)) {
+    return op->emitError() << "failed to type check super value";
+  }
 
   auto iv = loopOp.getInductionVar();
   auto arr = loopOp.getRegionIterArgs().front();
 
-  rewriter.create<Zmir::WriteArrayOp>(op.getLoc(), arr, iv, adaptor.getValue());
+  rewriter.create<Zmir::WriteArrayOp>(op.getLoc(), arr, iv, *value);
   rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, loopOp.getRegionIterArgs());
 
   return mlir::success();
@@ -1041,6 +921,8 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
     return op->emitOpError() << "failed to type check";
   }
 
+  assert(binding->getSlot());
+  auto *arrayFrame = cast<ArrayFrame>(binding->getSlot());
   auto inputBinding = getType(op.getArray());
   if (mlir::failed(inputBinding)) {
     return op->emitOpError() << "failed to type check input";
@@ -1056,6 +938,19 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   if (mlir::failed(accBinding)) {
     return op->emitOpError() << "failed to type check accumulator";
   }
+  // Allocate a component slot for the output of the accumulator.
+  auto self = op->getParentOfType<Zmir::SelfOp>().getSelfValue();
+  arrayFrame->getFrame().allocateSlot<ComponentSlot>(getTypeBindings(), *accBinding);
+
+  auto ctorBuilder = CtorCallBuilder::Make(op, *accBinding, rewriter, self);
+  if (mlir::failed(ctorBuilder)) {
+    return mlir::failure();
+  }
+  auto rootModule = op->getParentOfType<mlir::ModuleOp>();
+  auto *calleeComp = findCallee(accBinding->getName(), rootModule);
+  if (!calleeComp) {
+    return op->emitError() << "could not find component with name " << accBinding->getName();
+  }
 
   auto constructorType = Zmir::materializeTypeBindingConstructor(rewriter, *accBinding);
   assert(constructorType);
@@ -1064,33 +959,37 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
                              << constructorType.getInputs().size() << " arguments";
   }
 
+  auto init = getCastedValue(adaptor.getInit(), rewriter);
+  if (failed(init)) {
+    return op->emitError() << "failed to type cast init value";
+  }
   auto itType = Zmir::materializeTypeBinding(getContext(), *innerInputBinding);
 
-  auto arrValue = adaptor.getArray();
-
+  auto arrValue = getCastedValue(adaptor.getArray(), *inputBinding, rewriter);
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
-  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), adaptor.getArray());
+
+  auto len = rewriter.create<Zmir::GetArrayLenOp>(op.getLoc(), arrValue);
+
+  auto maybeSuperCoerce = [&](Value v, Type t) -> Value {
+    if (v.getType() == t) {
+      return v;
+    }
+    return rewriter.create<Zmir::SuperCoerceOp>(v.getLoc(), t, v);
+  };
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(adaptor.getInit()),
+      op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(*init),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
-    mlir::Value lhs =
-        builder.create<Zmir::ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv));
-    if (lhs.getType() != constructorType.getInputs()[0]) {
-      lhs = builder.create<Zmir::SuperCoerceOp>(loc, constructorType.getInputs()[0], lhs);
-    }
-    mlir::Value rhs = args[0];
-    if (rhs.getType() != constructorType.getInputs()[1]) {
-      rhs = builder.create<Zmir::SuperCoerceOp>(loc, constructorType.getInputs()[1], rhs);
-    }
-    auto ref = builder.create<Zmir::ConstructorRefOp>(loc, constructorType, accBinding->getName());
-    auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, mlir::ValueRange({lhs, rhs}));
-    mlir::Value acc = call.getResult(0);
-    if (acc.getType() != adaptor.getInit().getType()) {
-      acc = builder.create<Zmir::SuperCoerceOp>(loc, adaptor.getInit().getType(), acc);
-    }
-    builder.create<mlir::scf::YieldOp>(loc, acc);
+    arrayFrame->setInductionVar(iv);
+    mlir::Value lhs = maybeSuperCoerce(
+        builder.create<Zmir::ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv)),
+        constructorType.getInput(0)
+    );
+
+    mlir::Value rhs = maybeSuperCoerce(args[0], constructorType.getInput(1));
+    auto accResult = ctorBuilder->build(builder, adaptor.getType().getLoc(), {lhs, rhs});
+    builder.create<mlir::scf::YieldOp>(loc, maybeSuperCoerce(accResult, init->getType()));
   }
   );
 

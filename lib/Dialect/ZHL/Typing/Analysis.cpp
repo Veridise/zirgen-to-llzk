@@ -19,6 +19,7 @@ public:
   virtual const mlir::FailureOr<TypeBinding> &getType(mlir::Operation *op) const = 0;
   virtual const mlir::FailureOr<TypeBinding> &getType(mlir::Value value) const = 0;
   virtual mlir::FailureOr<TypeBinding> getType(mlir::StringRef name) const = 0;
+  virtual const TypeBindings &getBindings() const = 0;
   virtual void print(llvm::raw_ostream &) const = 0;
   virtual operator mlir::LogicalResult() const = 0;
 };
@@ -27,7 +28,7 @@ namespace {
 
 class DelegatedImpl : public zhl::ZIRTypeAnalysis::Impl {
 public:
-  DelegatedImpl(ZIRTypeAnalysis &delegate) : delegate(&delegate) {}
+  DelegatedImpl(ZIRTypeAnalysis &analysis) : delegate(&analysis) {}
 
   const mlir::FailureOr<TypeBinding> &getType(mlir::Operation *op) const final {
     return delegate->getType(op);
@@ -40,6 +41,8 @@ public:
   mlir::FailureOr<TypeBinding> getType(mlir::StringRef name) const final {
     return delegate->getType(name);
   }
+
+  const TypeBindings &getBindings() const override { return delegate->getBindings(); }
 
   void print(llvm::raw_ostream &os) const final { delegate->print(os); }
 
@@ -86,6 +89,8 @@ public:
     }
     return typeBindings.MaybeGet(name);
   }
+
+  const TypeBindings &getBindings() const override { return typeBindings; }
 
   void print(llvm::raw_ostream &os) const final {
     if (!typeCheckingFailed) {
@@ -136,6 +141,8 @@ const mlir::FailureOr<TypeBinding> &ZIRTypeAnalysis::getType(mlir::Value value) 
 mlir::FailureOr<TypeBinding> ZIRTypeAnalysis::getType(mlir::StringRef name) const {
   return impl->getType(name);
 }
+
+const TypeBindings &ZIRTypeAnalysis::getBindings() const { return impl->getBindings(); }
 void ZIRTypeAnalysis::dump() const { print(llvm::dbgs()); }
 void ZIRTypeAnalysis::print(llvm::raw_ostream &os) const { impl->print(os); }
 ZIRTypeAnalysis::operator mlir::LogicalResult() const {

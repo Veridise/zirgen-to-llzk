@@ -1,7 +1,10 @@
 #include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <cassert>
 #include <iterator>
+#include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/Frame.h>
+#include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 
 using namespace zhl;
 using namespace mlir;
@@ -89,9 +92,9 @@ TypeBinding::TypeBinding(
     : builtin(isBuiltin), name(CONST), loc(loc), constVal(value),
       superType(&const_cast<TypeBinding &>(bindings.Get("Val"))) {}
 
-TypeBinding TypeBinding::WithUpdatedLocation(mlir::Location loc) const {
+TypeBinding TypeBinding::WithUpdatedLocation(mlir::Location newLoc) const {
   TypeBinding b = *this;
-  b.loc = loc;
+  b.loc = newLoc;
   return b;
 }
 
@@ -99,22 +102,26 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
   type.print(os);
   return os;
 }
+
+mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const zhl::TypeBinding &b) {
+  std::string s;
+  llvm::raw_string_ostream ss(s);
+  b.print(ss);
+  diag << s;
+  return diag;
+}
+
 mlir::LogicalResult zhl::TypeBinding::subtypeOf(const TypeBinding &other) const {
-  /*llvm::dbgs() << *this << " is a subtype of " << other << "? ";*/
   if (name == BOTTOM) {
-    /*llvm::dbgs() << "Yes because is the bottom type\n";*/
     return mlir::success();
   }
   if (*this == other) {
-    /*llvm::dbgs() << "Yes because they have the same name\n";*/
     return mlir::success();
   }
 
   if (superType != nullptr) {
-    /*llvm::dbgs() << "Depends on the super type\n";*/
     return superType->subtypeOf(other);
   }
-  /*llvm::dbgs() << "No\n";*/
   return mlir::failure();
 }
 
@@ -124,51 +131,55 @@ inline bool isPrivate(StringRef name) { return name.starts_with("_"); }
 /// in components higher in the chain.
 /// Returns failure if it was not found.
 /// If it was found but it couldn't get typechecked returns success wrapping a nullopt.
-FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef name) const {
-  if (members.find(name) != members.end()) {
-    return members.at(name);
+FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef memberName) const {
+  if (members.find(memberName) != members.end()) {
+    return members.at(memberName);
   }
   if (superType != nullptr) {
-    return superType->locateMember(name);
+    return superType->locateMember(memberName);
   }
   return failure();
 }
 
-FailureOr<TypeBinding>
-TypeBinding::getMember(StringRef name, std::function<mlir::InFlightDiagnostic()> emitError) const {
-  auto memberLookupRes = locateMember(name);
+FailureOr<TypeBinding> TypeBinding::getMember(
+    StringRef memberName, std::function<mlir::InFlightDiagnostic()> emitError
+) const {
+  auto memberLookupRes = locateMember(memberName);
   if (failed(memberLookupRes)) {
-    return emitError() << "member " << getName() << "." << name << " was not found";
+    return emitError() << "member " << getName() << "." << memberName << " was not found";
   }
   // We check this after ensuring the member exists to give a more accurate error message
-  if (isPrivate(name)) {
-    return emitError() << "member " << getName() << "." << name
+  if (isPrivate(memberName)) {
+    return emitError() << "member " << getName() << "." << memberName
                        << " is private and cannot be accessed";
   }
   if (!memberLookupRes->has_value()) {
     return emitError() << "internal error: could not deduce the type of member " << getName() << "."
-                       << name;
+                       << memberName;
   }
   return **memberLookupRes;
 }
 
 zhl::TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-    ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members, bool isBuiltin
+    ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members, Frame t_frame,
+    bool isBuiltin
 )
     : builtin(isBuiltin), name(name), loc(loc), superType(&const_cast<TypeBinding &>(superType)),
-      members(members), genericParams(t_genericParams), constructorParams(t_constructorParams) {}
+      members(members), genericParams(t_genericParams), constructorParams(t_constructorParams),
+      frame(t_frame) {}
 
 zhl::TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-    ParamsMap t_genericParams, bool isBuiltin
+    ParamsMap t_genericParams, Frame t_frame, bool isBuiltin
 )
-    : TypeBinding(name, loc, superType, t_genericParams, {}, {}, isBuiltin) {}
+    : TypeBinding(name, loc, superType, t_genericParams, {}, {}, t_frame, isBuiltin) {}
 
 zhl::TypeBinding::TypeBinding(
-    llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, bool isBuiltin
+    llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, Frame t_frame,
+    bool isBuiltin
 )
-    : TypeBinding(name, loc, superType, {}, {}, {}, isBuiltin) {}
+    : TypeBinding(name, loc, superType, {}, {}, {}, t_frame, isBuiltin) {}
 
 zhl::TypeBinding::TypeBinding(mlir::Location loc)
     : builtin(true), name("Component"), loc(loc), superType(nullptr) {}
@@ -178,7 +189,7 @@ zhl::TypeBinding::TypeBinding(const TypeBinding &other)
       selfConstructor(other.selfConstructor), builtin(other.builtin), name(other.name),
       loc(other.loc), constVal(other.constVal), genericParamName(other.genericParamName),
       superType(other.superType), members(other.members), genericParams(other.genericParams),
-      constructorParams(other.constructorParams) {}
+      constructorParams(other.constructorParams), frame(other.frame), slot(other.slot) {}
 
 zhl::TypeBinding::TypeBinding(TypeBinding &&other)
     : variadic(std::move(other.variadic)), specialized(std::move(other.specialized)),
@@ -186,7 +197,8 @@ zhl::TypeBinding::TypeBinding(TypeBinding &&other)
       name(std::move(other.name)), loc(std::move(other.loc)), constVal(std::move(other.constVal)),
       genericParamName(std::move(other.genericParamName)), superType(std::move(other.superType)),
       members(std::move(other.members)), genericParams(std::move(other.genericParams)),
-      constructorParams(std::move(other.constructorParams)) {}
+      constructorParams(std::move(other.constructorParams)), frame(other.frame),
+      slot(std::move(other.slot)) {}
 
 zhl::TypeBinding &zhl::TypeBinding::operator=(const TypeBinding &other) {
   variadic = other.variadic;
@@ -201,6 +213,8 @@ zhl::TypeBinding &zhl::TypeBinding::operator=(const TypeBinding &other) {
   members = other.members;
   genericParams = other.genericParams;
   constructorParams = other.constructorParams;
+  frame = other.frame;
+  slot = other.slot;
   return *this;
 }
 
@@ -218,6 +232,8 @@ zhl::TypeBinding &zhl::TypeBinding::operator=(TypeBinding &&other) {
     members = std::move(other.members);
     genericParams = std::move(other.genericParams);
     constructorParams = std::move(other.constructorParams);
+    frame = other.frame;
+    slot = std::move(other.slot);
   }
   return *this;
 }
@@ -225,20 +241,9 @@ zhl::TypeBinding &zhl::TypeBinding::operator=(TypeBinding &&other) {
 zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
     print(llvm::dbgs());
-    llvm::dbgs() << " is a sub type of ";
-    other.print(llvm::dbgs());
-    llvm::dbgs() << " and thus we return ";
-    other.print(llvm::dbgs());
-    llvm::dbgs() << "\n";
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
-    other.print(llvm::dbgs());
-    llvm::dbgs() << " is a sub type of ";
-    print(llvm::dbgs());
-    llvm::dbgs() << " and thus we return ";
-    print(llvm::dbgs());
-    llvm::dbgs() << "\n";
     return *this;
   }
 
@@ -263,9 +268,6 @@ zhl::TypeBinding::getArrayElement(std::function<mlir::InFlightDiagnostic()> emit
     return getSuperType().getArrayElement(emitError);
   }
   assert(genericParams.size() == 2);
-  /*if (!specialized) {*/
-  /*  return emitError() << "array type has not been specialized";*/
-  /*}*/
   return genericParams.getParam(0);
 }
 
@@ -273,6 +275,12 @@ zhl::TypeBinding zhl::TypeBinding::WrapVariadic(const TypeBinding &t) {
   TypeBinding w = t;
   w.variadic = true;
   return w;
+}
+
+TypeBinding TypeBinding::ReplaceFrame(Frame newFrame) const {
+  auto copy = *this;
+  copy.frame = newFrame;
+  return copy;
 }
 
 std::vector<mlir::Location> TypeBinding::getConstructorParamLocations() const {
@@ -359,7 +367,7 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
       for (auto &[memberName, type] : members) {
         os << memberName << ": ";
         if (type.has_value()) {
-          os << *type;
+          type->print(os);
         } else {
           os << "⊥";
         }
@@ -399,6 +407,7 @@ bool zhl::TypeBinding::isArray() const {
 bool zhl::TypeBinding::isBuiltin() const { return builtin; }
 
 bool zhl::TypeBinding::isConst() const { return name == CONST; }
+
 bool zhl::TypeBinding::isKnownConst() const { return isConst() && constVal.has_value(); }
 
 bool TypeBinding::isGeneric() const { return genericParams.size() > 0; }
@@ -411,6 +420,12 @@ void TypeBinding::markAsSpecialized() {
 }
 
 ArrayRef<std::string> TypeBinding::getGenericParamNames() const { return genericParams.getNames(); }
+
+void TypeBinding::markSlot(FrameSlot *newSlot) { slot = newSlot; }
+
+FrameSlot *TypeBinding::getSlot() const { return slot; }
+
+Frame TypeBinding::getFrame() const { return frame; }
 
 const zhl::TypeBinding &zhl::TypeBindings::Component() {
   if (!Exists("Component")) {
@@ -444,7 +459,7 @@ zhl::TypeBindings::Array(TypeBinding type, uint64_t size, mlir::Location loc) co
   zhl::ParamsMap arrayGenericParams;
   arrayGenericParams.insert({{"T", 0}, type});
   arrayGenericParams.insert({{"N", 1}, Const(size)});
-  TypeBinding array("Array", loc, Component(), arrayGenericParams, true);
+  TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
   array.specialized = true;
   return array;
 }
@@ -455,7 +470,7 @@ zhl::TypeBinding zhl::TypeBindings::UnkArray(TypeBinding type, mlir::Location lo
   zhl::ParamsMap arrayGenericParams;
   arrayGenericParams.insert({{"T", 0}, type});
   arrayGenericParams.insert({{"N", 1}, UnkConst()});
-  TypeBinding array("Array", loc, Component(), arrayGenericParams, true);
+  TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
   array.specialized = true;
   return array;
 }
@@ -472,7 +487,6 @@ mlir::FailureOr<TypeBinding> zhl::TypeBindings::MaybeGet(std::string_view name) 
   if (Exists(name)) {
     return Get(name);
   }
-  llvm::dbgs() << "No binding found for " << name << "\n";
   return mlir::failure();
 }
 
@@ -556,9 +570,9 @@ void zhl::Params::replaceParam(std::string_view name, const TypeBinding &binding
   }
 }
 void zhl::TypeBinding::replaceGenericParamByName(
-    std::string_view name, const TypeBinding &binding
+    std::string_view paramName, const TypeBinding &binding
 ) {
-  genericParams.replaceParam(name, binding);
+  genericParams.replaceParam(paramName, binding);
 }
 zhl::TypeBinding &zhl::TypeBinding::getSuperType() {
   assert(superType != nullptr);

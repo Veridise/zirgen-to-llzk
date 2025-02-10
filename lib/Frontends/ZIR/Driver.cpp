@@ -2,6 +2,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 #include "zklang/Dialect/ZML/BuiltIns/BuiltIns.h"
+#include "llvm/Support/WithColor.h"
 
 #include "zirgen/dsl/lower.h"
 #include "zirgen/dsl/parser.h"
@@ -23,6 +24,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <mlir/Support/LogicalResult.h>
+
+#define DEBUG_TYPE "zir-driver"
 
 namespace cl = llvm::cl;
 using namespace mlir;
@@ -59,6 +62,18 @@ static cl::opt<enum Action> emitAction(
 static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::value_desc("path"));
 static cl::opt<std::string>
     outputFile("o", cl::desc("Where to write the result"), cl::value_desc("output"));
+
+// Dev-oriented command line options only available in debug builds
+// They are defined with external storage to avoid having to wrap
+// the code that uses them in preprocessor checks too
+bool DisableMultiThreadingFlag = false;
+
+#ifndef NDEBUG
+static cl::opt<bool, true> DisableMultiThreading(
+    "disable-multithreading", cl::desc("Disable multithreading of the lowering pipeline"),
+    cl::Hidden, cl::location(DisableMultiThreadingFlag)
+);
+#endif
 
 /// A wrapper around the dialect registry that ensures that the required dialects are available
 /// at initialization.
@@ -116,12 +131,19 @@ Driver::Driver(int &argc, char **&argv)
   cl::ParseCommandLineOptions(argc, argv, "zklang ZIR frontend\n");
 
   context.loadAllAvailableDialects();
+
+  if (DisableMultiThreadingFlag) {
+    llvm::errs() << "Multithreading was disabled!\n";
+    context.disableMultithreading();
+  }
 }
 
 void Driver::configureLoweringPipeline() {
   pm.clear();
+  if (emitAction >= Action::PrintLlzk || emitAction == Action::None) {
+    pm.addPass(zkc::createInjectLlzkModAttrsPass());
+  }
   pm.addPass(zkc::createStripTestsPass());
-  /*pm.addPass(zkc::createStripDirectivesPass());*/
   pm.addPass(zkc::Zmir::createInjectBuiltInsPass());
   pm.addPass(zkc::createConvertZhlToZmirPass());
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
@@ -135,7 +157,8 @@ void Driver::configureLoweringPipeline() {
   );
   pm.addPass(zkc::Zmir::createRemoveBuiltInsPass());
   pm.addPass(zkc::Zmir::createSplitComponentBodyPass());
-  auto &splitCompFuncsPipeline = pm.nest<zkc::Zmir::SplitComponentOp>().nest<mlir::func::FuncOp>();
+  auto &splitCompPipeline = pm.nest<zkc::Zmir::SplitComponentOp>();
+  auto &splitCompFuncsPipeline = splitCompPipeline.nest<mlir::func::FuncOp>();
   splitCompFuncsPipeline.addPass(zkc::Zmir::createRemoveIllegalComputeOpsPass());
   splitCompFuncsPipeline.addPass(zkc::Zmir::createRemoveIllegalConstrainOpsPass());
   splitCompFuncsPipeline.addPass(mlir::createCSEPass());
@@ -144,9 +167,8 @@ void Driver::configureLoweringPipeline() {
     return;
   }
 
-  pm.addPass(zkc::createConvertZmirComponentsToLlzkPass());
+  pm.addPass(zkc::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
-  llzkStructPipeline.addPass(zkc::createConvertZmirToLlzkPass());
   llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
   llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
 }
@@ -238,13 +260,16 @@ LogicalResult Driver::run() {
   configureLoweringPipeline();
   pm.dump();
   if (failed(pm.run(*mod))) {
-    llvm::errs() << "an internal compiler error ocurred while lowering this module:\n";
-    // mod->print(llvm::errs());
+    DEBUG_WITH_TYPE("zir-driver-dump-on-error", llvm::errs() << "Module contents:\n";
+                    mod->print(llvm::errs()));
+    llvm::WithColor(llvm::errs(), llvm::raw_ostream::RED, true)
+        << "An internal compiler error ocurred while lowering this module.\n";
     return failure();
   }
 
   mod->print(*dst);
 
+  llvm::WithColor(llvm::errs(), llvm::raw_ostream::GREEN) << "Success!\n";
   return success();
 }
 

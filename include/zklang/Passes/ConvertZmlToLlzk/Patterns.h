@@ -2,13 +2,38 @@
 
 #include "llzk/Dialect/LLZK/IR/Ops.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
 #include "zklang/Dialect/ZML/IR/Ops.h"
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 
 namespace zkc::Zmir {
+
+class UpdateScfForOpTypes : public mlir::OpConversionPattern<mlir::scf::ForOp> {
+public:
+  using OpConversionPattern<mlir::scf::ForOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::ForOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class UpdateScfYieldOpTypes : public mlir::OpConversionPattern<mlir::scf::YieldOp> {
+public:
+  using OpConversionPattern<mlir::scf::YieldOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::YieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class UpdateScfExecuteRegionOpTypes : public mlir::OpConversionPattern<mlir::scf::ExecuteRegionOp> {
+public:
+  using OpConversionPattern<mlir::scf::ExecuteRegionOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::ExecuteRegionOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
 
 /// Lowers literal Vals
 class LitValOpLowering : public mlir::OpConversionPattern<Zmir::LitValOp> {
@@ -17,15 +42,6 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(Zmir::LitValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
-};
-
-/// Converts self into a struct allocation
-class GetSelfOpLowering : public mlir::OpConversionPattern<Zmir::GetSelfOp> {
-public:
-  using OpConversionPattern<Zmir::GetSelfOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(Zmir::GetSelfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class ComponentLowering : public mlir::OpConversionPattern<SplitComponentOp> {
@@ -71,17 +87,6 @@ public:
 };
 
 class CallIndirectOpLoweringInCompute
-    : public mlir::OpConversionPattern<mlir::func::CallIndirectOp> {
-
-public:
-  using OpConversionPattern<mlir::func::CallIndirectOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor, mlir::ConversionPatternRewriter &)
-      const override;
-};
-
-class CallIndirectOpLoweringInConstrain
     : public mlir::OpConversionPattern<mlir::func::CallIndirectOp> {
 
 public:

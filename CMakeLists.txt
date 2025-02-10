@@ -110,8 +110,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DebWithSans")
 endif()
 
 
-# Temporary arrangement for enabling ASAN on the "debug" nix derivations
-if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+# TODO(LLZK-105) Temporary arrangement for enabling ASAN on the "debug" nix derivations
+if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
   # NOTE: undefined behavior sanitizer ("undefined") has been removed due to its
   # poor interaction with gtest fixtures and other standard MLIR/LLVM
   # operations.
@@ -119,13 +119,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_link_options(-fsanitize=address)
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  # NOTE: undefined behavior sanitizer ("undefined") has been removed due to its
-  # poor interaction with gtest fixtures and other standard MLIR/LLVM
-  # operations.
-  add_compile_options(-fsanitize=address)
-  add_link_options(-fsanitize=address)
-endif()
 
 if(ZKLANG_TEMPLATE_BACKTRACE_LIMIT)
   add_compile_options(-ftemplate-backtrace-limit=0)

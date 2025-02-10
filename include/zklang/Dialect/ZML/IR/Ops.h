@@ -24,10 +24,6 @@ struct IsBuiltIn {};
 
 } // namespace zkc::Zmir
 
-/*// Include TableGen'd declarations*/
-/*#define GET_OP_CLASSES*/
-/*#include "ZirToZkir/Dialect/ZMIR/IR/OpInterfaces.inc.h"*/
-
 // Include TableGen'd declarations
 #define GET_OP_CLASSES
 #include "zklang/Dialect/ZML/IR/Ops.h.inc"

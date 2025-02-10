@@ -12,8 +12,6 @@ include "mlir/IR/CommonAttrConstraints.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "OpInterfaces.td"
 
-def ReturnsExpr : DeclareOpInterfaceMethods<InferTypeOpInterface>;
-
 class ZmirOp<string mnemonic, list<Trait> traits = []>
     : Op<ZmirDialect, mnemonic, traits> {}
 
@@ -65,6 +63,32 @@ class ComponentOpBase<string prefix, string bodyFuncName,
 def ComponentOp : ComponentOpBase<"", "body", "body"> {}
 
 def SplitComponentOp : ComponentOpBase<"split_", "compute", "constrain"> {}
+
+def SelfOp : ZmirOp<"self", [NoTerminator]> {
+  let summary = "current component scope";
+  let description = "Returns the current component after executing its content";
+
+  let results = (outs Component);
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+     $body attr-dict `:` type(results) 
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders =
+      [OpBuilder<(ins "mlir::Type":$compType,
+           CArg<"mlir::function_ref<void(mlir::OpBuilder &, mlir::Value)>",
+                "nullptr">)>,
+       OpBuilder<(ins "mlir::Type":$compType, "mlir::Region &":$region)>];
+
+  let extraClassDeclaration = [{
+    mlir::Value getSelfValue() { 
+      assert(getRegion().getNumArguments() > 0 && "self region must have one argument");
+      return getRegion().getArgument(0); 
+    }
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 //  ConstructorRefOp
@@ -161,18 +185,7 @@ def NopOp : ZmirOp<"nop", [Pure]> {
   let arguments = (ins Variadic<AnyZmirType>:$ins);
   let results = (outs Variadic<AnyZmirType>:$outs);
 
-  let assemblyFormat = "$ins `:` type($ins) `->` type($outs) attr-dict";
-}
-
-def GetSelfOp : ZmirOp<"self", [Pure]> {
-  let summary = "get current component";
-  let description = "Returns the current component";
-
-  let results = (outs Component);
-
-  let assemblyFormat = [{
-     attr-dict `:` type(results)
-  }];
+  let assemblyFormat = "($ins `:` type($ins)^ `->`)? type($outs) attr-dict";
 }
 
 def GlobalDefOp : ZmirOp<"global", [HasParent<"::mlir::ModuleOp">]> {
@@ -202,9 +215,8 @@ def ConstrainCallOp : ZmirOp<"constrain_call"> {
   let summary = "calls the constrain function";
 
   let arguments = (ins TypeVarOr<Component>:$self, Variadic<AnyType>:$args);
-
   let assemblyFormat = [{
-    $self `(` $args `)` `:` `(` type($self) `,` type($args) `)` attr-dict
+    $self `(` $args `)` `:`  type($self) (`,` type($args)^ )?  attr-dict
   }];
 }
 
@@ -284,7 +296,7 @@ def WriteArrayOp : ZmirOp<"write_array"> {
   let summary = "write data into an array";
 
   let arguments = (ins TypeVarOr<Component>:$array, Variadic<AnyType>:$indices,
-      AnyZmirType:$value);
+      AnyZmirType:$value, UnitAttr:$computeOnly);
   let assemblyFormat = [{
     $array `[` $indices `]` `=` $value attr-dict `:` type($array) `[` type($indices) `]` `,` type($value)
   }];
