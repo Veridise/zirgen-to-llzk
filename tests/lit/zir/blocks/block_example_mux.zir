@@ -1,0 +1,12 @@
+// RUN: zklang -o - %s 
+
+component A() {
+  a := 1;
+  b := [a-1, a] -> ({
+    x := a * 2;
+    x
+  }, {
+    x := a + 3;
+    x + 1
+  });
+}

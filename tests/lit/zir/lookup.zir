@@ -1,0 +1,6 @@
+// RUN: zklang -o - %s 
+
+component Top() {
+  r := Reg(1);
+  r.reg = 1;
+}

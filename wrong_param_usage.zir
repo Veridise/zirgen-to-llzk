@@ -1,7 +1,0 @@
-component Bar<V: Val>(arr: Array<Val, V>) {
-  arr[0]
-}
-
-component Foo(v: Val) {
-  bar := Bar<v>([1,2,3]);
-}

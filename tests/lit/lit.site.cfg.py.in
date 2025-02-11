@@ -1,0 +1,16 @@
+@LIT_SITE_CFG_IN_HEADER@
+
+config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
+config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
+config.mlir_obj_dir = "@MLIR_BINARY_DIR@"
+config.python_executable = "@Python3_EXECUTABLE@"
+config.zklang_src_root = "@CMAKE_SOURCE_DIR@"
+config.zklang_obj_root = "@CMAKE_BINARY_DIR@"
+
+
+import lit.llvm
+
+lit.llvm.initialize(lit_config, config)
+
+# Let the main config do the real work.
+lit_config.load_config(config, "@CMAKE_SOURCE_DIR@/tests/lit/lit.cfg.py")

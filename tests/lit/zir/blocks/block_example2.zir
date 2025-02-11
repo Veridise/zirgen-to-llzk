@@ -1,0 +1,9 @@
+// RUN: zklang -o - %s 
+
+component A() {
+  b := {
+    x := a;
+    x
+  };
+  a := 1;
+}

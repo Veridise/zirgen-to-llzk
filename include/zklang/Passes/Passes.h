@@ -2,28 +2,27 @@
 
 #pragma once
 
-#include "llzk/Dialect/LLZK/IR/Dialect.h"
-#include "llzk/Dialect/LLZK/IR/Ops.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
-#include "zklang/Dialect/ZML/IR/Dialect.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
+#include <llzk/Dialect/LLZK/IR/Dialect.h>
+#include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/Pass/Pass.h>
+#include <zklang/Dialect/ZML/IR/Dialect.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
 
-namespace zkc {
+namespace zklang {
 
 // Pass constructors
 
 template <typename Op> using OpPass = std::unique_ptr<mlir::OperationPass<Op>>;
 
 OpPass<mlir::ModuleOp> createStripTestsPass();
-OpPass<mlir::ModuleOp> createStripDirectivesPass();
-OpPass<mlir::ModuleOp> createConvertZhlToZmirPass();
+OpPass<mlir::ModuleOp> createConvertZhlToZmlPass();
 OpPass<mlir::ModuleOp> createConvertZmlToLlzkPass();
 OpPass<mlir::ModuleOp> createInjectLlzkModAttrsPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#include "zklang/Passes/Passes.h.inc"
+#include <zklang/Passes/Passes.h.inc>
 
-} // namespace zkc
+} // namespace zklang

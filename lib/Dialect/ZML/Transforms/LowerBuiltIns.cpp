@@ -1,28 +1,28 @@
 // Copyright 2024 Veridise, Inc.
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZML/BuiltIns/BuiltIns.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/IR/Types.h"
-#include "zklang/Dialect/ZML/Transforms/PassDetail.h"
-#include "zklang/Dialect/ZML/Typing/ZMIRTypeConverter.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/SymbolTable.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 #include <unordered_set>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/IR/Types.h>
+#include <zklang/Dialect/ZML/Transforms/PassDetail.h>
+#include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
-mlir::FailureOr<Zmir::ConstructorRefOp> getConstructorRef(func::CallIndirectOp op) {
-  auto constrRef = mlir::dyn_cast<Zmir::ConstructorRefOp>(op.getCallee().getDefiningOp());
+mlir::FailureOr<ConstructorRefOp> getConstructorRef(func::CallIndirectOp op) {
+  auto constrRef = mlir::dyn_cast<ConstructorRefOp>(op.getCallee().getDefiningOp());
   if (!constrRef) {
     return mlir::failure();
   }
@@ -103,15 +103,15 @@ public:
   }
 };
 
-using BitAndPattern = ReplaceConstructorCallWithBuiltIn<Zmir::BitAndOp, BitAndStr>;
-using AddPattern = ReplaceConstructorCallWithBuiltIn<Zmir::AddOp, AddStr>;
-using SubPattern = ReplaceConstructorCallWithBuiltIn<Zmir::SubOp, SubStr>;
-using MulPattern = ReplaceConstructorCallWithBuiltIn<Zmir::MulOp, MulStr>;
-using ModPattern = ReplaceConstructorCallWithBuiltIn<Zmir::ModOp, ModStr>;
-using InvPattern = ReplaceConstructorCallWithBuiltIn<Zmir::InvOp, InvStr>;
-using IszPattern = ReplaceConstructorCallWithBuiltIn<Zmir::IsZeroOp, IszStr>;
-using NegPattern = ReplaceConstructorCallWithBuiltIn<Zmir::NegOp, NegStr>;
-using InRangePattern = ReplaceConstructorCallWithBuiltIn<Zmir::InRangeOp, InRangeStr>;
+using BitAndPattern = ReplaceConstructorCallWithBuiltIn<BitAndOp, BitAndStr>;
+using AddPattern = ReplaceConstructorCallWithBuiltIn<AddOp, AddStr>;
+using SubPattern = ReplaceConstructorCallWithBuiltIn<SubOp, SubStr>;
+using MulPattern = ReplaceConstructorCallWithBuiltIn<MulOp, MulStr>;
+using ModPattern = ReplaceConstructorCallWithBuiltIn<ModOp, ModStr>;
+using InvPattern = ReplaceConstructorCallWithBuiltIn<InvOp, InvStr>;
+using IszPattern = ReplaceConstructorCallWithBuiltIn<IsZeroOp, IszStr>;
+using NegPattern = ReplaceConstructorCallWithBuiltIn<NegOp, NegStr>;
+using InRangePattern = ReplaceConstructorCallWithBuiltIn<InRangeOp, InRangeStr>;
 
 namespace {
 class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
@@ -119,7 +119,7 @@ class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
   void runOnOperation() override {
     auto op = getOperation();
 
-    Zmir::ZMIRTypeConverter typeConverter;
+    ZMLTypeConverter typeConverter;
     mlir::MLIRContext *ctx = op->getContext();
     mlir::RewritePatternSet patterns(ctx);
 
@@ -130,8 +130,8 @@ class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, mlir::index::IndexDialect,
-        mlir::scf::SCFDialect, mlir::arith::ArithDialect>();
+        ZMLDialect, mlir::func::FuncDialect, mlir::index::IndexDialect, mlir::scf::SCFDialect,
+        mlir::arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
     target.addDynamicallyLegalOp<func::CallIndirectOp>(isLegalCallIndirect);
@@ -150,4 +150,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLowerBuiltInsPass() {
   return std::make_unique<LowerBuiltInsPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

@@ -16,4 +16,4 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
 // Include TableGen'd declarations
-#include "zklang/Dialect/ZML/IR/OpInterfaces.h.inc"
+#include <zklang/Dialect/ZML/IR/OpInterfaces.h.inc>

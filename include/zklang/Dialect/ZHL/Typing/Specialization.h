@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <llvm/ADT/StringSet.h>
 #include <mlir/Support/LLVM.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
 

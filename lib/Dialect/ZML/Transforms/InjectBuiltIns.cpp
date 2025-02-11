@@ -1,18 +1,18 @@
 // Copyright 2024 Veridise, Inc.
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZML/BuiltIns/BuiltIns.h"
-#include "zklang/Dialect/ZML/Transforms/PassDetail.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/SymbolTable.h>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
+#include <zklang/Dialect/ZML/Transforms/PassDetail.h>
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
 namespace {
 
@@ -36,4 +36,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createInjectBuiltInsPass() {
   return std::make_unique<InjectBuiltInsPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

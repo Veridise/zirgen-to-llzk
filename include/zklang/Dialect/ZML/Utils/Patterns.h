@@ -1,15 +1,15 @@
 #pragma once
 
-#include "zklang/Dialect/ZML/IR/Ops.h"
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Transforms/DialectConversion.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
 
 /*
  * Common patterns or templates thereof used by several passes grouped here together
  * to avoid duplicating code.
  */
 
-namespace zkc::Zmir {
+namespace zml {
 
 /// A strategy for ReplaceSelfWith that replaces the op's result with
 /// a Value coming from the N-th argument of the parent.
@@ -69,4 +69,4 @@ private:
   Strategy strategy;
 };
 
-} // namespace zkc::Zmir
+} // namespace zml

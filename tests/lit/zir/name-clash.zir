@@ -1,0 +1,10 @@
+// RUN: zklang -o - %s 
+
+component Top() {
+  {
+    x := 1;
+  };
+  {
+    x := 2;
+  };
+}

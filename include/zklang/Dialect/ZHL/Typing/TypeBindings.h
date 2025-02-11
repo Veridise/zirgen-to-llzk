@@ -1,15 +1,15 @@
 #pragma once
 
-#include "mlir/IR/Diagnostics.h"
-#include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <deque>
 #include <functional>
+#include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
 #include <map>
 #include <memory>
 #include <mlir/IR/Builders.h>
+#include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
@@ -214,7 +214,6 @@ public:
 
   template <typename... Args>
   const TypeBinding &Create(std::string_view name, mlir::Location loc, Args &&...args) {
-    llvm::dbgs() << "Creating binding with name " << name << "\n";
     assert(bindings.find(name) == bindings.end() && "double binding write");
     bindings.emplace(name, TypeBinding(name, loc, std::forward<Args>(args)...));
     return bindings.at(name);
@@ -226,7 +225,6 @@ public:
 
   template <typename... Args>
   const TypeBinding &CreateBuiltin(std::string_view name, mlir::Location loc, Args &&...args) {
-    llvm::dbgs() << "Creating binding with name " << name << "\n";
     assert(bindings.find(name) == bindings.end() && "double binding write");
     bindings.emplace(name, TypeBinding(name, loc, std::forward<Args>(args)..., Frame(), true));
     return bindings.at(name);

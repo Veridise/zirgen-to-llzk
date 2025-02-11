@@ -1,2 +1,0 @@
-build --remote_cache=http://localhost:7777
-build --local_resources=cpu='HOST_CPUS*0.5'

@@ -1,7 +1,0 @@
-component RegAdd(x: Val, y: Val) {
-  Reg(x + y)
-}
-
-component Top() {
-  reduce 1..10 init 0 with RegAdd = 1;
-}

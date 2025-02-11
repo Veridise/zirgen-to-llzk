@@ -1,8 +1,8 @@
-#include "zklang/Dialect/ZHL/Typing/Specialization.h"
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/Specialization.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 using namespace mlir;
 using namespace zhl;

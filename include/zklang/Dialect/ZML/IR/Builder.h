@@ -1,6 +1,5 @@
 #pragma once
 
-#include "zklang/Dialect/ZML/IR/Ops.h"
 #include <algorithm>
 #include <cassert>
 #include <memory>
@@ -11,8 +10,9 @@
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <vector>
+#include <zklang/Dialect/ZML/IR/Ops.h>
 
-namespace zkc::Zmir {
+namespace zml {
 
 class ComponentBuilder {
 private:
@@ -114,4 +114,4 @@ public:
   ComponentOp build(mlir::OpBuilder &builder);
 };
 
-} // namespace zkc::Zmir
+} // namespace zml

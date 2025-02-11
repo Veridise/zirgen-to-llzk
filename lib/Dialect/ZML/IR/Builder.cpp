@@ -1,6 +1,6 @@
-#include "zklang/Dialect/ZML/IR/Builder.h"
+#include <zklang/Dialect/ZML/IR/Builder.h>
 
-namespace zkc::Zmir {
+namespace zml {
 
 ComponentBuilder::BodySrc::~BodySrc() = default;
 
@@ -162,8 +162,8 @@ void ComponentBuilder::TakeRegion::set(ComponentOp op, Ctx &ctx, mlir::OpBuilder
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(&entryBlock);
 
-  auto self = builder.create<zkc::Zmir::SelfOp>(op.getLoc(), op.getType(), *body);
+  auto self = builder.create<zml::SelfOp>(op.getLoc(), op.getType(), *body);
   builder.create<mlir::func::ReturnOp>(self.getLoc(), mlir::ValueRange({self}));
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

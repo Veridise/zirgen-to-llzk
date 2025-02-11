@@ -1,9 +1,9 @@
 #pragma once
 
-#include "OpBindings.h"
-#include "Scope.h"
-#include "TypeBindings.h"
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
+#include <zklang/Dialect/ZHL/Typing/OpBindings.h>
+#include <zklang/Dialect/ZHL/Typing/Scope.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
 

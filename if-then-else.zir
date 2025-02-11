@@ -1,5 +1,0 @@
-component ShiftRight<SIZE: Val>(in: Array<Val, SIZE>, n: Val) {
-  for i : 0..SIZE {
-    if (InRange(0, i + n, SIZE)) { in[i + n] } else { 0 }
-  }
-}
