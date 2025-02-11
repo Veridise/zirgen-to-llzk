@@ -9,24 +9,17 @@
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
 
-#include "zklang/Dialect/ZML/IR/TypeInterfaces.cpp.inc"
+namespace zml {
 
-namespace zkc::Zmir {
-
-bool isValidZmirType(mlir::Type type) {
-  return llvm::isa<TypeVarType>(type) || llvm::isa<StringType>(type) ||
-         llvm::isa<UnionType>(type) || llvm::isa<ValType>(type) || llvm::isa<ComponentType>(type) ||
-         llvm::isa<PendingType>(type) ||
-         (llvm::isa<VarArgsType>(type) && isValidZmirType(llvm::cast<VarArgsType>(type).getInner())
-         ) ||
-         (llvm::isa<ArrayType>(type) && isValidZmirType(llvm::cast<ArrayType>(type).getInnerType())
-         );
+bool isValidZMLType(mlir::Type type) {
+  return llvm::isa<TypeVarType>(type) || llvm::isa<ComponentType>(type) ||
+         (llvm::isa<VarArgsType>(type) && isValidZMLType(llvm::cast<VarArgsType>(type).getInner()));
 }
 
 inline mlir::LogicalResult
 checkValidZmirType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Type type) {
-  if (!isValidZmirType(type)) {
-    return emitError() << "expected " << "a valid ZMIR type" << " but found " << type;
+  if (!isValidZMLType(type)) {
+    return emitError() << "expected " << "a valid ZML type" << " but found " << type;
   } else {
     return mlir::success();
   }
@@ -86,34 +79,4 @@ ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir:
   return mlir::dyn_cast<ComponentInterface>(comp);
 }
 
-mlir::LogicalResult BoundedArrayType::verify(
-    llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Type elementType,
-    mlir::Attribute size
-) {
-  auto typeRes = checkValidZmirType(emitError, elementType);
-  auto sizeRes = checkValidParam(emitError, size);
-
-  return mlir::success(mlir::succeeded(typeRes) && mlir::succeeded(sizeRes));
-}
-
-int64_t BoundedArrayType::getSizeInt() {
-  if (llvm::isa<mlir::IntegerAttr>(getSize())) {
-    mlir::IntegerAttr i = llvm::cast<mlir::IntegerAttr>(getSize());
-    return i.getValue().getZExtValue();
-  }
-  return 0;
-}
-
-mlir::LogicalResult UnboundedArrayType::verify(
-    llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Type type
-) {
-  return checkValidZmirType(emitError, type);
-}
-
-mlir::Attribute UnboundedArrayType::getSize() {
-  return mlir::IntegerAttr::get(
-      mlir::IntegerType::get(getContext(), 64, mlir::IntegerType::Signed), getSizeInt()
-  );
-}
-
-} // namespace zkc::Zmir
+} // namespace zml

@@ -24,7 +24,7 @@
 #define GET_OP_CLASSES
 #include "zklang/Dialect/ZML/IR/Ops.cpp.inc"
 
-namespace zkc::Zmir {
+namespace zml {
 
 void SelfOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, mlir::Type compType,
@@ -167,12 +167,12 @@ template <typename CompOp> mlir::Type getType(CompOp &op) {
   }
 }
 
-mlir::Type ComponentOp::getType() { return ::zkc::Zmir::getType(*this); }
-mlir::Type SplitComponentOp::getType() { return ::zkc::Zmir::getType(*this); }
+mlir::Type ComponentOp::getType() { return ::zml::getType(*this); }
+mlir::Type SplitComponentOp::getType() { return ::zml::getType(*this); }
 
 template <typename CompOp> mlir::FailureOr<mlir::Type> getSuperTypeCommon(CompOp &op) {
   if (op.isRoot()) {
-    if (auto comp = mlir::dyn_cast<zkc::Zmir::ComponentType>(op.getType())) {
+    if (auto comp = mlir::dyn_cast<zml::ComponentType>(op.getType())) {
       return comp;
     } else {
       return mlir::failure();
@@ -285,8 +285,8 @@ mlir::LogicalResult GetGlobalOp::inferReturnTypes(
     llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
 ) {
   // TODO
-  inferredReturnTypes.push_back(ValType::get(ctx));
+  inferredReturnTypes.push_back(ComponentType::Val(ctx));
   return mlir::success();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

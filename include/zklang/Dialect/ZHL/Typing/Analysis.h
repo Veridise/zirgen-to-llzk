@@ -1,8 +1,8 @@
 #pragma once
 
-#include "TypeBindings.h"
 #include <mlir/IR/Value.h>
 #include <mlir/Pass/AnalysisManager.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
 

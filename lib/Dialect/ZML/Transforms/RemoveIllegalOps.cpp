@@ -19,7 +19,7 @@
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
 namespace {
 
@@ -37,8 +37,8 @@ template <typename Impl, typename Base> class RemoveIllegalOpsCommon : public Ba
     // Set conversion target
     mlir::ConversionTarget target(Base::getContext());
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect,
-        mlir::index::IndexDialect, mlir::scf::SCFDialect, arith::ArithDialect>();
+        ZMLDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect, mlir::index::IndexDialect,
+        mlir::scf::SCFDialect, arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp>();
     setLegality(target);
 
@@ -132,7 +132,7 @@ public:
       rewriter.setInsertionPointToStart(&(op->getParentOfType<mlir::func::FuncOp>().getBody().front(
       )));
     }
-    auto read = rewriter.create<Zmir::ReadFieldOp>(
+    auto read = rewriter.create<ReadFieldOp>(
         op.getLoc(), op.getVal().getType(), adaptor.getComponent(), adaptor.getFieldNameAttr()
     );
     rewriter.replaceUsesWithIf(adaptor.getVal(), read, [](auto &operand) {
@@ -220,4 +220,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createRemoveIllegalConstrainOpsPass
   return std::make_unique<RemoveIllegalConstrainOpsPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

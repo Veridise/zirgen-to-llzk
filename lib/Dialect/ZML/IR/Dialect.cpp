@@ -12,7 +12,7 @@
 #define GET_ATTRDEF_CLASSES
 #include "zklang/Dialect/ZML/IR/Attrs.cpp.inc"
 
-auto zkc::Zmir::ZmirDialect::initialize() -> void {
+auto zml::ZMLDialect::initialize() -> void {
   // clang-format off
   addOperations<
     #define GET_OP_LIST

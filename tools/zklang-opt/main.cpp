@@ -20,11 +20,11 @@ int main(int argc, char **argv) {
   ::mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
     return mlir::createTopologicalSortPass();
   });
-  zkc::registerPasses();
-  zkc::Zmir::registerPasses();
+  zklang::registerPasses();
+  zml::registerPasses();
   zhl::registerPasses();
 
-  registry.insert<zkc::Zmir::ZmirDialect>();
+  registry.insert<zml::ZMLDialect>();
   registry.insert<zirgen::Zhl::ZhlDialect>();
   registry.insert<llzk::LLZKDialect>();
   return failed(mlir::MlirOptMain(argc, argv, "ZIR to ZKIR transformation pipeline\n", registry));

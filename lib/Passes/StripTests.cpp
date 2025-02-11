@@ -11,7 +11,7 @@
 
 using namespace mlir;
 
-namespace zkc {
+namespace zklang {
 
 namespace {
 
@@ -42,4 +42,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createStripTestsPass() {
   return std::make_unique<StripTestsPass>();
 }
 
-} // namespace zkc
+} // namespace zklang

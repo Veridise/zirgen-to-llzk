@@ -9,7 +9,7 @@
 #include "zklang/Dialect/ZML/IR/Ops.h"
 #include "zklang/Dialect/ZML/IR/Types.h"
 #include "zklang/Dialect/ZML/Transforms/PassDetail.h"
-#include "zklang/Dialect/ZML/Typing/ZMIRTypeConverter.h"
+#include "zklang/Dialect/ZML/Typing/ZMLTypeConverter.h"
 #include <algorithm>
 #include <cassert>
 #include <iterator>
@@ -21,7 +21,7 @@
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
 template <const char *Name, typename CompType>
 class RemoveBuiltIn : public OpConversionPattern<CompType> {
@@ -44,19 +44,19 @@ public:
   }
 };
 
-using BitAndPattern = RemoveBuiltIn<BitAndStr, Zmir::ComponentOp>;
-using AddPattern = RemoveBuiltIn<AddStr, Zmir::ComponentOp>;
-using SubPattern = RemoveBuiltIn<SubStr, Zmir::ComponentOp>;
-using MulPattern = RemoveBuiltIn<MulStr, Zmir::ComponentOp>;
-using ModPattern = RemoveBuiltIn<ModStr, Zmir::ComponentOp>;
-using InvPattern = RemoveBuiltIn<InvStr, Zmir::ComponentOp>;
-using IszPattern = RemoveBuiltIn<IszStr, Zmir::ComponentOp>;
-using NegPattern = RemoveBuiltIn<NegStr, Zmir::ComponentOp>;
-using ValPattern = RemoveBuiltIn<ValStr, Zmir::ComponentOp>;
-using StringPattern = RemoveBuiltIn<StrStr, Zmir::ComponentOp>;
-using ComponentPattern = RemoveBuiltIn<ComponentStr, Zmir::ComponentOp>;
-using ArrayPattern = RemoveBuiltIn<ArrayStr, Zmir::ComponentOp>;
-using InRangePattern = RemoveBuiltIn<InRangeStr, Zmir::ComponentOp>;
+using BitAndPattern = RemoveBuiltIn<BitAndStr, ComponentOp>;
+using AddPattern = RemoveBuiltIn<AddStr, ComponentOp>;
+using SubPattern = RemoveBuiltIn<SubStr, ComponentOp>;
+using MulPattern = RemoveBuiltIn<MulStr, ComponentOp>;
+using ModPattern = RemoveBuiltIn<ModStr, ComponentOp>;
+using InvPattern = RemoveBuiltIn<InvStr, ComponentOp>;
+using IszPattern = RemoveBuiltIn<IszStr, ComponentOp>;
+using NegPattern = RemoveBuiltIn<NegStr, ComponentOp>;
+using ValPattern = RemoveBuiltIn<ValStr, ComponentOp>;
+using StringPattern = RemoveBuiltIn<StrStr, ComponentOp>;
+using ComponentPattern = RemoveBuiltIn<ComponentStr, ComponentOp>;
+using ArrayPattern = RemoveBuiltIn<ArrayStr, ComponentOp>;
+using InRangePattern = RemoveBuiltIn<InRangeStr, ComponentOp>;
 
 namespace {
 class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
@@ -64,7 +64,7 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
   void runOnOperation() override {
     auto op = getOperation();
 
-    Zmir::ZMIRTypeConverter typeConverter;
+    ZMLTypeConverter typeConverter;
     mlir::MLIRContext *ctx = op->getContext();
     mlir::RewritePatternSet patterns(ctx);
 
@@ -74,11 +74,11 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
 
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
+        ZMLDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
         arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
-    target.addDynamicallyLegalOp<Zmir::ComponentOp>([&](Zmir::ComponentOp op) {
+    target.addDynamicallyLegalOp<ComponentOp>([&](ComponentOp op) {
       auto found = BuiltInComponentNames.find(op.getName().str()) != BuiltInComponentNames.end();
       auto markedBuiltIn = op.getBuiltin();
       return !(found && markedBuiltIn);
@@ -96,4 +96,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createRemoveBuiltInsPass() {
   return std::make_unique<RemoveBuiltInsPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

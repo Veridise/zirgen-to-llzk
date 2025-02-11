@@ -60,7 +60,7 @@ public:
     for (auto op : module.getOps<zirgen::Zhl::ComponentOp>()) {
       definedNames.insert(op.getName());
     }
-    zkc::Zmir::addBuiltinBindings(typeBindings, definedNames);
+    zml::addBuiltinBindings(typeBindings, definedNames);
     auto opBindingsResult = typeCheck(module, typeBindings, zhlTypingRules(typeBindings));
     if (failed(opBindingsResult)) {
       typeCheckingFailed = true;

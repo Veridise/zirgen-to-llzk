@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zklang/Dialect/ZHL/Typing/Frame.h"
-#include "zklang/Dialect/ZHL/Typing/FrameSlot.h"
 #include <llvm/Support/Debug.h>
+#include <zklang/Dialect/ZHL/Typing/Frame.h>
+#include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 
 namespace zhl {
 namespace detail {

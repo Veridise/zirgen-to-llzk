@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zklang/Dialect/ZHL/Typing/FrameSlot.h"
 #include <mlir/Support/LLVM.h>
+#include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {

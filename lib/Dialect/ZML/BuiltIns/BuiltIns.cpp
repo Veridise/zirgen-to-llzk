@@ -12,7 +12,7 @@
 #include <mlir/IR/ValueRange.h>
 #include <unordered_set>
 
-using namespace zkc::Zmir;
+using namespace zml;
 
 ComponentBuilder &builtinCommon(ComponentBuilder &builder) { return builder.isBuiltin(); }
 
@@ -180,7 +180,7 @@ void addArrayComponent(mlir::OpBuilder &builder) {
 }
 #define MAYBE(name) if (definedNames.find(name) == definedNames.end())
 
-void zkc::Zmir::addBuiltinBindings(
+void zml::addBuiltinBindings(
     zhl::TypeBindings &bindings, const std::unordered_set<std::string_view> &definedNames
 ) {
   auto &Val = bindings.CreateBuiltin("Val", bindings.Component());
@@ -248,7 +248,7 @@ void zkc::Zmir::addBuiltinBindings(
 }
 
 /// Adds the builtin operations that have not been overriden
-void zkc::Zmir::addBuiltins(
+void zml::addBuiltins(
     mlir::OpBuilder &builder, const std::unordered_set<std::string_view> &definedNames
 ) {
   assert(definedNames.find("Component") == definedNames.end() && "Can't redefine Component type");

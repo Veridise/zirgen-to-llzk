@@ -12,14 +12,11 @@ void findTypesInUseDefChain(
     llvm::SmallVector<mlir::Value> &results
 );
 
-namespace zkc::Zmir {
+namespace zml {
 
-class ZMIRTypeConverter : public mlir::TypeConverter {
+class ZMLTypeConverter : public mlir::TypeConverter {
 public:
-  ZMIRTypeConverter();
-
-private:
-  mlir::FailureOr<mlir::Value> findTypeInUseDefChain(mlir::Value, mlir::Type);
+  ZMLTypeConverter();
 };
 
-} // namespace zkc::Zmir
+} // namespace zml

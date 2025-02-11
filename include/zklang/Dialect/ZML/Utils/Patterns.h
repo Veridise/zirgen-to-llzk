@@ -9,7 +9,7 @@
  * to avoid duplicating code.
  */
 
-namespace zkc::Zmir {
+namespace zml {
 
 /// A strategy for ReplaceSelfWith that replaces the op's result with
 /// a Value coming from the N-th argument of the parent.
@@ -69,4 +69,4 @@ private:
   Strategy strategy;
 };
 
-} // namespace zkc::Zmir
+} // namespace zml

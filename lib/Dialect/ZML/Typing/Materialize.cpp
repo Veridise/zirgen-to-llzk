@@ -13,7 +13,7 @@
 using namespace mlir;
 using namespace zhl;
 
-namespace zkc::Zmir {
+namespace zml {
 
 void errMsg(const TypeBinding &binding, StringRef reason) {
   LLVM_DEBUG(
@@ -171,4 +171,4 @@ FunctionType materializeTypeBindingConstructor(OpBuilder &builder, const TypeBin
   return builder.getFunctionType(args, retType);
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

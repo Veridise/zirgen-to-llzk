@@ -16,7 +16,7 @@
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
 namespace {
 
@@ -212,11 +212,11 @@ class SplitComponentBodyPass : public SplitComponentBodyBase<SplitComponentBodyP
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
+        ZMLDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
         arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
     target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
-    target.addIllegalOp<Zmir::ComponentOp>();
+    target.addIllegalOp<ComponentOp>();
 
     // Return types may change so we need to adjust the return ops
     target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp ret) {
@@ -241,4 +241,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createSplitComponentBodyPass() {
   return std::make_unique<SplitComponentBodyPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

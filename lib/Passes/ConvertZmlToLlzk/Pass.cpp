@@ -24,9 +24,8 @@
 #include <zklang/Dialect/ZML/Utils/Patterns.h>
 
 using namespace mlir;
-using namespace zkc::Zmir;
 
-namespace zkc {
+namespace zml {
 
 void ConvertZmlToLlzkPass::runOnOperation() {
   auto op = getOperation();
@@ -52,7 +51,7 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
-  target.addIllegalDialect<zkc::Zmir::ZmirDialect, mlir::func::FuncDialect>();
+  target.addIllegalDialect<ZMLDialect, mlir::func::FuncDialect>();
 
   // Control flow operations may need to update their types
   target.addDynamicallyLegalDialect<scf::SCFDialect>([&](Operation *scfOp) {
@@ -65,10 +64,6 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZmlToLlzkPass() {
-  return std::make_unique<ConvertZmlToLlzkPass>();
-}
-
 void InjectLlzkModAttrsPass::runOnOperation() {
   auto op = getOperation();
   op->setAttr(
@@ -77,8 +72,16 @@ void InjectLlzkModAttrsPass::runOnOperation() {
   );
 }
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createInjectLlzkModAttrsPass() {
-  return std::make_unique<InjectLlzkModAttrsPass>();
+} // namespace zml
+
+namespace zklang {
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZmlToLlzkPass() {
+  return std::make_unique<zml::ConvertZmlToLlzkPass>();
 }
 
-} // namespace zkc
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createInjectLlzkModAttrsPass() {
+  return std::make_unique<zml::InjectLlzkModAttrsPass>();
+}
+
+} // namespace zklang

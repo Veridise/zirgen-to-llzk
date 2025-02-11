@@ -64,7 +64,7 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       Meaning, any builtin that was not overriden and that will lower to a llzk operation that
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
-  if (operands[0].isBuiltin() && zkc::Zmir::isBuiltinDontNeedAlloc(operands[0].getName())) {
+  if (operands[0].isBuiltin() && zml::isBuiltinDontNeedAlloc(operands[0].getName())) {
     return operands[0];
   }
   auto component = operands[0];

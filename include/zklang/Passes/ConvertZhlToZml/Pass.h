@@ -12,10 +12,10 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Support/LogicalResult.h>
 
-namespace zkc {
+namespace zml {
 
-class ConvertZhlToZmirPass : public ConvertZhlToZmirBase<ConvertZhlToZmirPass> {
+class ConvertZhlToZmlPass : public zklang::ConvertZhlToZmlBase<ConvertZhlToZmlPass> {
   void runOnOperation() override;
 };
 
-} // namespace zkc
+} // namespace zml

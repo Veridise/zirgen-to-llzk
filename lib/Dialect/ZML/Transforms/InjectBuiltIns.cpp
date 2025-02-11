@@ -12,7 +12,7 @@
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
 namespace {
 
@@ -36,4 +36,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createInjectBuiltInsPass() {
   return std::make_unique<InjectBuiltInsPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

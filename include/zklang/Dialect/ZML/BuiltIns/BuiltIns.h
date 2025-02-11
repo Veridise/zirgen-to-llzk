@@ -1,11 +1,11 @@
 #pragma once
 
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <mlir/IR/Builders.h>
 #include <string_view>
 #include <unordered_set>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
-namespace zkc::Zmir {
+namespace zml {
 
 void addBuiltinBindings(zhl::TypeBindings &, const std::unordered_set<std::string_view> &);
 // Add builtin components using the given builder
@@ -59,4 +59,4 @@ extern Log(message: String, vals: Val...);
 
 )";
 
-} // namespace zkc::Zmir
+} // namespace zml

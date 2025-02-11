@@ -2,20 +2,16 @@ include_directories(${MLIR_INCLUDE_DIRS} ${LLZK_INCLUDE_DIR})
 
 
 set(LLVM_TARGET_DEFINITIONS "Dialect.td")
-mlir_tablegen(Dialect.h.inc -gen-dialect-decls -dialect=zmir)
-mlir_tablegen(Dialect.cpp.inc -gen-dialect-defs -dialect=zmir)
+mlir_tablegen(Dialect.h.inc -gen-dialect-decls -dialect=zml)
+mlir_tablegen(Dialect.cpp.inc -gen-dialect-defs -dialect=zml)
 
 set(LLVM_TARGET_DEFINITIONS "Attrs.td")
-mlir_tablegen(Attrs.h.inc -gen-attrdef-decls -attrdefs-dialect=zmir)
-mlir_tablegen(Attrs.cpp.inc -gen-attrdef-defs -attrdefs-dialect=zmir)
+mlir_tablegen(Attrs.h.inc -gen-attrdef-decls -attrdefs-dialect=zml)
+mlir_tablegen(Attrs.cpp.inc -gen-attrdef-defs -attrdefs-dialect=zml)
 
 set(LLVM_TARGET_DEFINITIONS "Types.td")
-mlir_tablegen(Types.h.inc -gen-typedef-decls -typedefs-dialect=zmir)
-mlir_tablegen(Types.cpp.inc -gen-typedef-defs -typedefs-dialect=zmir)
-
-set(LLVM_TARGET_DEFINITIONS "TypeInterfaces.td")
-mlir_tablegen(TypeInterfaces.h.inc -gen-type-interface-decls)
-mlir_tablegen(TypeInterfaces.cpp.inc -gen-type-interface-defs)
+mlir_tablegen(Types.h.inc -gen-typedef-decls -typedefs-dialect=zml)
+mlir_tablegen(Types.cpp.inc -gen-typedef-defs -typedefs-dialect=zml)
 
 set(LLVM_TARGET_DEFINITIONS "Ops.td")
 mlir_tablegen(Ops.h.inc -gen-op-decls)

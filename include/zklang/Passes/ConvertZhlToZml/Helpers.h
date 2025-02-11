@@ -8,7 +8,7 @@
 #include <zklang/Dialect/ZHL/Typing/Analysis.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 
-namespace zkc {
+namespace zml {
 
 /// Finds the definition of the callee component. If the
 /// component was defined before the current operation w.r.t. the physical order of
@@ -22,7 +22,7 @@ bool calleeIsBuiltin(mlir::Operation *op);
 
 /// Creates a slot for storing a result inside a component's body.
 mlir::FlatSymbolRefAttr createSlot(
-    zhl::ComponentSlot *slot, mlir::OpBuilder &builder, Zmir::ComponentInterface component,
+    zhl::ComponentSlot *slot, mlir::OpBuilder &builder, ComponentInterface component,
     mlir::Location loc
 );
 
@@ -57,20 +57,20 @@ public:
   mlir::Value build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args);
   mlir::FunctionType getCtorType() const;
   const zhl::TypeBinding &getBinding() const;
-  Zmir::ComponentInterface getCalleeComp() const;
-  Zmir::ComponentInterface getCallerComp() const;
+  ComponentInterface getCalleeComp() const;
+  ComponentInterface getCallerComp() const;
 
 private:
   CtorCallBuilder(
-      mlir::FunctionType type, const zhl::TypeBinding &binding, Zmir::ComponentInterface callee,
-      Zmir::ComponentInterface caller, mlir::Value self, bool builtin
+      mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface callee,
+      ComponentInterface caller, mlir::Value self, bool builtin
   );
 
   mlir::FunctionType ctorType;
   const zhl::TypeBinding compBinding;
   bool isBuiltin;
-  Zmir::ComponentInterface calleeComponentOp, callerComponentOp;
+  ComponentInterface calleeComponentOp, callerComponentOp;
   mlir::Value self;
 };
 
-} // namespace zkc
+} // namespace zml
