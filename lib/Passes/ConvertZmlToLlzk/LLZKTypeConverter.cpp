@@ -22,7 +22,6 @@ mlir::Type deduceArrayType(mlir::Attribute attr) {
   if (auto typeAttr = mlir::dyn_cast<mlir::TypeAttr>(attr)) {
     return typeAttr.getValue();
   }
-  llvm::dbgs() << "attr = " << attr << "\n";
   assert(false && "Failed to convert array type");
   return nullptr;
 }
@@ -51,9 +50,6 @@ void convertParamAttrs(
 
 mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   auto sym = mlir::dyn_cast<mlir::SymbolRefAttr>(attr);
-  if (!sym) {
-    llvm::dbgs() << "attr = " << attr << "\n";
-  }
   assert(sym && "was expecting a symbol");
   return sym;
 }

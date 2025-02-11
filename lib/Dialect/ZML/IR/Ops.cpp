@@ -145,7 +145,6 @@ void SplitComponentOp::build(
 
 template <typename CompOp> mlir::Type getSuperType(CompOp &op) {
   if (op.isRoot()) {
-    llvm::dbgs() << "Super type of root is null\n";
     return nullptr;
   }
   auto result = op.lookupFieldType(op.getSuperFieldName());
