@@ -1,3 +1,5 @@
+// RUN: zklang -o - %s 
+
 component RegAdd(x: Val, y: Val) {
   Reg(x + y)
 }

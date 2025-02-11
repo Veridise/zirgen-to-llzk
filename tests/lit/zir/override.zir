@@ -1,3 +1,5 @@
+// RUN: zklang -o - %s 
+
 component Add(x: Val, y: Val) {
   x * y
 }

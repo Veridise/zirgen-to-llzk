@@ -1,3 +1,5 @@
+// RUN: zklang -o - %s 
+
 component Top() {
   {
     x := 1;

@@ -1,3 +1,5 @@
+// RUN: zklang -o - %s 
+
 component Head<T: Type, N: Val>(arr: Array<T, N>) {
   arr[0]
 }

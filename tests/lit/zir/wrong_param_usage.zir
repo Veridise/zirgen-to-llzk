@@ -1,3 +1,5 @@
+// RUN: zklang -o - %s 
+
 component Bar<V: Val>(arr: Array<Val, V>) {
   arr[0]
 }

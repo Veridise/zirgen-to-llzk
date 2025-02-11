@@ -1,4 +1,4 @@
-// Possible root cause for LLZK-156 
+// RUN: zklang -o - %s 
 
 component Foo<N: Val>() {
   0..N

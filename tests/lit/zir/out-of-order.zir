@@ -1,3 +1,5 @@
+// RUN: zklang -o - %s 
+
 component C() {
   x := 1;
 }
