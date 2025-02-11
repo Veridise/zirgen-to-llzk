@@ -1,6 +1,3 @@
-#include "zklang/Passes/ConvertZhlToZml/Helpers.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/Typing/Materialize.h"
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/Operation.h>
@@ -8,6 +5,9 @@
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
+#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 
 using namespace mlir;
 using namespace zhl;

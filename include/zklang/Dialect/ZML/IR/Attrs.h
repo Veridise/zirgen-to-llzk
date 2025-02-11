@@ -4,4 +4,4 @@
 
 // Include TableGen'd declarations
 #define GET_ATTRDEF_CLASSES
-#include "zklang/Dialect/ZML/IR/Attrs.h.inc"
+#include <zklang/Dialect/ZML/IR/Attrs.h.inc>

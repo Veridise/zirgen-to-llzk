@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zklang/Dialect/ZHL/Typing/Scope.h"
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
-#include "zklang/Dialect/ZHL/Typing/Typing.h"
+#include <zklang/Dialect/ZHL/Typing/Scope.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZHL/Typing/Typing.h>
 
 namespace zhl {
 

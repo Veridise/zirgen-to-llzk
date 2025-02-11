@@ -1,7 +1,7 @@
-#include "zklang/Dialect/ZHL/Typing/Scope.h"
 #include <cassert>
 #include <cstdint>
 #include <llvm/ADT/StringRef.h>
+#include <zklang/Dialect/ZHL/Typing/Scope.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 using namespace zirgen::Zhl;

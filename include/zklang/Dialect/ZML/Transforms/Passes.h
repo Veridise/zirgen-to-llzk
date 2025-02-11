@@ -2,9 +2,9 @@
 
 #pragma once
 
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/Pass/Pass.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
 
 namespace zml {
 
@@ -20,6 +20,6 @@ OpPass<mlir::func::FuncOp> createRemoveIllegalConstrainOpsPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#include "zklang/Dialect/ZML/Transforms/Passes.h.inc"
+#include <zklang/Dialect/ZML/Transforms/Passes.h.inc>
 
 } // namespace zml

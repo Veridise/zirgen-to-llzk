@@ -1,8 +1,3 @@
-#include "zklang/Dialect/ZML/BuiltIns/BuiltIns.h"
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
-#include "zklang/Dialect/ZML/IR/Builder.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/IR/Types.h"
 #include <functional>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Attributes.h>
@@ -11,6 +6,11 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/ValueRange.h>
 #include <unordered_set>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
+#include <zklang/Dialect/ZML/IR/Builder.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/IR/Types.h>
 
 using namespace zml;
 

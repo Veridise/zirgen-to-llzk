@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/Pass/Pass.h>
 
 namespace zhl {
 
@@ -14,6 +14,6 @@ OpPass<mlir::ModuleOp> createPrintTypeBindingsPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#include "zklang/Dialect/ZHL/Typing/Passes.h.inc"
+#include <zklang/Dialect/ZHL/Typing/Passes.h.inc>
 
 } // namespace zhl

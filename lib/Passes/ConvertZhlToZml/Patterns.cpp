@@ -1,14 +1,3 @@
-#include "zklang/Passes/ConvertZhlToZml/Patterns.h"
-#include "zklang/Dialect/ZHL/Typing/Frame.h"
-#include "zklang/Dialect/ZHL/Typing/FrameImpl.h"
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
-#include "zklang/Dialect/ZML/IR/Builder.h"
-#include "zklang/Dialect/ZML/IR/OpInterfaces.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/IR/Types.h"
-#include "zklang/Dialect/ZML/Typing/Materialize.h"
-#include "zklang/Dialect/ZML/Typing/ZMLTypeConverter.h"
-#include "zklang/Passes/ConvertZhlToZml/Helpers.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -32,7 +21,18 @@
 #include <vector>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
+#include <zklang/Dialect/ZHL/Typing/Frame.h>
+#include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZML/IR/Builder.h>
+#include <zklang/Dialect/ZML/IR/OpInterfaces.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/IR/Types.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
+#include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
+#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
+#include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
 using namespace zirgen;
 using namespace zhl;

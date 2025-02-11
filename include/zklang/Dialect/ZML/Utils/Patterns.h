@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zklang/Dialect/ZML/IR/Ops.h"
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Transforms/DialectConversion.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
 
 /*
  * Common patterns or templates thereof used by several passes grouped here together

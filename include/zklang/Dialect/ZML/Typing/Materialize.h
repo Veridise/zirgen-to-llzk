@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/MLIRContext.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zml {
 

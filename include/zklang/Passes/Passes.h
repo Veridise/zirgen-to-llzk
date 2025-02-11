@@ -2,13 +2,13 @@
 
 #pragma once
 
-#include "llzk/Dialect/LLZK/IR/Dialect.h"
-#include "llzk/Dialect/LLZK/IR/Ops.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
-#include "zklang/Dialect/ZML/IR/Dialect.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
+#include <llzk/Dialect/LLZK/IR/Dialect.h>
+#include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/Pass/Pass.h>
+#include <zklang/Dialect/ZML/IR/Dialect.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
 
 namespace zklang {
 
@@ -23,6 +23,6 @@ OpPass<mlir::ModuleOp> createInjectLlzkModAttrsPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#include "zklang/Passes/Passes.h.inc"
+#include <zklang/Passes/Passes.h.inc>
 
 } // namespace zklang

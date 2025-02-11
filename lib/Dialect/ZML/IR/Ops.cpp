@@ -1,11 +1,9 @@
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "llzk/Dialect/LLZK/IR/Ops.h"
-#include "zklang/Dialect/ZML/IR/Types.h"
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
+#include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
@@ -15,14 +13,16 @@
 #include <mlir/Interfaces/FunctionImplementation.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/IR/Types.h>
 
 // TableGen'd implementation files
 #define GET_OP_CLASSES
-#include "zklang/Dialect/ZML/IR/OpInterfaces.cpp.inc"
+#include <zklang/Dialect/ZML/IR/OpInterfaces.cpp.inc>
 
 // TableGen'd implementation files
 #define GET_OP_CLASSES
-#include "zklang/Dialect/ZML/IR/Ops.cpp.inc"
+#include <zklang/Dialect/ZML/IR/Ops.cpp.inc>
 
 namespace zml {
 

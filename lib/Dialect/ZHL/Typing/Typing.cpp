@@ -1,5 +1,3 @@
-#include "zklang/Dialect/ZHL/Typing/Typing.h"
-#include "zklang/Dialect/ZHL/Typing/Rules.h"
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/StringMap.h>
@@ -7,7 +5,9 @@
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/OpBindings.h>
+#include <zklang/Dialect/ZHL/Typing/Rules.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZHL/Typing/Typing.h>
 
 using namespace mlir;
 using namespace zirgen::Zhl;

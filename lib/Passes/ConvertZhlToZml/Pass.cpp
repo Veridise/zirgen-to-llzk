@@ -1,14 +1,5 @@
 // Copyright 2024 Veridise, Inc.
 
-#include "zklang/Passes/ConvertZhlToZml/Pass.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZHL/Typing/Analysis.h"
-#include "zklang/Dialect/ZML/IR/Dialect.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/Typing/ZMLTypeConverter.h"
-#include "zklang/Passes/ConvertZhlToZml/Patterns.h"
 #include <cassert>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
@@ -18,9 +9,18 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/OperationSupport.h>
+#include <mlir/IR/PatternMatch.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <mlir/Transforms/DialectConversion.h>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZHL/Typing/Analysis.h>
+#include <zklang/Dialect/ZML/IR/Dialect.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
+#include <zklang/Passes/ConvertZhlToZml/Pass.h>
+#include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
 using namespace mlir;
 

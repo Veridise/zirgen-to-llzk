@@ -1,5 +1,3 @@
-#include "zklang/Dialect/ZHL/Typing/Rules.h"
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <mlir/Support/LogicalResult.h>
 #include <numeric>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
@@ -8,6 +6,8 @@
 #include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
+#include <zklang/Dialect/ZHL/Typing/Rules.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 
 namespace zhl {

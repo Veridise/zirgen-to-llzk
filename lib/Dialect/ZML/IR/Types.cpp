@@ -1,6 +1,3 @@
-#include "zklang/Dialect/ZML/IR/Types.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/STLFunctionalExtras.h>
@@ -8,6 +5,9 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/IR/Types.h>
 
 namespace zml {
 

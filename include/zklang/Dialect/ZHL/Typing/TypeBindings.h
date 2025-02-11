@@ -1,15 +1,15 @@
 #pragma once
 
-#include "mlir/IR/Diagnostics.h"
-#include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <deque>
 #include <functional>
+#include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
 #include <map>
 #include <memory>
 #include <mlir/IR/Builders.h>
+#include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
