@@ -16,6 +16,31 @@ BAZELFLAGS=
 ZKLANG_FLAGS=
 DERIVATION='.?submodules=1#withGCC'
 
+mode=${1:-""}
+
+if [ $mode == 'nix' ]; then
+
+function build_zklang {
+  nix build "$DERIVATION"
+}
+
+function run_zklang {
+  nix run "$DERIVATION" -- $@
+}
+
+else 
+
+function build_zklang {
+  cmake --build build/Debug --target zklang
+}
+
+function run_zklang {
+  build/Debug/bin/zklang $@
+}
+
+fi
+
+
 mkdir -p $DEST
 
 function die {
@@ -28,9 +53,6 @@ function zir_files {
   find $workdir -name '*.zir'
 }
 
-function build_zklang {
-  nix build "$DERIVATION"
-}
 
 function build_zir {
   zir=$(realpath $1)
@@ -42,7 +64,7 @@ function build_zir {
   stderr=$dst/$name.stderr
   errcode=$dst/$name.errcode
   echo "[=] Building $name..."
-  nix run "$DERIVATION" -- -o $mlir_out -I $workdir $zir $ZKLANG_FLAGS > $stdout 2> $stderr
+  run_zklang -o $mlir_out -I $workdir $zir $ZKLANG_FLAGS > $stdout 2> $stderr
   # tail -F $stderr --pid=$!
   echo $? > $errcode
   echo " ============= $name =============="
@@ -67,5 +89,5 @@ function build_project {
 
 # Build first to avoid filling run output with build logs
 build_zklang || die "Failed to build zklang!"
-#build_project "rv32im-v2" $CIRCUIT_PATH $DEST
+build_project "rv32im-v2" $CIRCUIT_PATH $DEST
 build_project keccak2 $KECCAK_PATH $DEST
