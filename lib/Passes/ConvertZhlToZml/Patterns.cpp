@@ -602,7 +602,7 @@ mlir::LogicalResult ZhlSubscriptLowering::matchAndRewrite(
 
   Type concreteArrayType = zml::materializeTypeBinding(getContext(), *concreteArrayTypeBinding);
   auto arrayVal = getCastedValue(adaptor.getArray(), *arrayBinding, rewriter, concreteArrayType);
-  auto Val = Zmir::ComponentType::Val(getContext());
+  auto Val = ComponentType::Val(getContext());
   auto elementVal = getCastedValue(adaptor.getElement(), *elementBinding, rewriter, Val);
 
   rewriter.replaceOpWithNewOp<zml::ReadArrayOp>(

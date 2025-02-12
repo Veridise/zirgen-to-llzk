@@ -73,35 +73,31 @@ Value storeAndLoadSlot(
   if (compSlotIVs.empty()) {
     assert(slotType == value.getType() && "result of construction and slot type must be the same");
     // Write the construction in a temporary
-    builder.create<Zmir::WriteFieldOp>(loc, self, slotName, value);
+    builder.create<WriteFieldOp>(loc, self, slotName, value);
 
     // Read the temporary back to a SSA value
-    return builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
+    return builder.create<ReadFieldOp>(loc, slotType, self, slotName);
 
   } else {
     auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size());
-    auto unwrappedType = Zmir::materializeTypeBinding(builder.getContext(), unwrappedBinding);
-    if (unwrappedType != value.getType()) {
-      llvm::dbgs() << "unwrappedType = " << unwrappedType
-                   << "\nvalue.getType() = " << value.getType() << "\n";
-    }
+    auto unwrappedType = materializeTypeBinding(builder.getContext(), unwrappedBinding);
     assert(
         unwrappedType == value.getType() &&
         "result of construction and slot inner array type must be the same"
     );
     // Read the array from the slot field
-    auto arrayData = builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
+    auto arrayData = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
     // Write into the array the value
-    builder.create<Zmir::WriteArrayOp>(loc, arrayData, compSlotIVs, value, true);
+    builder.create<WriteArrayOp>(loc, arrayData, compSlotIVs, value, true);
 
     // Write the array back into the field
-    builder.create<Zmir::WriteFieldOp>(loc, self, slotName, arrayData);
+    builder.create<WriteFieldOp>(loc, self, slotName, arrayData);
 
     // Read the array back to a SSA value
-    auto arrayDataBis = builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
+    auto arrayDataBis = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
 
     // Read the value we wrote into the array back to a SSA value
-    return builder.create<Zmir::ReadArrayOp>(loc, value.getType(), arrayDataBis, compSlotIVs);
+    return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, compSlotIVs);
   }
 }
 

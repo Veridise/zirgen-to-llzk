@@ -78,7 +78,6 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
     assert(t.getParams().size() == 2);
     auto typeAttr = t.getParams()[0];
     auto sizeAttr = t.getParams()[1];
-    llvm::dbgs() << "t = " << t << "\n";
 
     auto inner = convertType(deduceArrayType(typeAttr));
     if (auto innerArr = mlir::dyn_cast<llzk::ArrayType>(inner)) {
@@ -96,7 +95,6 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
       newDims.insert(newDims.end(), innerDimensionSizes.begin(), innerDimensionSizes.end());
       return llzk::ArrayType::get(innerArr.getElementType(), newDims);
     }
-    // TODO(LLZK-173) Group together arrays of arrays
     if (arrayLenIsKnown(sizeAttr)) {
       return llzk::ArrayType::get(inner, {getSize(sizeAttr)});
     } else {

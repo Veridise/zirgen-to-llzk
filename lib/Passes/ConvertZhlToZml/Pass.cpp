@@ -60,8 +60,8 @@ void ConvertZhlToZmlPass::runOnOperation() {
   mlir::ConversionTarget target(*ctx);
   target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
   target.addLegalDialect<
-      zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, mlir::scf::SCFDialect,
-      mlir::index::IndexDialect, mlir::arith::ArithDialect>();
+      ZMLDialect, mlir::func::FuncDialect, mlir::scf::SCFDialect, mlir::index::IndexDialect,
+      mlir::arith::ArithDialect>();
 
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
