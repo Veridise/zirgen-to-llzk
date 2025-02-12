@@ -1,22 +1,22 @@
 
 // Copyright 2024 Veridise, Inc.
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/Transforms/PassDetail.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/SymbolTable.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Transforms/PassDetail.h>
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
 namespace {
 
@@ -212,11 +212,11 @@ class SplitComponentBodyPass : public SplitComponentBodyBase<SplitComponentBodyP
     // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
+        ZMLDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
         arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
     target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
-    target.addIllegalOp<Zmir::ComponentOp>();
+    target.addIllegalOp<ComponentOp>();
 
     // Return types may change so we need to adjust the return ops
     target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp ret) {
@@ -241,4 +241,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createSplitComponentBodyPass() {
   return std::make_unique<SplitComponentBodyPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

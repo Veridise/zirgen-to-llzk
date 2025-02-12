@@ -1,11 +1,9 @@
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "llzk/Dialect/LLZK/IR/Ops.h"
-#include "zklang/Dialect/ZML/IR/Types.h"
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
+#include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
@@ -15,16 +13,18 @@
 #include <mlir/Interfaces/FunctionImplementation.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/IR/Types.h>
 
 // TableGen'd implementation files
 #define GET_OP_CLASSES
-#include "zklang/Dialect/ZML/IR/OpInterfaces.cpp.inc"
+#include <zklang/Dialect/ZML/IR/OpInterfaces.cpp.inc>
 
 // TableGen'd implementation files
 #define GET_OP_CLASSES
-#include "zklang/Dialect/ZML/IR/Ops.cpp.inc"
+#include <zklang/Dialect/ZML/IR/Ops.cpp.inc>
 
-namespace zkc::Zmir {
+namespace zml {
 
 void SelfOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, mlir::Type compType,
@@ -145,7 +145,6 @@ void SplitComponentOp::build(
 
 template <typename CompOp> mlir::Type getSuperType(CompOp &op) {
   if (op.isRoot()) {
-    llvm::dbgs() << "Super type of root is null\n";
     return nullptr;
   }
   auto result = op.lookupFieldType(op.getSuperFieldName());
@@ -167,12 +166,12 @@ template <typename CompOp> mlir::Type getType(CompOp &op) {
   }
 }
 
-mlir::Type ComponentOp::getType() { return ::zkc::Zmir::getType(*this); }
-mlir::Type SplitComponentOp::getType() { return ::zkc::Zmir::getType(*this); }
+mlir::Type ComponentOp::getType() { return ::zml::getType(*this); }
+mlir::Type SplitComponentOp::getType() { return ::zml::getType(*this); }
 
 template <typename CompOp> mlir::FailureOr<mlir::Type> getSuperTypeCommon(CompOp &op) {
   if (op.isRoot()) {
-    if (auto comp = mlir::dyn_cast<zkc::Zmir::ComponentType>(op.getType())) {
+    if (auto comp = mlir::dyn_cast<zml::ComponentType>(op.getType())) {
       return comp;
     } else {
       return mlir::failure();
@@ -285,8 +284,8 @@ mlir::LogicalResult GetGlobalOp::inferReturnTypes(
     llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
 ) {
   // TODO
-  inferredReturnTypes.push_back(ValType::get(ctx));
+  inferredReturnTypes.push_back(ComponentType::Val(ctx));
   return mlir::success();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

@@ -1,0 +1,6 @@
+// RUN: zklang -o - %s 
+
+component Top() {
+  r := [1];
+  r[0] = 1;
+}

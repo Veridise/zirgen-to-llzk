@@ -1,0 +1,13 @@
+// RUN: zklang -o - %s 
+
+component B<T: Type>(v: Val) {
+  v
+}
+
+component A<T: Type>() {
+  a := 1;
+  b := {
+    x := B<T>(a);
+    x
+  };
+}

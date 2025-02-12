@@ -1,14 +1,14 @@
 #pragma once
 
-#include "llzk/Dialect/LLZK/IR/Ops.h"
-#include "mlir/Transforms/DialectConversion.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
+#include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Transforms/DialectConversion.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
 
-namespace zkc::Zmir {
+namespace zml {
 
 class UpdateScfForOpTypes : public mlir::OpConversionPattern<mlir::scf::ForOp> {
 public:
@@ -44,12 +44,12 @@ public:
 };
 
 /// Lowers literal Vals
-class LitValOpLowering : public mlir::OpConversionPattern<Zmir::LitValOp> {
+class LitValOpLowering : public mlir::OpConversionPattern<LitValOp> {
 public:
-  using OpConversionPattern<Zmir::LitValOp>::OpConversionPattern;
+  using OpConversionPattern<LitValOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Zmir::LitValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(LitValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class ComponentLowering : public mlir::OpConversionPattern<SplitComponentOp> {
@@ -105,23 +105,22 @@ public:
       const override;
 };
 
-class WriteFieldOpLowering : public mlir::OpConversionPattern<Zmir::WriteFieldOp> {
+class WriteFieldOpLowering : public mlir::OpConversionPattern<WriteFieldOp> {
 
 public:
-  using OpConversionPattern<Zmir::WriteFieldOp>::OpConversionPattern;
+  using OpConversionPattern<WriteFieldOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Zmir::WriteFieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(WriteFieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
-class RemoveConstructorRefOp : public mlir::OpConversionPattern<Zmir::ConstructorRefOp> {
+class RemoveConstructorRefOp : public mlir::OpConversionPattern<ConstructorRefOp> {
 
 public:
-  using OpConversionPattern<Zmir::ConstructorRefOp>::OpConversionPattern;
+  using OpConversionPattern<ConstructorRefOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Zmir::ConstructorRefOp, OpAdaptor, mlir::ConversionPatternRewriter &)
-      const override;
+  matchAndRewrite(ConstructorRefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 template <typename FromOp, typename ToOp>
@@ -138,13 +137,13 @@ public:
   }
 };
 
-using LowerBitAnd = LowerArithBuiltIns<Zmir::BitAndOp, llzk::AndFeltOp>;
-using LowerAdd = LowerArithBuiltIns<Zmir::AddOp, llzk::AddFeltOp>;
-using LowerSub = LowerArithBuiltIns<Zmir::SubOp, llzk::SubFeltOp>;
-using LowerMul = LowerArithBuiltIns<Zmir::MulOp, llzk::MulFeltOp>;
-using LowerMod = LowerArithBuiltIns<Zmir::ModOp, llzk::ModFeltOp>;
-using LowerInv = LowerArithBuiltIns<Zmir::InvOp, llzk::InvFeltOp>;
-using LowerNeg = LowerArithBuiltIns<Zmir::NegOp, llzk::NegFeltOp>;
+using LowerBitAnd = LowerArithBuiltIns<BitAndOp, llzk::AndFeltOp>;
+using LowerAdd = LowerArithBuiltIns<AddOp, llzk::AddFeltOp>;
+using LowerSub = LowerArithBuiltIns<SubOp, llzk::SubFeltOp>;
+using LowerMul = LowerArithBuiltIns<MulOp, llzk::MulFeltOp>;
+using LowerMod = LowerArithBuiltIns<ModOp, llzk::ModFeltOp>;
+using LowerInv = LowerArithBuiltIns<InvOp, llzk::InvFeltOp>;
+using LowerNeg = LowerArithBuiltIns<NegOp, llzk::NegFeltOp>;
 
 class LowerIsz : public mlir::OpConversionPattern<IsZeroOp> {
 public:
@@ -282,4 +281,4 @@ public:
   matchAndRewrite(LoadValParamOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
-} // namespace zkc::Zmir
+} // namespace zml

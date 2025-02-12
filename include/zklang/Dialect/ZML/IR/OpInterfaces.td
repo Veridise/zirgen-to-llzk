@@ -1,5 +1,5 @@
-#ifndef ZMIR_OP_INTERFACES
-#define ZMIR_OP_INTERFACES
+#ifndef ZML_OP_INTERFACES
+#define ZML_OP_INTERFACES
 
 include "mlir/IR/Interfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
@@ -11,7 +11,7 @@ class DefinesFunc<string ifaceName, string funcName>
   let description =
       "Interface for accesing a function named "#funcName#" defined inside the "
       "implementor";
-  let cppNamespace = "::zkc::Zmir";
+  let cppNamespace = "::zml";
 
   string capitalizedName;
   string ifaceMethodName;
@@ -50,7 +50,7 @@ def ComponentInterface
   let description =
       "Abstracts the public API of a component op from the implementations";
 
-  let cppNamespace = "::zkc::Zmir";
+  let cppNamespace = "::zml";
   let methods =
       [InterfaceMethod<"Returns the type of the component", "::mlir::Type",
                        "getType", (ins)>,
@@ -79,4 +79,4 @@ def ComponentInterface
   }];
 }
 
-#endif // ZKIR_OP_INTERFACES
+#endif // ZML_OP_INTERFACES

@@ -1,14 +1,5 @@
 // Copyright 2024 Veridise, Inc.
 
-#include "zklang/Passes/ConvertZhlToZml/Pass.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZHL/Typing/Analysis.h"
-#include "zklang/Dialect/ZML/IR/Dialect.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/Typing/ZMIRTypeConverter.h"
-#include "zklang/Passes/ConvertZhlToZml/Patterns.h"
 #include <cassert>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
@@ -18,26 +9,39 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/OperationSupport.h>
+#include <mlir/IR/PatternMatch.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <mlir/Transforms/DialectConversion.h>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZHL/Typing/Analysis.h>
+#include <zklang/Dialect/ZML/IR/Dialect.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
+#include <zklang/Passes/ConvertZhlToZml/Pass.h>
+#include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
 using namespace mlir;
 
-namespace zkc {
+namespace zklang {
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZhlToZmirPass() {
-  return std::make_unique<ConvertZhlToZmirPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZhlToZmlPass() {
+  return std::make_unique<zml::ConvertZhlToZmlPass>();
 }
 
-void ConvertZhlToZmirPass::runOnOperation() {
+} // namespace zklang
+
+namespace zml {
+
+void ConvertZhlToZmlPass::runOnOperation() {
   auto &typeAnalysis = getAnalysis<zhl::ZIRTypeAnalysis>();
   mlir::SmallVector<mlir::Attribute> builtinOverrideSet;
   mlir::ModuleOp module = getOperation();
   mlir::MLIRContext *ctx = module->getContext();
 
   // Init patterns for this transformation
-  Zmir::ZMIRTypeConverter typeConverter;
+  ZMLTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);
   patterns.add<
       ZhlGlobalRemoval, ZhlDefineLowering, ZhlParameterLowering, ZhlConstructLowering,
@@ -58,6 +62,7 @@ void ConvertZhlToZmirPass::runOnOperation() {
   target.addLegalDialect<
       zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, mlir::scf::SCFDialect,
       mlir::index::IndexDialect, mlir::arith::ArithDialect>();
+
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
   // Call partialTransformation
@@ -69,4 +74,4 @@ void ConvertZhlToZmirPass::runOnOperation() {
   }
 }
 
-} // namespace zkc
+} // namespace zml

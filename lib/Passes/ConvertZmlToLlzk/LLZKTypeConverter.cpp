@@ -1,19 +1,16 @@
 
-#include "zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h"
-#include "llzk/Dialect/LLZK/IR/Types.h"
-#include "zklang/Dialect/ZML/IR/Types.h"
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/Support/FileSystem.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
 #include <optional>
-
-using namespace zkc::Zmir;
-using namespace zkc;
+#include <zklang/Dialect/ZML/IR/Types.h>
+#include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
 
 std::optional<mlir::Value> unrealizedCastMaterialization(
     mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs, mlir::Location loc
@@ -27,7 +24,6 @@ mlir::Type deduceArrayType(mlir::Attribute attr) {
   if (auto typeAttr = mlir::dyn_cast<mlir::TypeAttr>(attr)) {
     return typeAttr.getValue();
   }
-  llvm::dbgs() << "attr = " << attr << "\n";
   assert(false && "Failed to convert array type");
   return nullptr;
 }
@@ -56,9 +52,6 @@ void convertParamAttrs(
 
 mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   auto sym = mlir::dyn_cast<mlir::SymbolRefAttr>(attr);
-  if (!sym) {
-    llvm::dbgs() << "attr = " << attr << "\n";
-  }
   assert(sym && "was expecting a symbol");
   return sym;
 }
@@ -70,7 +63,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
 
   // Conversions from ZML to LLZK
 
-  addConversion([&](Zmir::ComponentType t) -> mlir::Type {
+  addConversion([&](zml::ComponentType t) -> mlir::Type {
     llvm::SmallVector<mlir::Attribute> convertedAttrs;
     convertParamAttrs(t.getParams(), convertedAttrs, *this);
     return llzk::StructType::get(
@@ -78,7 +71,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
     );
   });
 
-  addConversion([&](Zmir::ComponentType t) -> std::optional<mlir::Type> {
+  addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {
     if (t.getName().getValue() != "Array") {
       return std::nullopt;
     }
@@ -111,14 +104,14 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
     }
   });
 
-  addConversion([](Zmir::ComponentType t) -> std::optional<mlir::Type> {
+  addConversion([](zml::ComponentType t) -> std::optional<mlir::Type> {
     if (t.getName().getValue() == "String") {
       return llzk::StringType::get(t.getContext());
     }
     return std::nullopt;
   });
 
-  addConversion([&](Zmir::ComponentType t) -> std::optional<mlir::Type> {
+  addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {
     if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
         t.getBuiltin()) {
       return llzk::FeltType::get(t.getContext());
@@ -126,12 +119,12 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
     return std::nullopt;
   });
 
-  addConversion([&](Zmir::VarArgsType t) {
+  addConversion([&](zml::VarArgsType t) {
     std::vector<int64_t> shape = {mlir::ShapedType::kDynamic};
     return llzk::ArrayType::get(convertType(t.getInner()), shape);
   });
 
-  addConversion([](Zmir::TypeVarType t) {
+  addConversion([](zml::TypeVarType t) {
     return llzk::TypeVarType::get(t.getContext(), t.getName());
   });
 

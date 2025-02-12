@@ -1,0 +1,14 @@
+// RUN: zklang -o - %s 
+
+component C() {
+  x := 1;
+}
+
+component A() {
+  c := C();
+  b := B();
+}
+
+component B() {
+  x := 1;
+}

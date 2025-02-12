@@ -1,7 +1,5 @@
 #pragma once
 
-#include "zklang/Dialect/ZML/IR/OpInterfaces.h" // IWYU pragma: keep
-#include "zklang/Dialect/ZML/IR/Types.h"        // IWYU pragma: keep
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
@@ -16,14 +14,16 @@
 #include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
+#include <zklang/Dialect/ZML/IR/OpInterfaces.h> // IWYU pragma: keep
+#include <zklang/Dialect/ZML/IR/Types.h>        // IWYU pragma: keep
 
-namespace zkc::Zmir {
+namespace zml {
 
 /// Tag for ComponentOp build method
 struct IsBuiltIn {};
 
-} // namespace zkc::Zmir
+} // namespace zml
 
 // Include TableGen'd declarations
 #define GET_OP_CLASSES
-#include "zklang/Dialect/ZML/IR/Ops.h.inc"
+#include <zklang/Dialect/ZML/IR/Ops.h.inc>

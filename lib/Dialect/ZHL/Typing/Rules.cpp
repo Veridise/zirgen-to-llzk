@@ -1,5 +1,3 @@
-#include "zklang/Dialect/ZHL/Typing/Rules.h"
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <mlir/Support/LogicalResult.h>
 #include <numeric>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
@@ -8,6 +6,8 @@
 #include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
+#include <zklang/Dialect/ZHL/Typing/Rules.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 
 namespace zhl {
@@ -64,7 +64,7 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       Meaning, any builtin that was not overriden and that will lower to a llzk operation that
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
-  if (operands[0].isBuiltin() && zkc::Zmir::isBuiltinDontNeedAlloc(operands[0].getName())) {
+  if (operands[0].isBuiltin() && zml::isBuiltinDontNeedAlloc(operands[0].getName())) {
     return operands[0];
   }
   auto component = operands[0];

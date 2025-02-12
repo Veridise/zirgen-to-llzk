@@ -1,10 +1,10 @@
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
 #include <cassert>
 #include <iterator>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 using namespace zhl;
 using namespace mlir;

@@ -1,0 +1,10 @@
+// RUN: zklang -o - %s 
+
+component Foo<N: Val>() {
+  0..N
+}
+
+component Bar() {
+  f := Foo<2>();
+  f[1]
+}

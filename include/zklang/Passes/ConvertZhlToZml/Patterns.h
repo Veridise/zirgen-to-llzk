@@ -1,19 +1,19 @@
 #pragma once
 
-#include "mlir/Transforms/DialectConversion.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZHL/Typing/Analysis.h"
-#include "zklang/Dialect/ZHL/Typing/TypeBindings.h"
-#include "zklang/Passes/ConvertZhlToZml/Helpers.h"
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <mlir/Transforms/DialectConversion.h>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZHL/Typing/Analysis.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
+#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 
-namespace zkc {
+namespace zml {
 
 template <typename Op> class ZhlOpLoweringPattern : public mlir::OpConversionPattern<Op> {
 public:
@@ -107,7 +107,7 @@ public:
       mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
       mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
   ) const {
-    auto materialized = Zmir::materializeTypeBinding(builder.getContext(), binding);
+    auto materialized = materializeTypeBinding(builder.getContext(), binding);
     assert(materialized);
     if (value.getType() == materialized) {
       return value;
@@ -119,7 +119,7 @@ public:
 
     mlir::Value result = cast.getResult(0);
     if (super && super != materialized) {
-      auto coerce = builder.create<Zmir::SuperCoerceOp>(value.getLoc(), super, result);
+      auto coerce = builder.create<SuperCoerceOp>(value.getLoc(), super, result);
       generatedOps.push_back(coerce.getOperation());
       result = coerce;
     }
@@ -136,7 +136,7 @@ public:
 
   mlir::FailureOr<CtorCallBuilder>
   makeCtorCallBuilder(mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder) const {
-    auto selfOp = op->getParentOfType<Zmir::SelfOp>();
+    auto selfOp = op->getParentOfType<SelfOp>();
     if (!selfOp) {
       return op->emitOpError() << "is not within a self region";
     }
@@ -408,4 +408,4 @@ public:
       const override;
 };
 
-} // namespace zkc
+} // namespace zml

@@ -12,15 +12,15 @@ include "mlir/IR/CommonAttrConstraints.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "OpInterfaces.td"
 
-class ZmirOp<string mnemonic, list<Trait> traits = []>
-    : Op<ZmirDialect, mnemonic, traits> {}
+class ZMLOp<string mnemonic, list<Trait> traits = []>
+    : Op<ZMLDialect, mnemonic, traits> {}
 
 class ComponentOpBase<string prefix, string bodyFuncName,
                       string constrainFuncName>
-    : ZmirOp<prefix#"component", [HasParent<"::mlir::ModuleOp">, Symbol,
-                                  SymbolTable, IsolatedFromAbove,
-                                  GraphRegionNoTerminator, OpAsmOpInterface,
-                                  ComponentInterface]> {
+    : ZMLOp<prefix#"component", [HasParent<"::mlir::ModuleOp">, Symbol,
+                                 SymbolTable, IsolatedFromAbove,
+                                 GraphRegionNoTerminator, OpAsmOpInterface,
+                                 ComponentInterface]> {
   let summary = prefix#"component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
       UnitAttr:$generic, UnitAttr:$builtin,
@@ -30,10 +30,10 @@ class ComponentOpBase<string prefix, string bodyFuncName,
   let builders = [OpBuilder<(ins "::mlir::StringRef":$name,
                       "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
-                      "::zkc::Zmir::IsBuiltIn":$tag)>,
+                      "::zml::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
                       "::mlir::ArrayRef<mlir::StringRef>":$params,
-                      "::zkc::Zmir::IsBuiltIn":$tag)>,
+                      "::zml::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
                       "::mlir::ArrayRef<mlir::StringRef>":$params,
                       "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>];
@@ -64,7 +64,7 @@ def ComponentOp : ComponentOpBase<"", "body", "body"> {}
 
 def SplitComponentOp : ComponentOpBase<"split_", "compute", "constrain"> {}
 
-def SelfOp : ZmirOp<"self", [NoTerminator]> {
+def SelfOp : ZMLOp<"self", [NoTerminator]> {
   let summary = "current component scope";
   let description = "Returns the current component after executing its content";
 
@@ -94,7 +94,7 @@ def SelfOp : ZmirOp<"self", [NoTerminator]> {
 //  ConstructorRefOp
 //===----------------------------------------------------------------------===//
 
-def ConstructorRefOp : ZmirOp<"constructor", [Pure]> {
+def ConstructorRefOp : ZMLOp<"constructor", [Pure]> {
   let summary = "reference to a component constructor";
   let description = [{
     Returns a function value for the constructor function of a component.
@@ -125,9 +125,9 @@ def ConstructorRefOp : ZmirOp<"constructor", [Pure]> {
   let hasVerifier = 1;
 }
 
-def FieldDefOp : ZmirOp<"field", [HasParent<"::zkc::Zmir::ComponentOp, "
-                                            "::zkc::Zmir::SplitComponentOp">,
-                                  Symbol]> {
+def FieldDefOp : ZMLOp<"field", [HasParent<"::zml::ComponentOp, "
+                                           "::zml::SplitComponentOp">,
+                                 Symbol]> {
   let summary = "component field definition";
   let arguments = (ins SymbolNameAttr:$sym_name,
       TypeAttrOf<TypeVarOr<Component>>:$type);
@@ -138,7 +138,7 @@ def FieldDefOp : ZmirOp<"field", [HasParent<"::zkc::Zmir::ComponentOp, "
 }
 
 def ReadFieldOp
-    : ZmirOp<"read_field", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    : ZMLOp<"read_field", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let summary = "reads the value of a field";
   let description = [{
     Reads the value of a field in a component.
@@ -154,8 +154,7 @@ def ReadFieldOp
 }
 
 def WriteFieldOp
-    : ZmirOp<
-          "write_field", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    : ZMLOp<"write_field", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let summary = "writes a value into a field";
   let description = [{
     Writes a value into a field in a component.
@@ -169,7 +168,7 @@ def WriteFieldOp
   }];
 }
 
-def SuperCoerceOp : ZmirOp<"super_coerce"> {
+def SuperCoerceOp : ZMLOp<"super_coerce"> {
   let summary =
       "transitively reads the super field until the target type is reached";
 
@@ -180,20 +179,20 @@ def SuperCoerceOp : ZmirOp<"super_coerce"> {
       "$component attr-dict `:` type($component) `->` type($val)";
 }
 
-def NopOp : ZmirOp<"nop", [Pure]> {
+def NopOp : ZMLOp<"nop", [Pure]> {
 
-  let arguments = (ins Variadic<AnyZmirType>:$ins);
-  let results = (outs Variadic<AnyZmirType>:$outs);
+  let arguments = (ins Variadic<AnyZMLType>:$ins);
+  let results = (outs Variadic<AnyZMLType>:$outs);
 
   let assemblyFormat = "($ins `:` type($ins)^ `->`)? type($outs) attr-dict";
 }
 
-def GlobalDefOp : ZmirOp<"global", [HasParent<"::mlir::ModuleOp">]> {
+def GlobalDefOp : ZMLOp<"global", [HasParent<"::mlir::ModuleOp">]> {
   let summary = "defines a global component";
   let description = "Defines a global component and binds it to a symbol.";
 
-  let arguments = (ins SymbolNameAttr:$sym_name, AnyZmirType:$value,
-      TypeAttrOf<AnyZmirType>:$type);
+  let arguments = (ins SymbolNameAttr:$sym_name, AnyZMLType:$value,
+      TypeAttrOf<AnyZMLType>:$type);
 
   let assemblyFormat = [{
     $sym_name `=` $value `:` $type `,` type($value) attr-dict
@@ -201,7 +200,7 @@ def GlobalDefOp : ZmirOp<"global", [HasParent<"::mlir::ModuleOp">]> {
 }
 
 def GetGlobalOp
-    : ZmirOp<"get_global", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+    : ZMLOp<"get_global", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
   let summary = "loads a global variable";
 
   let arguments = (ins SymbolNameAttr:$sym_name);
@@ -211,7 +210,7 @@ def GetGlobalOp
   }];
 }
 
-def ConstrainCallOp : ZmirOp<"constrain_call"> {
+def ConstrainCallOp : ZMLOp<"constrain_call"> {
   let summary = "calls the constrain function";
 
   let arguments = (ins TypeVarOr<Component>:$self, Variadic<AnyType>:$args);
@@ -220,7 +219,7 @@ def ConstrainCallOp : ZmirOp<"constrain_call"> {
   }];
 }
 
-def ConstrainOp : ZmirOp<"constrain"> {
+def ConstrainOp : ZMLOp<"constrain"> {
   let summary = "emits a constraint";
 
   let arguments = (ins TypeVarOr<Component>:$lhs, TypeVarOr<Component>:$rhs);
@@ -230,20 +229,10 @@ def ConstrainOp : ZmirOp<"constrain"> {
   }];
 }
 
-def NewArrayOp
-    : ZmirOp<"new_array",
-             [/*
-  TypesMatchWith<
-                 "operand types match result type", "result", "elements",
-                 "::llvm::SmallVector<::mlir::Type, 2>("
-                 "::llvm::cast<::zkc::Zmir::ArrayType>($_self).getSizeInt(), "
-                 "::llvm::cast<::zkc::Zmir::ArrayType>($_self).getInnerType())">
-
-*/
-]> {
+def NewArrayOp : ZMLOp<"new_array"> {
   let summary = "creates a new array with data";
 
-  let arguments = (ins Variadic<AnyZmirType>:$elements);
+  let arguments = (ins Variadic<AnyZMLType>:$elements);
   let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat =
@@ -252,7 +241,7 @@ def NewArrayOp
 
 def VarArgsTypeCheckPred : TypesMatchWith<"inner type matches input operands",
                                           "result", "elements", [{
-  ::llvm::cast<::zkc::Zmir::VarArgsType>($_self).getInner()
+  ::llvm::cast<::zml::VarArgsType>($_self).getInner()
 }],
                                           [{
   ([](::mlir::Type inner, mlir::OperandRange::type_range elems) {
@@ -263,16 +252,16 @@ def VarArgsTypeCheckPred : TypesMatchWith<"inner type matches input operands",
   })
 }]>;
 
-def VarArgsOp : ZmirOp<"vargs", [SameTypeOperands, VarArgsTypeCheckPred]> {
+def VarArgsOp : ZMLOp<"vargs", [SameTypeOperands, VarArgsTypeCheckPred]> {
   let summary = "groups variable arguments";
 
-  let arguments = (ins Variadic<AnyNonPendingZmirType>:$elements);
+  let arguments = (ins Variadic<AnyZMLType>:$elements);
   let results = (outs VarArgs:$result);
 
   let assemblyFormat = "$elements attr-dict `:` type($result)";
 }
 
-def AllocArrayOp : ZmirOp<"alloc_array"> {
+def AllocArrayOp : ZMLOp<"alloc_array"> {
   let summary = "creates a new empty array";
 
   let results = (outs Component:$result);
@@ -280,7 +269,7 @@ def AllocArrayOp : ZmirOp<"alloc_array"> {
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
-def ReadArrayOp : ZmirOp<"read_array"> {
+def ReadArrayOp : ZMLOp<"read_array"> {
   let summary = "read data from an array";
 
   let arguments = (ins TypeVarOr<Component>:$lvalue,
@@ -292,24 +281,24 @@ def ReadArrayOp : ZmirOp<"read_array"> {
   }];
 }
 
-def WriteArrayOp : ZmirOp<"write_array"> {
+def WriteArrayOp : ZMLOp<"write_array"> {
   let summary = "write data into an array";
 
   let arguments = (ins TypeVarOr<Component>:$array, Variadic<AnyType>:$indices,
-      AnyZmirType:$value, UnitAttr:$computeOnly);
+      AnyZMLType:$value, UnitAttr:$computeOnly);
   let assemblyFormat = [{
     $array `[` $indices `]` `=` $value attr-dict `:` type($array) `[` type($indices) `]` `,` type($value)
   }];
 }
 
-def GetArrayLenOp : ZmirOp<"array_len"> {
+def GetArrayLenOp : ZMLOp<"array_len"> {
   let summary = "returns the length of an array";
 
   let arguments = (ins TypeVarOr<Component>:$array);
   let results = (outs Index:$length);
 }
 
-def ValToIndexOp : ZmirOp<"toindex"> {
+def ValToIndexOp : ZMLOp<"toindex"> {
   let summary = "convert val to index";
 
   let arguments = (ins TypeVarOr<Component>:$val);
@@ -318,7 +307,7 @@ def ValToIndexOp : ZmirOp<"toindex"> {
   let assemblyFormat = "$val `:` type($val) attr-dict";
 }
 
-def ValToI1Op : ZmirOp<"tobool"> {
+def ValToI1Op : ZMLOp<"tobool"> {
   let summary = "convert val to i1";
 
   let arguments = (ins TypeVarOr<Component>:$val);
@@ -326,7 +315,7 @@ def ValToI1Op : ZmirOp<"tobool"> {
   let assemblyFormat = "$val `:` type($val) attr-dict";
 }
 
-def IndexToValOp : ZmirOp<"fromindex"> {
+def IndexToValOp : ZMLOp<"fromindex"> {
   let summary = "convert index to val";
 
   let arguments = (ins Index:$index);
@@ -334,7 +323,7 @@ def IndexToValOp : ZmirOp<"fromindex"> {
   let assemblyFormat = "$index `:` type($result) attr-dict";
 }
 
-def LitValOp : ZmirOp<"literal"> {
+def LitValOp : ZMLOp<"literal"> {
   let summary = "a literal value";
   let arguments = (ins UI64Attr:$value);
   let results = (outs Component:$val);
@@ -344,10 +333,10 @@ def LitValOp : ZmirOp<"literal"> {
   }];
 }
 
-def LitStrOp : ZmirOp<"string"> {
+def LitStrOp : ZMLOp<"string"> {
   let summary = "a literal value";
   let arguments = (ins StrAttr:$value);
-  let results = (outs String:$val);
+  let results = (outs Component:$val);
 
   let assemblyFormat = [{
     $value `:` type($val) attr-dict
@@ -355,7 +344,7 @@ def LitStrOp : ZmirOp<"string"> {
 }
 
 // Used for the last branch of an if-then-else lowered from a zhl.switch
-def AssertOp : ZmirOp<"assert"> {
+def AssertOp : ZMLOp<"assert"> {
   let summary = "assert";
   let arguments = (ins AnyType:$cond);
 
@@ -364,7 +353,7 @@ def AssertOp : ZmirOp<"assert"> {
     }];
 }
 
-def LoadValParamOp : ZmirOp<"load_param"> {
+def LoadValParamOp : ZMLOp<"load_param"> {
   let summary = "loads val from parameter";
   let arguments = (ins SymbolNameAttr:$param);
   let results = (outs Component:$val);
@@ -374,7 +363,7 @@ def LoadValParamOp : ZmirOp<"load_param"> {
 
 ///////////////////// Builtin Ops /////////////////////
 
-def InRangeOp : ZmirOp<"in_range", [Pure]> {
+def InRangeOp : ZMLOp<"in_range", [Pure]> {
   let summary = "checks if value is within range";
   let arguments = (ins Component:$low, Component:$mid, Component:$high);
   let results = (outs Component:$out);
@@ -383,11 +372,10 @@ def InRangeOp : ZmirOp<"in_range", [Pure]> {
 }
 
 class UnaryOp<string mnemonic, list<Trait> traits = []>
-    : ZmirOp<mnemonic, !listconcat([Pure /*, InferTypeOpAdaptor*/], traits)> {
+    : ZMLOp<mnemonic, !listconcat([Pure], traits)> {
   let arguments = (ins Component:$in);
   let results = (outs Component:$out);
   let assemblyFormat = [{ $in `:` type($in) `->` type($out) attr-dict }];
-  // let hasFolder = 1;
 }
 
 def IsZeroOp : UnaryOp<"isz"> {}
@@ -395,12 +383,11 @@ def NegOp : UnaryOp<"neg"> {}
 def InvOp : UnaryOp<"inv"> {}
 
 class BinaryOp<string mnemonic, list<Trait> traits = []>
-    : ZmirOp<mnemonic, !listconcat([Pure /*, InferTypeOpAdaptor*/], traits)> {
+    : ZMLOp<mnemonic, !listconcat([Pure], traits)> {
   let arguments = (ins Component:$lhs, Component:$rhs);
   let results = (outs Component:$out);
   let assemblyFormat =
       [{ $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `->` type($out) attr-dict }];
-  // let hasFolder = 1;
 }
 
 def AddOp : BinaryOp<"add", [Commutative]> {}

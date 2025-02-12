@@ -1,29 +1,25 @@
-#include "zklang/Frontends/ZIR/Driver.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/Passes.h"
-#include "zklang/Dialect/ZML/BuiltIns/BuiltIns.h"
-#include "llvm/Support/WithColor.h"
-
-#include "zirgen/dsl/lower.h"
-#include "zirgen/dsl/parser.h"
-/*#include "zirgen/dsl/passes/Passes.h"*/
-/*#include "zirgen/dsl/stats.h"*/
-#include "llzk/Dialect/LLZK/IR/Dialect.h"
-#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
-#include "mlir/Debug/CLOptionsSetup.h"
-#include "mlir/Transforms/Passes.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZHL/Typing/Passes.h"
-#include "zklang/Dialect/ZML/IR/Dialect.h"
-#include "zklang/Dialect/ZML/Transforms/Passes.h"
-#include "zklang/Passes/Passes.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/raw_ostream.h"
+#include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/StringExtras.h>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/InitLLVM.h>
+#include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/WithColor.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llzk/Dialect/LLZK/IR/Dialect.h>
+#include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
+#include <mlir/Debug/CLOptionsSetup.h>
+#include <mlir/Pass/PassManager.h>
 #include <mlir/Support/LogicalResult.h>
+#include <mlir/Transforms/Passes.h>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zirgen/dsl/lower.h>
+#include <zirgen/dsl/parser.h>
+#include <zklang/Dialect/ZHL/Typing/Passes.h>
+#include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
+#include <zklang/Dialect/ZML/IR/Dialect.h>
+#include <zklang/Dialect/ZML/Transforms/Passes.h>
+#include <zklang/Frontends/ZIR/Driver.h>
+#include <zklang/Passes/Passes.h>
 
 #define DEBUG_TYPE "zir-driver"
 
@@ -86,7 +82,7 @@ static cl::opt<bool, true> DontReconcileCasts(
 struct ZirFrontendDialects {
 
   ZirFrontendDialects() {
-    registry.insert<zkc::Zmir::ZmirDialect>();
+    registry.insert<zml::ZMLDialect>();
     registry.insert<zirgen::Zhl::ZhlDialect>();
     registry.insert<llzk::LLZKDialect>();
   }
@@ -147,11 +143,11 @@ Driver::Driver(int &argc, char **&argv)
 void Driver::configureLoweringPipeline() {
   pm.clear();
   if (emitAction >= Action::PrintLlzk || emitAction == Action::None) {
-    pm.addPass(zkc::createInjectLlzkModAttrsPass());
+    pm.addPass(zklang::createInjectLlzkModAttrsPass());
   }
-  pm.addPass(zkc::createStripTestsPass());
-  pm.addPass(zkc::Zmir::createInjectBuiltInsPass());
-  pm.addPass(zkc::createConvertZhlToZmirPass());
+  pm.addPass(zklang::createStripTestsPass());
+  pm.addPass(zml::createInjectBuiltInsPass());
+  pm.addPass(zklang::createConvertZhlToZmlPass());
   if (emitAction != Action::PrintZML || !DontReconcileCastsFlag) {
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   }
@@ -160,22 +156,20 @@ void Driver::configureLoweringPipeline() {
     return;
   }
 
-  pm.nest<zkc::Zmir::ComponentOp>().nest<mlir::func::FuncOp>().addPass(
-      zkc::Zmir::createLowerBuiltInsPass()
-  );
-  pm.addPass(zkc::Zmir::createRemoveBuiltInsPass());
-  pm.addPass(zkc::Zmir::createSplitComponentBodyPass());
-  auto &splitCompPipeline = pm.nest<zkc::Zmir::SplitComponentOp>();
+  pm.nest<zml::ComponentOp>().nest<mlir::func::FuncOp>().addPass(zml::createLowerBuiltInsPass());
+  pm.addPass(zml::createRemoveBuiltInsPass());
+  pm.addPass(zml::createSplitComponentBodyPass());
+  auto &splitCompPipeline = pm.nest<zml::SplitComponentOp>();
   auto &splitCompFuncsPipeline = splitCompPipeline.nest<mlir::func::FuncOp>();
-  splitCompFuncsPipeline.addPass(zkc::Zmir::createRemoveIllegalComputeOpsPass());
-  splitCompFuncsPipeline.addPass(zkc::Zmir::createRemoveIllegalConstrainOpsPass());
+  splitCompFuncsPipeline.addPass(zml::createRemoveIllegalComputeOpsPass());
+  splitCompFuncsPipeline.addPass(zml::createRemoveIllegalConstrainOpsPass());
   splitCompFuncsPipeline.addPass(mlir::createCSEPass());
 
   if (emitAction == Action::OptimizeZML) {
     return;
   }
 
-  pm.addPass(zkc::createConvertZmlToLlzkPass());
+  pm.addPass(zklang::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
   if (!DontReconcileCastsFlag) {
     llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
@@ -185,7 +179,7 @@ void Driver::configureLoweringPipeline() {
 
 zirgen::dsl::ast::Module::Ptr Driver::parse() {
   zirgen::dsl::Parser parser(sourceManager);
-  parser.addPreamble(zkc::Zmir::zirPreamble);
+  parser.addPreamble(zml::zirPreamble);
   auto ast = parser.parseModule();
   if (!ast) {
     const auto &errors = parser.getErrors();

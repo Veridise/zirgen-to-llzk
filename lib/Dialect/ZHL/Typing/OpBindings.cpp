@@ -1,4 +1,4 @@
-#include "zklang/Dialect/ZHL/Typing/OpBindings.h"
+#include <zklang/Dialect/ZHL/Typing/OpBindings.h>
 
 using namespace mlir;
 using namespace llvm;

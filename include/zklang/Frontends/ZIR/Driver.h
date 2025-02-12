@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mlir/Support/LogicalResult.h>
+
 namespace zklang {
 
 /// ZIR frontend driver

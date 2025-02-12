@@ -3,9 +3,9 @@
 include "mlir/IR/AttrTypeBase.td"
 include "Dialect.td"
 
-class ZmirAttr<string name, string attrMnemonic, list<Trait> traits = []>
-    : AttrDef<ZmirDialect, name, traits> {
+class ZMLAttr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<ZMLDialect, name, traits> {
   let mnemonic = attrMnemonic;
 }
 
-def Variadic : ZmirAttr<"Variadic", "variadic"> {}
+def Variadic : ZMLAttr<"Variadic", "variadic"> {}

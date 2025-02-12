@@ -1,6 +1,3 @@
-#include "zklang/Passes/ConvertZhlToZml/Helpers.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/Typing/Materialize.h"
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
@@ -9,15 +6,17 @@
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
+#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 
 using namespace mlir;
-using namespace zkc::Zmir;
 using namespace zhl;
 
-namespace zkc {
+namespace zml {
 
 mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root) {
-  auto calleeComp = root.lookupSymbol<Zmir::ComponentInterface>(name);
+  auto calleeComp = root.lookupSymbol<ComponentInterface>(name);
   if (calleeComp) {
     return calleeComp;
   }
@@ -32,22 +31,22 @@ mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root) {
 }
 
 bool calleeIsBuiltin(mlir::Operation *op) {
-  if (auto zmlOp = mlir::dyn_cast<Zmir::ComponentInterface>(op)) {
+  if (auto zmlOp = mlir::dyn_cast<ComponentInterface>(op)) {
     return zmlOp.getBuiltin();
   }
   return false;
 }
 
 FlatSymbolRefAttr createSlot(
-    zhl::ComponentSlot *slot, OpBuilder &builder, Zmir::ComponentInterface component, Location loc
+    zhl::ComponentSlot *slot, OpBuilder &builder, ComponentInterface component, Location loc
 ) {
   mlir::SymbolTable st(component);
 
   auto desiredName = mlir::StringAttr::get(component.getContext(), slot->getSlotName());
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(&component.getRegion().front().front());
-  auto type = Zmir::materializeTypeBinding(builder.getContext(), slot->getBinding());
-  auto fieldDef = builder.create<Zmir::FieldDefOp>(loc, desiredName, TypeAttr::get(type));
+  auto type = materializeTypeBinding(builder.getContext(), slot->getBinding());
+  auto fieldDef = builder.create<FieldDefOp>(loc, desiredName, TypeAttr::get(type));
 
   // Insert the FieldDefOp into the symbol table to make sure it has an unique name within the
   // component
@@ -111,18 +110,18 @@ Value storeAndLoadArraySlot(
     OpBuilder &builder, mlir::ValueRange ivs, Value self
 ) {
   // Read the array from the slot field
-  auto arrayData = builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
+  auto arrayData = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
   // Write into the array the value
-  builder.create<Zmir::WriteArrayOp>(loc, arrayData, ivs, value, true);
+  builder.create<WriteArrayOp>(loc, arrayData, ivs, value, true);
 
   // Write the array back into the field
-  builder.create<Zmir::WriteFieldOp>(loc, self, slotName, arrayData);
+  builder.create<WriteFieldOp>(loc, self, slotName, arrayData);
 
   // Read the array back to a SSA value
-  auto arrayDataBis = builder.create<Zmir::ReadFieldOp>(loc, slotType, self, slotName);
+  auto arrayDataBis = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
 
   // Read the value we wrote into the array back to a SSA value
-  return builder.create<Zmir::ReadArrayOp>(loc, value.getType(), arrayDataBis, ivs);
+  return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, ivs);
 }
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
@@ -145,23 +144,22 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   if (!calleeComp) {
     return op->emitError() << "could not find component with name " << binding.getName();
   }
-  auto constructorType = Zmir::materializeTypeBindingConstructor(builder, binding);
+  auto constructorType = materializeTypeBindingConstructor(builder, binding);
 
   return CtorCallBuilder(
-      constructorType, binding, mlir::dyn_cast<Zmir::ComponentInterface>(calleeComp),
-      op->getParentOfType<Zmir::ComponentInterface>(), self, calleeIsBuiltin(calleeComp)
+      constructorType, binding, mlir::dyn_cast<ComponentInterface>(calleeComp),
+      op->getParentOfType<ComponentInterface>(), self, calleeIsBuiltin(calleeComp)
   );
 }
 
 mlir::Value
 CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args) {
   auto buildPrologue = [&](mlir::Value v) {
-    builder.create<Zmir::ConstrainCallOp>(loc, v, args);
+    builder.create<ConstrainCallOp>(loc, v, args);
     return v;
   };
 
-  auto ref =
-      builder.create<Zmir::ConstructorRefOp>(loc, ctorType, compBinding.getName(), isBuiltin);
+  auto ref = builder.create<ConstructorRefOp>(loc, ctorType, compBinding.getName(), isBuiltin);
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
 
@@ -175,7 +173,7 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
   // Create the field
   auto name = createSlot(compSlot, builder, callerComponentOp, loc);
 
-  auto slotType = Zmir::materializeTypeBinding(builder.getContext(), compSlotBinding);
+  auto slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
 
   compValue = storeAndLoadSlot(
       *compSlot, compValue, name, slotType, loc, callerComponentOp.getType(), builder, self
@@ -188,11 +186,11 @@ mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }
 
 const zhl::TypeBinding &CtorCallBuilder::getBinding() const { return compBinding; }
 
-Zmir::ComponentInterface CtorCallBuilder::getCalleeComp() const { return calleeComponentOp; }
+ComponentInterface CtorCallBuilder::getCalleeComp() const { return calleeComponentOp; }
 
 CtorCallBuilder::CtorCallBuilder(
-    mlir::FunctionType type, const zhl::TypeBinding &binding, Zmir::ComponentInterface callee,
-    Zmir::ComponentInterface caller, mlir::Value selfValue, bool builtin
+    mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface callee,
+    ComponentInterface caller, mlir::Value selfValue, bool builtin
 )
     : ctorType(type), compBinding(binding), isBuiltin(builtin), calleeComponentOp(callee),
       callerComponentOp(caller), self(selfValue) {
@@ -201,4 +199,4 @@ CtorCallBuilder::CtorCallBuilder(
   assert(self);
 }
 
-} // namespace zkc
+} // namespace zml

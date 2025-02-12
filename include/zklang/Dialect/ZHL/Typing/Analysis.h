@@ -1,9 +1,12 @@
 #pragma once
 
-#include "TypeBindings.h"
 #include <mlir/IR/Value.h>
 #include <mlir/Pass/AnalysisManager.h>
+<<<<<<< HEAD
 #include <mlir/Support/LogicalResult.h>
+=======
+#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+>>>>>>> main
 
 namespace zhl {
 

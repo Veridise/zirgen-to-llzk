@@ -1,5 +1,3 @@
-#include "zklang/Dialect/ZHL/Typing/Typing.h"
-#include "zklang/Dialect/ZHL/Typing/Rules.h"
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/StringMap.h>
@@ -7,7 +5,9 @@
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/OpBindings.h>
+#include <zklang/Dialect/ZHL/Typing/Rules.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZHL/Typing/Typing.h>
 
 using namespace mlir;
 using namespace zirgen::Zhl;
@@ -201,10 +201,7 @@ private:
 /// Fills the graph with all the components declared in ZHL. This ensures that
 /// while iterating the map components with an indegree of 0 will still have an entry in the map.
 void fillGraph(Operation *root, GraphInDegrees &indegrees) {
-  root->walk([&](ComponentOp op) {
-    llvm::dbgs() << "Adding " << op.getName() << " to the graph\n";
-    indegrees[op.getName()];
-  });
+  root->walk([&](ComponentOp op) { indegrees[op.getName()]; });
 }
 
 /// Sorts the components in topological order of declarations. This ensures that
@@ -223,8 +220,6 @@ sortComponents(Operation *root, SmallVector<ComponentOp> &sortedComponents, ZhlS
       // This excludes builtins that have bindings but not a ZHL representation because they are
       // generated directly in ZML.
       if (indegrees.contains(global.getName())) {
-        llvm::dbgs() << "Component " << op.getName() << " depends on component " << global.getName()
-                     << "\n";
         indegrees[global.getName()]++;
       }
     });
@@ -238,7 +233,6 @@ sortComponents(Operation *root, SmallVector<ComponentOp> &sortedComponents, ZhlS
     if (indegreeCount == 0) {
       auto compOp = st.lookup(name);
       assert(compOp);
-      llvm::dbgs() << "Adding " << name << " to the initial queue\n";
       queue.push_back(compOp);
     }
   }
@@ -247,7 +241,6 @@ sortComponents(Operation *root, SmallVector<ComponentOp> &sortedComponents, ZhlS
   while (!queue.empty()) {
     auto op = queue.front();
     queue.erase(queue.begin());
-    llvm::dbgs() << "Adding " << op.getName() << " into the sorted vector\n";
     // Since its traverses the graph in reverse we need to add the elements to front of the vector
     sortedComponents.insert(sortedComponents.begin(), op);
 
@@ -286,7 +279,6 @@ typeCheck(Operation *root, TypeBindings &typeBindings, const FrozenTypingRuleSet
   }
   // Run the typechecker
   for (auto op : sortedComponents) {
-    llvm::dbgs() << "Type checking " << op.getName() << "\n";
     checkComponent(op, *bindings, typeBindings, rules);
   }
 

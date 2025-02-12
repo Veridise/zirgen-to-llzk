@@ -1,25 +1,25 @@
 
 // Copyright 2024 Veridise, Inc.
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
-#include "zirgen/Dialect/ZHL/IR/ZHL.h"
-#include "zklang/Dialect/ZML/IR/Ops.h"
-#include "zklang/Dialect/ZML/Transforms/PassDetail.h"
-#include "zklang/Dialect/ZML/Utils/Patterns.h"
 #include <cassert>
 #include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/SymbolTable.h>
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 #include <type_traits>
+#include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Transforms/PassDetail.h>
+#include <zklang/Dialect/ZML/Utils/Patterns.h>
 
 using namespace mlir;
 
-namespace zkc::Zmir {
+namespace zml {
 
 namespace {
 
@@ -37,8 +37,8 @@ template <typename Impl, typename Base> class RemoveIllegalOpsCommon : public Ba
     // Set conversion target
     mlir::ConversionTarget target(Base::getContext());
     target.addLegalDialect<
-        zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect,
-        mlir::index::IndexDialect, mlir::scf::SCFDialect, arith::ArithDialect>();
+        ZMLDialect, mlir::func::FuncDialect, zirgen::Zhl::ZhlDialect, mlir::index::IndexDialect,
+        mlir::scf::SCFDialect, arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp>();
     setLegality(target);
 
@@ -132,7 +132,7 @@ public:
       rewriter.setInsertionPointToStart(&(op->getParentOfType<mlir::func::FuncOp>().getBody().front(
       )));
     }
-    auto read = rewriter.create<Zmir::ReadFieldOp>(
+    auto read = rewriter.create<ReadFieldOp>(
         op.getLoc(), op.getVal().getType(), adaptor.getComponent(), adaptor.getFieldNameAttr()
     );
     rewriter.replaceUsesWithIf(adaptor.getVal(), read, [](auto &operand) {
@@ -220,4 +220,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createRemoveIllegalConstrainOpsPass
   return std::make_unique<RemoveIllegalConstrainOpsPass>();
 }
 
-} // namespace zkc::Zmir
+} // namespace zml

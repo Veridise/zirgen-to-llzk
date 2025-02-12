@@ -2,7 +2,6 @@
 
 // Copyright 2024 Veridise, Inc.
 
-#include "zklang/Passes/PassDetail.h"
 #include <cassert>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
@@ -11,11 +10,12 @@
 #include <mlir/IR/OperationSupport.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Passes/PassDetail.h>
 
-namespace zkc {
+namespace zml {
 
-class ConvertZhlToZmirPass : public ConvertZhlToZmirBase<ConvertZhlToZmirPass> {
+class ConvertZhlToZmlPass : public zklang::ConvertZhlToZmlBase<ConvertZhlToZmlPass> {
   void runOnOperation() override;
 };
 
-} // namespace zkc
+} // namespace zml

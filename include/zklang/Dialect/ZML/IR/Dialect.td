@@ -1,14 +1,14 @@
 // Copyright 2024 Veridise, Inc.
 
-#ifndef ZMIR_DIALECT
-#define ZMIR_DIALECT
+#ifndef ZML_DIALECT
+#define ZML_DIALECT
 
 include "mlir/IR/DialectBase.td"
 
-def ZmirDialect : Dialect {
-  let name = "zmir";
-  let cppNamespace = "::zkc::Zmir";
-  let summary = "Zir to Zkir medium-level dialect";
+def ZMLDialect : Dialect {
+  let name = "zml";
+  let cppNamespace = "::zml";
+  let summary = "ZIR medium-level dialect";
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
 
@@ -17,4 +17,4 @@ def ZmirDialect : Dialect {
                            "::mlir::scf::SCFDialect"];
 }
 
-#endif // ZMIR_DIALECT
+#endif // ZML_DIALECT
