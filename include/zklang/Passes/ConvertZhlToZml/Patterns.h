@@ -42,7 +42,7 @@ public:
   /// value can reference a type binding linked to the new value.
   mlir::LogicalResult addType(mlir::Value value, const zhl::TypeBinding &binding) const {
     /// The cast is done over an injected object to the pattern so while this breaks constness on
-    /// the whole pass it doesn't on the pattern itself. In addition, this is a append change so it
+    /// the whole pass it doesn't on the pattern itself. In addition, this is an append change so it
     /// is safe to do as long as the value has not been inserted already.
     return const_cast<zhl::ZIRTypeAnalysis *>(typeAnalysis)->addType(value, binding);
   }
