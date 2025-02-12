@@ -1,0 +1,13 @@
+// RUN: zklang -o - %s
+
+component Po2(n: Val) { n }
+
+component UnpackNondet<N: Val, P: Val>(in: Array<Val, N/P>) {
+  N % P = 0;
+  inv := Inv(P);
+  for n : 0..N {
+    j := n % P;
+    i := (n - j) * inv;
+    (in[i] & Po2(j)) / Po2(j)
+  }
+}
