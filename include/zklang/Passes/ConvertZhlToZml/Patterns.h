@@ -37,6 +37,16 @@ public:
     return typeAnalysis->getType(name);
   }
 
+  /// Add a type binding to a value created during the dialect conversion. This should be used when
+  /// a `replaceUses*` rewriter function is used in a pattern, this way dependants of the previous
+  /// value can reference a type binding linked to the new value.
+  mlir::LogicalResult addType(mlir::Value value, const zhl::TypeBinding &binding) const {
+    /// The cast is done over an injected object to the pattern so while this breaks constness on
+    /// the whole pass it doesn't on the pattern itself. In addition, this is a append change so it
+    /// is safe to do as long as the value has not been inserted already.
+    return const_cast<zhl::ZIRTypeAnalysis *>(typeAnalysis)->addType(value, binding);
+  }
+
   /// Extracts the binding from the input value/operation and creates a
   /// cast of the value into the type materialized from the binding.
   /// If the super type is specified generates an additional SuperCoerceOp
@@ -136,7 +146,7 @@ public:
   const zhl::TypeBindings &getTypeBindings() const { return typeAnalysis->getBindings(); }
 
 private:
-  const zhl::ZIRTypeAnalysis *typeAnalysis;
+  zhl::ZIRTypeAnalysis *const typeAnalysis;
 };
 
 /// Lowers literal Vals

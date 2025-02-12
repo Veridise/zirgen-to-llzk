@@ -67,11 +67,17 @@ static cl::opt<std::string>
 // They are defined with external storage to avoid having to wrap
 // the code that uses them in preprocessor checks too
 bool DisableMultiThreadingFlag = false;
+bool DontReconcileCastsFlag = false;
 
 #ifndef NDEBUG
 static cl::opt<bool, true> DisableMultiThreading(
     "disable-multithreading", cl::desc("Disable multithreading of the lowering pipeline"),
     cl::Hidden, cl::location(DisableMultiThreadingFlag)
+);
+
+static cl::opt<bool, true> DontReconcileCasts(
+    "dont-reconcile-casts", cl::desc("Don't reconcile the casts while emitting zml or llzk"),
+    cl::Hidden, cl::location(DontReconcileCastsFlag)
 );
 #endif
 
@@ -146,7 +152,9 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zkc::createStripTestsPass());
   pm.addPass(zkc::Zmir::createInjectBuiltInsPass());
   pm.addPass(zkc::createConvertZhlToZmirPass());
-  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  if (emitAction != Action::PrintZML || !DontReconcileCastsFlag) {
+    pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  }
 
   if (emitAction == Action::PrintZML) {
     return;
@@ -169,8 +177,10 @@ void Driver::configureLoweringPipeline() {
 
   pm.addPass(zkc::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
-  llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
-  llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
+  if (!DontReconcileCastsFlag) {
+    llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
+    llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
+  }
 }
 
 zirgen::dsl::ast::Module::Ptr Driver::parse() {

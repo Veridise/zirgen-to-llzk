@@ -54,18 +54,11 @@ void ConvertZhlToZmirPass::runOnOperation() {
 
   // Set conversion target
   mlir::ConversionTarget target(*ctx);
+  target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
   target.addLegalDialect<
       zkc::Zmir::ZmirDialect, mlir::func::FuncDialect, mlir::scf::SCFDialect,
-      mlir::index::IndexDialect, zirgen::Zhl::ZhlDialect, mlir::arith::ArithDialect>();
+      mlir::index::IndexDialect, mlir::arith::ArithDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
-  target.addIllegalOp<
-      zirgen::Zhl::ComponentOp, zirgen::Zhl::ConstructorParamOp, zirgen::Zhl::LiteralOp,
-      zirgen::Zhl::ConstructOp, zirgen::Zhl::DefinitionOp, zirgen::Zhl::ConstraintOp,
-      zirgen::Zhl::DeclarationOp, zirgen::Zhl::ExternOp, zirgen::Zhl::SuperOp,
-      zirgen::Zhl::GlobalOp, zirgen::Zhl::LookupOp, zirgen::Zhl::ArrayOp, zirgen::Zhl::SubscriptOp,
-      zirgen::Zhl::RangeOp, zirgen::Zhl::MapOp, zirgen::Zhl::SuperOp, zirgen::Zhl::BlockOp,
-      zirgen::Zhl::StringOp, zirgen::Zhl::TypeParamOp, zirgen::Zhl::SpecializeOp,
-      zirgen::Zhl::ReduceOp, zirgen::Zhl::SwitchOp, zirgen::Zhl::DirectiveOp>();
 
   // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(module, target, std::move(patterns)))) {

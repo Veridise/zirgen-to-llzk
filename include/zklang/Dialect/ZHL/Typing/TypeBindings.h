@@ -124,6 +124,10 @@ public:
   mlir::FailureOr<TypeBinding> getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError
   ) const;
 
+  /// Returns the type of the concrete array type this binding supports. Either because the binding
+  /// itself is an array type or because one of the types in the super chain is an Array type.
+  mlir::FailureOr<TypeBinding> getConcreteArrayType() const;
+
   void replaceGenericParamByName(std::string_view name, const TypeBinding &binding);
 
   /// Attempts to create an specialized version of the type using the provided parameters.

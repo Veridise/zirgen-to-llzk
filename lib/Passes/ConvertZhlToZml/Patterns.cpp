@@ -9,6 +9,7 @@
 #include "zklang/Dialect/ZML/Typing/Materialize.h"
 #include "zklang/Dialect/ZML/Typing/ZMIRTypeConverter.h"
 #include "zklang/Passes/ConvertZhlToZml/Helpers.h"
+#include <ZHL.h>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -16,6 +17,7 @@
 #include <functional>
 #include <iterator>
 #include <llvm/Support/Casting.h>
+#include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexAttrs.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
@@ -387,13 +389,24 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
     auto slotName = createSlot(slot, rewriter, comp, op.getLoc());
     mlir::Type slotType = Zmir::materializeTypeBinding(getContext(), slot->getBinding());
     SmallVector<Operation *, 2> castOps;
-    Value result = getCastedValue(value, *exprBinding, rewriter, castOps, slotType);
-    result =
-        storeAndLoadSlot(result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
+    Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
+    result = storeAndLoadSlot(
+        *slot, result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self
+    );
+    // Cast it back to a Expr to maintain type safety in the ZHL ops
+    auto castedResult = rewriter
+                            .create<mlir::UnrealizedConversionCastOp>(
+                                op.getLoc(), mlir::TypeRange(Zhl::ExprType::get(getContext())),
+                                mlir::ValueRange(result)
+                            )
+                            .getResult(0);
+    // We can't return mlir::failure() at this stage because we already created new ops.
+    assert(succeeded(addType(castedResult, *exprBinding)));
+
     if (castOps.empty()) {
-      rewriter.replaceAllUsesWith(value, result);
+      rewriter.replaceAllUsesWith(value, castedResult);
     } else {
-      rewriter.replaceAllUsesExcept(value, result, castOps.front());
+      rewriter.replaceAllUsesExcept(value, castedResult, castOps.front());
     }
   }
 
@@ -588,20 +601,16 @@ mlir::LogicalResult ZhlSubscriptLowering::matchAndRewrite(
   if (mlir::failed(elementBinding)) {
     return op->emitOpError() << "failed to type check index";
   }
+  auto concreteArrayTypeBinding = arrayBinding->getConcreteArrayType();
+  if (failed(concreteArrayTypeBinding)) {
+    return failure();
+  }
 
-  auto arrayVal = adaptor.getArray();
-  auto arrayType = Zmir::materializeTypeBinding(getContext(), *arrayBinding);
-  if (arrayVal.getType() != arrayType) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), arrayType, arrayVal);
-    arrayVal = cast.getResult(0);
-  }
-  auto elementVal = adaptor.getElement();
-  auto elementType = Zmir::materializeTypeBinding(getContext(), *elementBinding);
-  if (elementVal.getType() != elementType) {
-    auto cast =
-        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), elementType, elementVal);
-    elementVal = cast.getResult(0);
-  }
+  Type concreteArrayType = Zmir::materializeTypeBinding(getContext(), *concreteArrayTypeBinding);
+  auto arrayVal = getCastedValue(adaptor.getArray(), *arrayBinding, rewriter, concreteArrayType);
+  auto Val = Zmir::ComponentType::Val(getContext());
+  auto elementVal = getCastedValue(adaptor.getElement(), *elementBinding, rewriter, Val);
+
   rewriter.replaceOpWithNewOp<Zmir::ReadArrayOp>(
       op, Zmir::materializeTypeBinding(getContext(), *binding), arrayVal, elementVal
   );

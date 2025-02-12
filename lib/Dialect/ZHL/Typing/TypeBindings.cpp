@@ -271,6 +271,16 @@ zhl::TypeBinding::getArrayElement(std::function<mlir::InFlightDiagnostic()> emit
   return genericParams.getParam(0);
 }
 
+FailureOr<TypeBinding> TypeBinding::getConcreteArrayType() const {
+  if (!isArray()) {
+    return failure();
+  }
+  if (name == "Array") {
+    return *this;
+  }
+  return superType->getConcreteArrayType();
+}
+
 zhl::TypeBinding zhl::TypeBinding::WrapVariadic(const TypeBinding &t) {
   TypeBinding w = t;
   w.variadic = true;

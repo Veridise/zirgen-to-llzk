@@ -364,6 +364,11 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
   // TODO: Validation that the inner type of the array is a subtype of the first argument of
   // operands[2]
   // TODO: Validation that the init type is a subtype of the second arguments of operands[2]
+
+  // If the init value is a constant then return its super type (Val)
+  if (operands[1].isConst()) {
+    return operands[1].getSuperType();
+  }
   return operands[1];
 }
 

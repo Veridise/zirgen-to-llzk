@@ -54,20 +54,20 @@ ZMIRTypeConverter::ZMIRTypeConverter() {
     return builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs).getResult(0);
   }
   );
-  addTargetMaterialization(
-      [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
-         mlir::Location loc) -> std::optional<mlir::Value> {
-    if (!mlir::isa<Zmir::ComponentType>(type)) {
-      return std::nullopt;
-    }
-    if (auto compTyp = mlir::dyn_cast<Zmir::ComponentType>(inputs[0].getType())) {
-      if (compTyp.getName().getValue() != "Component") {
-        return builder.create<Zmir::SuperCoerceOp>(loc, type, inputs[0]);
-      }
-    }
-    return std::nullopt;
-  }
-  );
+  // addTargetMaterialization(
+  //     [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
+  //        mlir::Location loc) -> std::optional<mlir::Value> {
+  //   if (!mlir::isa<Zmir::ComponentType>(type)) {
+  //     return std::nullopt;
+  //   }
+  //   if (auto compTyp = mlir::dyn_cast<Zmir::ComponentType>(inputs[0].getType())) {
+  //     if (compTyp.getName().getValue() != "Component") {
+  //       return builder.create<Zmir::SuperCoerceOp>(loc, type, inputs[0]);
+  //     }
+  //   }
+  //   return std::nullopt;
+  // }
+  // );
 
   addArgumentMaterialization(
       [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,

@@ -29,8 +29,9 @@ mlir::FlatSymbolRefAttr createSlot(
 /// Stores a value into the field defined by the slotName symbol and immediately reads it back.
 /// Returns the value read from the field.
 mlir::Value storeAndLoadSlot(
-    mlir::Value value, mlir::FlatSymbolRefAttr slotName, mlir::Type slotType, mlir::Location loc,
-    mlir::Type compType, mlir::OpBuilder &builder, mlir::Value
+    zhl::ComponentSlot &slot, mlir::Value value, mlir::FlatSymbolRefAttr slotName,
+    mlir::Type slotType, mlir::Location loc, mlir::Type compType, mlir::OpBuilder &builder,
+    mlir::Value
 );
 
 /// Helper for creating the ops that represent the call to a component's constructor.
