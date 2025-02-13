@@ -368,7 +368,24 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
     return mlir::failure();
   }
 
+  if (failed(operands[0].subtypeOf(getBindings().Get("Val")))) {
+    return op->emitError()
+           << "expected left side of range to be 'Val' or subtype of 'Val', but got '"
+           << operands[0].getName() << "'";
+  }
+  if (failed(operands[1].subtypeOf(getBindings().Get("Val")))) {
+    return op->emitError()
+           << "expected right side of range to be 'Val' or subtype of 'Val', but got '"
+           << operands[0].getName() << "'";
+  }
   auto common = operands[0].commonSupertypeWith(operands[1]);
+
+  if (operands[0].isKnownConst() && operands[1].isKnownConst()) {
+    if (operands[1].getConst() < operands[0].getConst()) {
+      return op->emitError() << "right side of range must be greater or equal then left side";
+    }
+    return getBindings().Array(common, operands[1].getConst() - operands[0].getConst());
+  }
   return getBindings().UnkArray(common);
 }
 

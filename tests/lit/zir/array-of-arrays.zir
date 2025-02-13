@@ -1,9 +1,9 @@
-component Diag<N: Val>(m: Array<Array<Val, N>, N>) {
-  for i : 0..N { m[i][i] }
+component Diag(m: Array<Array<Val, 3>, 3>) {
+  for i : 0..3 { m[i][i] }
 }
 
 component Top() {
-  Diag<3>([
+  Diag([
     [1,2,3],
     [4,5,6],
     [7,8,9]
