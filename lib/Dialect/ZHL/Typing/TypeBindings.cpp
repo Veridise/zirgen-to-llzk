@@ -271,6 +271,23 @@ zhl::TypeBinding::getArrayElement(std::function<mlir::InFlightDiagnostic()> emit
   return genericParams.getParam(0);
 }
 
+mlir::FailureOr<TypeBinding>
+zhl::TypeBinding::getArraySize(std::function<mlir::InFlightDiagnostic()> emitError) const {
+  if (!isArray()) {
+    return emitError() << "non array type '" << name << "' cannot be subscripted";
+  }
+  // A component with an array super type can behave like an array but it doesn't have all the
+  // information required. In that case we defer the answer to the super type.
+  if (name != "Array") {
+    if (!hasSuperType()) {
+      return failure();
+    }
+    return getSuperType().getArrayElement(emitError);
+  }
+  assert(genericParams.size() == 2);
+  return genericParams.getParam(1);
+}
+
 FailureOr<TypeBinding> TypeBinding::getConcreteArrayType() const {
   if (!isArray()) {
     return failure();
@@ -464,11 +481,19 @@ zhl::TypeBinding zhl::TypeBindings::Array(TypeBinding type, uint64_t size) const
   return Array(type, size, unk);
 }
 
+TypeBinding TypeBindings::Array(TypeBinding type, TypeBinding size) const {
+  return Array(type, size, unk);
+}
+
 zhl::TypeBinding
 zhl::TypeBindings::Array(TypeBinding type, uint64_t size, mlir::Location loc) const {
-  zhl::ParamsMap arrayGenericParams;
+  return Array(type, Const(size), loc);
+}
+
+TypeBinding TypeBindings::Array(TypeBinding type, TypeBinding size, mlir::Location loc) const {
+  ParamsMap arrayGenericParams;
   arrayGenericParams.insert({{"T", 0}, type});
-  arrayGenericParams.insert({{"N", 1}, Const(size)});
+  arrayGenericParams.insert({{"N", 1}, size});
   TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
   array.specialized = true;
   return array;
@@ -477,12 +502,7 @@ zhl::TypeBindings::Array(TypeBinding type, uint64_t size, mlir::Location loc) co
 zhl::TypeBinding zhl::TypeBindings::UnkArray(TypeBinding type) const { return UnkArray(type, unk); }
 
 zhl::TypeBinding zhl::TypeBindings::UnkArray(TypeBinding type, mlir::Location loc) const {
-  zhl::ParamsMap arrayGenericParams;
-  arrayGenericParams.insert({{"T", 0}, type});
-  arrayGenericParams.insert({{"N", 1}, UnkConst()});
-  TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
-  array.specialized = true;
-  return array;
+  return Array(type, UnkConst(), loc);
 }
 
 bool zhl::TypeBindings::Exists(std::string_view name) const {
@@ -555,6 +575,9 @@ llvm::StringRef zhl::TypeBinding::getGenericParamName() const {
   return *genericParamName;
 }
 const zhl::Params &zhl::TypeBinding::getGenericParamsMapping() const { return genericParams; }
+
+zhl::Params &zhl::TypeBinding::getGenericParamsMapping() { return genericParams; }
+
 const TypeBinding *zhl::Params::operator[](std::string_view name) const {
   for (size_t i = 0; i < names.size(); i++) {
     if (names.at(i) == name) {

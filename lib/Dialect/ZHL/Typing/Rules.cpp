@@ -281,9 +281,27 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
 mlir::FailureOr<TypeBinding> ConstrainTypeRule::
     typeCheck(zirgen::Zhl::ConstraintOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  // TODO: Check that the argument types are correct
-  // XXX: Improvement idea; return the least common super type of the arguments instead of
-  // `Component`.
+  if (operands.size() != 2) {
+    return op.emitError() << "constraint expression expects 2 operands, but got "
+                          << operands.size();
+  }
+  auto &lhs = operands[0];
+  auto &rhs = operands[1];
+
+  auto leastCommon = lhs.commonSupertypeWith(rhs);
+  if (leastCommon.isArray()) {
+    auto leastCommonArray = leastCommon.getConcreteArrayType();
+    if (mlir::failed(leastCommonArray)) {
+      return op.emitError()
+             << "constraint operands have Array supertype but it could not be deduced";
+    }
+    return leastCommonArray;
+  }
+  auto &Val = getBindings().Get("Val");
+  if (succeeded(leastCommon.subtypeOf(Val))) {
+    return Val;
+  }
+
   return getBindings().Component();
 }
 
@@ -437,6 +455,10 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return op->emitOpError() << "was expecting a array as input. Got '" << operands[0].getName()
                              << "'";
   }
+  auto arrayLen = operands[0].getArraySize([&] { return op->emitError(); });
+  if (failed(arrayLen)) {
+    return failure();
+  }
 
   assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
@@ -444,7 +466,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return op->emitOpError() << "failed to deduce the super type";
   }
 
-  return getBindings().UnkArray(*super);
+  return getBindings().Array(*super, *arrayLen, op.getLoc());
 }
 
 FailureOr<Frame> MapTypeRule::allocate(Frame frame) const {

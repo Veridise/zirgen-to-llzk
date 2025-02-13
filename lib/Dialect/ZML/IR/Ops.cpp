@@ -288,4 +288,26 @@ mlir::LogicalResult GetGlobalOp::inferReturnTypes(
   return mlir::success();
 }
 
+mlir::OpFoldResult LitValOp::fold(LitValOp::FoldAdaptor) { return getValueAttr(); }
+
+mlir::OpFoldResult LitValArrayOp::fold(LitValArrayOp::FoldAdaptor) { return getElementsAttr(); }
+
+mlir::OpFoldResult NewArrayOp::fold(NewArrayOp::FoldAdaptor adaptor) {
+  mlir::SmallVector<long> values;
+  for (auto attr : adaptor.getElements()) {
+    if (!attr) {
+      return nullptr;
+    }
+    if (auto arrayAttr = mlir::dyn_cast<mlir::DenseI64ArrayAttr>(attr)) {
+      values.insert(values.end(), arrayAttr.asArrayRef().begin(), arrayAttr.asArrayRef().end());
+    } else if (auto intAttr = mlir::dyn_cast<mlir::IntegerAttr>(attr)) {
+      values.push_back(intAttr.getInt());
+    } else {
+      return nullptr;
+    }
+  }
+
+  return mlir::DenseI64ArrayAttr::get(getContext(), values);
+}
+
 } // namespace zml

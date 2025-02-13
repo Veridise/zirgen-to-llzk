@@ -317,6 +317,26 @@ mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
   return mlir::success();
 }
 
+mlir::LogicalResult LowerLitValArrayOp::matchAndRewrite(
+    LitValArrayOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+  SmallVector<Value> lits;
+  std::transform(
+      op.getElements().begin(), op.getElements().end(), std::back_inserter(lits),
+      [&](long value) {
+    llzk::FeltType felt = llzk::FeltType::get(getContext());
+    return rewriter.create<llzk::FeltConstantOp>(
+        op.getLoc(), felt, llzk::FeltConstAttr::get(getContext(), llvm::APInt(64, value))
+    );
+  }
+  );
+
+  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
+      op, getTypeConverter()->convertType(op.getType()), ValueRange(lits)
+  );
+  return success();
+}
+
 mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
     ReadArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {

@@ -13,7 +13,6 @@
 
 using namespace zhl;
 using namespace mlir;
-using namespace zkc;
 
 namespace zhl {
 
@@ -31,7 +30,7 @@ void PrintTo(const TypeBinding &binding, std::ostream *os) {
 class MaterializationTest : public testing::Test {
 protected:
   MaterializationTest() : ctx{}, builder(&ctx), bindings(builder.getUnknownLoc()) {
-    ctx.loadDialect<Zmir::ZmirDialect>();
+    ctx.loadDialect<zml::ZMLDialect>();
   }
 
   MLIRContext ctx;
@@ -43,20 +42,19 @@ class MaterializationTestWithBuiltins : public MaterializationTest {
 protected:
   MaterializationTestWithBuiltins() : MaterializationTest() {
     std::unordered_set<std::string_view> s;
-    Zmir::addBuiltinBindings(bindings, s);
+    zml::addBuiltinBindings(bindings, s);
   }
 };
 
 TEST_F(MaterializationTest, componentBaseType) {
-  Type output = Zmir::materializeTypeBinding(&ctx, bindings.Component());
-  Type expected = Zmir::ComponentType::Component(&ctx);
+  Type output = zml::materializeTypeBinding(&ctx, bindings.Component());
+  Type expected = zml::ComponentType::Component(&ctx);
   ASSERT_EQ(output, expected);
 }
 
 TEST_F(MaterializationTest, componentBaseConstructorType) {
-  FunctionType output = Zmir::materializeTypeBindingConstructor(builder, bindings.Component());
-  FunctionType expected =
-      builder.getFunctionType(TypeRange(), Zmir::ComponentType::Component(&ctx));
+  FunctionType output = zml::materializeTypeBindingConstructor(builder, bindings.Component());
+  FunctionType expected = builder.getFunctionType(TypeRange(), zml::ComponentType::Component(&ctx));
   ASSERT_EQ(output, expected);
 }
 
@@ -68,7 +66,7 @@ class SpecializationTest : public testing::Test {
 protected:
   SpecializationTest() : ctx{}, bindings(unkLoc()) {
     std::unordered_set<std::string_view> s;
-    Zmir::addBuiltinBindings(bindings, s);
+    zml::addBuiltinBindings(bindings, s);
   }
 
   Location unkLoc() { return OpBuilder(&ctx).getUnknownLoc(); }
@@ -113,6 +111,31 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyForArrays) {
   auto SpecializedArr = Arr.specialize(diag, {Val, Const10});
   ASSERT_TRUE(succeeded(SpecializedArr));
   ASSERT_EQ(*SpecializedArr, ExpectedSpecializedArray);
+}
+
+TEST_F(SpecializationTest, constValSpecializationPropagatesProperlyForArraysOfArraysCtorParam) {
+  auto &Type = bindings.Get("Type");
+  auto &Val = bindings.Get("Val");
+  auto T = TypeBinding::MakeGenericParam(Type, "T");
+  auto N = TypeBinding::MakeGenericParam(Val, "N");
+  auto Const10 = bindings.Const(10);
+
+  auto genericCtorParam = bindings.Array(bindings.Array(Val, N), N);
+
+  TypeBinding GenericFoo(
+      "Foo", unkLoc(), Val, zhl::ParamsMap({{{"N", 0}, N}}),
+      zhl::ParamsMap({{{"m", 0}, genericCtorParam}}), zhl::MembersMap(), Frame(), true
+  );
+
+  auto ctorParam = bindings.Array(bindings.Array(Val, 10), 10);
+  TypeBinding ExpectedType(
+      "Foo", unkLoc(), Val, zhl::ParamsMap({{{"N", 0}, Const10}}),
+      zhl::ParamsMap({{{"m", 0}, ctorParam}}), zhl::MembersMap(), Frame(), true
+  );
+  ExpectedType.markAsSpecialized();
+  auto SpecializedFoo = GenericFoo.specialize(diag, {Const10});
+  ASSERT_TRUE(succeeded(SpecializedFoo));
+  ASSERT_EQ(*SpecializedFoo, ExpectedType);
 }
 
 /// Tests that the specialization specializes the constructor params of a type

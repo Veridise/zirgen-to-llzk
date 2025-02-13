@@ -149,6 +149,7 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zml::createInjectBuiltInsPass());
   pm.addPass(zklang::createConvertZhlToZmlPass());
   if (emitAction != Action::PrintZML || !DontReconcileCastsFlag) {
+    pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   }
 
@@ -163,6 +164,7 @@ void Driver::configureLoweringPipeline() {
   auto &splitCompFuncsPipeline = splitCompPipeline.nest<mlir::func::FuncOp>();
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalComputeOpsPass());
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalConstrainOpsPass());
+  splitCompFuncsPipeline.addPass(mlir::createCanonicalizerPass());
   splitCompFuncsPipeline.addPass(mlir::createCSEPass());
 
   if (emitAction == Action::OptimizeZML) {

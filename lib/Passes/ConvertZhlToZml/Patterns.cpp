@@ -220,7 +220,10 @@ mlir::Value ZhlConstructLowering::prepareArgument(
 mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     Zhl::ConstraintOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-
+  auto binding = getType(op);
+  if (failed(binding)) {
+    return failure();
+  }
   auto lhsBinding = getType(op.getLhs());
   if (mlir::failed(lhsBinding)) {
     return op->emitOpError() << "failed to type check lhs";
@@ -230,28 +233,11 @@ mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     return op->emitOpError() << "failed to type check rhs";
   }
 
-  mlir::Value lhsValue = adaptor.getLhs();
-  mlir::Type lhsTarget = materializeTypeBinding(getContext(), *lhsBinding);
-  if (lhsValue.getType() != lhsTarget) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), lhsTarget, lhsValue);
-    lhsValue = cast.getResult(0);
-  }
-  // Coerce to Val if necessary
-  if (lhsValue.getType() != ComponentType::Val(getContext())) {
-    lhsValue =
-        rewriter.create<SuperCoerceOp>(op.getLoc(), ComponentType::Val(getContext()), lhsValue);
-  }
-  mlir::Value rhsValue = adaptor.getRhs();
-  mlir::Type rhsTarget = materializeTypeBinding(getContext(), *rhsBinding);
-  if (rhsValue.getType() != rhsTarget) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), rhsTarget, rhsValue);
-    rhsValue = cast.getResult(0);
-  }
-  // Coerce to Val if necessary
-  if (rhsValue.getType() != ComponentType::Val(getContext())) {
-    rhsValue =
-        rewriter.create<SuperCoerceOp>(op.getLoc(), ComponentType::Val(getContext()), rhsValue);
-  }
+  auto constraintType = materializeTypeBinding(getContext(), *binding);
+  mlir::Value lhsValue = getCastedValue(adaptor.getLhs(), *lhsBinding, rewriter, constraintType);
+
+  mlir::Value rhsValue = getCastedValue(adaptor.getRhs(), *rhsBinding, rewriter, constraintType);
+
   rewriter.replaceOpWithNewOp<ConstrainOp>(op, lhsValue, rhsValue);
   return mlir::success();
 }

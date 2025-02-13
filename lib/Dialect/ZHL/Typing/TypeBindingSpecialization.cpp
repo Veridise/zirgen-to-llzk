@@ -18,15 +18,20 @@ void spaces(size_t n) {
 ParamsScopeStack::ParamsScopeStack(const Params &root) { stack.push_back(&root); }
 
 const TypeBinding *ParamsScopeStack::operator[](StringRef name) {
+  StringRef currName = name;
+  const TypeBinding *result = nullptr;
   for (auto It = stack.rbegin(); It != stack.rend(); ++It) {
     auto level = *It;
-    auto binding = (*level)[name];
+    auto binding = (*level)[currName];
     if (binding != nullptr) {
-      return binding;
+      result = binding;
+      if (binding->isGenericParam()) {
+        currName = binding->getGenericParamName();
+      }
     }
   }
 
-  return nullptr;
+  return result;
 }
 
 void ParamsScopeStack::pushScope(const Params &param) { stack.push_back(&param); }
@@ -96,12 +101,20 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
 ) {
   auto &params = dst->getGenericParamsMapping();
   for (auto &name : dst->getGenericParamNames()) {
+
+    LLVM_DEBUG(spaces(ident);
+               llvm::dbgs() << "Variable " << name << " binds to " << *params[name] << "\n");
     if (!params[name]->isGenericParam()) {
+      LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Specializing " << *params[name] << "\n");
+      auto result = specializeTypeBindingImpl(params[name], scopes, FV, ident + 1);
+      if (failed(result)) {
+        LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");
+        return failure();
+      }
+
       continue;
     }
     LLVM_DEBUG(spaces(ident);
-               llvm::dbgs() << "Variable " << name << " binds to " << *params[name] << "\n";
-               spaces(ident);
                llvm::dbgs() << "Specializing variable " << params[name]->getGenericParamName());
     auto replacement = scopes[params[name]->getGenericParamName()];
     // Fail the materialization if the name was not found. A well typed program should not have
@@ -133,7 +146,7 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     // And specialize it if necessary
     auto &newScope = copy.getGenericParamsMapping();
     {
-      ScopeGuard guard(scopes, newScope);
+      // ScopeGuard guard(scopes, newScope);
       auto result = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
       if (failed(result)) {
         LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");

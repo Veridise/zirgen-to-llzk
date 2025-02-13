@@ -201,6 +201,14 @@ public:
   matchAndRewrite(NewArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerLitValArrayOp : public mlir::OpConversionPattern<LitValArrayOp> {
+public:
+  using mlir::OpConversionPattern<LitValArrayOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(LitValArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 class LowerReadArrayOp : public mlir::OpConversionPattern<ReadArrayOp> {
 public:
   using mlir::OpConversionPattern<ReadArrayOp>::OpConversionPattern;

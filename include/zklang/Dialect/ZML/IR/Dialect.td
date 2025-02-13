@@ -9,8 +9,10 @@ def ZMLDialect : Dialect {
   let name = "zml";
   let cppNamespace = "::zml";
   let summary = "ZIR medium-level dialect";
+
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
+  let hasConstantMaterializer = 1;
 
   let dependentDialects = ["::mlir::index::IndexDialect",
                            "::mlir::func::FuncDialect",
