@@ -380,8 +380,15 @@ mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
   }
   );
   llvm::dbgs() << "adaptor.getLvalue() = " << adaptor.getLvalue() << "\n";
+  auto convertedType = getTypeConverter()->convertType(op.getType());
+  if (isa<llzk::ArrayType>(convertedType)) {
+    rewriter.replaceOpWithNewOp<llzk::ExtractArrayOp>(
+        op, convertedType, adaptor.getLvalue(), toIndexOps
+    );
+    return success();
+  }
   rewriter.replaceOpWithNewOp<llzk::ReadArrayOp>(
-      op, getTypeConverter()->convertType(op.getType()), adaptor.getLvalue(), toIndexOps
+      op, convertedType, adaptor.getLvalue(), toIndexOps
   );
   return mlir::success();
 }

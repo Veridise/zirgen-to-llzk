@@ -248,7 +248,7 @@ def NewArrayOp : ZMLOp<"new_array", [Pure]> {
   let assemblyFormat =
       "$elements attr-dict `:` `[` type($elements) `]` `,` type($result)";
 
-  let hasFolder = 1;
+  // let hasFolder = 1;
 }
 
 def LitValArrayOp : ZMLOp<"litval_array", [Pure, ConstantLike]> {
