@@ -1,3 +1,5 @@
+#include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/DialectImplementation.h>
@@ -41,7 +43,13 @@ namespace zml {
 Operation *
 ZMLDialect::materializeConstant(OpBuilder &builder, Attribute attr, Type type, Location loc) {
   if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
-    return builder.create<LitValOp>(loc, ComponentType::Val(builder.getContext()), intAttr);
+    if (isa<ComponentType>(type)) {
+      return builder.create<LitValOp>(loc, ComponentType::Val(builder.getContext()), intAttr);
+    }
+
+    if (isa<IndexType>(type)) {
+      return builder.create<mlir::index::ConstantOp>(loc, intAttr.getInt());
+    }
   }
   if (auto arrayAttr = mlir::dyn_cast<DenseI64ArrayAttr>(attr)) {
     return builder.create<LitValArrayOp>(loc, type, arrayAttr);

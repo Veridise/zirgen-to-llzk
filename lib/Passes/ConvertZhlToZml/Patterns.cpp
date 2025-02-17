@@ -439,7 +439,7 @@ mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
     mlir::ConversionPatternRewriter &rewriter, mlir::Location loc
 ) {
   mlir::OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointAfter(op.getBodyFunc());
+  rewriter.setInsertionPointAfter(op /*.getBodyFunc()*/);
   auto attrs = externFuncAttrs(rewriter);
 
   return rewriter.create<mlir::func::FuncOp>(loc, name, type, attrs);
@@ -466,6 +466,22 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
     argBindings.push_back(materializeTypeBinding(getContext(), *argBinding));
   }
 
+  auto retType = materializeTypeBinding(getContext(), *binding);
+
+  // Extern ops are wrapped around a component by the AST->ZHL step and have the same inputs as the
+  // component.
+  auto funcType =
+      rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
+  // TODO Replaces this with a Twine
+  std::string externName(op.getName().str());
+  externName += "$$extern";
+  auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
+  if (mlir::failed(externDeclrResult)) {
+    return mlir::failure();
+  }
+  auto externNameSymRef = SymbolRefAttr::get(rewriter.getStringAttr(externName));
+
+  auto externFnRef = rewriter.create<ExternFnRefOp>(op.getLoc(), funcType, externNameSymRef);
   std::vector<mlir::Value> args;
   std::transform(
       adaptor.getArgs().begin(), adaptor.getArgs().end(), argBindings.begin(),
@@ -481,20 +497,7 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
   }
   );
 
-  auto retType = materializeTypeBinding(getContext(), *binding);
-
-  // Extern ops are wrapped around a component by the AST->ZHL step and have the same inputs as the
-  // component.
-  auto funcType =
-      rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
-  std::string externName(op.getName().str());
-  externName += "$$extern";
-  auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
-  if (mlir::failed(externDeclrResult)) {
-    return mlir::failure();
-  }
-
-  rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, *externDeclrResult, mlir::ValueRange(args));
+  rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, externFnRef, mlir::ValueRange(args));
 
   return mlir::success();
 }
@@ -705,6 +708,7 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
+  assert(binding->isArray());
   auto startBinding = getType(op.getStart());
   if (mlir::failed(startBinding)) {
     return op->emitOpError() << "failed to type check start";
@@ -714,10 +718,26 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
     return op->emitOpError() << "failed to type check end";
   }
   auto type = materializeTypeBinding(getContext(), *binding);
-  assert(binding->isArray());
   auto innerBinding = binding->getArrayElement([&]() { return op->emitError(); });
   if (mlir::failed(innerBinding)) {
     return mlir::failure();
+  }
+
+  // Create a literal array directly if we know the range is made of literal values
+  if (startBinding->isKnownConst() && endBinding->isKnownConst()) {
+    SmallVector<int64_t> values;
+    unsigned E = endBinding->getConst();
+    unsigned I = startBinding->getConst();
+    values.reserve(E - I);
+    for (; I < E; I++) {
+      values.push_back(I);
+    }
+    auto litArr = DenseI64ArrayAttr::get(getContext(), values);
+    rewriter.replaceOpWithNewOp<LitValArrayOp>(
+        op, ComponentType::Array(getContext(), ComponentType::Val(getContext()), values.size()),
+        litArr
+    );
+    return success();
   }
   auto innerType = materializeTypeBinding(getContext(), *innerBinding);
   Value startVal =
@@ -732,15 +752,14 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto start = rewriter.create<ValToIndexOp>(op.getStart().getLoc(), startVal);
   auto end = rewriter.create<ValToIndexOp>(op.getEnd().getLoc(), endVal);
-  auto loop = rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), start, end, one, mlir::ValueRange(arrAlloc),
+  rewriter.create<mlir::scf::ForOp>(
+      op.getLoc(), start, end, one, mlir::ValueRange(),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     auto conv = builder.create<IndexToValOp>(loc, innerType, iv);
-    builder.create<WriteArrayOp>(loc, args[0], iv, conv);
-    builder.create<mlir::scf::YieldOp>(loc, args[0]);
+    builder.create<WriteArrayOp>(loc, arrAlloc, iv, conv);
   }
   );
-  rewriter.replaceOp(op, loop);
+  rewriter.replaceOp(op, arrAlloc);
 
   return mlir::success();
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
@@ -85,13 +86,14 @@ public:
       const override;
 };
 
-class CallOpLowering : public mlir::OpConversionPattern<mlir::func::CallOp> {
+class ExternCallOpLowering : public mlir::OpConversionPattern<mlir::func::CallIndirectOp> {
 
 public:
-  using OpConversionPattern<mlir::func::CallOp>::OpConversionPattern;
+  using OpConversionPattern<mlir::func::CallIndirectOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
 };
 
 class CallIndirectOpLoweringInCompute
@@ -121,6 +123,15 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(ConstructorRefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class RemoveExternFnRefOp : public mlir::OpConversionPattern<ExternFnRefOp> {
+
+public:
+  using OpConversionPattern<ExternFnRefOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(ExternFnRefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 template <typename FromOp, typename ToOp>

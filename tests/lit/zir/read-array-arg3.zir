@@ -1,0 +1,5 @@
+component Foo(a: Array<Array<Val, 3>, 3>) {
+ { i:= 1;
+   a[i][i] }
+}
+

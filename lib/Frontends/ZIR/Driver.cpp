@@ -164,13 +164,13 @@ void Driver::configureLoweringPipeline() {
   auto &splitCompFuncsPipeline = splitCompPipeline.nest<mlir::func::FuncOp>();
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalComputeOpsPass());
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalConstrainOpsPass());
-  splitCompFuncsPipeline.addPass(mlir::createCanonicalizerPass());
   splitCompFuncsPipeline.addPass(mlir::createCSEPass());
+  splitCompFuncsPipeline.addPass(mlir::createCanonicalizerPass());
 
   if (emitAction == Action::OptimizeZML) {
     return;
   }
-
+  pm.addPass(createLocationSnapshotPass());
   pm.addPass(zklang::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
   if (!DontReconcileCastsFlag) {
@@ -267,13 +267,13 @@ LogicalResult Driver::run() {
   pm.dump();
   if (failed(pm.run(*mod))) {
     DEBUG_WITH_TYPE("zir-driver-dump-on-error", llvm::errs() << "Module contents:\n";
-                    mod->print(llvm::errs()));
+                    mod->print(llvm::errs(), OpPrintingFlags(std::nullopt).printGenericOpForm()));
     llvm::WithColor(llvm::errs(), llvm::raw_ostream::RED, true)
         << "An internal compiler error ocurred while lowering this module.\n";
     return failure();
   }
 
-  mod->print(*dst);
+  mod->print(*dst, OpPrintingFlags(std::nullopt).printGenericOpForm().printValueUsers());
 
   llvm::WithColor(llvm::errs(), llvm::raw_ostream::GREEN) << "Success!\n";
   return success();

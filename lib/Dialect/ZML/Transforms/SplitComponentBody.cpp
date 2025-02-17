@@ -2,12 +2,16 @@
 // Copyright 2024 Veridise, Inc.
 
 #include <cassert>
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/Support/Debug.h>
+#include <llvm/Support/Format.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/SymbolTable.h>
+#include <mlir/IR/ValueRange.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
@@ -88,7 +92,7 @@ public:
 private:
   mlir::func::FuncOp fillFunc(
       SplitComponentOp op, mlir::StringRef, mlir::FunctionType funcType, Region &original,
-      mlir::ConversionPatternRewriter &rewriter
+      ValueRange arguments, int argsOffset, mlir::ConversionPatternRewriter &rewriter
   ) const;
 
   PendingSymbolRenames &pending;
@@ -114,61 +118,71 @@ LogicalResult SplitComponentOpPattern::matchAndRewrite(
   // but don't name it like the old op right now.
   pending.removeOp(op);
   pending.addOp(newOp, op.getSymNameAttr());
-  rewriter.replaceOp(op.getOperation(), newOp.getOperation());
+  // rewriter.replaceOp(op.getOperation(), newOp.getOperation());
 
-  {
-    mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
-    auto *block = rewriter.createBlock(&newOp.getRegion());
-    rewriter.setInsertionPointToStart(block);
+  mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
+  auto *block = rewriter.createBlock(&newOp.getRegion());
+  rewriter.setInsertionPointToStart(block);
 
-    // Copy the field definitions
-    for (auto paramOp : op.getOps<FieldDefOp>()) {
-      rewriter.clone(*paramOp.getOperation());
-    }
-    // Copy additional functions declared (like externs)
-    for (auto f : op.getOps<mlir::func::FuncOp>()) {
-      if (f == op.getBodyFunc()) {
-        continue;
-      }
-      rewriter.clone(*f.getOperation());
-    }
-
-    auto bodyFuncType = op.getBodyFunc().getFunctionType();
-
-    fillFunc(newOp, newOp.getBodyFuncName(), bodyFuncType, op.getBodyFunc().getRegion(), rewriter);
-    {
-      std::vector<mlir::Type> constrainFuncArgTypes({op.getType()});
-      constrainFuncArgTypes.insert(
-          constrainFuncArgTypes.end(), bodyFuncType.getInputs().begin(),
-          bodyFuncType.getInputs().end()
-      );
-      auto constrainFuncType = rewriter.getFunctionType(constrainFuncArgTypes, TypeRange());
-      auto constrainFunc = fillFunc(
-          newOp, newOp.getConstrainFuncName(), constrainFuncType, op.getBodyFunc().getRegion(),
-          rewriter
-      );
-      // Insert the self argument for the constrain function as it will be
-      // required by zkir.
-      assert(!constrainFunc.getRegion().empty() && "was expecting a filled out function");
-
-      auto &b = constrainFunc.getRegion().front();
-      // If there are no arguments just add it.
-      // If there are arguments already insert it at the beginning
-      // and shift all other arguments
-      if (b.args_empty()) {
-        b.addArgument(op.getType(), op.getLoc());
-      } else {
-        b.insertArgument(b.args_begin(), op.getType(), b.args_begin()->getLoc());
-      }
-    }
+  // Copy the field definitions
+  for (auto paramOp : op.getOps<FieldDefOp>()) {
+    rewriter.clone(*paramOp.getOperation());
   }
+  // Copy additional functions declared (like externs)
+  for (auto f : op.getOps<mlir::func::FuncOp>()) {
+    if (f == op.getBodyFunc()) {
+      continue;
+    }
+    rewriter.clone(*f.getOperation());
+  }
+
+  auto bodyFuncType = op.getBodyFunc().getFunctionType();
+
+  llvm::dbgs() << "Fill compute\n";
+  mlir::IRMapping computeMapping;
+  auto computeFunc = mlir::cast<mlir::func::FuncOp>(
+      rewriter.clone(*op.getBodyFunc().getOperation(), computeMapping)
+  );
+  computeFunc.setName(newOp.getBodyFuncName());
+  // fillFunc(
+  //     newOp, newOp.getBodyFuncName(), bodyFuncType, op.getBodyFunc().getRegion(),
+  //     op.getBodyFunc().getArguments(), 0, rewriter
+  // );
+  std::vector<mlir::Type> constrainFuncArgTypes({op.getType()});
+  constrainFuncArgTypes.insert(
+      constrainFuncArgTypes.end(), bodyFuncType.getInputs().begin(), bodyFuncType.getInputs().end()
+  );
+  auto constrainFuncType = rewriter.getFunctionType(constrainFuncArgTypes, TypeRange());
+  llvm::dbgs() << "Fill constrain\n";
+  mlir::IRMapping contrainMapping;
+  auto constrainFunc = mlir::cast<mlir::func::FuncOp>(
+      rewriter.clone(*op.getBodyFunc().getOperation(), contrainMapping)
+  );
+  constrainFunc.setName(newOp.getConstrainFuncName());
+  constrainFunc.setFunctionType(constrainFuncType);
+  // auto constrainFunc = fillFunc(
+  //     newOp, newOp.getConstrainFuncName(), constrainFuncType, op.getBodyFunc().getRegion(),
+  //     op.getBodyFunc().getArguments(), 1, rewriter
+  // );
+  // Insert the self argument for the constrain function as it will be
+  // required by zkir.
+  assert(!constrainFunc.getRegion().empty() && "was expecting a filled out function");
+
+  auto &b = constrainFunc.getRegion().front();
+  if (b.args_empty()) {
+    b.addArgument(op.getType(), op.getLoc());
+  } else {
+    b.insertArgument(b.args_begin(), op.getType(), op.getLoc());
+  }
+
+  rewriter.eraseOp(op);
 
   return mlir::success();
 }
 
 mlir::func::FuncOp SplitComponentOpPattern::fillFunc(
     SplitComponentOp op, llvm::StringRef name, mlir::FunctionType funcType, Region &original,
-    mlir::ConversionPatternRewriter &rewriter
+    ValueRange args, int argsOffset, mlir::ConversionPatternRewriter &rewriter
 ) const {
 
   std::vector<mlir::NamedAttribute> attrs = {mlir::NamedAttribute(
@@ -177,7 +191,20 @@ mlir::func::FuncOp SplitComponentOpPattern::fillFunc(
 
   auto bodyOp = rewriter.create<mlir::func::FuncOp>(op.getLoc(), name, funcType, attrs);
 
-  rewriter.cloneRegionBefore(original, bodyOp.getRegion(), bodyOp.getRegion().end());
+  llvm::dbgs() << "bodyOp = " << bodyOp << "\n";
+
+  mlir::IRMapping mapping;
+  llvm::dbgs() << "args = ";
+  llvm::interleaveComma(args, llvm::dbgs());
+  llvm::dbgs() << "\n";
+  llvm::dbgs() << "bodyOp.getArguments() = ";
+  llvm::interleaveComma(ValueRange(bodyOp.getArguments()), llvm::dbgs());
+  llvm::dbgs() << "\n";
+  for (auto [oldArg, newArg] : llvm::zip_equal(args, bodyOp.getArguments())) {
+    mapping.map(oldArg, newArg);
+  }
+  // Map the arguments in the old region to the arguments of the newly created function
+  rewriter.cloneRegionBefore(original, bodyOp.getRegion(), bodyOp.getRegion().end(), mapping);
   return bodyOp;
 }
 

@@ -9,6 +9,8 @@
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 
+using namespace mlir;
+
 namespace zml {
 
 bool isValidZMLType(mlir::Type type) {
@@ -77,6 +79,29 @@ ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir:
   }
 
   return mlir::dyn_cast<ComponentInterface>(comp);
+}
+
+FailureOr<Attribute> ComponentType::getArraySize() const {
+  if (!isArray()) {
+    return failure();
+  }
+  if (getName().getValue() == "Array") {
+    assert(getParams().size() == 2 && "Arrays must have only two params by definition");
+    return getParams()[1];
+  }
+  if (!getSuperTypeAsComp()) {
+    return failure();
+  }
+  return getSuperTypeAsComp().getArraySize();
+}
+
+ComponentType ComponentType::getSuperTypeAsComp() const {
+  if (getSuperType()) {
+    if (auto comp = mlir::dyn_cast<ComponentType>(getSuperType())) {
+      return comp;
+    }
+  }
+  return nullptr;
 }
 
 } // namespace zml

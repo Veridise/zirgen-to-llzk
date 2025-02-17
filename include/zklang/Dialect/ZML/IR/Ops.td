@@ -125,6 +125,12 @@ def ConstructorRefOp : ZMLOp<"constructor", [Pure]> {
   let hasVerifier = 1;
 }
 
+def ExternFnRefOp : ZMLOp<"extern_fn", [Pure]> {
+  let arguments = (ins FlatSymbolRefAttr:$name);
+  let results = (outs FunctionType);
+  let assemblyFormat = "attr-dict $name `:` type(results)";
+}
+
 def FieldDefOp : ZMLOp<"field", [HasParent<"::zml::ComponentOp, "
                                            "::zml::SplitComponentOp">,
                                  Symbol]> {
@@ -185,6 +191,10 @@ def NopOp : ZMLOp<"nop", [Pure]> {
   let results = (outs Variadic<AnyZMLType>:$outs);
 
   let assemblyFormat = "($ins `:` type($ins)^ `->`)? type($outs) attr-dict";
+
+  let hasFolder = 1;
+
+  let hasCanonicalizeMethod = 1;
 }
 
 def GlobalDefOp : ZMLOp<"global", [HasParent<"::mlir::ModuleOp">]> {
@@ -236,7 +246,7 @@ def NewArrayOp : ZMLOp<"new_array", [Pure]> {
   let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat =
-      "$elements attr-dict `:` `[` type($elements) `]` `->` type($result)";
+      "$elements attr-dict `:` `[` type($elements) `]` `,` type($result)";
 
   let hasFolder = 1;
 }
@@ -309,6 +319,10 @@ def GetArrayLenOp : ZMLOp<"array_len", [Pure]> {
 
   let arguments = (ins TypeVarOr<Component>:$array);
   let results = (outs Index:$length);
+
+  let assemblyFormat = "$array attr-dict `:` type($array)";
+
+  let hasFolder = 1;
 }
 
 def ValToIndexOp : ZMLOp<"toindex", [Pure]> {
@@ -318,6 +332,8 @@ def ValToIndexOp : ZMLOp<"toindex", [Pure]> {
   let results = (outs Index:$result);
 
   let assemblyFormat = "$val `:` type($val) attr-dict";
+
+  let hasFolder = 1;
 }
 
 def ValToI1Op : ZMLOp<"tobool", [Pure]> {

@@ -33,7 +33,6 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   mlir::MLIRContext *ctx = op->getContext();
   llzk::LLZKTypeConverter typeConverter;
 
-  // Init patterns for this transformation
   mlir::RewritePatternSet patterns(ctx);
 
   patterns.add<
@@ -42,25 +41,23 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp, LowerAllocArrayOp, LowerArrayLengthOp,
       LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp, WriteFieldOpLowering,
       LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
-      ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, CallOpLowering,
+      ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, ExternCallOpLowering,
       CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
-      UpdateScfForOpTypes, UpdateScfYieldOpTypes, UpdateScfExecuteRegionOpTypes, UpdateScfIfOpTypes,
-      ValToI1OpLowering, AssertOpLowering, LowerLitValArrayOp
+      RemoveExternFnRefOp, UpdateScfForOpTypes, UpdateScfYieldOpTypes,
+      UpdateScfExecuteRegionOpTypes, UpdateScfIfOpTypes, ValToI1OpLowering, AssertOpLowering,
+      LowerLitValArrayOp
 
       >(typeConverter, ctx);
 
-  // Set conversion target
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
   target.addIllegalDialect<ZMLDialect, mlir::func::FuncDialect>();
 
-  // Control flow operations may need to update their types
   target.addDynamicallyLegalDialect<scf::SCFDialect>([&](Operation *scfOp) {
     return typeConverter.isLegal(scfOp);
   });
 
-  // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();
   }
