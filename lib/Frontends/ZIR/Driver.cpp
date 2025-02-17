@@ -149,8 +149,8 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zml::createInjectBuiltInsPass());
   pm.addPass(zklang::createConvertZhlToZmlPass());
   if (emitAction != Action::PrintZML || !DontReconcileCastsFlag) {
-    pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+    // pm.addPass(mlir::createCanonicalizerPass());
+    // pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   }
 
   if (emitAction == Action::PrintZML) {
@@ -164,8 +164,8 @@ void Driver::configureLoweringPipeline() {
   auto &splitCompFuncsPipeline = splitCompPipeline.nest<mlir::func::FuncOp>();
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalComputeOpsPass());
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalConstrainOpsPass());
-  splitCompFuncsPipeline.addPass(mlir::createCSEPass());
-  splitCompFuncsPipeline.addPass(mlir::createCanonicalizerPass());
+  // splitCompFuncsPipeline.addPass(mlir::createCSEPass());
+  // splitCompFuncsPipeline.addPass(mlir::createCanonicalizerPass());
 
   if (emitAction == Action::OptimizeZML) {
     return;
@@ -174,8 +174,8 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zklang::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
   if (!DontReconcileCastsFlag) {
-    llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
-    llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
+    // llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
+    // llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
   }
 }
 

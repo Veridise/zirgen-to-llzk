@@ -195,7 +195,13 @@ class RemoveIllegalConstrainOpsPass
         WriteFieldOp, ConstructorRefOp,
         SelfOp, // Gets transformed into llzk.new_struct
         BitAndOp, InvOp>();
-    target.addIllegalOp<func::CallIndirectOp>(); // Gets transformed into a call to @compute
+    target.addDynamicallyLegalOp<func::CallIndirectOp>([](func::CallIndirectOp callOp) {
+      auto calleeOp = callOp.getCallee().getDefiningOp();
+      if (!calleeOp) {
+        return false;
+      }
+      return mlir::isa<ExternFnRefOp>(calleeOp);
+    }); // Gets transformed into a call to @compute
     target.addDynamicallyLegalOp<WriteArrayOp>([](WriteArrayOp writeArrOp) {
       return !writeArrOp.getComputeOnly();
     });

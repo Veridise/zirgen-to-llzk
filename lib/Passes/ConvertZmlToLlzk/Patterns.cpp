@@ -458,23 +458,6 @@ mlir::LogicalResult UpdateScfForOpTypes::matchAndRewrite(
     mlir::scf::ForOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
 
-  TypeConverter::SignatureConversion conv(op.getRegion().getNumArguments());
-  for (unsigned i = 1; i < op.getRegion().getNumArguments(); i++) {
-    conv.addInputs(i, adaptor.getInitArgs()[i].getType());
-  }
-  SmallVector<Type> updatedTypes;
-  if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), updatedTypes))) {
-    return failure();
-  }
-  rewriter.applySignatureConversion(&op.getRegion(), conv, getTypeConverter());
-  rewriter.modifyOpInPlace(op, [&]() {
-    for (auto [resultVal, updatedType] : llvm::zip_equal(op.getResults(), updatedTypes)) {
-      resultVal.setType(updatedType);
-    }
-  });
-
-  llvm::dbgs() << "ForOp = " << op << "\n";
-#if 0
   auto initArgs = adaptor.getInitArgs();
   rewriter.replaceOpWithNewOp<mlir::scf::ForOp>(
       op, adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep(), initArgs,
@@ -500,7 +483,6 @@ mlir::LogicalResult UpdateScfForOpTypes::matchAndRewrite(
     );
   }
   );
-#endif
   return mlir::success();
 }
 
