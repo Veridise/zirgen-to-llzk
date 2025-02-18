@@ -8,7 +8,7 @@ set -o pipefail
 # If you have access to the circuit and want to run it change the path 
 # to the location where you have it.
 
-CIRCUIT_PATH=$HOME/code/veridise/risczero-wip/zirgen/circuit/rv32im/v2/dsl/
+CIRCUIT_PATH=$HOME/code/veridise/zir-benchmarks/rv32im-v2/
 KECCAK_PATH=$HOME/code/veridise/zir-benchmarks/keccak2/
 DEST=../risc0_v2_circuit_build_results/$(date +%Y-%m-%d-%H-%M)
 # BAZELFLAGS=--local_resources=cpu='HOST_CPUS*0.5' 
