@@ -379,7 +379,6 @@ mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
     return rewriter.create<llzk::FeltToIndexOp>(op.getLoc(), index).getResult();
   }
   );
-  llvm::dbgs() << "adaptor.getLvalue() = " << adaptor.getLvalue() << "\n";
   auto convertedType = getTypeConverter()->convertType(op.getType());
   if (isa<llzk::ArrayType>(convertedType)) {
     rewriter.replaceOpWithNewOp<llzk::ExtractArrayOp>(

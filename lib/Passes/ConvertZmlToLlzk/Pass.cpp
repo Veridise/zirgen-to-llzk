@@ -7,6 +7,7 @@
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/Util/SymbolHelper.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/SCF/Transforms/Patterns.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/MLIRContext.h>
@@ -43,9 +44,9 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
       ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, ExternCallOpLowering,
       CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
-      RemoveExternFnRefOp, UpdateScfForOpTypes, UpdateScfYieldOpTypes,
-      UpdateScfExecuteRegionOpTypes, UpdateScfIfOpTypes, ValToI1OpLowering, AssertOpLowering,
-      LowerLitValArrayOp
+      RemoveExternFnRefOp, /*UpdateScfForOpTypes, UpdateScfYieldOpTypes,
+      UpdateScfExecuteRegionOpTypes, UpdateScfIfOpTypes,*/
+      ValToI1OpLowering, AssertOpLowering, LowerLitValArrayOp
 
       >(typeConverter, ctx);
 
@@ -54,9 +55,11 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
   target.addIllegalDialect<ZMLDialect, mlir::func::FuncDialect>();
 
-  target.addDynamicallyLegalDialect<scf::SCFDialect>([&](Operation *scfOp) {
-    return typeConverter.isLegal(scfOp);
-  });
+  // target.addDynamicallyLegalDialect<scf::SCFDialect>([&](Operation *scfOp) {
+  //   return typeConverter.isLegal(scfOp);
+  // });
+
+  scf::populateSCFStructuralTypeConversionsAndLegality(typeConverter, patterns, target);
 
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();
