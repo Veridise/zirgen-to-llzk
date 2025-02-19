@@ -1,3 +1,6 @@
+// RUN: zklang -o - %s
+// XFAIL: *
+
 // Diag in this test case returns Array<Val, N>, but we don't know that 
 // because the size of the array returned by the map expression is the size of the 
 // range. And since this range is determined by N we don't know its size.
