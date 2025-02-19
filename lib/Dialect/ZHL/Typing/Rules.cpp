@@ -343,10 +343,18 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
     return op->emitOpError() << "could not infer the type of the array";
   }
 
-  auto commonType = std::reduce(
-      operands.drop_front().begin(), operands.end(), operands.front(),
-      [](auto a, auto b) { return a.commonSupertypeWith(b); }
-  );
+  auto get = [](const TypeBinding &t) -> const TypeBinding & {
+    if (t.isKnownConst()) {
+      return t.getSuperType();
+    }
+    return t;
+  };
+
+  auto &fst = get(operands.front());
+  auto commonType =
+      std::reduce(operands.drop_front().begin(), operands.end(), fst, [&](auto &lhs, auto &rhs) {
+    return get(lhs).commonSupertypeWith(get(rhs));
+  });
 
   return getBindings().Array(commonType, operands.size());
 }
