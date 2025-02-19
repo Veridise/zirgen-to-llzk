@@ -170,7 +170,7 @@ void Driver::configureLoweringPipeline() {
   if (emitAction == Action::OptimizeZML) {
     return;
   }
-  pm.addPass(createLocationSnapshotPass());
+  // pm.addPass(createLocationSnapshotPass());
   pm.addPass(zklang::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
   if (!DontReconcileCastsFlag) {

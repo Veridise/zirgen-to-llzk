@@ -7,6 +7,7 @@
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/Util/SymbolHelper.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SCF/Transforms/Patterns.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -44,8 +45,8 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
       ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, ExternCallOpLowering,
       CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
-      RemoveExternFnRefOp, /*UpdateScfForOpTypes, UpdateScfYieldOpTypes,
-      UpdateScfExecuteRegionOpTypes, UpdateScfIfOpTypes,*/
+      RemoveExternFnRefOp,           /*UpdateScfForOpTypes, UpdateScfYieldOpTypes,*/
+      UpdateScfExecuteRegionOpTypes, /* UpdateScfIfOpTypes,*/
       ValToI1OpLowering, AssertOpLowering, LowerLitValArrayOp
 
       >(typeConverter, ctx);
@@ -55,15 +56,36 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
   target.addIllegalDialect<ZMLDialect, mlir::func::FuncDialect>();
 
-  // target.addDynamicallyLegalDialect<scf::SCFDialect>([&](Operation *scfOp) {
-  //   return typeConverter.isLegal(scfOp);
-  // });
+  // Legality for scf ops added manually here because ExecuteRegionOp and its associated YieldOp are
+  // not supported by the MLIR provided populate* function
+  target.addDynamicallyLegalOp<scf::ExecuteRegionOp>([&](scf::ExecuteRegionOp execOp) {
+    return typeConverter.isLegal(execOp.getResultTypes());
+  });
 
-  scf::populateSCFStructuralTypeConversionsAndLegality(typeConverter, patterns, target);
+  target.addDynamicallyLegalOp<scf::YieldOp>([&](scf::YieldOp yieldOp) {
+    if (!isa<scf::ExecuteRegionOp, scf::ForOp, scf::IfOp, scf::WhileOp>(yieldOp->getParentOp())) {
+      return true;
+    }
+    return typeConverter.isLegal(yieldOp.getOperandTypes());
+  });
 
+  target.addDynamicallyLegalOp<scf::ForOp, scf::IfOp>([&](Operation *scfOp) {
+    return typeConverter.isLegal(scfOp->getResultTypes());
+  });
+
+  target.addDynamicallyLegalOp<scf::WhileOp, scf::ConditionOp>([&](Operation *scfOp) {
+    return typeConverter.isLegal(scfOp);
+  });
+
+  scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
+
+  llvm::dbgs() << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaa\n";
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
+    llvm::dbgs(
+    ) << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n";
     signalPassFailure();
   }
+  llvm::dbgs() << "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n";
 }
 
 void InjectLlzkModAttrsPass::runOnOperation() {

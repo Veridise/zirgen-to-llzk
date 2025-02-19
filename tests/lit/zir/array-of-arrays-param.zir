@@ -1,3 +1,24 @@
+// Diag in this test case returns Array<Val, N>, but we don't know that 
+// because the size of the array returned by the map expression is the size of the 
+// range. And since this range is determined by N we don't know its size.
+// To solve this we need to set the size of said range as the affine expr `N - 0`,
+// or `High - Low` in the general case. Then the map expression picks up the affine expression 
+// from the range and then Diag from it. Until LLZK-174 is done this test case will fail.
+
+// In principle there is "nothing wrong" with returning an array of unknown size, but 
+// when creating the constraint what happens is that the lhs has type `!array<? x !felt>` and 
+// the rhs has type `!array<3 x !felt>`. With the subtyping rules what will happen is that the 
+// least common super type of these two is `!struct<@Component>` (aka the top of the lattice)
+// and thus we have effectively lost the type information we need to properly emit the constraint.
+
+// A safe workaround is to allow coercing arrays of known size to arrays of unknown size, however,
+// a well formed ZIR program should never have an array whose size is not known. This arrays os unknown 
+// size are an artifact of the WIP nature of the frontend and keeping the type parameters in the emitted 
+// IR. Considering this I think such workaround would be a specific edge case that should be removed 
+// in a mature version of the frontend that either knowns a mathematical function that relates the size of
+// arrays (via a constant value, a constant variable in scope, or an affine map), or expands the body of the 
+// components in the cases where the relation cannot be expressed with the afforementioned constructs.
+
 component Diag<N: Val>(m: Array<Array<Val, N>, N>) {
   for i : 0..N { m[i][i] }
 }

@@ -66,9 +66,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
   addConversion([&](zml::ComponentType t) -> mlir::Type {
     llvm::SmallVector<mlir::Attribute> convertedAttrs;
     convertParamAttrs(t.getParams(), convertedAttrs, *this);
-    return llzk::StructType::get(
-        t.getContext(), t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs)
-    );
+    return llzk::StructType::get(t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs));
   });
 
   addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {

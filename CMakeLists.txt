@@ -115,9 +115,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "Debu
   # NOTE: undefined behavior sanitizer ("undefined") has been removed due to its
   # poor interaction with gtest fixtures and other standard MLIR/LLVM
   # operations.
-  # TODO: Turn me back on before merging!
-  #add_compile_options(-fsanitize=address)
-  #add_link_options(-fsanitize=address)
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
 endif()
 
 

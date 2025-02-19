@@ -6,8 +6,10 @@
 #include <iterator>
 #include <llvm/ADT/STLExtras.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
@@ -160,7 +162,7 @@ mlir::LogicalResult ExternCallOpLowering::matchAndRewrite(
     return op->emitError("failed to transform zml types into llzk types");
   }
   rewriter.replaceOpWithNewOp<llzk::CallOp>(
-      op, callee.getName(), results, adaptor.getCalleeOperands()
+      op, results, callee.getNameAttr(), adaptor.getCalleeOperands()
   );
   return mlir::success();
 }
@@ -233,7 +235,7 @@ LogicalResult LowerConstrainCallOp::matchAndRewrite(
   auto sym = mlir::SymbolRefAttr::get(
       compName, {mlir::SymbolRefAttr::get(rewriter.getStringAttr("constrain"))}
   );
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, sym, TypeRange(), adaptor.getOperands());
+  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, TypeRange(), sym, adaptor.getOperands());
 
   return success();
 }
@@ -274,7 +276,7 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
       mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
   );
 
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, sym, types, args);
+  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, types, sym, args);
   return mlir::success();
 }
 
@@ -340,15 +342,39 @@ mlir::LogicalResult LowerInRangeOp::matchAndRewrite(
 mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
     NewArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
-      op, getTypeConverter()->convertType(op.getType()), adaptor.getElements()
-  );
+  // NewArrayOp is SameTypeOperands so by querying the type of any one of the elements we can know
+  // if the inputs are scalar or arrays
+
+  auto type = getTypeConverter()->convertType(op.getType());
+  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  if (!arrType) {
+    return op.emitOpError() << "was expecting an array type";
+  }
+
+  // If its an array then we allocate an empty one and then insert each operand with InsertArrayOp
+  if (!adaptor.getElements().empty() && isa<llzk::ArrayType>(adaptor.getElements()[0].getType())) {
+    auto arr = rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange());
+    for (size_t i = 0; i < adaptor.getElements().size(); i++) {
+      auto idx = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), i);
+      rewriter.create<llzk::InsertArrayOp>(
+          op.getLoc(), arr, ValueRange({idx}), adaptor.getElements()[i]
+      );
+    }
+  } else {
+    rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, adaptor.getElements());
+  }
   return mlir::success();
 }
 
 mlir::LogicalResult LowerLitValArrayOp::matchAndRewrite(
     LitValArrayOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
+  auto type = getTypeConverter()->convertType(op.getType());
+  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  if (!arrType) {
+    return op.emitOpError() << "was expecting an array type";
+  }
+
   SmallVector<Value> lits;
   std::transform(
       op.getElements().begin(), op.getElements().end(), std::back_inserter(lits),
@@ -360,9 +386,7 @@ mlir::LogicalResult LowerLitValArrayOp::matchAndRewrite(
   }
   );
 
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
-      op, getTypeConverter()->convertType(op.getType()), ValueRange(lits)
-  );
+  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange(lits));
   return success();
 }
 
@@ -384,11 +408,11 @@ mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
     rewriter.replaceOpWithNewOp<llzk::ExtractArrayOp>(
         op, convertedType, adaptor.getLvalue(), toIndexOps
     );
-    return success();
+  } else {
+    rewriter.replaceOpWithNewOp<llzk::ReadArrayOp>(
+        op, convertedType, adaptor.getLvalue(), toIndexOps
+    );
   }
-  rewriter.replaceOpWithNewOp<llzk::ReadArrayOp>(
-      op, convertedType, adaptor.getLvalue(), toIndexOps
-  );
   return mlir::success();
 }
 
@@ -409,9 +433,12 @@ mlir::LogicalResult LowerIsz::matchAndRewrite(
 mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
     AllocArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
-      op, getTypeConverter()->convertType(op.getType()), mlir::ValueRange()
-  );
+  auto type = getTypeConverter()->convertType(op.getType());
+  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  if (!arrType) {
+    return op.emitOpError() << "was expecting an array type";
+  }
+  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, mlir::ValueRange());
 
   return mlir::success();
 }
@@ -491,7 +518,7 @@ mlir::LogicalResult UpdateScfForOpTypes::matchAndRewrite(
   );
   return mlir::success();
 }
-
+// TODO: Remove me
 mlir::LogicalResult UpdateScfYieldOpTypes::matchAndRewrite(
     mlir::scf::YieldOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {

@@ -69,7 +69,7 @@ def SelfOp : ZMLOp<"self", [NoTerminator]> {
   let description = "Returns the current component after executing its content";
 
   let results = (outs Component);
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region MaxSizedRegion<1>:$body);
 
   let assemblyFormat = [{
      $body attr-dict `:` type(results) 
@@ -239,7 +239,7 @@ def ConstrainOp : ZMLOp<"constrain"> {
   }];
 }
 
-def NewArrayOp : ZMLOp<"new_array", [Pure]> {
+def NewArrayOp : ZMLOp<"new_array", [Pure, SameTypeOperands]> {
   let summary = "creates a new array with data";
 
   let arguments = (ins Variadic<AnyZMLType>:$elements);
