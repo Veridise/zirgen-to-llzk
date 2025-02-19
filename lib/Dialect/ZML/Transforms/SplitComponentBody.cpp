@@ -138,7 +138,6 @@ LogicalResult SplitComponentOpPattern::matchAndRewrite(
 
   auto bodyFuncType = op.getBodyFunc().getFunctionType();
 
-  llvm::dbgs() << "Fill compute\n";
   mlir::IRMapping computeMapping;
   auto computeFunc = mlir::cast<mlir::func::FuncOp>(
       rewriter.clone(*op.getBodyFunc().getOperation(), computeMapping)
@@ -153,7 +152,6 @@ LogicalResult SplitComponentOpPattern::matchAndRewrite(
       constrainFuncArgTypes.end(), bodyFuncType.getInputs().begin(), bodyFuncType.getInputs().end()
   );
   auto constrainFuncType = rewriter.getFunctionType(constrainFuncArgTypes, TypeRange());
-  llvm::dbgs() << "Fill constrain\n";
   mlir::IRMapping contrainMapping;
   auto constrainFunc = mlir::cast<mlir::func::FuncOp>(
       rewriter.clone(*op.getBodyFunc().getOperation(), contrainMapping)

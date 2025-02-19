@@ -171,7 +171,7 @@ LogicalResult LowerNopOp::matchAndRewrite(
     NopOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
   if (adaptor.getIns().size() == op.getNumResults()) {
-    llvm::dbgs() << "Replacing NopOp results with its inputs\n";
+    // FIXME: This is bad to do here!
     rewriter.replaceAllUsesWith(op.getResults(), adaptor.getIns());
   }
   rewriter.eraseOp(op);
