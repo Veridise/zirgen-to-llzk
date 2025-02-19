@@ -58,19 +58,18 @@ public:
   mlir::Value build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args);
   mlir::FunctionType getCtorType() const;
   const zhl::TypeBinding &getBinding() const;
-  ComponentInterface getCalleeComp() const;
   ComponentInterface getCallerComp() const;
 
 private:
   CtorCallBuilder(
-      mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface callee,
-      ComponentInterface caller, mlir::Value self, bool builtin
+      mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
+      mlir::Value self, bool builtin
   );
 
   mlir::FunctionType ctorType;
   const zhl::TypeBinding compBinding;
   bool isBuiltin;
-  ComponentInterface calleeComponentOp, callerComponentOp;
+  ComponentInterface callerComponentOp;
   mlir::Value self;
 };
 

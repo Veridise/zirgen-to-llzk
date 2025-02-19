@@ -122,13 +122,10 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     StringRef expectingNArgsMsg =
         isVariadic(constructorType) ? ", was expecting at least " : ", was expecting ";
     auto minArgCount = isVariadic(constructorType) ? ctorFormalsCount - 1 : ctorFormalsCount;
-    return op->emitOpError()
-        .append(
-            "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
-            minArgCount, " arguments but got ", adaptor.getArgs().size()
-        )
-        .attachNote(ctor->getCalleeComp()->getLoc())
-        .append("component declared here");
+    return op->emitOpError().append(
+        "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
+        minArgCount, " arguments but got ", adaptor.getArgs().size()
+    );
   }
 
   std::vector<mlir::Value> preparedArguments;

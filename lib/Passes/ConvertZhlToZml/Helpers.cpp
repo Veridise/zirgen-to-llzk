@@ -143,8 +143,8 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   auto constructorType = materializeTypeBindingConstructor(builder, binding);
 
   return CtorCallBuilder(
-      constructorType, binding, mlir::dyn_cast<ComponentInterface>(calleeComp),
-      op->getParentOfType<ComponentInterface>(), self, calleeIsBuiltin(calleeComp)
+      constructorType, binding, op->getParentOfType<ComponentInterface>(), self,
+      calleeIsBuiltin(calleeComp)
   );
 }
 
@@ -182,15 +182,12 @@ mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }
 
 const zhl::TypeBinding &CtorCallBuilder::getBinding() const { return compBinding; }
 
-ComponentInterface CtorCallBuilder::getCalleeComp() const { return calleeComponentOp; }
-
 CtorCallBuilder::CtorCallBuilder(
-    mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface callee,
-    ComponentInterface caller, mlir::Value selfValue, bool builtin
+    mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
+    mlir::Value selfValue, bool builtin
 )
-    : ctorType(type), compBinding(binding), isBuiltin(builtin), calleeComponentOp(callee),
-      callerComponentOp(caller), self(selfValue) {
-  assert(calleeComponentOp);
+    : ctorType(type), compBinding(binding), isBuiltin(builtin), callerComponentOp(caller),
+      self(selfValue) {
   assert(callerComponentOp);
   assert(self);
 }
