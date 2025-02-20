@@ -753,6 +753,7 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     auto conv = builder.create<IndexToValOp>(loc, innerType, iv);
     builder.create<WriteArrayOp>(loc, arrAlloc, iv, conv);
+    builder.create<scf::YieldOp>(loc);
   }
   );
   rewriter.replaceOp(op, arrAlloc);
