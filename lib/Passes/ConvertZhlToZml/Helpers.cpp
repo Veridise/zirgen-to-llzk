@@ -69,15 +69,31 @@ Value storeAndLoadSlot(
 ) {
   auto compSlotBinding = slot.getBinding();
   auto compSlotIVs = slot.collectIVs();
+  storeSlot(slot, value, slotName, slotType, loc, compType, builder, self);
+
+  if (compSlotIVs.empty()) {
+    // Read the temporary back to a SSA value
+    return builder.create<ReadFieldOp>(loc, slotType, self, slotName);
+  } else {
+    // Read the array back to a SSA value
+    auto arrayDataBis = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
+
+    // Read the value we wrote into the array back to a SSA value
+    return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, compSlotIVs);
+  }
+}
+
+void storeSlot(
+    ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
+    Type compType, OpBuilder &builder, Value self
+) {
+  auto compSlotBinding = slot.getBinding();
+  auto compSlotIVs = slot.collectIVs();
 
   if (compSlotIVs.empty()) {
     assert(slotType == value.getType() && "result of construction and slot type must be the same");
     // Write the construction in a temporary
     builder.create<WriteFieldOp>(loc, self, slotName, value);
-
-    // Read the temporary back to a SSA value
-    return builder.create<ReadFieldOp>(loc, slotType, self, slotName);
-
   } else {
     auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size());
     auto unwrappedType = materializeTypeBinding(builder.getContext(), unwrappedBinding);
@@ -92,12 +108,6 @@ Value storeAndLoadSlot(
 
     // Write the array back into the field
     builder.create<WriteFieldOp>(loc, self, slotName, arrayData);
-
-    // Read the array back to a SSA value
-    auto arrayDataBis = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
-
-    // Read the value we wrote into the array back to a SSA value
-    return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, compSlotIVs);
   }
 }
 

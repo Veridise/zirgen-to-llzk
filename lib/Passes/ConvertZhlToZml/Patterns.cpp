@@ -359,32 +359,31 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
   // If the binding of this op has a slot then it is responsible of creating it.
   // Otherwise, check if the declaration's binding has a slot. If it does create it here.
   // Wrap the value around a SuperCoerceOp.
-  // If a slot is created here then replace all the uses of the definition expression with the
-  // result of writing and reading from the slot. Then remove this op.
+  // If a slot is created here that means that the value we are storing in the field does not need
+  // memory according to the type checker and thus we don't need to introduce the use-def cut since
+  // that value is safe to use in @constrain functions.
 
   if (slot) {
     auto slotName = createSlot(slot, rewriter, comp, op.getLoc());
     mlir::Type slotType = materializeTypeBinding(getContext(), slot->getBinding());
     SmallVector<Operation *, 2> castOps;
     Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
-    result = storeAndLoadSlot(
-        *slot, result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self
-    );
-    // Cast it back to a Expr to maintain type safety in the ZHL ops
-    auto castedResult = rewriter
-                            .create<mlir::UnrealizedConversionCastOp>(
-                                op.getLoc(), mlir::TypeRange(Zhl::ExprType::get(getContext())),
-                                mlir::ValueRange(result)
-                            )
-                            .getResult(0);
-    // We can't return mlir::failure() at this stage because we already created new ops.
-    assert(succeeded(addType(castedResult, *exprBinding)));
-
-    if (castOps.empty()) {
-      rewriter.replaceAllUsesWith(value, castedResult);
-    } else {
-      rewriter.replaceAllUsesExcept(value, castedResult, castOps.front());
-    }
+    storeSlot(*slot, result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
+    // // Cast it back to a Expr to maintain type safety in the ZHL ops
+    // auto castedResult = rewriter
+    //                         .create<mlir::UnrealizedConversionCastOp>(
+    //                             op.getLoc(), mlir::TypeRange(Zhl::ExprType::get(getContext())),
+    //                             mlir::ValueRange(result)
+    //                         )
+    //                         .getResult(0);
+    // // We can't return mlir::failure() at this stage because we already created new ops.
+    // assert(succeeded(addType(castedResult, *exprBinding)));
+    //
+    // if (castOps.empty()) {
+    //   rewriter.replaceAllUsesWith(value, castedResult);
+    // } else {
+    //   rewriter.replaceAllUsesExcept(value, castedResult, castOps.front());
+    // }
   }
 
   rewriter.eraseOp(op);
@@ -403,7 +402,7 @@ mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
     return op->emitOpError() << "failed to type check";
   }
   if (!mlir::isa<SelfOp>(op->getParentOp())) {
-    return mlir::failure();
+    return failure();
   }
   auto comp = op->getParentOfType<ComponentInterface>();
   assert(comp);
@@ -871,7 +870,7 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
 ) const {
   auto parent = op->getParentOp();
   if (!parent || !mlir::isa<mlir::scf::ExecuteRegionOp>(parent)) {
-    return mlir::failure();
+    return failure();
   }
   auto binding = getType(op);
   if (mlir::failed(binding)) {

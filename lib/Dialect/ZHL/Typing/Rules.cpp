@@ -10,6 +10,8 @@
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 
+#define DEBUG_TYPE "type-checker"
+
 namespace zhl {
 
 using namespace zirgen::Zhl;
@@ -221,18 +223,20 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     return copy;
   };
 
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Type checking op " << op << "\n");
   auto decl = getDeclaration(op);
   if (mlir::failed(decl)) {
-    return op->emitError() << "Malformed IR: Definition must have a declaration operand";
+    return op->emitError() << "malformed IR: Definition must have a declaration operand";
   }
   if (operands.size() < 2) {
-    return mlir::failure();
+    return op->emitError() << "not enough arguments for define op";
   }
   if (!operands[0].isBottom() && failed(operands[1].subtypeOf(operands[0]))) {
     return op->emitError() << "was expecting a subtype of '" << operands[0] << "', but got '"
                            << operands[1] << "'";
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Validation passed\n");
   auto *declSlot = operands[0].getSlot();
   auto *exprSlot = operands[1].getSlot();
 
@@ -247,6 +251,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // expression op is renamed to the member's name. The type binding returned by
     // this rule does not link to a slot since the expression op already does.
     if (declBinding == exprBinding) {
+      LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 2\n");
       exprSlot->rename(decl->getMember());
       scope.declareMember(decl->getMember(), operands[1]);
       return copyWithoutSlot(operands[1]);
@@ -255,16 +260,19 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // Case 1: In this case the result of this rule is a copy of the type binding of the declaration
     // op. The slot allocated by the expression needs to be maintained to avoid losing the type
     // information.
+    LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 1\n");
     return copyWithoutSlot(operands[0]);
   }
 
   // Case 3: The result is a copy of the type binding of the declaration op.
   if (declSlot) {
+    LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 3\n");
     return copyWithoutSlot(operands[0]);
   }
 
   // Case 4: Rename the slot with the name of the member.
   if (exprSlot) {
+    LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 4\n");
     exprSlot->rename(decl->getMember());
     scope.declareMember(decl->getMember(), operands[1]);
     return copyWithoutSlot(operands[1]);
@@ -272,6 +280,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
 
   // Case 5: Allocate a slot of the type binding of the expression and the name of the member.
   // Return a type binding that links to the allocated slot.
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 5\n");
   auto binding = operands[1];
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), binding, decl->getMember());
   scope.declareMember(decl->getMember(), binding);

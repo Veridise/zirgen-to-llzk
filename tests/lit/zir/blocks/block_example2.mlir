@@ -48,8 +48,6 @@ module {
     %5 = zhl.extern "Log"(%1, %3) : %4
     zhl.super %5
   }
-  // expected-error@+2 {{failed to legalize operation 'zhl.component'}}
-  // expected-error@+1 {{'zhl.component' op failed to type check component member 'b'}}
   zhl.component @A {
     // expected-error@+1 {{could not deduce the type of op 'zhl.block'}}
     %0 = zhl.block {

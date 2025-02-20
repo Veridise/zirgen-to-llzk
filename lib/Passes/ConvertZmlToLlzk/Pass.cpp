@@ -79,13 +79,9 @@ void ConvertZmlToLlzkPass::runOnOperation() {
 
   scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
 
-  llvm::dbgs() << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaa\n";
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
-    llvm::dbgs(
-    ) << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n";
     signalPassFailure();
   }
-  llvm::dbgs() << "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n";
 }
 
 void InjectLlzkModAttrsPass::runOnOperation() {

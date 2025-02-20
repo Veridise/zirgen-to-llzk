@@ -36,6 +36,10 @@ namespace zml {
 
 void ConvertZhlToZmlPass::runOnOperation() {
   auto &typeAnalysis = getAnalysis<zhl::ZIRTypeAnalysis>();
+  if (failed(typeAnalysis)) {
+    signalPassFailure();
+    return;
+  }
   mlir::SmallVector<mlir::Attribute> builtinOverrideSet;
   mlir::ModuleOp module = getOperation();
   mlir::MLIRContext *ctx = module->getContext();

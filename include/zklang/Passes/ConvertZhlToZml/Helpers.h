@@ -34,6 +34,13 @@ mlir::Value storeAndLoadSlot(
     mlir::Value
 );
 
+/// Stores a value into the field defined by the slotName symbol.
+void storeSlot(
+    zhl::ComponentSlot &slot, mlir::Value value, mlir::FlatSymbolRefAttr slotName,
+    mlir::Type slotType, mlir::Location loc, mlir::Type compType, mlir::OpBuilder &builder,
+    mlir::Value
+);
+
 /// Helper for creating the ops that represent the call to a component's constructor.
 /// If the associated binding is linked to a frame slot it also creates the field and writes the
 /// result into it.
