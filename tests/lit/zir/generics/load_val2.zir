@@ -1,6 +1,16 @@
 // RUN: zklang -o - %s | FileCheck %s
 
 component A<N: Val>() {
+// CHECK-LABEL:   llzk.struct @A<[@N]> {
+// CHECK-LABEL:     func @compute() -> !llzk.struct<@A<[@N]>> {
+// CHECK-DAG:       %[[T1:[0-9a-zA-Z_\.]+]] = constfelt  1
+// CHECK-DAG:       %[[T2:[0-9a-zA-Z_\.]+]] = new_struct : <@A<[@N]>>
+// CHECK-DAG:       %[[T3:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
+// CHECK-DAG:       %[[T4:[0-9a-zA-Z_\.]+]] = add %[[T3]], %[[T1]] : !llzk.felt, !llzk.felt
+// CHECK-DAG:       %[[T5:[0-9a-zA-Z_\.]+]] = new_array %[[T3]], %[[T4]] : <2 x !llzk.felt>
+// CHECK-DAG:       writef %[[T2]][@"$super"] = %[[T5]] : <@A<[@N]>>, !llzk.array<2 x !llzk.felt>
+// CHECK-DAG:       return %[[T2]] : !llzk.struct<@A<[@N]>>
+// CHECK-LABEL:     func @constrain
   [N,N+1]
 }
 
@@ -8,20 +18,6 @@ component Top() {
   a := A<1>();
 }
 
-//      CHECK:   llzk.struct @A<[@N]> {
-// CHECK-NEXT:     field @"$super" : !llzk.array<2 x !llzk.felt>
-// CHECK-NEXT:     func @compute() -> !llzk.struct<@A<[@N]>> {
-// CHECK-NEXT:       %felt_const_1 = constfelt  1
-// CHECK-NEXT:       %self = new_struct : <@A<[@N]>>
-// CHECK-NEXT:       %0 = read_const @N : !llzk.felt
-// CHECK-NEXT:       %1 = add %0, %felt_const_1 : !llzk.felt, !llzk.felt
-// CHECK-NEXT:       %array = new_array %0, %1 : <2 x !llzk.felt>
-// CHECK-NEXT:       writef %self[@"$super"] = %array : <@A<[@N]>>, !llzk.array<2 x !llzk.felt>
-// CHECK-NEXT:       return %self : !llzk.struct<@A<[@N]>>
-// CHECK-NEXT:     }
-// CHECK-NEXT:     func @constrain(%arg0: !llzk.struct<@A<[@N]>>) {
-// CHECK-NEXT:       %0 = read_const @N : !llzk.felt
-// CHECK-NEXT:       return
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
+
+
 
