@@ -321,8 +321,9 @@ mlir::FailureOr<TypeBinding> GenericParamTypeRule::
     return mlir::failure();
   }
 
-  scope.declareGenericParam(op.getName(), op.getIndex(), operands[0]);
-  return TypeBinding::MakeGenericParam(getBindings().Manage(operands[0]), op.getName());
+  auto param = TypeBinding::MakeGenericParam(getBindings().Manage(operands[0]), op.getName());
+  scope.declareGenericParam(op.getName(), op.getIndex(), param);
+  return param;
 }
 
 mlir::FailureOr<TypeBinding> SpecializeTypeRule::
