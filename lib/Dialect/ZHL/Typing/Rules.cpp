@@ -417,7 +417,7 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
 
   if (operands[0].isKnownConst() && operands[1].isKnownConst()) {
     if (operands[1].getConst() < operands[0].getConst()) {
-      return op->emitError() << "right side of range must be greater or equal then left side";
+      return op->emitError() << "right side of range must be greater or equal than the left side";
     }
     return getBindings().Array(common, operands[1].getConst() - operands[0].getConst());
   }
