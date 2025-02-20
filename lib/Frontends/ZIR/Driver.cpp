@@ -63,7 +63,9 @@ static cl::opt<std::string>
 // They are defined with external storage to avoid having to wrap
 // the code that uses them in preprocessor checks too
 bool DisableMultiThreadingFlag = false;
-bool DisableCleanupPassesFlag = false;
+// Disabled by default until LLZK-177 is resolved
+bool DisableCleanupPassesFlag = true;
+bool DisableCastReconciliationFlag = false;
 
 #ifndef NDEBUG
 static cl::opt<bool, true> DisableMultiThreading(
@@ -72,9 +74,14 @@ static cl::opt<bool, true> DisableMultiThreading(
 );
 
 static cl::opt<bool, true> DisableCleanupPasses(
-    "disable-cleanup-passes",
-    cl::desc("Disables running reconcile-unrealized-casts, cse, and canonicalize in the pipeline"),
+    "disable-cleanup-passes", cl::desc("Disables running cse and canonicalize in the pipeline"),
     cl::Hidden, cl::location(DisableCleanupPassesFlag)
+);
+
+static cl::opt<bool, true> DisableCastReconciliation(
+    "disable-reconciliation-passes",
+    cl::desc("Disables running reconcile-unrealized-casts in the pipeline"), cl::Hidden,
+    cl::location(DisableCastReconciliationFlag)
 );
 #endif
 
@@ -149,7 +156,7 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zklang::createStripTestsPass());
   pm.addPass(zml::createInjectBuiltInsPass());
   pm.addPass(zklang::createConvertZhlToZmlPass());
-  if (!DisableCleanupPassesFlag) {
+  if (!DisableCastReconciliationFlag) {
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   }
 
@@ -173,8 +180,10 @@ void Driver::configureLoweringPipeline() {
   }
   pm.addPass(zklang::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
-  if (!DisableCleanupPassesFlag) {
+  if (!DisableCastReconciliationFlag) {
     llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
+  }
+  if (!DisableCleanupPassesFlag) {
     llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
   }
 }
