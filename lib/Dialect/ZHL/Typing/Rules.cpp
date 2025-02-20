@@ -332,6 +332,23 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
   if (operands.empty()) {
     return mlir::failure();
   }
+
+  auto I = op.getArgs().begin();
+  auto E = op.getArgs().end();
+  bool failed = false;
+  for (; I != E; ++I) {
+    auto argOp = (*I).getDefiningOp();
+    assert(argOp && "cannot have values that do not come from operations in ZHL");
+    if (!mlir::isa<TypeParamOp, LiteralOp, SpecializeOp, GlobalOp>(argOp)) {
+      op->emitError() << "was expecting a type, a literal value or a generic parameter, but got "
+                      << argOp->getName().stripDialect();
+      failed = true;
+    }
+  }
+  if (failed) {
+    return failure();
+  }
+
   auto typeToSpecialize = operands[0];
   return typeToSpecialize.specialize([&]() { return op->emitOpError(); }, operands.drop_front());
 }
