@@ -65,7 +65,7 @@ static cl::opt<std::string>
 bool DisableMultiThreadingFlag = false;
 // Disabled by default until LLZK-177 is resolved
 bool DisableCleanupPassesFlag = true;
-bool DisableCastReconciliationFlag = false;
+bool DisableCastReconciliationFlag = true;
 
 #ifndef NDEBUG
 static cl::opt<bool, true> DisableMultiThreading(
