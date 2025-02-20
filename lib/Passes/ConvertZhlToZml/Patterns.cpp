@@ -900,14 +900,16 @@ mlir::LogicalResult ZhlSuperLoweringInSwitch::matchAndRewrite(
     return op->emitOpError() << "failed to type check";
   }
 
-  auto value = adaptor.getValue();
   auto type = materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != type) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), type, value);
-    value = cast.getResult(0);
+  assert(parent->getResultTypes().size() == 1);
+  auto parentType = parent->getResultTypes().front();
+  auto value = getCastedValue(adaptor.getValue(), rewriter, type);
+  if (failed(value)) {
+    return failure();
   }
+  auto coercion = rewriter.create<SuperCoerceOp>(op.getLoc(), parentType, *value);
 
-  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, value);
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, coercion.getResult());
   return mlir::success();
 }
 
