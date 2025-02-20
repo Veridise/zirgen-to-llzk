@@ -146,7 +146,6 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     // And specialize it if necessary
     auto &newScope = copy.getGenericParamsMapping();
     {
-      // ScopeGuard guard(scopes, newScope);
       auto result = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
       if (failed(result)) {
         LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");

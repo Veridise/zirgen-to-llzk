@@ -64,28 +64,21 @@ private:
       return nullptr;
     }
     if (binding.isGeneric()) {
-      // LLVM_DEBUG(llvm::dbgs() << "Binding " << binding << " is generic\n");
       std::vector<Attribute> params;
       if (binding.isSpecialized()) {
-        // zml-type-materialization LLVM_DEBUG(llvm::dbgs() << "Binding " << binding << " is
-        // specialized\n");
         //  Put the types associated with the specialization
         auto paramBindings = binding.getGenericParams();
         std::transform(
             paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
             [&](const auto &b) -> Attribute {
-          // LLVM_DEBUG(llvm::dbgs() << "Parameter binding " << b);
           if (b.isConst()) {
-            // LLVM_DEBUG(llvm::dbgs() << " is a constant\n");
             return mlir::IntegerAttr::get(
                 mlir::IntegerType::get(context, 64),
                 b.isKnownConst() ? b.getConst() : mlir::ShapedType::kDynamic
             );
           } else if (b.isGenericParam() && b.getSuperType().isVal()) {
-            // LLVM_DEBUG(llvm::dbgs() << " is a symbol\n");
             return SymbolRefAttr::get(StringAttr::get(context, b.getGenericParamName()));
           } else {
-            // LLVM_DEBUG(llvm::dbgs() << " is a type\n");
             return mlir::TypeAttr::get(materializeImpl(b));
           }
         }

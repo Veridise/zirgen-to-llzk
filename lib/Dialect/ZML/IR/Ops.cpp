@@ -300,27 +300,6 @@ mlir::OpFoldResult ValToIndexOp::fold(ValToIndexOp::FoldAdaptor adaptor) {
   return adaptor.getVal();
 }
 
-// Disabled because something wrong is going on with this one.
-// mlir::OpFoldResult NewArrayOp::fold(NewArrayOp::FoldAdaptor adaptor) {
-//   return nullptr;
-//
-//   mlir::SmallVector<long> values;
-//   for (auto attr : adaptor.getElements()) {
-//     if (!attr) {
-//       return nullptr;
-//     }
-//     if (auto arrayAttr = mlir::dyn_cast<mlir::DenseI64ArrayAttr>(attr)) {
-//       values.insert(values.end(), arrayAttr.asArrayRef().begin(), arrayAttr.asArrayRef().end());
-//     } else if (auto intAttr = mlir::dyn_cast<mlir::IntegerAttr>(attr)) {
-//       values.push_back(intAttr.getInt());
-//     } else {
-//       return nullptr;
-//     }
-//   }
-//
-//   return mlir::DenseI64ArrayAttr::get(getContext(), values);
-// }
-
 OpFoldResult GetArrayLenOp::fold(GetArrayLenOp::FoldAdaptor adaptor) {
   if (auto compType = dyn_cast<ComponentType>(getArray().getType())) {
     auto arrSize = compType.getArraySize();
@@ -353,7 +332,6 @@ LogicalResult NopOp::fold(NopOp::FoldAdaptor adaptor, SmallVectorImpl<OpFoldResu
 
 LogicalResult NopOp::canonicalize(NopOp op, PatternRewriter &rewriter) {
   if (op.getIns().size() == op.getNumResults()) {
-    llvm::dbgs() << "Replacing NopOp results with its inputs\n";
     rewriter.replaceAllUsesWith(op.getResults(), op.getIns());
     return success();
   }

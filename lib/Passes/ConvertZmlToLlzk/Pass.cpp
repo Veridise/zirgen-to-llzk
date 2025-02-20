@@ -45,11 +45,8 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
       ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, ExternCallOpLowering,
       CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
-      RemoveExternFnRefOp,           /*UpdateScfForOpTypes, UpdateScfYieldOpTypes,*/
-      UpdateScfExecuteRegionOpTypes, /* UpdateScfIfOpTypes,*/
-      ValToI1OpLowering, AssertOpLowering, LowerLitValArrayOp
-
-      >(typeConverter, ctx);
+      RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering, AssertOpLowering,
+      LowerLitValArrayOp>(typeConverter, ctx);
 
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect>();

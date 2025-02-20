@@ -369,21 +369,6 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
     SmallVector<Operation *, 2> castOps;
     Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
     storeSlot(*slot, result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
-    // // Cast it back to a Expr to maintain type safety in the ZHL ops
-    // auto castedResult = rewriter
-    //                         .create<mlir::UnrealizedConversionCastOp>(
-    //                             op.getLoc(), mlir::TypeRange(Zhl::ExprType::get(getContext())),
-    //                             mlir::ValueRange(result)
-    //                         )
-    //                         .getResult(0);
-    // // We can't return mlir::failure() at this stage because we already created new ops.
-    // assert(succeeded(addType(castedResult, *exprBinding)));
-    //
-    // if (castOps.empty()) {
-    //   rewriter.replaceAllUsesWith(value, castedResult);
-    // } else {
-    //   rewriter.replaceAllUsesExcept(value, castedResult, castOps.front());
-    // }
   }
 
   rewriter.eraseOp(op);
@@ -435,7 +420,7 @@ mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
     mlir::ConversionPatternRewriter &rewriter, mlir::Location loc
 ) {
   mlir::OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointAfter(op /*.getBodyFunc()*/);
+  rewriter.setInsertionPointAfter(op);
   auto attrs = externFuncAttrs(rewriter);
 
   return rewriter.create<mlir::func::FuncOp>(loc, name, type, attrs);

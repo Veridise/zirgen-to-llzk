@@ -46,33 +46,9 @@ mlir::LogicalResult ComponentLowering::matchAndRewrite(
       op.getLoc(), op.getNameAttr(),
       op.getParams().has_value() ? *op.getParams() : rewriter.getArrayAttr({})
   );
-  // auto *block = rewriter.createBlock(&newOp.getRegion());
   rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(), newOp.getRegion().end());
   rewriter.eraseOp(op);
   return success();
-#if 0
-  // for (auto funcOp : op.getOps<mlir::func::FuncOp>()) {
-  //   if (funcOp == op.getBodyFunc() || funcOp == op.getConstrainFunc()) {
-  //     continue;
-  //   }
-  //   rewriter.clone(*funcOp.getOperation());
-  // }
-  mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
-  rewriter.setInsertionPointToStart(block);
-
-  // Copy the field definitions
-  for (auto paramOp : op.getOps<FieldDefOp>()) {
-    rewriter.clone(*paramOp.getOperation());
-  }
-
-  rewriter.clone(*op.getBodyFunc());
-  rewriter.clone(*op.getConstrainFunc());
-  rewriter.eraseOp(op);
-  // for (auto &blk : op.getRegion()) {
-  //   rewriter.eraseBlock(&blk);
-  // }
-  return mlir::success();
-#endif
 }
 
 mlir::LogicalResult FieldDefOpLowering::matchAndRewrite(
@@ -127,12 +103,7 @@ mlir::LogicalResult FuncOpLowering::matchAndRewrite(
   auto newFuncOp = rewriter.replaceOpWithNewOp<llzk::FuncOp>(op, op.getNameAttr(), newType);
   cloneAttrsIntoLlzkFunc(op, newFuncOp);
 
-  // for (auto [newArg, oldArg] : llvm::zip_equal())
-
-  // assert(op.getRegion().getBlocks().size() == 1);
   rewriter.inlineRegionBefore(op.getRegion(), newFuncOp.getRegion(), newFuncOp.end());
-  // rewriter.cloneRegionBefore(op.getRegion(), newFuncOp.getRegion(), newFuncOp.getRegion().end());
-  // newFuncOp.getRegion().takeBody(op.getRegion());
   return mlir::success();
 }
 
@@ -171,10 +142,10 @@ LogicalResult LowerNopOp::matchAndRewrite(
     NopOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
   if (adaptor.getIns().size() == op.getNumResults()) {
-    // FIXME: This is bad to do here!
-    rewriter.replaceAllUsesWith(op.getResults(), adaptor.getIns());
+    rewriter.replaceOp(op, adaptor.getIns());
+  } else {
+    rewriter.eraseOp(op);
   }
-  rewriter.eraseOp(op);
   return success();
 }
 
@@ -260,7 +231,6 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
   auto callee = mlir::dyn_cast<ConstructorRefOp>(adaptor.getCallee().getDefiningOp());
   if (!callee) {
     return failure();
-    // return op->emitOpError() << "was expecting the callee comes from an zmir.constructor op";
   }
   auto comp = callee.getComponentAttr();
 
@@ -485,69 +455,6 @@ mlir::LogicalResult LowerWriteArrayOp::matchAndRewrite(
   );
 
   return mlir::success();
-}
-
-mlir::LogicalResult UpdateScfForOpTypes::matchAndRewrite(
-    mlir::scf::ForOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-
-  auto initArgs = adaptor.getInitArgs();
-  rewriter.replaceOpWithNewOp<mlir::scf::ForOp>(
-      op, adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep(), initArgs,
-      [&](mlir::OpBuilder &, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
-    mlir::SmallVector<mlir::Value> allArgs({iv}), finalArgs;
-
-    allArgs.insert(allArgs.end(), args.begin(), args.end());
-    for (auto [arg, origType] :
-         llvm::zip_equal(allArgs, op.getRegion().front().getArgumentTypes())) {
-      // To avoid redundant casts that cannot be reconciled only make a cast if the types difer
-      if (arg.getType() == origType) {
-        finalArgs.push_back(arg);
-      } else {
-        auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, origType, arg);
-        finalArgs.push_back(cast.getResult(0));
-      }
-    }
-
-    auto loopPrologue = rewriter.getInsertionBlock();
-
-    rewriter.inlineBlockBefore(
-        &op.getRegion().front(), loopPrologue, loopPrologue->end(), finalArgs
-    );
-  }
-  );
-  return mlir::success();
-}
-// TODO: Remove me
-mlir::LogicalResult UpdateScfYieldOpTypes::matchAndRewrite(
-    mlir::scf::YieldOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-
-  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, adaptor.getOperands());
-
-  return mlir::success();
-}
-
-LogicalResult UpdateScfIfOpTypes::matchAndRewrite(
-    scf::IfOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-) const {
-  SmallVector<Type, 1> newTypes;
-  if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), newTypes))) {
-    return failure();
-  }
-  auto newIf =
-      rewriter.replaceOpWithNewOp<scf::IfOp>(op, newTypes, adaptor.getCondition(), true, true);
-  {
-    OpBuilder::InsertionGuard guard(rewriter);
-    auto &thenBlock = newIf.getThenRegion().front();
-    rewriter.inlineBlockBefore(&op.getThenRegion().front(), &thenBlock, thenBlock.end());
-  }
-  {
-    OpBuilder::InsertionGuard guard(rewriter);
-    auto &elseBlock = newIf.getElseRegion().front();
-    rewriter.inlineBlockBefore(&op.getElseRegion().front(), &elseBlock, elseBlock.end());
-  }
-  return success();
 }
 
 mlir::LogicalResult UpdateScfExecuteRegionOpTypes::matchAndRewrite(

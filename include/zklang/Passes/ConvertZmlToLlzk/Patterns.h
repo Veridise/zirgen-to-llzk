@@ -11,22 +11,6 @@
 
 namespace zml {
 
-class UpdateScfForOpTypes : public mlir::OpConversionPattern<mlir::scf::ForOp> {
-public:
-  using OpConversionPattern<mlir::scf::ForOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::scf::ForOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
-};
-
-class UpdateScfYieldOpTypes : public mlir::OpConversionPattern<mlir::scf::YieldOp> {
-public:
-  using OpConversionPattern<mlir::scf::YieldOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::scf::YieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
-};
-
 class UpdateScfExecuteRegionOpTypes : public mlir::OpConversionPattern<mlir::scf::ExecuteRegionOp> {
 public:
   using OpConversionPattern<mlir::scf::ExecuteRegionOp>::OpConversionPattern;
@@ -34,14 +18,6 @@ public:
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::ExecuteRegionOp, OpAdaptor, mlir::ConversionPatternRewriter &)
       const override;
-};
-
-class UpdateScfIfOpTypes : public mlir::OpConversionPattern<mlir::scf::IfOp> {
-public:
-  using OpConversionPattern<mlir::scf::IfOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::scf::IfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 /// Lowers literal Vals

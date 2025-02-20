@@ -63,7 +63,7 @@ static cl::opt<std::string>
 // They are defined with external storage to avoid having to wrap
 // the code that uses them in preprocessor checks too
 bool DisableMultiThreadingFlag = false;
-bool DontReconcileCastsFlag = false;
+bool DisableCleanupPassesFlag = false;
 
 #ifndef NDEBUG
 static cl::opt<bool, true> DisableMultiThreading(
@@ -71,9 +71,10 @@ static cl::opt<bool, true> DisableMultiThreading(
     cl::Hidden, cl::location(DisableMultiThreadingFlag)
 );
 
-static cl::opt<bool, true> DontReconcileCasts(
-    "dont-reconcile-casts", cl::desc("Don't reconcile the casts while emitting zml or llzk"),
-    cl::Hidden, cl::location(DontReconcileCastsFlag)
+static cl::opt<bool, true> DisableCleanupPasses(
+    "disable-cleanup-passes",
+    cl::desc("Disables running reconcile-unrealized-casts, cse, and canonicalize in the pipeline"),
+    cl::Hidden, cl::location(DisableCleanupPassesFlag)
 );
 #endif
 
@@ -148,9 +149,8 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zklang::createStripTestsPass());
   pm.addPass(zml::createInjectBuiltInsPass());
   pm.addPass(zklang::createConvertZhlToZmlPass());
-  if (emitAction != Action::PrintZML || !DontReconcileCastsFlag) {
-    // pm.addPass(mlir::createCanonicalizerPass());
-    //  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  if (!DisableCleanupPassesFlag) {
+    pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   }
 
   if (emitAction == Action::PrintZML) {
@@ -164,17 +164,17 @@ void Driver::configureLoweringPipeline() {
   auto &splitCompFuncsPipeline = splitCompPipeline.nest<mlir::func::FuncOp>();
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalComputeOpsPass());
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalConstrainOpsPass());
-  splitCompFuncsPipeline.addPass(mlir::createCSEPass());
-  // splitCompFuncsPipeline.addPass(mlir::createCanonicalizerPass());
+  if (!DisableCleanupPassesFlag) {
+    splitCompFuncsPipeline.addPass(mlir::createCSEPass());
+  }
 
   if (emitAction == Action::OptimizeZML) {
     return;
   }
-  // pm.addPass(createLocationSnapshotPass());
   pm.addPass(zklang::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
-  if (!DontReconcileCastsFlag) {
-    // llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
+  if (!DisableCleanupPassesFlag) {
+    llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
     llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
   }
 }

@@ -44,7 +44,6 @@ void ConvertZhlToZmlPass::runOnOperation() {
   mlir::ModuleOp module = getOperation();
   mlir::MLIRContext *ctx = module->getContext();
 
-  // Init patterns for this transformation
   ZMLTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);
   patterns.add<
@@ -60,7 +59,6 @@ void ConvertZhlToZmlPass::runOnOperation() {
     builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
   }, typeAnalysis, typeConverter, ctx);
 
-  // Set conversion target
   mlir::ConversionTarget target(*ctx);
   target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
   target.addLegalDialect<
@@ -69,7 +67,6 @@ void ConvertZhlToZmlPass::runOnOperation() {
 
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
-  // Call partialTransformation
   if (mlir::failed(mlir::applyFullConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
   }
