@@ -4,6 +4,7 @@
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/Diagnostics.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
@@ -73,12 +74,9 @@ mlir::LogicalResult ComponentType::verify(
 
 ComponentInterface
 ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op) {
-  auto comp = symbolTable.lookupNearestSymbolFrom(op, getName());
-  if (!comp) {
-    return nullptr;
-  }
-
-  return mlir::dyn_cast<ComponentInterface>(comp);
+  return mlir::dyn_cast_if_present<ComponentInterface>(
+      symbolTable.lookupNearestSymbolFrom(op, getName())
+  );
 }
 
 FailureOr<Attribute> ComponentType::getArraySize() const {
@@ -96,10 +94,8 @@ FailureOr<Attribute> ComponentType::getArraySize() const {
 }
 
 ComponentType ComponentType::getSuperTypeAsComp() const {
-  if (getSuperType()) {
-    if (auto comp = mlir::dyn_cast<ComponentType>(getSuperType())) {
-      return comp;
-    }
+  if (auto comp = mlir::dyn_cast_if_present<ComponentType>(getSuperType())) {
+    return comp;
   }
   return nullptr;
 }
