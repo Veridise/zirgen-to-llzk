@@ -254,8 +254,7 @@ zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other)
   }
   return type != nullptr ? *type : TypeBinding(loc);
 }
-mlir::FailureOr<TypeBinding>
-zhl::TypeBinding::getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError) const {
+mlir::FailureOr<TypeBinding> zhl::TypeBinding::getArrayElement(EmitErrorFn emitError) const {
   if (!isArray()) {
     return emitError() << "non array type '" << name << "' cannot be subscripted";
   }
@@ -271,8 +270,7 @@ zhl::TypeBinding::getArrayElement(std::function<mlir::InFlightDiagnostic()> emit
   return genericParams.getParam(0);
 }
 
-mlir::FailureOr<TypeBinding>
-zhl::TypeBinding::getArraySize(std::function<mlir::InFlightDiagnostic()> emitError) const {
+mlir::FailureOr<TypeBinding> zhl::TypeBinding::getArraySize(EmitErrorFn emitError) const {
   if (!isArray()) {
     return emitError() << "non array type '" << name << "' cannot be subscripted";
   }

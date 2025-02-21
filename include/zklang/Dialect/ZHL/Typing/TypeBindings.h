@@ -29,7 +29,7 @@ class TypeBinding;
 
 using ParamsMap = std::map<std::pair<std::string_view, uint64_t>, TypeBinding>;
 using MembersMap = std::map<std::string_view, std::optional<TypeBinding>>;
-using EmitErrorFn = std::function<mlir::InFlightDiagnostic()>;
+using EmitErrorFn = llvm::function_ref<mlir::InFlightDiagnostic()>;
 
 class Params {
 public:
