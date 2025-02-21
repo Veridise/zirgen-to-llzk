@@ -416,14 +416,14 @@ std::vector<mlir::NamedAttribute> externFuncAttrs(mlir::ConversionPatternRewrite
 }
 
 mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
-    ComponentInterface op, llvm::StringRef name, mlir::FunctionType type,
+    ComponentInterface op, Twine &name, mlir::FunctionType type,
     mlir::ConversionPatternRewriter &rewriter, mlir::Location loc
 ) {
   mlir::OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(op);
   auto attrs = externFuncAttrs(rewriter);
-
-  return rewriter.create<mlir::func::FuncOp>(loc, name, type, attrs);
+  SmallVector<char, 10> nameMem;
+  return rewriter.create<mlir::func::FuncOp>(loc, name.toStringRef(nameMem), type, attrs);
 }
 
 mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
@@ -453,12 +453,10 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
   // component.
   auto funcType =
       rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
-  // TODO Replaces this with a Twine
-  std::string externName(op.getName().str());
-  externName += "$$extern";
+  Twine externName = op.getName() + "$$extern";
   auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
-  if (mlir::failed(externDeclrResult)) {
-    return mlir::failure();
+  if (failed(externDeclrResult)) {
+    return failure();
   }
   auto externNameSymRef = SymbolRefAttr::get(rewriter.getStringAttr(externName));
 
