@@ -346,10 +346,10 @@ mlir::LogicalResult LowerLitValArrayOp::matchAndRewrite(
   }
 
   SmallVector<Value> lits;
+  llzk::FeltType felt = llzk::FeltType::get(getContext());
   std::transform(
       op.getElements().begin(), op.getElements().end(), std::back_inserter(lits),
       [&](long value) {
-    llzk::FeltType felt = llzk::FeltType::get(getContext());
     return rewriter.create<llzk::FeltConstantOp>(
         op.getLoc(), felt, llzk::FeltConstAttr::get(getContext(), llvm::APInt(64, value))
     );
