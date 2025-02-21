@@ -151,7 +151,7 @@ LogicalResult SplitComponentOpPattern::matchAndRewrite(
   constrainFunc.setFunctionType(constrainFuncType);
 
   // Insert the self argument for the constrain function as it will be
-  // required by zkir.
+  // required by llzk.
   assert(!constrainFunc.getRegion().empty() && "was expecting a filled out function");
 
   auto &b = constrainFunc.getRegion().front();
