@@ -5,7 +5,6 @@
 #include <functional>
 #include <iterator>
 #include <llvm/Support/Casting.h>
-#include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexAttrs.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
