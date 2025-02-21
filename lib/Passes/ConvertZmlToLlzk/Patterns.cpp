@@ -321,7 +321,7 @@ mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
     return op.emitOpError() << "was expecting an array type";
   }
 
-  // If its an array then we allocate an empty one and then insert each operand with InsertArrayOp
+  // If it's an array then we allocate an empty one and then insert each operand with InsertArrayOp
   if (!adaptor.getElements().empty() && isa<llzk::ArrayType>(adaptor.getElements()[0].getType())) {
     auto arr = rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange());
     for (size_t i = 0; i < adaptor.getElements().size(); i++) {
