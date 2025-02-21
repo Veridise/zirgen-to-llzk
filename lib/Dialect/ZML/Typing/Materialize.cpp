@@ -66,7 +66,7 @@ private:
     if (binding.isGeneric()) {
       std::vector<Attribute> params;
       if (binding.isSpecialized()) {
-        //  Put the types associated with the specialization
+        // Put the types associated with the specialization
         auto paramBindings = binding.getGenericParams();
         std::transform(
             paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
