@@ -411,7 +411,7 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
   if (failed(operands[1].subtypeOf(getBindings().Get("Val")))) {
     return op->emitError()
            << "expected right side of range to be 'Val' or subtype of 'Val', but got '"
-           << operands[0].getName() << "'";
+           << operands[1].getName() << "'";
   }
   auto common = operands[0].commonSupertypeWith(operands[1]);
 
