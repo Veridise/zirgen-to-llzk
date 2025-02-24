@@ -209,10 +209,9 @@ class RemoveIllegalConstrainOpsPass
 
   void addPatterns(RewritePatternSet &patterns) override {
     patterns.add<
-        RemoveOp<WriteFieldOp>, RemoveOp<BitAndOp>, RemoveOp<InvOp>, ReplaceSelfWith<Arg<0>>,
-        RemoveOp<WriteArrayOp>, RemoveOp<func::CallIndirectOp>, RemoveOp<ConstructorRefOp>>(
-        &getContext()
-    );
+        RemoveOp<WriteFieldOp>, RemoveOp<BitAndOp>, RemoveOp<InvOp>, RemoveOp<ExtInvOp>,
+        ReplaceSelfWith<Arg<0>>, RemoveOp<WriteArrayOp>, RemoveOp<func::CallIndirectOp>,
+        RemoveOp<ConstructorRefOp>>(&getContext());
   }
 };
 

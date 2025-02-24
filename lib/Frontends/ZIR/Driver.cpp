@@ -164,7 +164,9 @@ void Driver::configureLoweringPipeline() {
     return;
   }
 
-  pm.nest<zml::ComponentOp>().nest<mlir::func::FuncOp>().addPass(zml::createLowerBuiltInsPass());
+  auto compPm = pm.nest<zml::ComponentOp>();
+  compPm.nest<mlir::func::FuncOp>().addPass(zml::createLowerBuiltInsPass());
+  compPm.addPass(zml::createLowerExtValOpsPass());
   pm.addPass(zml::createRemoveBuiltInsPass());
   pm.addPass(zml::createSplitComponentBodyPass());
   auto &splitCompPipeline = pm.nest<zml::SplitComponentOp>();

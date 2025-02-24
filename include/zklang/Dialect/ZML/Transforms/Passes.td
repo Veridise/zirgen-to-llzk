@@ -50,4 +50,12 @@ def RemoveIllegalComputeOps : RemoveIllegalOps<"Compute"> {}
 
 def RemoveIllegalConstrainOps : RemoveIllegalOps<"Constrain"> {}
 
+def LowerExtValOps : Pass<"lower-ext-val", "zml::ComponentOp"> {
+  let summary =
+      "Lowers ops that operate with ExtVals to an array based representation";
+  let constructor = "zml::createLowerExtValOpsPass()";
+
+  let dependentDialects = ["zml::ZMLDialect"];
+}
+
 #endif

@@ -48,11 +48,17 @@ using BitAndPattern = RemoveBuiltIn<BitAndStr, ComponentOp>;
 using AddPattern = RemoveBuiltIn<AddStr, ComponentOp>;
 using SubPattern = RemoveBuiltIn<SubStr, ComponentOp>;
 using MulPattern = RemoveBuiltIn<MulStr, ComponentOp>;
+using ExtAddPattern = RemoveBuiltIn<ExtAddStr, ComponentOp>;
+using ExtSubPattern = RemoveBuiltIn<ExtSubStr, ComponentOp>;
+using ExtMulPattern = RemoveBuiltIn<ExtMulStr, ComponentOp>;
 using ModPattern = RemoveBuiltIn<ModStr, ComponentOp>;
 using InvPattern = RemoveBuiltIn<InvStr, ComponentOp>;
+using ExtInvPattern = RemoveBuiltIn<ExtInvStr, ComponentOp>;
+using MakeExtPattern = RemoveBuiltIn<MakeExtStr, ComponentOp>;
 using IszPattern = RemoveBuiltIn<IszStr, ComponentOp>;
 using NegPattern = RemoveBuiltIn<NegStr, ComponentOp>;
 using ValPattern = RemoveBuiltIn<ValStr, ComponentOp>;
+using ExtValPattern = RemoveBuiltIn<ExtValStr, ComponentOp>;
 using StringPattern = RemoveBuiltIn<StrStr, ComponentOp>;
 using ComponentPattern = RemoveBuiltIn<ComponentStr, ComponentOp>;
 using ArrayPattern = RemoveBuiltIn<ArrayStr, ComponentOp>;
@@ -70,7 +76,10 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
 
     patterns.add<
         BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern, IszPattern, NegPattern,
-        ModPattern, ValPattern, StringPattern, ArrayPattern, InRangePattern>(typeConverter, ctx);
+        ModPattern, ValPattern, StringPattern, ArrayPattern, InRangePattern, ExtAddPattern,
+        ExtSubPattern, ExtMulPattern, ExtInvPattern, MakeExtPattern, ExtValPattern>(
+        typeConverter, ctx
+    );
 
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
