@@ -2,12 +2,16 @@
 // Copyright 2024 Veridise, Inc.
 
 #include <cassert>
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/Support/Debug.h>
+#include <llvm/Support/Format.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/SymbolTable.h>
+#include <mlir/IR/ValueRange.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <tuple>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
@@ -86,11 +90,6 @@ public:
   matchAndRewrite(ComponentOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 
 private:
-  mlir::func::FuncOp fillFunc(
-      SplitComponentOp op, mlir::StringRef, mlir::FunctionType funcType, Region &original,
-      mlir::ConversionPatternRewriter &rewriter
-  ) const;
-
   PendingSymbolRenames &pending;
 };
 
@@ -114,71 +113,57 @@ LogicalResult SplitComponentOpPattern::matchAndRewrite(
   // but don't name it like the old op right now.
   pending.removeOp(op);
   pending.addOp(newOp, op.getSymNameAttr());
-  rewriter.replaceOp(op.getOperation(), newOp.getOperation());
 
-  {
-    mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
-    auto *block = rewriter.createBlock(&newOp.getRegion());
-    rewriter.setInsertionPointToStart(block);
+  mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
+  auto *block = rewriter.createBlock(&newOp.getRegion());
+  rewriter.setInsertionPointToStart(block);
 
-    // Copy the field definitions
-    for (auto paramOp : op.getOps<FieldDefOp>()) {
-      rewriter.clone(*paramOp.getOperation());
+  // Copy the field definitions
+  for (auto paramOp : op.getOps<FieldDefOp>()) {
+    rewriter.clone(*paramOp.getOperation());
+  }
+  // Copy additional functions declared (like externs)
+  for (auto f : op.getOps<mlir::func::FuncOp>()) {
+    if (f == op.getBodyFunc()) {
+      continue;
     }
-    // Copy additional functions declared (like externs)
-    for (auto f : op.getOps<mlir::func::FuncOp>()) {
-      if (f == op.getBodyFunc()) {
-        continue;
-      }
-      rewriter.clone(*f.getOperation());
-    }
-
-    auto bodyFuncType = op.getBodyFunc().getFunctionType();
-
-    fillFunc(newOp, newOp.getBodyFuncName(), bodyFuncType, op.getBodyFunc().getRegion(), rewriter);
-    {
-      std::vector<mlir::Type> constrainFuncArgTypes({op.getType()});
-      constrainFuncArgTypes.insert(
-          constrainFuncArgTypes.end(), bodyFuncType.getInputs().begin(),
-          bodyFuncType.getInputs().end()
-      );
-      auto constrainFuncType = rewriter.getFunctionType(constrainFuncArgTypes, TypeRange());
-      auto constrainFunc = fillFunc(
-          newOp, newOp.getConstrainFuncName(), constrainFuncType, op.getBodyFunc().getRegion(),
-          rewriter
-      );
-      // Insert the self argument for the constrain function as it will be
-      // required by zkir.
-      assert(!constrainFunc.getRegion().empty() && "was expecting a filled out function");
-
-      auto &b = constrainFunc.getRegion().front();
-      // If there are no arguments just add it.
-      // If there are arguments already insert it at the beginning
-      // and shift all other arguments
-      if (b.args_empty()) {
-        b.addArgument(op.getType(), op.getLoc());
-      } else {
-        b.insertArgument(b.args_begin(), op.getType(), b.args_begin()->getLoc());
-      }
-    }
+    rewriter.clone(*f.getOperation());
   }
 
+  auto bodyFuncType = op.getBodyFunc().getFunctionType();
+
+  mlir::IRMapping computeMapping;
+  auto computeFunc = mlir::cast<mlir::func::FuncOp>(
+      rewriter.clone(*op.getBodyFunc().getOperation(), computeMapping)
+  );
+  computeFunc.setName(newOp.getBodyFuncName());
+
+  std::vector<mlir::Type> constrainFuncArgTypes({op.getType()});
+  constrainFuncArgTypes.insert(
+      constrainFuncArgTypes.end(), bodyFuncType.getInputs().begin(), bodyFuncType.getInputs().end()
+  );
+  auto constrainFuncType = rewriter.getFunctionType(constrainFuncArgTypes, TypeRange());
+  mlir::IRMapping contrainMapping;
+  auto constrainFunc = mlir::cast<mlir::func::FuncOp>(
+      rewriter.clone(*op.getBodyFunc().getOperation(), contrainMapping)
+  );
+  constrainFunc.setName(newOp.getConstrainFuncName());
+  constrainFunc.setFunctionType(constrainFuncType);
+
+  // Insert the self argument for the constrain function as it will be
+  // required by llzk.
+  assert(!constrainFunc.getRegion().empty() && "was expecting a filled out function");
+
+  auto &b = constrainFunc.getRegion().front();
+  if (b.args_empty()) {
+    b.addArgument(op.getType(), op.getLoc());
+  } else {
+    b.insertArgument(b.args_begin(), op.getType(), op.getLoc());
+  }
+
+  rewriter.eraseOp(op);
+
   return mlir::success();
-}
-
-mlir::func::FuncOp SplitComponentOpPattern::fillFunc(
-    SplitComponentOp op, llvm::StringRef name, mlir::FunctionType funcType, Region &original,
-    mlir::ConversionPatternRewriter &rewriter
-) const {
-
-  std::vector<mlir::NamedAttribute> attrs = {mlir::NamedAttribute(
-      rewriter.getStringAttr("sym_visibility"), rewriter.getStringAttr("nested")
-  )};
-
-  auto bodyOp = rewriter.create<mlir::func::FuncOp>(op.getLoc(), name, funcType, attrs);
-
-  rewriter.cloneRegionBefore(original, bodyOp.getRegion(), bodyOp.getRegion().end());
-  return bodyOp;
 }
 
 LogicalResult ReplaceReturnOpInConstrainFunc::matchAndRewrite(
@@ -209,7 +194,6 @@ class SplitComponentBodyPass : public SplitComponentBodyBase<SplitComponentBodyP
     patterns.add<SplitComponentOpPattern>(pending, ctx);
     patterns.add<ReplaceReturnOpInConstrainFunc>(ctx);
 
-    // Set conversion target
     mlir::ConversionTarget target(*ctx);
     target.addLegalDialect<
         ZMLDialect, mlir::func::FuncDialect, index::IndexDialect, scf::SCFDialect,
@@ -218,13 +202,11 @@ class SplitComponentBodyPass : public SplitComponentBodyBase<SplitComponentBodyP
     target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();
     target.addIllegalOp<ComponentOp>();
 
-    // Return types may change so we need to adjust the return ops
     target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp ret) {
       return ret.getOperandTypes() ==
              ret.getParentOp<func::FuncOp>().getFunctionType().getResults();
     });
 
-    // Call partialTransformation
     if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns))) ||
         // If the transformation went OK then we try to apply the pending
         // renames if any
@@ -237,7 +219,6 @@ class SplitComponentBodyPass : public SplitComponentBodyBase<SplitComponentBodyP
 } // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createSplitComponentBodyPass() {
-
   return std::make_unique<SplitComponentBodyPass>();
 }
 

@@ -4,9 +4,12 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <llvm/ADT/STLExtras.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
@@ -39,33 +42,13 @@ mlir::LogicalResult LitValOpLowering::matchAndRewrite(
 mlir::LogicalResult ComponentLowering::matchAndRewrite(
     SplitComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto newOp = rewriter.replaceOpWithNewOp<llzk::StructDefOp>(
-      op, op.getNameAttr(), op.getParams().has_value() ? *op.getParams() : rewriter.getArrayAttr({})
+  auto newOp = rewriter.create<llzk::StructDefOp>(
+      op.getLoc(), op.getNameAttr(),
+      op.getParams().has_value() ? *op.getParams() : rewriter.getArrayAttr({})
   );
-  {
-    mlir::OpBuilder::InsertionGuard insertionGuard(rewriter);
-    auto *block = rewriter.createBlock(&newOp.getRegion());
-    rewriter.setInsertionPointToStart(block);
-
-    // Copy the field definitions
-    for (auto paramOp : op.getOps<FieldDefOp>()) {
-      rewriter.clone(*paramOp.getOperation());
-    }
-    {
-      mlir::OpBuilder::InsertionGuard modGuard(rewriter);
-      rewriter.setInsertionPointAfter(newOp);
-      for (auto funcOp : op.getOps<mlir::func::FuncOp>()) {
-        if (funcOp == op.getBodyFunc() || funcOp == op.getConstrainFunc()) {
-          continue;
-        }
-
-        rewriter.clone(*funcOp.getOperation());
-      }
-    }
-    rewriter.clone(*op.getBodyFunc());
-    rewriter.clone(*op.getConstrainFunc());
-  }
-  return mlir::success();
+  rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(), newOp.getRegion().end());
+  rewriter.eraseOp(op);
+  return success();
 }
 
 mlir::LogicalResult FieldDefOpLowering::matchAndRewrite(
@@ -119,7 +102,8 @@ mlir::LogicalResult FuncOpLowering::matchAndRewrite(
 
   auto newFuncOp = rewriter.replaceOpWithNewOp<llzk::FuncOp>(op, op.getNameAttr(), newType);
   cloneAttrsIntoLlzkFunc(op, newFuncOp);
-  newFuncOp.getRegion().takeBody(op.getRegion());
+
+  rewriter.inlineRegionBefore(op.getRegion(), newFuncOp.getRegion(), newFuncOp.end());
   return mlir::success();
 }
 
@@ -130,17 +114,26 @@ mlir::LogicalResult ReturnOpLowering::matchAndRewrite(
   return mlir::success();
 }
 
-mlir::LogicalResult CallOpLowering::matchAndRewrite(
-    mlir::func::CallOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+mlir::LogicalResult ExternCallOpLowering::matchAndRewrite(
+    mlir::func::CallIndirectOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
+  auto calleeOp = adaptor.getCallee().getDefiningOp();
+  if (!calleeOp) {
+    return failure();
+  }
+  auto callee = dyn_cast<ExternFnRefOp>(calleeOp);
+  if (!callee) {
+    return failure();
+  }
+
   llvm::SmallVector<mlir::Type> results;
 
-  auto convRes = getTypeConverter()->convertTypes(op.getCalleeType().getResults(), results);
+  auto convRes = getTypeConverter()->convertTypes(op.getCallee().getType().getResults(), results);
   if (mlir::failed(convRes)) {
     return op->emitError("failed to transform zml types into llzk types");
   }
   rewriter.replaceOpWithNewOp<llzk::CallOp>(
-      op, adaptor.getCallee(), results, adaptor.getOperands()
+      op, results, callee.getNameAttr(), adaptor.getCalleeOperands()
   );
   return mlir::success();
 }
@@ -148,10 +141,11 @@ mlir::LogicalResult CallOpLowering::matchAndRewrite(
 LogicalResult LowerNopOp::matchAndRewrite(
     NopOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  if (op.getNumOperands() == op.getNumResults()) {
-    rewriter.replaceAllUsesWith(op.getResults(), adaptor.getOperands());
+  if (adaptor.getIns().size() == op.getNumResults()) {
+    rewriter.replaceOp(op, adaptor.getIns());
+  } else {
+    rewriter.eraseOp(op);
   }
-  rewriter.eraseOp(op);
   return success();
 }
 
@@ -212,7 +206,7 @@ LogicalResult LowerConstrainCallOp::matchAndRewrite(
   auto sym = mlir::SymbolRefAttr::get(
       compName, {mlir::SymbolRefAttr::get(rewriter.getStringAttr("constrain"))}
   );
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, sym, TypeRange(), adaptor.getOperands());
+  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, TypeRange(), sym, adaptor.getOperands());
 
   return success();
 }
@@ -236,7 +230,7 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
 
   auto callee = mlir::dyn_cast<ConstructorRefOp>(adaptor.getCallee().getDefiningOp());
   if (!callee) {
-    return op->emitOpError() << "was expecting the callee comes from an zmir.constructor op";
+    return failure();
   }
   auto comp = callee.getComponentAttr();
 
@@ -252,7 +246,7 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
       mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
   );
 
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, sym, types, args);
+  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, types, sym, args);
   return mlir::success();
 }
 
@@ -267,6 +261,13 @@ mlir::LogicalResult WriteFieldOpLowering::matchAndRewrite(
 
 mlir::LogicalResult RemoveConstructorRefOp::matchAndRewrite(
     ConstructorRefOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+  rewriter.eraseOp(op);
+  return mlir::success();
+}
+
+mlir::LogicalResult RemoveExternFnRefOp::matchAndRewrite(
+    ExternFnRefOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   rewriter.eraseOp(op);
   return mlir::success();
@@ -311,10 +312,52 @@ mlir::LogicalResult LowerInRangeOp::matchAndRewrite(
 mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
     NewArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
-      op, getTypeConverter()->convertType(op.getType()), adaptor.getElements()
-  );
+  // NewArrayOp is SameTypeOperands so by querying the type of any one of the elements we can know
+  // if the inputs are scalar or arrays
+
+  auto type = getTypeConverter()->convertType(op.getType());
+  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  if (!arrType) {
+    return op.emitOpError() << "was expecting an array type";
+  }
+
+  // If it's an array then we allocate an empty one and then insert each operand with InsertArrayOp
+  if (!adaptor.getElements().empty() && isa<llzk::ArrayType>(adaptor.getElements()[0].getType())) {
+    auto arr = rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange());
+    for (size_t i = 0; i < adaptor.getElements().size(); i++) {
+      auto idx = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), i);
+      rewriter.create<llzk::InsertArrayOp>(
+          op.getLoc(), arr, ValueRange({idx}), adaptor.getElements()[i]
+      );
+    }
+  } else {
+    rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, adaptor.getElements());
+  }
   return mlir::success();
+}
+
+mlir::LogicalResult LowerLitValArrayOp::matchAndRewrite(
+    LitValArrayOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
+) const {
+  auto type = getTypeConverter()->convertType(op.getType());
+  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  if (!arrType) {
+    return op.emitOpError() << "was expecting an array type";
+  }
+
+  SmallVector<Value> lits;
+  llzk::FeltType felt = llzk::FeltType::get(getContext());
+  std::transform(
+      op.getElements().begin(), op.getElements().end(), std::back_inserter(lits),
+      [&](long value) {
+    return rewriter.create<llzk::FeltConstantOp>(
+        op.getLoc(), felt, llzk::FeltConstAttr::get(getContext(), llvm::APInt(64, value))
+    );
+  }
+  );
+
+  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange(lits));
+  return success();
 }
 
 mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
@@ -330,9 +373,16 @@ mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
     return rewriter.create<llzk::FeltToIndexOp>(op.getLoc(), index).getResult();
   }
   );
-  rewriter.replaceOpWithNewOp<llzk::ReadArrayOp>(
-      op, getTypeConverter()->convertType(op.getType()), adaptor.getLvalue(), toIndexOps
-  );
+  auto convertedType = getTypeConverter()->convertType(op.getType());
+  if (isa<llzk::ArrayType>(convertedType)) {
+    rewriter.replaceOpWithNewOp<llzk::ExtractArrayOp>(
+        op, convertedType, adaptor.getLvalue(), toIndexOps
+    );
+  } else {
+    rewriter.replaceOpWithNewOp<llzk::ReadArrayOp>(
+        op, convertedType, adaptor.getLvalue(), toIndexOps
+    );
+  }
   return mlir::success();
 }
 
@@ -353,9 +403,12 @@ mlir::LogicalResult LowerIsz::matchAndRewrite(
 mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
     AllocArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
-      op, getTypeConverter()->convertType(op.getType()), mlir::ValueRange()
-  );
+  auto type = getTypeConverter()->convertType(op.getType());
+  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  if (!arrType) {
+    return op.emitOpError() << "was expecting an array type";
+  }
+  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, mlir::ValueRange());
 
   return mlir::success();
 }
@@ -402,70 +455,6 @@ mlir::LogicalResult LowerWriteArrayOp::matchAndRewrite(
   );
 
   return mlir::success();
-}
-
-mlir::LogicalResult UpdateScfForOpTypes::matchAndRewrite(
-    mlir::scf::ForOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-
-  auto initArgs = adaptor.getInitArgs();
-  rewriter.replaceOpWithNewOp<mlir::scf::ForOp>(
-      op, adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep(), initArgs,
-      [&](mlir::OpBuilder &, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
-    mlir::SmallVector<mlir::Value> allArgs({iv}), finalArgs;
-
-    allArgs.insert(allArgs.end(), args.begin(), args.end());
-    for (auto [arg, origType] :
-         llvm::zip_equal(allArgs, op.getRegion().front().getArgumentTypes())) {
-      // To avoid redundant casts that cannot be reconciled only make a cast if the types difer
-      if (arg.getType() == origType) {
-        finalArgs.push_back(arg);
-      } else {
-        auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, origType, arg);
-        finalArgs.push_back(cast.getResult(0));
-      }
-    }
-
-    auto loopPrologue = rewriter.getInsertionBlock();
-
-    rewriter.inlineBlockBefore(
-        &op.getRegion().front(), loopPrologue, loopPrologue->end(), finalArgs
-    );
-  }
-  );
-
-  return mlir::success();
-}
-
-mlir::LogicalResult UpdateScfYieldOpTypes::matchAndRewrite(
-    mlir::scf::YieldOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-
-  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, adaptor.getOperands());
-
-  return mlir::success();
-}
-
-LogicalResult UpdateScfIfOpTypes::matchAndRewrite(
-    scf::IfOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-) const {
-  SmallVector<Type, 1> newTypes;
-  if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), newTypes))) {
-    return failure();
-  }
-  auto newIf =
-      rewriter.replaceOpWithNewOp<scf::IfOp>(op, newTypes, adaptor.getCondition(), true, true);
-  {
-    OpBuilder::InsertionGuard guard(rewriter);
-    auto &thenBlock = newIf.getThenRegion().front();
-    rewriter.inlineBlockBefore(&op.getThenRegion().front(), &thenBlock, thenBlock.end());
-  }
-  {
-    OpBuilder::InsertionGuard guard(rewriter);
-    auto &elseBlock = newIf.getElseRegion().front();
-    rewriter.inlineBlockBefore(&op.getElseRegion().front(), &elseBlock, elseBlock.end());
-  }
-  return success();
 }
 
 mlir::LogicalResult UpdateScfExecuteRegionOpTypes::matchAndRewrite(

@@ -1,0 +1,7 @@
+// RUN: zklang -o - %s 
+
+component Diag(m: Array<Array<Val, 1>, 1>) {
+  for i : 0..1 { m[i][i] }
+}
+
+

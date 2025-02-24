@@ -1,11 +1,13 @@
 
 #include <algorithm>
 #include <iterator>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/Support/FileSystem.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Types.h>
+#include <mlir/Support/LogicalResult.h>
 #include <optional>
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
@@ -64,9 +66,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
   addConversion([&](zml::ComponentType t) -> mlir::Type {
     llvm::SmallVector<mlir::Attribute> convertedAttrs;
     convertParamAttrs(t.getParams(), convertedAttrs, *this);
-    return llzk::StructType::get(
-        t.getContext(), t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs)
-    );
+    return llzk::StructType::get(t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs));
   });
 
   addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {
@@ -76,11 +76,27 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
     assert(t.getParams().size() == 2);
     auto typeAttr = t.getParams()[0];
     auto sizeAttr = t.getParams()[1];
-    // TODO(LLZK-173) Group together arrays of arrays
+
+    auto inner = convertType(deduceArrayType(typeAttr));
+    if (auto innerArr = mlir::dyn_cast<llzk::ArrayType>(inner)) {
+      auto innerDimensionSizes = innerArr.getDimensionSizes();
+
+      llvm::SmallVector<mlir::Attribute> newDims;
+      if (arrayLenIsKnown(sizeAttr)) {
+        llvm::SmallVector<int64_t> shape({getSize(sizeAttr)});
+        if (mlir::failed(llzk::computeDimsFromShape(t.getContext(), shape, newDims))) {
+          return nullptr;
+        }
+      } else {
+        newDims.push_back(getSizeSym(sizeAttr));
+      }
+      newDims.insert(newDims.end(), innerDimensionSizes.begin(), innerDimensionSizes.end());
+      return llzk::ArrayType::get(innerArr.getElementType(), newDims);
+    }
     if (arrayLenIsKnown(sizeAttr)) {
-      return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSize(sizeAttr)});
+      return llzk::ArrayType::get(inner, {getSize(sizeAttr)});
     } else {
-      return llzk::ArrayType::get(convertType(deduceArrayType(typeAttr)), {getSizeSym(sizeAttr)});
+      return llzk::ArrayType::get(inner, {getSizeSym(sizeAttr)});
     }
   });
 

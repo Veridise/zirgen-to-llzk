@@ -4,10 +4,13 @@
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/Diagnostics.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
+
+using namespace mlir;
 
 namespace zml {
 
@@ -71,12 +74,30 @@ mlir::LogicalResult ComponentType::verify(
 
 ComponentInterface
 ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op) {
-  auto comp = symbolTable.lookupNearestSymbolFrom(op, getName());
-  if (!comp) {
-    return nullptr;
-  }
+  return mlir::dyn_cast_if_present<ComponentInterface>(
+      symbolTable.lookupNearestSymbolFrom(op, getName())
+  );
+}
 
-  return mlir::dyn_cast<ComponentInterface>(comp);
+FailureOr<Attribute> ComponentType::getArraySize() const {
+  if (!isArray()) {
+    return failure();
+  }
+  if (getName().getValue() == "Array") {
+    assert(getParams().size() == 2 && "Arrays must have only two params by definition");
+    return getParams()[1];
+  }
+  if (!getSuperTypeAsComp()) {
+    return failure();
+  }
+  return getSuperTypeAsComp().getArraySize();
+}
+
+ComponentType ComponentType::getSuperTypeAsComp() const {
+  if (auto comp = mlir::dyn_cast_if_present<ComponentType>(getSuperType())) {
+    return comp;
+  }
+  return nullptr;
 }
 
 } // namespace zml

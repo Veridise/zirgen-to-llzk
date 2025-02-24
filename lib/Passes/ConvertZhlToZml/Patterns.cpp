@@ -121,13 +121,10 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     StringRef expectingNArgsMsg =
         isVariadic(constructorType) ? ", was expecting at least " : ", was expecting ";
     auto minArgCount = isVariadic(constructorType) ? ctorFormalsCount - 1 : ctorFormalsCount;
-    return op->emitOpError()
-        .append(
-            "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
-            minArgCount, " arguments but got ", adaptor.getArgs().size()
-        )
-        .attachNote(ctor->getCalleeComp()->getLoc())
-        .append("component declared here");
+    return op->emitOpError().append(
+        "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
+        minArgCount, " arguments but got ", adaptor.getArgs().size()
+    );
   }
 
   std::vector<mlir::Value> preparedArguments;
@@ -219,7 +216,10 @@ mlir::Value ZhlConstructLowering::prepareArgument(
 mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     Zhl::ConstraintOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-
+  auto binding = getType(op);
+  if (failed(binding)) {
+    return failure();
+  }
   auto lhsBinding = getType(op.getLhs());
   if (mlir::failed(lhsBinding)) {
     return op->emitOpError() << "failed to type check lhs";
@@ -229,28 +229,11 @@ mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     return op->emitOpError() << "failed to type check rhs";
   }
 
-  mlir::Value lhsValue = adaptor.getLhs();
-  mlir::Type lhsTarget = materializeTypeBinding(getContext(), *lhsBinding);
-  if (lhsValue.getType() != lhsTarget) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), lhsTarget, lhsValue);
-    lhsValue = cast.getResult(0);
-  }
-  // Coerce to Val if necessary
-  if (lhsValue.getType() != ComponentType::Val(getContext())) {
-    lhsValue =
-        rewriter.create<SuperCoerceOp>(op.getLoc(), ComponentType::Val(getContext()), lhsValue);
-  }
-  mlir::Value rhsValue = adaptor.getRhs();
-  mlir::Type rhsTarget = materializeTypeBinding(getContext(), *rhsBinding);
-  if (rhsValue.getType() != rhsTarget) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), rhsTarget, rhsValue);
-    rhsValue = cast.getResult(0);
-  }
-  // Coerce to Val if necessary
-  if (rhsValue.getType() != ComponentType::Val(getContext())) {
-    rhsValue =
-        rewriter.create<SuperCoerceOp>(op.getLoc(), ComponentType::Val(getContext()), rhsValue);
-  }
+  auto constraintType = materializeTypeBinding(getContext(), *binding);
+  mlir::Value lhsValue = getCastedValue(adaptor.getLhs(), *lhsBinding, rewriter, constraintType);
+
+  mlir::Value rhsValue = getCastedValue(adaptor.getRhs(), *rhsBinding, rewriter, constraintType);
+
   rewriter.replaceOpWithNewOp<ConstrainOp>(op, lhsValue, rhsValue);
   return mlir::success();
 }
@@ -375,21 +358,16 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
   // If the binding of this op has a slot then it is responsible of creating it.
   // Otherwise, check if the declaration's binding has a slot. If it does create it here.
   // Wrap the value around a SuperCoerceOp.
-  // If a slot is created here then replace all the uses of the definition expression with the
-  // result of writing and reading from the slot. Then remove this op.
+  // If a slot is created here that means that the value we are storing in the field does not need
+  // memory according to the type checker and thus we don't need to introduce the use-def cut since
+  // that value is safe to use in @constrain functions.
 
   if (slot) {
     auto slotName = createSlot(slot, rewriter, comp, op.getLoc());
     mlir::Type slotType = materializeTypeBinding(getContext(), slot->getBinding());
     SmallVector<Operation *, 2> castOps;
-    Value result = getCastedValue(value, *exprBinding, rewriter, castOps, slotType);
-    result =
-        storeAndLoadSlot(result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
-    if (castOps.empty()) {
-      rewriter.replaceAllUsesWith(value, result);
-    } else {
-      rewriter.replaceAllUsesExcept(value, result, castOps.front());
-    }
+    Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
+    storeSlot(*slot, result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
   }
 
   rewriter.eraseOp(op);
@@ -408,7 +386,7 @@ mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
     return op->emitOpError() << "failed to type check";
   }
   if (!mlir::isa<SelfOp>(op->getParentOp())) {
-    return mlir::failure();
+    return failure();
   }
   auto comp = op->getParentOfType<ComponentInterface>();
   assert(comp);
@@ -437,14 +415,14 @@ std::vector<mlir::NamedAttribute> externFuncAttrs(mlir::ConversionPatternRewrite
 }
 
 mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
-    ComponentInterface op, llvm::StringRef name, mlir::FunctionType type,
+    ComponentInterface op, Twine &name, mlir::FunctionType type,
     mlir::ConversionPatternRewriter &rewriter, mlir::Location loc
 ) {
   mlir::OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointAfter(op.getBodyFunc());
+  rewriter.setInsertionPointAfter(op);
   auto attrs = externFuncAttrs(rewriter);
-
-  return rewriter.create<mlir::func::FuncOp>(loc, name, type, attrs);
+  SmallVector<char, 10> nameMem;
+  return rewriter.create<mlir::func::FuncOp>(loc, name.toStringRef(nameMem), type, attrs);
 }
 
 mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
@@ -468,6 +446,20 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
     argBindings.push_back(materializeTypeBinding(getContext(), *argBinding));
   }
 
+  auto retType = materializeTypeBinding(getContext(), *binding);
+
+  // Extern ops are wrapped around a component by the AST->ZHL step and have the same inputs as the
+  // component.
+  auto funcType =
+      rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
+  Twine externName = op.getName() + "$$extern";
+  auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
+  if (failed(externDeclrResult)) {
+    return failure();
+  }
+  auto externNameSymRef = SymbolRefAttr::get(rewriter.getStringAttr(externName));
+
+  auto externFnRef = rewriter.create<ExternFnRefOp>(op.getLoc(), funcType, externNameSymRef);
   std::vector<mlir::Value> args;
   std::transform(
       adaptor.getArgs().begin(), adaptor.getArgs().end(), argBindings.begin(),
@@ -483,20 +475,7 @@ mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
   }
   );
 
-  auto retType = materializeTypeBinding(getContext(), *binding);
-
-  // Extern ops are wrapped around a component by the AST->ZHL step and have the same inputs as the
-  // component.
-  auto funcType =
-      rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
-  std::string externName(op.getName().str());
-  externName += "$$extern";
-  auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
-  if (mlir::failed(externDeclrResult)) {
-    return mlir::failure();
-  }
-
-  rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, *externDeclrResult, mlir::ValueRange(args));
+  rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, externFnRef, mlir::ValueRange(args));
 
   return mlir::success();
 }
@@ -583,22 +562,19 @@ mlir::LogicalResult ZhlSubscriptLowering::matchAndRewrite(
   if (mlir::failed(elementBinding)) {
     return op->emitOpError() << "failed to type check index";
   }
+  auto concreteArrayTypeBinding = arrayBinding->getConcreteArrayType();
+  if (failed(concreteArrayTypeBinding)) {
+    return failure();
+  }
 
-  auto arrayVal = adaptor.getArray();
-  auto arrayType = materializeTypeBinding(getContext(), *arrayBinding);
-  if (arrayVal.getType() != arrayType) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), arrayType, arrayVal);
-    arrayVal = cast.getResult(0);
-  }
-  auto elementVal = adaptor.getElement();
-  auto elementType = materializeTypeBinding(getContext(), *elementBinding);
-  if (elementVal.getType() != elementType) {
-    auto cast =
-        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), elementType, elementVal);
-    elementVal = cast.getResult(0);
-  }
-  rewriter.replaceOpWithNewOp<ReadArrayOp>(
-      op, materializeTypeBinding(getContext(), *binding), arrayVal, elementVal
+  Type concreteArrayType = zml::materializeTypeBinding(getContext(), *concreteArrayTypeBinding);
+  auto arrayVal = getCastedValue(adaptor.getArray(), *arrayBinding, rewriter, concreteArrayType);
+  auto Val = ComponentType::Val(getContext());
+  auto elementVal = getCastedValue(adaptor.getElement(), *elementBinding, rewriter, Val);
+
+  rewriter.replaceOpWithNewOp<zml::ReadArrayOp>(
+      op, zml::materializeTypeBinding(getContext(), *binding), arrayVal, elementVal
+
   );
   return mlir::success();
 }
@@ -710,6 +686,7 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
+  assert(binding->isArray());
   auto startBinding = getType(op.getStart());
   if (mlir::failed(startBinding)) {
     return op->emitOpError() << "failed to type check start";
@@ -719,10 +696,26 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
     return op->emitOpError() << "failed to type check end";
   }
   auto type = materializeTypeBinding(getContext(), *binding);
-  assert(binding->isArray());
   auto innerBinding = binding->getArrayElement([&]() { return op->emitError(); });
   if (mlir::failed(innerBinding)) {
     return mlir::failure();
+  }
+
+  // Create a literal array directly if we know the range is made of literal values
+  if (startBinding->isKnownConst() && endBinding->isKnownConst()) {
+    SmallVector<int64_t> values;
+    unsigned E = endBinding->getConst();
+    unsigned I = startBinding->getConst();
+    values.reserve(E - I);
+    for (; I < E; I++) {
+      values.push_back(I);
+    }
+    auto litArr = DenseI64ArrayAttr::get(getContext(), values);
+    rewriter.replaceOpWithNewOp<LitValArrayOp>(
+        op, ComponentType::Array(getContext(), ComponentType::Val(getContext()), values.size()),
+        litArr
+    );
+    return success();
   }
   auto innerType = materializeTypeBinding(getContext(), *innerBinding);
   Value startVal =
@@ -737,15 +730,15 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto start = rewriter.create<ValToIndexOp>(op.getStart().getLoc(), startVal);
   auto end = rewriter.create<ValToIndexOp>(op.getEnd().getLoc(), endVal);
-  auto loop = rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), start, end, one, mlir::ValueRange(arrAlloc),
+  rewriter.create<mlir::scf::ForOp>(
+      op.getLoc(), start, end, one, mlir::ValueRange(),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     auto conv = builder.create<IndexToValOp>(loc, innerType, iv);
-    builder.create<WriteArrayOp>(loc, args[0], iv, conv);
-    builder.create<mlir::scf::YieldOp>(loc, args[0]);
+    builder.create<WriteArrayOp>(loc, arrAlloc, iv, conv);
+    builder.create<scf::YieldOp>(loc);
   }
   );
-  rewriter.replaceOp(op, loop);
+  rewriter.replaceOp(op, arrAlloc);
 
   return mlir::success();
 }
@@ -860,7 +853,7 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
 ) const {
   auto parent = op->getParentOp();
   if (!parent || !mlir::isa<mlir::scf::ExecuteRegionOp>(parent)) {
-    return mlir::failure();
+    return failure();
   }
   auto binding = getType(op);
   if (mlir::failed(binding)) {
@@ -890,14 +883,16 @@ mlir::LogicalResult ZhlSuperLoweringInSwitch::matchAndRewrite(
     return op->emitOpError() << "failed to type check";
   }
 
-  auto value = adaptor.getValue();
   auto type = materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != type) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), type, value);
-    value = cast.getResult(0);
+  assert(parent->getResultTypes().size() == 1);
+  auto parentType = parent->getResultTypes().front();
+  auto value = getCastedValue(adaptor.getValue(), rewriter, type);
+  if (failed(value)) {
+    return failure();
   }
+  auto coercion = rewriter.create<SuperCoerceOp>(op.getLoc(), parentType, *value);
 
-  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, value);
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, coercion.getResult());
   return mlir::success();
 }
 

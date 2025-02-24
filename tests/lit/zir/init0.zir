@@ -1,0 +1,8 @@
+// RUN: zklang -o - %s
+
+component Top() {
+
+  for i : 1..10 {
+    reduce 2..20 init 0 with Add
+  }
+}

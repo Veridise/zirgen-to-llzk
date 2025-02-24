@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iterator>
+#include <llvm/Support/Debug.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <unordered_set>

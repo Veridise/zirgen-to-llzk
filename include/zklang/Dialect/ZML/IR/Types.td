@@ -22,6 +22,8 @@ def TypeVar : ZMLType<"TypeVar", "tvar"> {
   }];
 }
 
+// XXX: Improvement idea: Make this a type interface and split the logic of the
+// "special" types in different types that implement the interface.
 def Component : ZMLType<"Component", "comp"> {
   let summary = "component type";
   let parameters = (ins "::mlir::FlatSymbolRefAttr":$name,
@@ -42,6 +44,10 @@ def Component : ZMLType<"Component", "comp"> {
 
     /// Returns wether the component associated to this type is the root 'Component'
     bool isRoot() const { return getName().getValue() == "Component"; }
+    bool isArray() const { return getName().getValue() == "Array" || (getSuperTypeAsComp() != nullptr && getSuperTypeAsComp().isArray()); }
+
+    mlir::FailureOr<mlir::Attribute> getArraySize() const;
+    ComponentType getSuperTypeAsComp() const;
 
     static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
     static ComponentType Component(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
@@ -59,6 +65,7 @@ def Component : ZMLType<"Component", "comp"> {
     }
   }];
 
+  // TODO: Make this builders infer context since they already take a Type
   let builders = [TypeBuilder<(ins "::llvm::StringRef":$name, "Type":$superType,
                                   "::llvm::ArrayRef<::mlir::Attribute>":$params,
                                   "bool":$builtin),
