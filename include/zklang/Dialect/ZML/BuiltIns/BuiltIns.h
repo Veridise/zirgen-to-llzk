@@ -13,7 +13,10 @@ void addBuiltins(mlir::OpBuilder &, const std::unordered_set<std::string_view> &
 mlir::Operation *getBuiltInOp(mlir::StringRef);
 
 static const std::unordered_set<std::string> BuiltInComponentNames = {
-    "BitAnd", "Add", "Sub", "Mul", "Inv", "Isz", "Neg", "Val", "String", "Array", "Mod", "InRange"
+    "BitAnd", "Add",    "Sub",    "Mul",     "Inv",          "Isz",     "Neg",    "Val",
+    "String", "Array",  "Mod",    "InRange",
+
+    "ExtInv", "ExtAdd", "ExtSub", "ExtMul",  "NondetExtReg", "MakeExt", "EqzExt", "ExtVal"
 };
 
 static const std::unordered_set<std::string_view> BuiltinsDontNeedAlloc = {"Add",    "Sub", "Mul",
@@ -48,6 +51,12 @@ component Reg(v: Val) {
    reg
 }
 
+component ExtReg(v: ExtVal) {
+   reg := NondetExtReg(v);
+   EqzExt(ExtSub(reg, v));
+   reg
+}
+
 function Div(lhs: Val, rhs: Val) {
    reciprocal := Inv(rhs);
    reciprocal * rhs = 1;
@@ -56,6 +65,10 @@ function Div(lhs: Val, rhs: Val) {
 }
 
 extern Log(message: String, vals: Val...);
+extern Abort();
+extern Assert(x: Val, message: String);
+
+
 
 )";
 

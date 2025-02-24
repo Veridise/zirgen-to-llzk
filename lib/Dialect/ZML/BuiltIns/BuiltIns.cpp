@@ -42,8 +42,8 @@ ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
   );
 }
 
-template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef name) {
-  auto superType = ComponentType::Val(builder.getContext());
+template <typename OpTy>
+void addBinOpCommon(mlir::OpBuilder &builder, mlir::StringRef name, ComponentType superType) {
   auto componentType = ComponentType::get(builder.getContext(), name, superType, true);
 
   builtinCommon(ComponentBuilder()
@@ -64,9 +64,18 @@ template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef
                     )
   ).build(builder);
 }
-
-template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringRef name) {
+template <typename OpTy> void addBinOp(mlir::OpBuilder &builder, mlir::StringRef name) {
   auto superType = ComponentType::Val(builder.getContext());
+  addBinOpCommon<OpTy>(builder, name, superType);
+}
+
+template <typename OpTy> void addExtBinOp(mlir::OpBuilder &builder, mlir::StringRef name) {
+  auto superType = ComponentType::ExtVal(builder.getContext());
+  addBinOpCommon<OpTy>(builder, name, superType);
+}
+
+template <typename OpTy>
+void addUnaryOpCommon(mlir::OpBuilder &builder, mlir::StringRef name, ComponentType superType) {
   auto componentType = ComponentType::get(builder.getContext(), name, superType, true);
 
   builtinCommon(ComponentBuilder()
@@ -86,6 +95,16 @@ template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringR
   }
                     )
   ).build(builder);
+}
+
+template <typename OpTy> void addUnaryOp(mlir::OpBuilder &builder, mlir::StringRef name) {
+  auto superType = ComponentType::Val(builder.getContext());
+  addUnaryOpCommon<OpTy>(builder, name, superType);
+}
+
+template <typename OpTy> void addExtUnaryOp(mlir::OpBuilder &builder, mlir::StringRef name) {
+  auto superType = ComponentType::ExtVal(builder.getContext());
+  addUnaryOpCommon<OpTy>(builder, name, superType);
 }
 
 void addInRange(mlir::OpBuilder &builder) {
@@ -128,12 +147,11 @@ void addComponent(mlir::OpBuilder &builder) {
   ).build(builder);
 }
 
-void addNondetReg(mlir::OpBuilder &builder) {
-  auto superType = ComponentType::Val(builder.getContext());
-  auto componentType = ComponentType::get(builder.getContext(), "NondetReg", superType, true);
+void addNondetRegCommon(mlir::OpBuilder &builder, mlir::StringRef name, ComponentType superType) {
+  auto componentType = ComponentType::get(builder.getContext(), name, superType, true);
 
   builtinCommon(ComponentBuilder()
-                    .name("NondetReg")
+                    .name(name)
                     .field("$super", superType)
                     .field("reg", superType)
                     .fillBody(
@@ -146,6 +164,70 @@ void addNondetReg(mlir::OpBuilder &builder) {
     b.create<WriteFieldOp>(b.getUnknownLoc(), self, "$super", args[0]);
     // Return self
     b.create<mlir::func::ReturnOp>(b.getUnknownLoc(), mlir::ValueRange({self}));
+  }
+                    )
+  ).build(builder);
+}
+
+void addNondetReg(mlir::OpBuilder &builder) {
+  auto superType = ComponentType::Val(builder.getContext());
+  addNondetRegCommon(builder, "NondetReg", superType);
+}
+
+void addNondetExtReg(mlir::OpBuilder &builder) {
+  auto superType = ComponentType::ExtVal(builder.getContext());
+  addNondetRegCommon(builder, "NondetExtReg", superType);
+}
+
+void addMakeExt(mlir::OpBuilder &builder) {
+  auto superType = ComponentType::ExtVal(builder.getContext());
+  auto valType = ComponentType::Val(builder.getContext());
+  auto componentType = ComponentType::get(builder.getContext(), "MakeExt", superType, true);
+
+  builtinCommon(ComponentBuilder()
+                    .name("MakeExt")
+                    .field("$super", superType)
+                    .fillBody(
+                        {valType}, {componentType},
+                        [&](mlir::ValueRange args, mlir::OpBuilder &) {
+    // Reference to self
+    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
+    auto ext = builder.create<MakeExtOp>(builder.getUnknownLoc(), superType, args[0]);
+    // Store the result
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", ext);
+    // Return self
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+  }
+                    )
+  ).build(builder);
+}
+
+void addEqzExt(mlir::OpBuilder &builder) {
+  auto superType = ComponentType::Component(builder.getContext());
+  auto valType = ComponentType::ExtVal(builder.getContext());
+
+  auto componentType = ComponentType::get(builder.getContext(), "EqzExt", superType, true);
+
+  builtinCommon(ComponentBuilder()
+                    .name("EqzExt")
+                    .field("$super", superType)
+                    .fillBody(
+                        {valType}, {componentType},
+                        [&](mlir::ValueRange args, mlir::OpBuilder &) {
+    // Reference to self
+    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
+    builder.create<EqzExtOp>(builder.getUnknownLoc(), args[0]);
+    auto compCtorRef = builder.create<ConstructorRefOp>(
+        builder.getUnknownLoc(), superType.getName(),
+        builder.getFunctionType(mlir::TypeRange(), superType), true
+    );
+    auto comp = builder.create<mlir::func::CallIndirectOp>(
+        builder.getUnknownLoc(), compCtorRef, mlir::ValueRange()
+    );
+    // Store the result
+    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", comp.getResult(0));
+    // Return self
+    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
   }
                     )
   ).build(builder);
@@ -185,6 +267,8 @@ void zml::addBuiltinBindings(
 ) {
   auto &Val = bindings.CreateBuiltin("Val", bindings.Component());
   const_cast<zhl::TypeBinding &>(Val).selfConstructs();
+  auto &ExtVal = bindings.CreateBuiltin("ExtVal", bindings.Component());
+  const_cast<zhl::TypeBinding &>(ExtVal).selfConstructs();
   MAYBE("String") {
     auto &String = bindings.CreateBuiltin("String", bindings.Component());
     const_cast<zhl::TypeBinding &>(String).selfConstructs();
@@ -196,6 +280,11 @@ void zml::addBuiltinBindings(
   MAYBE("NondetReg")
   bindings.CreateBuiltin(
       "NondetReg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+  );
+  MAYBE("NondetExtReg")
+  bindings.CreateBuiltin(
+      "NondetExtReg", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, ExtVal}}),
+      zhl::MembersMap()
   );
   MAYBE("InRange")
   bindings.CreateBuiltin(
@@ -212,15 +301,30 @@ void zml::addBuiltinBindings(
       "Add", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
+  MAYBE("ExtAdd")
+  bindings.CreateBuiltin(
+      "ExtAdd", ExtVal, zhl::ParamsMap(),
+      zhl::ParamsMap({{{"lhs", 0}, ExtVal}, {{"rhs", 1}, ExtVal}}), zhl::MembersMap()
+  );
   MAYBE("Sub")
   bindings.CreateBuiltin(
       "Sub", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
   );
+  MAYBE("ExtSub")
+  bindings.CreateBuiltin(
+      "ExtSub", ExtVal, zhl::ParamsMap(),
+      zhl::ParamsMap({{{"lhs", 0}, ExtVal}, {{"rhs", 1}, ExtVal}}), zhl::MembersMap()
+  );
   MAYBE("Mul")
   bindings.CreateBuiltin(
       "Mul", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
       zhl::MembersMap()
+  );
+  MAYBE("ExtMul")
+  bindings.CreateBuiltin(
+      "ExtMul", ExtVal, zhl::ParamsMap(),
+      zhl::ParamsMap({{{"lhs", 0}, ExtVal}, {{"rhs", 1}, ExtVal}}), zhl::MembersMap()
   );
   MAYBE("Mod")
   bindings.CreateBuiltin(
@@ -231,6 +335,10 @@ void zml::addBuiltinBindings(
   bindings.CreateBuiltin(
       "Inv", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
   );
+  MAYBE("ExtInv")
+  bindings.CreateBuiltin(
+      "ExtInv", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, ExtVal}}), zhl::MembersMap()
+  );
   MAYBE("Isz")
   bindings.CreateBuiltin(
       "Isz", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
@@ -238,6 +346,15 @@ void zml::addBuiltinBindings(
   MAYBE("Neg")
   bindings.CreateBuiltin(
       "Neg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+  );
+  MAYBE("MakeExt")
+  bindings.CreateBuiltin(
+      "MakeExt", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+  );
+  MAYBE("EqzExt")
+  bindings.CreateBuiltin(
+      "EqzExt", bindings.Component(), zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, ExtVal}}),
+      zhl::MembersMap()
   );
   MAYBE("Array") {
     auto &Array = bindings.CreateBuiltin(
@@ -255,17 +372,25 @@ void zml::addBuiltins(
   addComponent(builder);
 
   assert(definedNames.find("Val") == definedNames.end() && "Can't redefine Val type");
+  assert(definedNames.find("ExtVal") == definedNames.end() && "Can't redefine ExtVal type");
   addTrivial(builder, "Val");
+  addTrivial(builder, "ExtVal");
   MAYBE("String") { addTrivial(builder, "String"); }
 
   MAYBE("NondetReg") { addNondetReg(builder); }
+  MAYBE("NondetExtReg") { addNondetExtReg(builder); }
+  MAYBE("MakeExt") { addMakeExt(builder); }
   MAYBE("InRange") { addInRange(builder); }
   MAYBE("BitAnd") { addBinOp<BitAndOp>(builder, "BitAnd"); }
   MAYBE("Add") { addBinOp<AddOp>(builder, "Add"); }
   MAYBE("Sub") { addBinOp<SubOp>(builder, "Sub"); }
   MAYBE("Mul") { addBinOp<MulOp>(builder, "Mul"); }
+  MAYBE("ExtAdd") { addExtBinOp<ExtAddOp>(builder, "ExtAdd"); }
+  MAYBE("ExtSub") { addExtBinOp<ExtSubOp>(builder, "ExtSub"); }
+  MAYBE("ExtMul") { addExtBinOp<ExtMulOp>(builder, "ExtMul"); }
   MAYBE("Mod") { addBinOp<ModOp>(builder, "Mod"); }
   MAYBE("Inv") { addUnaryOp<InvOp>(builder, "Inv"); }
+  MAYBE("ExtInv") { addExtUnaryOp<ExtInvOp>(builder, "ExtInv"); }
   MAYBE("Isz") { addUnaryOp<IsZeroOp>(builder, "Isz"); }
   MAYBE("Neg") { addUnaryOp<NegOp>(builder, "Neg"); }
   MAYBE("Array") { addArrayComponent(builder); }

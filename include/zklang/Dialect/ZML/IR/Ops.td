@@ -400,6 +400,12 @@ def InRangeOp : ZMLOp<"in_range", [Pure]> {
       [{ $low ` ` `<` `=` $mid ` ` `<` ` ` $high `:` `(` type($low) `,` type($mid) `,` type($high) `)` `->` type($out) attr-dict }];
 }
 
+def EqzExtOp : ZMLOp<"eqzext"> {
+  let summary = "checks if ext value is zero";
+  let arguments = (ins Component:$extval);
+  let assemblyFormat = [{ $extval `:` type($extval) attr-dict }];
+}
+
 class UnaryOp<string mnemonic, list<Trait> traits = []>
     : ZMLOp<mnemonic, !listconcat([Pure], traits)> {
   let arguments = (ins Component:$in);
@@ -410,6 +416,8 @@ class UnaryOp<string mnemonic, list<Trait> traits = []>
 def IsZeroOp : UnaryOp<"isz"> {}
 def NegOp : UnaryOp<"neg"> {}
 def InvOp : UnaryOp<"inv"> {}
+def ExtInvOp : UnaryOp<"extinv"> {}
+def MakeExtOp : UnaryOp<"mkext"> {}
 
 class BinaryOp<string mnemonic, list<Trait> traits = []>
     : ZMLOp<mnemonic, !listconcat([Pure], traits)> {
@@ -420,7 +428,10 @@ class BinaryOp<string mnemonic, list<Trait> traits = []>
 }
 
 def AddOp : BinaryOp<"add", [Commutative]> {}
+def ExtAddOp : BinaryOp<"extadd", [Commutative]> {}
 def SubOp : BinaryOp<"sub"> {}
+def ExtSubOp : BinaryOp<"extsub"> {}
 def MulOp : BinaryOp<"mul", [Commutative]> {}
+def ExtMulOp : BinaryOp<"extmul", [Commutative]> {}
 def BitAndOp : BinaryOp<"bit_and"> {}
 def ModOp : BinaryOp<"mod"> {}
