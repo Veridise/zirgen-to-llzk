@@ -1,0 +1,16 @@
+// RUN: zklang -o - -emit=zml %s
+// COM: This test ensures that the frontend doesn't crash when typechecking a compiler directive statement.
+
+component A() {
+  public foo := 1;
+}
+
+component B() {
+  public bar := 2;
+}
+
+component Top() {
+  a := A();
+  b := B();
+  AliasLayout!(a.foo, b.bar);
+}

@@ -322,7 +322,7 @@ FrozenTypingRuleSet zhlTypingRules(TypeBindings &bindings) {
       GetGlobalTypingRule, ConstructTypingRule, ExternTypingRule, DeclareTypingRule,
       SubscriptTypeRule, SpecializeTypeRule, ConstrainTypeRule, DefineTypeRule, ArrayTypeRule,
       BlockTypeRule, ReduceTypeRule, RangeTypeRule, BackTypeRule, GenericParamTypeRule, MapTypeRule,
-      LookupTypeRule, SwitchTypeRule, ConstructGlobalTypeRule>(bindings);
+      DirectiveTypeRule, LookupTypeRule, SwitchTypeRule, ConstructGlobalTypeRule>(bindings);
 
   return rules;
 }
