@@ -149,11 +149,19 @@ LogicalResult LowerNopOp::matchAndRewrite(
   return success();
 }
 
-// Set of the builtins (by name) that are converted to a LLZK felt. Used for shortcircuiting the
-// lowering of SuperCoerceOp and for removing the calls to @constrain that point to structs that get
-// removed during lowering because the implementation of these types gets removed.
-static std::unordered_set<std::string_view> feltEquivalentTypes{"Val",    "Add", "Sub", "Mul",
-                                                                "BitAnd", "Inv", "Isz", "InRange"};
+// Set of the builtins (by name) that are converted to a LLZK felt or a extended field element
+// representation. Used for shortcircuiting the lowering of SuperCoerceOp and for removing the calls
+// to @constrain that point to structs that get removed during lowering because the implementation
+// of these types gets removed.
+static std::unordered_set<std::string_view> builtinsConvertibleToOps{
+    "Val",     "Add",    "Sub",    "Mul",    "BitAnd", "Inv",    "Isz",
+    "InRange", "ExtVal", "ExtAdd", "ExtSub", "ExtInv", "ExtMul", "MakeExt"
+};
+
+bool wasConvertedToPrimitiveType(ComponentType t) {
+  return t.getBuiltin() &&
+         (builtinsConvertibleToOps.find(t.getName().getValue()) != builtinsConvertibleToOps.end());
+}
 
 LogicalResult LowerSuperCoerceOp::matchAndRewrite(
     SuperCoerceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
@@ -162,24 +170,15 @@ LogicalResult LowerSuperCoerceOp::matchAndRewrite(
   auto opChain = adaptor.getComponent();
   auto tc = getTypeConverter();
   while (t != op.getResult().getType()) {
-    if (t.getBuiltin() &&
-        feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end()) {
-      // This type will get converted to a felt so there is not need to extract the super value any
-      // longer.
-      break;
-    }
-    if (t.getName().getValue() == "Array") {
+    if (wasConvertedToPrimitiveType(t) || t.getName().getValue() == "Array") {
       break;
     }
     auto typ = t.getSuperType();
-    if (!typ) {
+    if (!typ || mlir::isa<TypeVarType>(typ)) {
       break;
     }
     if (auto comp = mlir::dyn_cast<ComponentType>(typ)) {
       t = comp;
-    }
-    if (auto comp = mlir::dyn_cast<TypeVarType>(typ)) {
-      break;
     }
     opChain =
         rewriter.create<llzk::FieldReadOp>(op.getLoc(), tc->convertType(t), opChain, "$super");
@@ -198,8 +197,7 @@ LogicalResult LowerConstrainCallOp::matchAndRewrite(
     return op->emitOpError() << "was expecting a component type but got " << compType;
   }
   auto compName = comp.getName().getAttr();
-  if (comp.getBuiltin() &&
-      feltEquivalentTypes.find(compName.getValue()) != feltEquivalentTypes.end()) {
+  if (wasConvertedToPrimitiveType(comp)) {
     rewriter.eraseOp(op);
     return success();
   }

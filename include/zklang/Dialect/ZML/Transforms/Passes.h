@@ -14,7 +14,6 @@ template <typename Op> using OpPass = std::unique_ptr<mlir::OperationPass<Op>>;
 OpPass<mlir::ModuleOp> createInjectBuiltInsPass();
 OpPass<mlir::ModuleOp> createRemoveBuiltInsPass();
 OpPass<mlir::ModuleOp> createSplitComponentBodyPass();
-OpPass<ComponentOp> createLowerExtValOpsPass();
 OpPass<mlir::func::FuncOp> createLowerBuiltInsPass();
 OpPass<mlir::func::FuncOp> createRemoveIllegalComputeOpsPass();
 OpPass<mlir::func::FuncOp> createRemoveIllegalConstrainOpsPass();

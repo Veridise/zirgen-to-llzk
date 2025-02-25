@@ -380,6 +380,7 @@ void zml::addBuiltins(
   MAYBE("NondetReg") { addNondetReg(builder); }
   MAYBE("NondetExtReg") { addNondetExtReg(builder); }
   MAYBE("MakeExt") { addMakeExt(builder); }
+  MAYBE("EqzExt") { addEqzExt(builder); }
   MAYBE("InRange") { addInRange(builder); }
   MAYBE("BitAnd") { addBinOp<BitAndOp>(builder, "BitAnd"); }
   MAYBE("Add") { addBinOp<AddOp>(builder, "Add"); }

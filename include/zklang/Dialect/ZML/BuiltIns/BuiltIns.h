@@ -13,10 +13,10 @@ void addBuiltins(mlir::OpBuilder &, const std::unordered_set<std::string_view> &
 mlir::Operation *getBuiltInOp(mlir::StringRef);
 
 static const std::unordered_set<std::string> BuiltInComponentNames = {
-    "BitAnd", "Add",    "Sub",    "Mul",     "Inv",          "Isz",     "Neg",    "Val",
-    "String", "Array",  "Mod",    "InRange",
+    "BitAnd", "Add",    "Sub",    "Mul",    "Inv",     "Isz",
+    "Neg",    "Val",    "String", "Array",  "Mod",     "InRange",
 
-    "ExtInv", "ExtAdd", "ExtSub", "ExtMul",  "NondetExtReg", "MakeExt", "EqzExt", "ExtVal"
+    "ExtInv", "ExtAdd", "ExtSub", "ExtMul", "MakeExt", "ExtVal"
 };
 
 static const std::unordered_set<std::string_view> BuiltinsDontNeedAlloc = {
@@ -37,6 +37,7 @@ static const char ExtSubStr[] = "ExtSub";
 static const char ExtMulStr[] = "ExtMul";
 static const char ExtInvStr[] = "ExtInv";
 static const char MakeExtStr[] = "MakeExt";
+static const char EqzExtStr[] = "EqzExt";
 static const char IszStr[] = "Isz";
 static const char NegStr[] = "Neg";
 static const char ValStr[] = "Val";

@@ -4,5 +4,4 @@ target_sources(ZIRC PRIVATE
   RemoveBuiltIns.cpp 
   RemoveIllegalOps.cpp 
   SplitComponentBody.cpp
-  LowerExtValOps.cpp
 )

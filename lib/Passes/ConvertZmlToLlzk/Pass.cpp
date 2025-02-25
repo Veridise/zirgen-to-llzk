@@ -18,9 +18,12 @@
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <unordered_set>
+#include <zklang/Dialect/ZML/ExtVal/BabyBear.h>
+#include <zklang/Dialect/ZML/ExtVal/Patterns.h>
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Utils/Patterns.h>
+#include <zklang/FiniteFields/BabyBear.h>
 #include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
 #include <zklang/Passes/ConvertZmlToLlzk/Pass.h>
 #include <zklang/Passes/ConvertZmlToLlzk/Patterns.h>
@@ -33,7 +36,10 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   auto op = getOperation();
 
   mlir::MLIRContext *ctx = op->getContext();
-  llzk::LLZKTypeConverter typeConverter;
+  // Only BabyBear is supported for now
+  ff::babybear::Field BabyBear;
+  llzk::LLZKTypeConverter typeConverter(BabyBear);
+  extval::babybear::Converter extValConverter(typeConverter);
 
   mlir::RewritePatternSet patterns(ctx);
 
@@ -47,6 +53,9 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
       RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering, AssertOpLowering,
       LowerLitValArrayOp>(typeConverter, ctx);
+  populateExtValToLlzkConversionPatterns(patterns, typeConverter, ctx, extValConverter);
+
+  scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
 
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect>();
@@ -73,8 +82,6 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   target.addDynamicallyLegalOp<scf::WhileOp, scf::ConditionOp>([&](Operation *scfOp) {
     return typeConverter.isLegal(scfOp);
   });
-
-  scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
 
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();

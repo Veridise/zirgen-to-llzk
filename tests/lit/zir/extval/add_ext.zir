@@ -1,0 +1,5 @@
+// RUN: zklang -o - %s
+
+component Foo(x: ExtVal, y: ExtVal) {
+  ExtAdd(x, y)
+}
