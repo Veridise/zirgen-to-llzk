@@ -114,7 +114,6 @@ using ModPattern = ReplaceConstructorCallWithBuiltIn<ModOp, ModStr>;
 using InvPattern = ReplaceConstructorCallWithBuiltIn<InvOp, InvStr>;
 using ExtInvPattern = ReplaceConstructorCallWithBuiltIn<ExtInvOp, ExtInvStr>;
 using MakeExtPattern = ReplaceConstructorCallWithBuiltIn<MakeExtOp, MakeExtStr>;
-// using EqzExtPattern = ReplaceConstructorCallWithBuiltIn<EqzExtOp, EqzExtStr>;
 using IszPattern = ReplaceConstructorCallWithBuiltIn<IsZeroOp, IszStr>;
 using NegPattern = ReplaceConstructorCallWithBuiltIn<NegOp, NegStr>;
 using InRangePattern = ReplaceConstructorCallWithBuiltIn<InRangeOp, InRangeStr>;

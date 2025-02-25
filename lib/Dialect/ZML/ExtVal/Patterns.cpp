@@ -50,13 +50,9 @@ public:
     SmallVector<Value> iszs;
     std::transform(a.begin(), a.end(), std::back_inserter(iszs), [&](Value v) -> Value {
       return helper.createIszOp(v, rewriter);
-
-      // rewriter.create<IsZeroOp>(op.getLoc(), ComponentType::Val(getContext()), v);
     });
     auto mult = std::reduce(iszs.begin() + 1, iszs.end(), *iszs.begin(), [&](auto lhs, auto rhs) {
       return helper.createAndOp(lhs, rhs, rewriter);
-
-      // rewriter.create<MulOp>(op.getLoc(), ComponentType::Val(getContext()), lhs, rhs);
     });
     Twine msg = "failed assertion: extended field element is not equal to zero";
     rewriter.replaceOp(op, helper.createAssertOp(mult, rewriter.getStringAttr(msg), rewriter));

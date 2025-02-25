@@ -55,7 +55,6 @@ using ModPattern = RemoveBuiltIn<ModStr, ComponentOp>;
 using InvPattern = RemoveBuiltIn<InvStr, ComponentOp>;
 using ExtInvPattern = RemoveBuiltIn<ExtInvStr, ComponentOp>;
 using MakeExtPattern = RemoveBuiltIn<MakeExtStr, ComponentOp>;
-// using EqzExtPattern = RemoveBuiltIn<EqzExtStr, ComponentOp>;
 using IszPattern = RemoveBuiltIn<IszStr, ComponentOp>;
 using NegPattern = RemoveBuiltIn<NegStr, ComponentOp>;
 using ValPattern = RemoveBuiltIn<ValStr, ComponentOp>;

@@ -17,7 +17,7 @@ class BaseConverter {
 public:
   class TypeHelper;
 
-  /// A simple wrapper that implements operators =, -, * for readability.
+  /// A simple wrapper that implements operators +, -, * for readability.
   /// It is meant to be used to define a static set of operations in a readable manner while
   /// instantiating the required operations on the fly via the TypeHelper and the OpBuilder.
   class ValueWrap {
