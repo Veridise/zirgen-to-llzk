@@ -154,7 +154,7 @@ LogicalResult LowerNopOp::matchAndRewrite(
 // to @constrain that point to structs that get removed during lowering because the implementation
 // of these types gets removed.
 static std::unordered_set<std::string_view> builtinsConvertibleToOps{
-    "Val",     "Add",    "Sub",    "Mul",    "BitAnd", "Inv",    "Isz",
+    "Val",     "Add",    "Sub",    "Mul",    "BitAnd", "Inv",    "Isz",    "Neg",
     "InRange", "ExtVal", "ExtAdd", "ExtSub", "ExtInv", "ExtMul", "MakeExt"
 };
 
