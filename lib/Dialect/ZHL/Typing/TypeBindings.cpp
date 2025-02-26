@@ -240,7 +240,6 @@ zhl::TypeBinding &zhl::TypeBinding::operator=(TypeBinding &&other) {
 
 zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
-    print(llvm::dbgs());
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
