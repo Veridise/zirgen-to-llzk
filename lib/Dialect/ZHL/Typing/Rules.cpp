@@ -557,4 +557,10 @@ FailureOr<TypeBinding> LookupTypeRule::
   return comp.getMember(op.getMember(), [&]() { return op->emitError(); });
 }
 
+FailureOr<TypeBinding>
+DirectiveTypeRule::typeCheck(DirectiveOp, ArrayRef<TypeBinding>, Scope &, ArrayRef<const Scope *>)
+    const {
+  return getBindings().Component();
+}
+
 } // namespace zhl

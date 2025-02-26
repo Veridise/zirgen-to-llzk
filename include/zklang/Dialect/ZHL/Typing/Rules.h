@@ -234,4 +234,13 @@ public:
       const override;
 };
 
+class DirectiveTypeRule : public OpTypingRule<zirgen::Zhl::DirectiveOp> {
+public:
+  using OpTypingRule<zirgen::Zhl::DirectiveOp>::OpTypingRule;
+
+  mlir::FailureOr<TypeBinding>
+  typeCheck(zirgen::Zhl::DirectiveOp, mlir::ArrayRef<TypeBinding>, Scope &, mlir::ArrayRef<const Scope *>)
+      const override;
+};
+
 } // namespace zhl
