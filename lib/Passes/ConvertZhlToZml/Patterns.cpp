@@ -34,6 +34,8 @@
 #include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
+#define DEBUG_TYPE "lower-zhl-pass"
+
 using namespace zirgen;
 using namespace zhl;
 using namespace mlir;
@@ -488,17 +490,23 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto comp = adaptor.getComponent();
+  LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << "\n");
   auto originalComp = getType(op.getComponent());
   if (mlir::failed(originalComp)) {
     return op->emitOpError() << "failed to type check component reference";
   }
+  LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << "\n";
+             llvm::dbgs() << "Full printout: \n"; originalComp->print(llvm::dbgs(), true);
+             llvm::dbgs() << "\n");
   auto materializedType = materializeTypeBinding(getContext(), *originalComp);
+  LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << "\n");
   auto compType = mlir::dyn_cast<ComponentType>(materializedType);
   if (!compType) {
     return op->emitError() << "type mismatch, cannot access a member for a non-component type "
                            << materializedType;
   }
   if (comp.getType() != compType) {
+    LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << "\n");
     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
     comp = cast.getResult(0);
   }
@@ -507,19 +515,29 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
   auto compDef = compType.getDefinition(st, mod);
   assert(compDef && "Component type without a definition!");
 
+  LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << "\n");
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Starting search for member " << adaptor.getMember() << " starting with type "
+                   << compType << "\n"
+  );
   auto nameSym = mlir::SymbolRefAttr::get(adaptor.getMemberAttr());
   while (mlir::failed(compDef.lookupFieldType(nameSym))) {
+    LLVM_DEBUG(llvm::dbgs() << "  Failed! Trying with the super type\n");
     auto superType = compType.getSuperType();
     if (!superType) {
+      LLVM_DEBUG(llvm::dbgs() << "  Failed to get the super type\n");
       return op->emitError() << "member " << adaptor.getMember() << " was not found";
     }
     compType = mlir::dyn_cast<ComponentType>(superType);
     if (!compType) {
+      LLVM_DEBUG(llvm::dbgs() << "  Super type is not a component\n");
       return op->emitError() << "type mismatch, cannot access a member for a non-component type "
                              << superType;
     }
 
     compDef = compType.getDefinition(st, mod);
+    LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << "\n");
   }
 
   auto fieldType = compDef.lookupFieldType(nameSym);
@@ -800,8 +818,20 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     );
   }
   );
-
-  rewriter.replaceOp(op, arrAlloc);
+  if (auto compSlot = dyn_cast_if_present<ComponentSlot>(binding->getSlot())) {
+    auto self = op->getParentOfType<SelfOp>().getSelfValue();
+    ComponentInterface comp = op->getParentOfType<ComponentInterface>();
+    assert(comp);
+    auto name = createSlot(compSlot, rewriter, comp, op.getLoc());
+    auto slotType = materializeTypeBinding(getContext(), compSlot->getBinding());
+    Type compType = comp.getType();
+    auto val = storeAndLoadSlot(
+        *compSlot, arrAlloc, name, slotType, op.getLoc(), compType, rewriter, self
+    );
+    rewriter.replaceOp(op, val);
+  } else {
+    rewriter.replaceOp(op, arrAlloc);
+  }
   loop->setAttr("original_op", rewriter.getStringAttr("map"));
 
   return mlir::success();

@@ -36,6 +36,8 @@ public:
   void setParentSlot(FrameSlot *);
   FrameSlot *getParentSlot() const;
 
+  friend FrameSlot;
+
 private:
   // A pointer to the unique information about the frame
   std::shared_ptr<detail::FrameInfo> info;

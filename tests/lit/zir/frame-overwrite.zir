@@ -1,0 +1,15 @@
+// RUN: zklang -o - %s
+
+component Foo() {
+  x := 1 + 1;
+}
+
+component Bar() {
+  f := Foo();
+  y := f.x;
+}
+
+component Baz() {
+  f := Foo();
+  f.x = 2;
+}

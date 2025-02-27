@@ -15,9 +15,14 @@
 
 #ifndef NDEBUG
 static uint8_t ident;
+static mlir::StringRef loggingScope = "";
 
 inline llvm::raw_ostream &logLine() {
-  llvm::dbgs() << "[Typing] ";
+  if (loggingScope.empty()) {
+    llvm::dbgs() << "[Typing] ";
+  } else {
+    llvm::dbgs() << "[Typing(" << loggingScope << ")] ";
+  }
   llvm::dbgs().indent(ident * 4);
   return llvm::dbgs();
 }
@@ -40,13 +45,14 @@ void checkComponent(
     ComponentOp comp, ZhlOpBindings &bindings, TypeBindings &typeBindings,
     const FrozenTypingRuleSet &rules
 ) {
-  LLVM_DEBUG(llvm::dbgs() << "\n"; logLine() << "Checking component " << comp.getName() << ":\n";
-             ident++);
+  LLVM_DEBUG(llvm::dbgs() << "\n"; loggingScope = comp.getName();
+             logLine() << "Checking component " << comp.getName() << ":\n"; ident++);
   ComponentScope scope(comp, typeBindings);
   for (auto &op : comp.getRegion().getOps()) {
     (void)typeCheckOp(&op, bindings, scope, rules);
   }
-  LLVM_DEBUG(ident--; logLine() << "Finished checking component " << comp.getName() << "\n");
+  LLVM_DEBUG(ident--; logLine() << "Finished checking component " << comp.getName() << "\n";
+             loggingScope = "");
 }
 
 FailureOr<TypeBinding>

@@ -37,21 +37,32 @@ bool calleeIsBuiltin(mlir::Operation *op) {
   return false;
 }
 
+#define DEBUG_TYPE "zml-create-slot"
+
 FlatSymbolRefAttr createSlot(
     zhl::ComponentSlot *slot, OpBuilder &builder, ComponentInterface component, Location loc
 ) {
   mlir::SymbolTable st(component);
 
   auto desiredName = mlir::StringAttr::get(component.getContext(), slot->getSlotName());
+  LLVM_DEBUG(
+      llvm::dbgs() << "Creating a slot in " << component.getName()
+                   << "\nDesired name: " << desiredName << "\n"
+  );
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(&component.getRegion().front().front());
   auto type = materializeTypeBinding(builder.getContext(), slot->getBinding());
   auto fieldDef = builder.create<FieldDefOp>(loc, desiredName, TypeAttr::get(type));
 
+  LLVM_DEBUG(llvm::dbgs() << "Field op: " << fieldDef << "\n");
   // Insert the FieldDefOp into the symbol table to make sure it has an unique name within the
   // component
-  return mlir::FlatSymbolRefAttr::get(component.getContext(), st.insert(fieldDef));
+  auto name = st.insert(fieldDef);
+  LLVM_DEBUG(llvm::dbgs() << "Name created by the symbol table: " << name << "\n");
+  return mlir::FlatSymbolRefAttr::get(component.getContext(), name);
 }
+
+#undef DEBUG_TYPE
 
 TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
   if (count == 0) {
