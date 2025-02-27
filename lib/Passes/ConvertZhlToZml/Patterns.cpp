@@ -795,6 +795,9 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
 
   auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
   assert(succeeded(arrValue) && "this binding was validated above");
+  auto concreteArrValue =
+      coerceToArray(mlir::dyn_cast<TypedValue<ComponentType>>(*arrValue), rewriter);
+  assert(succeeded(concreteArrValue));
 
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), outputType);
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
@@ -805,7 +808,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     arrayFrame->setInductionVar(iv);
-    auto itVal = builder.create<ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv));
+    auto itVal = builder.create<ReadArrayOp>(loc, itType, *concreteArrValue, mlir::ValueRange(iv));
     // Cast it to a zhl Expr type for the block inlining
     auto itValCast = builder.create<mlir::UnrealizedConversionCastOp>(
         loc, mlir::TypeRange(Zhl::ExprType::get(getContext())), mlir::ValueRange(itVal)
@@ -978,11 +981,16 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   }
   auto itType = materializeTypeBinding(getContext(), *innerInputBinding);
 
-  auto arrValue = getCastedValue(adaptor.getArray(), *inputBinding, rewriter);
+  auto arrValue = coerceToArray(
+      mlir::cast<TypedValue<ComponentType>>(
+          getCastedValue(adaptor.getArray(), *inputBinding, rewriter)
+      ),
+      rewriter
+  );
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
 
-  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), arrValue);
+  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *arrValue);
 
   auto maybeSuperCoerce = [&](Value v, Type t) -> Value {
     if (v.getType() == t) {
@@ -996,7 +1004,7 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     arrayFrame->setInductionVar(iv);
     mlir::Value lhs = maybeSuperCoerce(
-        builder.create<ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv)),
+        builder.create<ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv)),
         constructorType.getInput(0)
     );
 

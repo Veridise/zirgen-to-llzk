@@ -450,9 +450,15 @@ mlir::LogicalResult LowerValToIndexOp::matchAndRewrite(
 mlir::LogicalResult LowerWriteArrayOp::matchAndRewrite(
     WriteArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::WriteArrayOp>(
-      op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
-  );
+  if (mlir::isa<llzk::ArrayType>(adaptor.getValue().getType())) {
+    rewriter.replaceOpWithNewOp<llzk::InsertArrayOp>(
+        op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
+    );
+  } else {
+    rewriter.replaceOpWithNewOp<llzk::WriteArrayOp>(
+        op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
+    );
+  }
 
   return mlir::success();
 }

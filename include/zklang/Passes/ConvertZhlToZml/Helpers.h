@@ -41,6 +41,10 @@ void storeSlot(
     mlir::Value
 );
 
+/// Given a Value of type ComponentType it returns a value of type Array<T,N> where
+/// said array is one of the super types of the input's type.
+mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentType> v, mlir::OpBuilder &);
+
 /// Helper for creating the ops that represent the call to a component's constructor.
 /// If the associated binding is linked to a frame slot it also creates the field and writes the
 /// result into it.

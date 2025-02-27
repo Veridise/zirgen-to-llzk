@@ -79,6 +79,21 @@ ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir:
   );
 }
 
+FailureOr<Type> ComponentType::getFirstMatchingSuperType(llvm::function_ref<bool(Type)> pred
+) const {
+  if (pred(*this)) {
+    return *this;
+  }
+  if (auto super = getSuperType()) {
+    if (auto superComp = mlir::dyn_cast<ComponentType>(super)) {
+      return superComp.getFirstMatchingSuperType(pred);
+    } else if (pred(super)) {
+      return super;
+    }
+  }
+  return failure();
+}
+
 FailureOr<Attribute> ComponentType::getArraySize() const {
   if (!isArray()) {
     return failure();

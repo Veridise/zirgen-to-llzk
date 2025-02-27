@@ -548,6 +548,8 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return failure();
   }
 
+  assert(arrayLen->isConst());
+
   assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
   if (failed(super)) {

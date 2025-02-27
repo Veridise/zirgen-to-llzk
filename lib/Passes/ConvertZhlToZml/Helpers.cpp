@@ -213,4 +213,19 @@ CtorCallBuilder::CtorCallBuilder(
   assert(self);
 }
 
+mlir::FailureOr<Value> coerceToArray(TypedValue<ComponentType> v, OpBuilder &builder) {
+  auto arraySuper = v.getType().getFirstMatchingSuperType([](Type t) {
+    if (auto ct = mlir::dyn_cast_if_present<ComponentType>(t)) {
+      return ct.isConcreteArray();
+    }
+    return false;
+  });
+
+  if (failed(arraySuper)) {
+    return failure();
+  }
+
+  return builder.create<SuperCoerceOp>(v.getLoc(), *arraySuper, v).getResult();
+}
+
 } // namespace zml

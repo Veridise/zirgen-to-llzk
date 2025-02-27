@@ -240,7 +240,6 @@ zhl::TypeBinding &zhl::TypeBinding::operator=(TypeBinding &&other) {
 
 zhl::TypeBinding zhl::TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
-    print(llvm::dbgs());
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
@@ -280,7 +279,7 @@ mlir::FailureOr<TypeBinding> zhl::TypeBinding::getArraySize(EmitErrorFn emitErro
     if (!hasSuperType()) {
       return failure();
     }
-    return getSuperType().getArrayElement(emitError);
+    return getSuperType().getArraySize(emitError);
   }
   assert(genericParams.size() == 2);
   return genericParams.getParam(1);
@@ -300,6 +299,13 @@ zhl::TypeBinding zhl::TypeBinding::WrapVariadic(const TypeBinding &t) {
   TypeBinding w = t;
   w.variadic = true;
   return w;
+}
+
+const TypeBinding &TypeBinding::StripConst(const TypeBinding &binding) {
+  if (binding.isConst()) {
+    return binding.getSuperType();
+  }
+  return binding;
 }
 
 TypeBinding TypeBinding::ReplaceFrame(Frame newFrame) const {
@@ -490,7 +496,8 @@ zhl::TypeBindings::Array(TypeBinding type, uint64_t size, mlir::Location loc) co
 
 TypeBinding TypeBindings::Array(TypeBinding type, TypeBinding size, mlir::Location loc) const {
   ParamsMap arrayGenericParams;
-  arrayGenericParams.insert({{"T", 0}, type});
+  auto cleanedType = TypeBinding::StripConst(type);
+  arrayGenericParams.insert({{"T", 0}, cleanedType});
   arrayGenericParams.insert({{"N", 1}, size});
   TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
   array.specialized = true;
