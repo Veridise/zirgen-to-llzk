@@ -23,6 +23,8 @@ protected:
   void printBinding(llvm::raw_ostream &os, mlir::FailureOr<TypeBinding> type) const;
 };
 
+class ZhlOpBindings;
+
 template <typename Key> class OpBindingsMap : public OpBindings {
 public:
   using map = mlir::DenseMap<Key, mlir::FailureOr<TypeBinding>>;
@@ -66,6 +68,8 @@ public:
 
   bool containsKey(Key k) const { return bindings.find(k) != end(); }
 
+  friend ZhlOpBindings;
+
 protected:
   virtual Key opToKey(mlir::Operation *) const = 0;
   virtual void validateOp(mlir::Operation *) const = 0;
@@ -104,6 +108,8 @@ public:
   bool containsValue(mlir::Value v) const;
   void print(llvm::raw_ostream &os) const final;
   bool missingBindings() const final;
+
+  mlir::SmallVector<TypeBinding *> getClosures();
 
 private:
   bool opIsValue(mlir::Operation *op) const;

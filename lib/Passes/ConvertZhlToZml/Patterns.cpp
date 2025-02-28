@@ -620,7 +620,7 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   }
   auto elementType = materializeTypeBinding(getContext(), *elementTypeBinding);
 
-  llvm::SmallVector<FailureOr<TypeBinding>> argBindings;
+  llvm::SmallVector<FailureOr<TypeBinding>, 1> argBindings;
   std::transform(
       op.getElements().begin(), op.getElements().end(), std::back_inserter(argBindings),
       [&](auto element) { return getType(element); }
@@ -892,15 +892,32 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
-
-  auto value = adaptor.getValue();
-  auto type = materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != type) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), type, value);
-    value = cast.getResult(0);
+  auto valueBinding = getType(op.getValue());
+  if (failed(valueBinding)) {
+    return op->emitOpError() << "failed to type check value";
   }
 
-  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, value);
+  auto getSuperTypeValue = [&]() -> Value {
+    return getCastedValue(
+        adaptor.getValue(), *valueBinding, rewriter,
+        materializeTypeBinding(getContext(), binding->getSuperType())
+    );
+  };
+
+  Value yieldValue;
+  if (binding->hasClosure()) {
+    auto self = op->getParentOfType<SelfOp>().getSelfValue();
+    assert(self);
+    auto pod = constructPODComponent(op, *binding, rewriter, self, getSuperTypeValue);
+    if (failed(pod)) {
+      return failure();
+    }
+    yieldValue = *pod;
+  } else {
+    yieldValue = getSuperTypeValue();
+  }
+
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, yieldValue);
   return mlir::success();
 }
 

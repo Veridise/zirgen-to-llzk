@@ -33,57 +33,12 @@ using namespace zirgen::Zhl;
 
 namespace zhl {
 
-FailureOr<TypeBinding>
-typeCheckValue(Value v, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules);
-FailureOr<TypeBinding>
-typeCheckOp(Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules);
-FailureOr<std::vector<TypeBinding>> getOperandTypes(
-    Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules
-);
-
-void checkComponent(
-    ComponentOp comp, ZhlOpBindings &bindings, TypeBindings &typeBindings,
-    const FrozenTypingRuleSet &rules
-) {
-  LLVM_DEBUG(llvm::dbgs() << "\n"; loggingScope = comp.getName();
-             logLine() << "Checking component " << comp.getName() << ":\n"; ident++);
-  ComponentScope scope(comp, typeBindings);
-  for (auto &op : comp.getRegion().getOps()) {
-    (void)typeCheckOp(&op, bindings, scope, rules);
-  }
-  LLVM_DEBUG(ident--; logLine() << "Finished checking component " << comp.getName() << "\n";
-             loggingScope = "");
-}
-
-FailureOr<TypeBinding>
-typeCheckValue(Value v, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules) {
-  auto op = v.getDefiningOp();
-  if (op) {
-    return typeCheckOp(op, bindings, scope, rules);
-  } else {
-    if (bindings.containsValue(v)) {
-      return bindings.getValue(v);
-    }
-    return failure();
-  }
-}
-
-LogicalResult typeCheckRegion(
-    Region &region, Scope &scope, const FrozenTypingRuleSet &rules, ZhlOpBindings &bindings
-) {
-  bool anyFailed = false;
-
-  for (auto &op : region.getOps()) {
-    auto result = typeCheckOp(&op, bindings, scope, rules);
-    anyFailed = anyFailed || failed(result);
-  }
-
-  return anyFailed ? failure() : success();
-}
+namespace {
 
 class BlockScopesGuard {
 public:
-  explicit BlockScopesGuard(Scope &parent) : parent(parent) {}
+  explicit BlockScopesGuard(Scope &Parent, TypeBindings &Bindings)
+      : parent(&Parent), bindings(&Bindings) {}
   ~BlockScopesGuard() {
     for (auto scope : scopes) {
       delete scope;
@@ -91,7 +46,7 @@ public:
   }
 
   Scope &get() {
-    auto scope = new BlockScope(parent);
+    auto scope = new BlockScope(*parent, *bindings);
     scopes.push_back(scope);
     return *scope;
   }
@@ -99,115 +54,163 @@ public:
   operator mlir::ArrayRef<const Scope *>() { return scopes; }
 
 private:
-  Scope &parent;
+  Scope *parent;
+  TypeBindings *bindings;
   std::vector<Scope *> scopes;
 };
 
-template <typename Out, typename In1, typename In2>
-inline void zip(In1 begin1, In1 end1, In2 begin2, Out out) {
-  std::transform(begin1, end1, begin2, out, [](auto lhs, auto rhs) { return std::pair(lhs, rhs); });
-}
+class TypeCheckingEnv {
+public:
+  TypeCheckingEnv(ZhlOpBindings &Bindings, const FrozenTypingRuleSet &Rules, TypeBindings &TB)
+      : bindings(&Bindings), rules(&Rules), typeBindings(&TB) {}
 
-FailureOr<TypeBinding> applyRule(
-    Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules,
-    const TypingRule &rule, ArrayRef<TypeBinding> operands
-) {
-  // Check if the operation has regions and evaluate them first
-  auto regions = op->getRegions();
-  BlockScopesGuard regionScopes(scope);
+  ZhlOpBindings &getBindings() { return *bindings; }
 
-  if (!std::all_of(regions.begin(), regions.end(), [&](auto &region) {
-    auto valueBindings =
-        rule.bindRegionArguments(ValueRange(region.getArguments()), op, operands, scope);
-    if (failed(valueBindings)) {
-      return false;
+  const FrozenTypingRuleSet &getRules() { return *rules; }
+
+  TypeBindings &getTypeBindings() { return *typeBindings; }
+
+private:
+  ZhlOpBindings *bindings;
+  const FrozenTypingRuleSet *rules;
+  TypeBindings *typeBindings;
+};
+
+class TypeChecker : TypeCheckingEnv {
+public:
+  using TypeCheckingEnv::TypeCheckingEnv;
+
+  void checkComponent(ComponentOp comp) {
+    LLVM_DEBUG(llvm::dbgs() << "\n"; loggingScope = comp.getName();
+               logLine() << "Checking component " << comp.getName() << ":\n"; ident++);
+    ComponentScope scope(comp, getTypeBindings());
+    for (auto &op : comp.getRegion().getOps()) {
+      (void)typeCheckOp(&op, scope);
     }
-    for (auto [value, type] : llvm::zip_equal(
-             mlir::iterator_range(region.args_begin(), region.args_end()), *valueBindings
-         )) {
-      (void)bindings.addValue(value, type);
+    LLVM_DEBUG(ident--; logLine() << "Finished checking component " << comp.getName() << "\n";
+               loggingScope = "");
+  }
+
+private:
+  FailureOr<TypeBinding> typeCheckOp(Operation *op, Scope &scope) {
+    assert(op != nullptr);
+    LLVM_DEBUG(logLine() << "Checking " << op->getName() << "\n";
+               if (op->getNumRegions() == 0) { logLine() << "  " << *op << "\n"; });
+    if (getBindings().contains(op)) {
+      auto &cachedBinding = getBindings().get(op);
+      LLVM_DEBUG(logLine() << "Pulled from cache: "; if (failed(cachedBinding)) {
+        llvm::dbgs() << "<<FAILURE>>\n";
+      } else { llvm::dbgs() << *cachedBinding << "\n"; });
+      return cachedBinding;
     }
-    return succeeded(typeCheckRegion(region, regionScopes.get(), rules, bindings));
-  })) {
-    return failure();
-  }
-
-  return rule.typeCheck(op, operands, scope, regionScopes);
-}
-
-/// Handles the creation of the frame and linking it to the generated type binding if it succeeded.
-FailureOr<TypeBinding> applyRuleWithFrame(
-    Frame frame, Operation *op, ZhlOpBindings &bindings, Scope &scope,
-    const FrozenTypingRuleSet &rules, const TypingRule &rule, ArrayRef<TypeBinding> operands
-) {
-  FrameScope frameScope(scope, frame);
-  // Typecheck normally using a scope with the frame
-  auto result = applyRule(op, bindings, frameScope, rules, rule, operands);
-
-  if (failed(result)) {
-    return failure();
-  }
-  auto finalBinding = result->ReplaceFrame(frame);
-  finalBinding.markSlot(frame.getParentSlot());
-  return finalBinding;
-}
-
-FailureOr<TypeBinding> typeCheckOp(
-    Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules
-) {
-  assert(op != nullptr);
-  LLVM_DEBUG(logLine() << "Checking " << op->getName() << "\n";
-             if (op->getNumRegions() == 0) { logLine() << "  " << *op << "\n"; });
-  if (bindings.contains(op)) {
-    auto &cachedBinding = bindings.get(op);
-    LLVM_DEBUG(logLine() << "Pulled from cache: "; if (failed(cachedBinding)) {
-      llvm::dbgs() << "<<FAILURE>>\n";
-    } else { llvm::dbgs() << *cachedBinding << "\n"; });
-    return cachedBinding;
-  }
-  LLVM_DEBUG(ident++);
-  auto operands = getOperandTypes(op, bindings, scope, rules);
-  LLVM_DEBUG(ident--);
-  if (failed(operands)) {
-    LLVM_DEBUG(logLine() << "Failed to obtain bindings of the operation's operands\n");
-    return failure();
-  }
-  for (auto &rule : rules) {
-    if (failed(rule->match(op))) {
-      continue;
-    }
-    LLVM_DEBUG(llvm::dbgs() << "\n");
-    auto frame = rule->allocate(scope.getCurrentFrame());
-    FailureOr<TypeBinding> ruleResult =
-        succeeded(frame) ? applyRuleWithFrame(*frame, op, bindings, scope, rules, *rule, *operands)
-                         : applyRule(op, bindings, scope, rules, *rule, *operands);
-
-    LLVM_DEBUG(llvm::dbgs() << "\n");
-    if (succeeded(ruleResult)) {
-      LLVM_DEBUG(logLine() << "SUCCESS: Storing binding " << *ruleResult << "\n");
-      return bindings.add(op, ruleResult);
-    }
-  }
-  LLVM_DEBUG(logLine() << " FAILURE: Not rule was matched\n");
-  return bindings.add(
-      op, op->emitError() << "could not deduce the type of op '" << op->getName() << "'"
-  );
-}
-
-FailureOr<std::vector<TypeBinding>> getOperandTypes(
-    Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules
-) {
-  auto operands = op->getOperands();
-  std::vector<TypeBinding> operandBindings;
-  for (auto operand : operands) {
-    auto r = typeCheckValue(operand, bindings, scope, rules);
-    if (failed(r)) {
+    LLVM_DEBUG(ident++);
+    auto operands = getOperandTypes(op, scope);
+    LLVM_DEBUG(ident--);
+    if (failed(operands)) {
+      LLVM_DEBUG(logLine() << "Failed to obtain bindings of the operation's operands\n");
       return failure();
     }
-    operandBindings.push_back(*r);
+    for (auto &rule : getRules()) {
+      if (failed(rule->match(op))) {
+        continue;
+      }
+      LLVM_DEBUG(llvm::dbgs() << "\n");
+      auto frame = rule->allocate(scope.getCurrentFrame());
+      FailureOr<TypeBinding> ruleResult =
+          succeeded(frame) ? applyRuleWithFrame(*frame, op, scope, *rule, *operands)
+                           : applyRule(op, scope, *rule, *operands);
+
+      LLVM_DEBUG(llvm::dbgs() << "\n");
+      if (succeeded(ruleResult)) {
+        LLVM_DEBUG(logLine() << "SUCCESS: Storing binding "; ruleResult->print(llvm::dbgs(), true);
+                   llvm::dbgs() << "\n");
+        return getBindings().add(op, ruleResult);
+      }
+    }
+    LLVM_DEBUG(logLine() << " FAILURE: Not rule was matched\n");
+    return getBindings().add(
+        op, op->emitError() << "could not deduce the type of op '" << op->getName() << "'"
+    );
   }
-  return operandBindings;
-}
+
+  FailureOr<std::vector<TypeBinding>> getOperandTypes(Operation *op, Scope &scope) {
+    auto operands = op->getOperands();
+    std::vector<TypeBinding> operandBindings;
+    for (auto operand : operands) {
+      auto r = typeCheckValue(operand, scope);
+      if (failed(r)) {
+        return failure();
+      }
+      operandBindings.push_back(*r);
+    }
+    return operandBindings;
+  }
+
+  FailureOr<TypeBinding> typeCheckValue(Value v, Scope &scope) {
+    auto op = v.getDefiningOp();
+    if (op) {
+      return typeCheckOp(op, scope);
+    } else {
+      if (getBindings().containsValue(v)) {
+        return getBindings().getValue(v);
+      }
+      return failure();
+    }
+  }
+
+  FailureOr<TypeBinding>
+  applyRule(Operation *op, Scope &scope, const TypingRule &rule, ArrayRef<TypeBinding> operands) {
+    // Check if the operation has regions and evaluate them first
+    auto regions = op->getRegions();
+    BlockScopesGuard regionScopes(scope, getTypeBindings());
+
+    if (!std::all_of(regions.begin(), regions.end(), [&](auto &region) {
+      auto valueBindings =
+          rule.bindRegionArguments(ValueRange(region.getArguments()), op, operands, scope);
+      if (failed(valueBindings)) {
+        return false;
+      }
+      for (auto [value, type] : llvm::zip_equal(
+               mlir::iterator_range(region.args_begin(), region.args_end()), *valueBindings
+           )) {
+        (void)getBindings().addValue(value, type);
+      }
+      return succeeded(typeCheckRegion(region, regionScopes.get()));
+    })) {
+      return failure();
+    }
+
+    return rule.typeCheck(op, operands, scope, regionScopes);
+  }
+  /// Handles the creation of the frame and linking it to the generated type binding if it
+  /// succeeded.
+  FailureOr<TypeBinding> applyRuleWithFrame(
+      Frame frame, Operation *op, Scope &scope, const TypingRule &rule,
+      ArrayRef<TypeBinding> operands
+  ) {
+    FrameScope frameScope(scope, frame);
+    // Typecheck normally using a scope with the frame
+    auto result = applyRule(op, frameScope, rule, operands);
+
+    if (failed(result)) {
+      return failure();
+    }
+    auto finalBinding = result->ReplaceFrame(frame);
+    finalBinding.markSlot(frame.getParentSlot());
+    return finalBinding;
+  }
+
+  LogicalResult typeCheckRegion(Region &region, Scope &scope) {
+    bool anyFailed = false;
+
+    for (auto &op : region.getOps()) {
+      auto result = typeCheckOp(&op, scope);
+      anyFailed = anyFailed || failed(result);
+    }
+
+    return anyFailed ? failure() : success();
+  }
+};
 
 using GraphInDegrees = llvm::StringMap<int>;
 
@@ -303,6 +306,8 @@ sortComponents(Operation *root, SmallVector<ComponentOp> &sortedComponents, ZhlS
   return success();
 }
 
+} // namespace
+
 FailureOr<std::unique_ptr<ZhlOpBindings>>
 typeCheck(Operation *root, TypeBindings &typeBindings, const FrozenTypingRuleSet &rules) {
   // Initialize what we need for type checking
@@ -314,8 +319,9 @@ typeCheck(Operation *root, TypeBindings &typeBindings, const FrozenTypingRuleSet
     return failure();
   }
   // Run the typechecker
+  TypeChecker tc(*bindings, rules, typeBindings);
   for (auto op : sortedComponents) {
-    checkComponent(op, *bindings, typeBindings, rules);
+    tc.checkComponent(op);
   }
 
   return bindings;

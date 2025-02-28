@@ -3,6 +3,7 @@
 #include <cassert>
 #include <deque>
 #include <functional>
+#include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
@@ -85,6 +86,7 @@ public:
   using ParamNames = std::vector<std::string>;
   /// Returns the name of the type.
   std::string_view getName() const;
+  void setName(mlir::StringRef);
 
   void print(llvm::raw_ostream &os, bool fullPrintout = false) const;
 
@@ -167,6 +169,8 @@ public:
   static TypeBinding WrapVariadic(const TypeBinding &t);
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name);
   static const TypeBinding &StripConst(const TypeBinding &);
+  static TypeBinding WithClosure(const TypeBinding &);
+  static TypeBinding WithoutClosure(const TypeBinding &);
 
   friend TypeBindings;
   friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const zhl::TypeBinding &b);
@@ -181,6 +185,8 @@ public:
 
   Frame getFrame() const;
 
+  bool hasClosure() const;
+
 private:
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
 
@@ -188,6 +194,7 @@ private:
   bool specialized = false;
   bool selfConstructor = false;
   bool builtin = false;
+  bool closure = false;
   llvm::StringRef name;
   mlir::Location loc;
   std::optional<uint64_t> constVal;

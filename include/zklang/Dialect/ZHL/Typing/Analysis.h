@@ -26,6 +26,8 @@ public:
 
   void print(llvm::raw_ostream &os) const;
 
+  mlir::ArrayRef<TypeBinding *> getClosures();
+
   operator mlir::LogicalResult() const;
 
   class Impl;

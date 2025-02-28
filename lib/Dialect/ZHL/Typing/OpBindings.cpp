@@ -39,11 +39,7 @@ FailureOr<TypeBinding> ZhlOpBindings::addValue(Value v, FailureOr<TypeBinding> t
 }
 
 FailureOr<TypeBinding> ZhlOpBindings::add(Operation *op, FailureOr<TypeBinding> type) {
-  if (opIsValue(op)) {
-    return values.add(op, type);
-  } else {
-    return stmts.add(op, type);
-  }
+  return (opIsValue(op)) ? values.add(op, type) : stmts.add(op, type);
 }
 
 const FailureOr<TypeBinding> &ZhlOpBindings::getValue(Value v) const { return values.getType(v); }
@@ -69,4 +65,19 @@ bool ZhlOpBindings::missingBindings() const {
 
 bool ZhlOpBindings::opIsValue(Operation *op) const { return op->getNumResults() == 1; }
 
+mlir::SmallVector<TypeBinding *> ZhlOpBindings::getClosures() {
+  SmallVector<TypeBinding *> closures;
+
+  auto forEach = [&](auto &map) {
+    for (auto &[_, binding] : map) {
+      if (binding->hasClosure()) {
+        closures.push_back(&*binding);
+      }
+    }
+  };
+  forEach(values.bindings);
+  forEach(stmts.bindings);
+
+  return closures;
+}
 } // namespace zhl

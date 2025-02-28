@@ -39,13 +39,15 @@ void ComponentBuilder::Ctx::checkRequirements() {
   assert(body != nullptr);
   assert(loc.has_value());
   assert(!compName.empty());
-  assert(isBuiltin == compAttrs.empty());
+  assert((isBuiltin || isClosure) == compAttrs.empty());
 }
 
 ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   auto builtin = builtinAttrs(builder);
-  mlir::ArrayRef<mlir::NamedAttribute> attrs =
-      isBuiltin ? mlir::ArrayRef<mlir::NamedAttribute>(builtin) : compAttrs;
+  mlir::ArrayRef<mlir::NamedAttribute> attrs;
+  if (!isClosure) {
+    attrs = isBuiltin ? mlir::ArrayRef<mlir::NamedAttribute>(builtin) : compAttrs;
+  }
 
   if (isGeneric()) {
     return builder.create<ComponentOp>(*loc, compName, typeParams, attrs);
@@ -122,6 +124,11 @@ ComponentBuilder &ComponentBuilder::takeRegion(mlir::Region *region) {
 }
 ComponentBuilder &ComponentBuilder::isBuiltin() {
   ctx.isBuiltin = true;
+  return *this;
+}
+
+ComponentBuilder &ComponentBuilder::isClosure() {
+  ctx.isClosure = true;
   return *this;
 }
 ComponentBuilder &ComponentBuilder::forceGeneric() {

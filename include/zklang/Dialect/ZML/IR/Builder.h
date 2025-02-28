@@ -39,6 +39,7 @@ private:
     std::vector<mlir::Location> argLocs;
     std::unique_ptr<BodySrc> body;
     bool isBuiltin = false;
+    bool isClosure = false;
     bool forceSetGeneric = false;
 
     bool isGeneric();
@@ -86,6 +87,8 @@ public:
   ComponentBuilder &forceGeneric();
 
   ComponentBuilder &isBuiltin();
+
+  ComponentBuilder &isClosure();
 
   ComponentBuilder &takeRegion(mlir::Region *region);
 

@@ -186,17 +186,19 @@ zhl::TypeBinding::TypeBinding(mlir::Location loc)
 
 zhl::TypeBinding::TypeBinding(const TypeBinding &other)
     : variadic(other.variadic), specialized(other.specialized),
-      selfConstructor(other.selfConstructor), builtin(other.builtin), name(other.name),
-      loc(other.loc), constVal(other.constVal), genericParamName(other.genericParamName),
-      superType(other.superType), members(other.members), genericParams(other.genericParams),
-      constructorParams(other.constructorParams), frame(other.frame), slot(other.slot) {}
+      selfConstructor(other.selfConstructor), builtin(other.builtin), closure(other.closure),
+      name(other.name), loc(other.loc), constVal(other.constVal),
+      genericParamName(other.genericParamName), superType(other.superType), members(other.members),
+      genericParams(other.genericParams), constructorParams(other.constructorParams),
+      frame(other.frame), slot(other.slot) {}
 
 zhl::TypeBinding::TypeBinding(TypeBinding &&other)
     : variadic(std::move(other.variadic)), specialized(std::move(other.specialized)),
       selfConstructor(std::move(other.selfConstructor)), builtin(std::move(other.builtin)),
-      name(std::move(other.name)), loc(std::move(other.loc)), constVal(std::move(other.constVal)),
-      genericParamName(std::move(other.genericParamName)), superType(std::move(other.superType)),
-      members(std::move(other.members)), genericParams(std::move(other.genericParams)),
+      closure(std::move(other.closure)), name(std::move(other.name)), loc(std::move(other.loc)),
+      constVal(std::move(other.constVal)), genericParamName(std::move(other.genericParamName)),
+      superType(std::move(other.superType)), members(std::move(other.members)),
+      genericParams(std::move(other.genericParams)),
       constructorParams(std::move(other.constructorParams)), frame(other.frame),
       slot(std::move(other.slot)) {}
 
@@ -205,6 +207,7 @@ zhl::TypeBinding &zhl::TypeBinding::operator=(const TypeBinding &other) {
   specialized = other.specialized;
   selfConstructor = other.selfConstructor;
   builtin = other.builtin;
+  closure = other.closure;
   name = other.name;
   loc = other.loc;
   constVal = other.constVal;
@@ -224,6 +227,7 @@ zhl::TypeBinding &zhl::TypeBinding::operator=(TypeBinding &&other) {
     specialized = std::move(other.specialized);
     selfConstructor = std::move(other.selfConstructor);
     builtin = std::move(other.builtin);
+    closure = std::move(other.closure);
     name = std::move(other.name);
     loc = std::move(other.loc);
     constVal = std::move(other.constVal);
@@ -308,6 +312,20 @@ const TypeBinding &TypeBinding::StripConst(const TypeBinding &binding) {
   return binding;
 }
 
+TypeBinding TypeBinding::WithClosure(const TypeBinding &binding) {
+  auto copy = binding;
+  copy.closure = true;
+  return copy;
+}
+
+TypeBinding TypeBinding::WithoutClosure(const TypeBinding &binding) {
+  auto copy = binding;
+  copy.closure = false;
+  return copy;
+}
+
+bool TypeBinding::hasClosure() const { return closure; }
+
 TypeBinding TypeBinding::ReplaceFrame(Frame newFrame) const {
   auto copy = *this;
   copy.frame = newFrame;
@@ -347,6 +365,8 @@ bool TypeBinding::operator==(const TypeBinding &other) const {
 const Params &TypeBinding::getConstructorParams() const { return constructorParams; }
 Params &TypeBinding::getConstructorParams() { return constructorParams; }
 
+void TypeBinding::setName(StringRef newName) { name = newName; }
+
 void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   if (isConst()) {
     if (constVal.has_value()) {
@@ -383,6 +403,9 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     }
     if (builtin) {
       os << "builtin ";
+    }
+    if (closure) {
+      os << "closure ";
     }
     if (constVal.has_value()) {
       os << "const(" << *constVal << ") ";

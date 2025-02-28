@@ -5,6 +5,7 @@
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
+#include <zklang/Dialect/ZML/IR/Builder.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
@@ -59,6 +60,7 @@ FlatSymbolRefAttr createSlot(
   // component
   auto name = st.insert(fieldDef);
   LLVM_DEBUG(llvm::dbgs() << "Name created by the symbol table: " << name << "\n");
+  slot->rename(name.getValue());
   return mlir::FlatSymbolRefAttr::get(component.getContext(), name);
 }
 
@@ -78,9 +80,16 @@ Value storeAndLoadSlot(
     ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
     Type compType, OpBuilder &builder, Value self
 ) {
+  storeSlot(slot, value, slotName, slotType, loc, compType, builder, self);
+  return loadSlot(slot, value.getType(), slotName, slotType, loc, builder, self);
+}
+
+Value loadSlot(
+    ComponentSlot &slot, Type valueType, FlatSymbolRefAttr slotName, Type slotType, Location loc,
+    OpBuilder &builder, Value self
+) {
   auto compSlotBinding = slot.getBinding();
   auto compSlotIVs = slot.collectIVs();
-  storeSlot(slot, value, slotName, slotType, loc, compType, builder, self);
 
   if (compSlotIVs.empty()) {
     // Read the temporary back to a SSA value
@@ -90,7 +99,7 @@ Value storeAndLoadSlot(
     auto arrayDataBis = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
 
     // Read the value we wrote into the array back to a SSA value
-    return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, compSlotIVs);
+    return builder.create<ReadArrayOp>(loc, valueType, arrayDataBis, compSlotIVs);
   }
 }
 
@@ -108,6 +117,8 @@ void storeSlot(
   } else {
     auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size());
     auto unwrappedType = materializeTypeBinding(builder.getContext(), unwrappedBinding);
+    llvm::dbgs() << "unwrappedType = " << unwrappedType
+                 << " | value.getType() = " << value.getType() << "\n";
     assert(
         unwrappedType == value.getType() &&
         "result of construction and slot inner array type must be the same"
@@ -139,6 +150,108 @@ Value storeAndLoadArraySlot(
 
   // Read the value we wrote into the array back to a SSA value
   return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, ivs);
+}
+
+void materializeFieldTypes(
+    zhl::TypeBinding &binding, MLIRContext *ctx, SmallVectorImpl<Type> &types,
+    SmallVectorImpl<StringRef> &fields
+) {
+  llvm::StringMap<Type> map;
+  SmallVector<StringRef> fieldsToSort;
+  fieldsToSort.reserve(binding.getMembers().size());
+
+  for (auto &[memberName, memberBinding] : binding.getMembers()) {
+    assert(memberBinding.has_value());
+    auto memberType = materializeTypeBinding(ctx, *memberBinding);
+    map[memberName] = memberType;
+    fieldsToSort.push_back(memberName);
+  }
+
+  std::sort(fieldsToSort.begin(), fieldsToSort.end());
+  for (auto field : fieldsToSort) {
+    types.push_back(map[field]);
+  }
+  fields.insert(fields.end(), fieldsToSort.begin(), fieldsToSort.end());
+}
+
+void constructFieldReads(
+    TypeRange types, ArrayRef<StringRef> fieldNames, SmallVectorImpl<Value> &results,
+    OpBuilder &builder, Value self, Location loc, zhl::TypeBinding &binding
+) {
+  for (auto [type, field] : llvm::zip_equal(types, fieldNames)) {
+    auto memberBinding = binding.getMembers().at(field);
+    assert(memberBinding.has_value());
+    ComponentSlot *slot = mlir::dyn_cast_if_present<ComponentSlot>(memberBinding->getSlot());
+    assert(slot);
+    auto slotName = FlatSymbolRefAttr::get(builder.getStringAttr(slot->getSlotName()));
+    auto slotType = materializeTypeBinding(builder.getContext(), slot->getBinding());
+    results.push_back(loadSlot(*slot, type, slotName, slotType, loc, builder, self));
+  }
+}
+
+FailureOr<Value> constructPODComponent(
+    Operation *op, zhl::TypeBinding &binding, OpBuilder &builder, Value self,
+    llvm::function_ref<mlir::Value()> superTypeValueCb
+) {
+  auto ctor = CtorCallBuilder::Make(op, binding, builder, self);
+  if (failed(ctor)) {
+    return failure();
+  }
+
+  auto loc = binding.getLocation();
+
+  auto superTypeValue = superTypeValueCb();
+  SmallVector<Type, 1> argTypes({superTypeValue.getType()});
+  SmallVector<StringRef, 1> fieldNames({"$super"});
+  SmallVector<Value, 1> args({superTypeValue});
+  auto toReserve = 1 + binding.getMembers().size();
+  argTypes.reserve(toReserve);
+  fieldNames.reserve(toReserve);
+  args.reserve(toReserve);
+
+  materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames);
+  constructFieldReads(
+      ArrayRef(argTypes).drop_front(), ArrayRef(fieldNames).drop_front(), args, builder, self, loc,
+      binding
+  );
+
+  return ctor->build(builder, loc, args);
+}
+
+void createPODComponent(
+    zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::SymbolTable &st
+) {
+  auto componentType = materializeTypeBinding(builder.getContext(), binding);
+  auto superType = materializeTypeBinding(builder.getContext(), binding.getSuperType());
+  auto loc = binding.getLocation();
+
+  SmallVector<Type> argTypes({superType});
+  SmallVector<StringRef> fieldNames({"$super"});
+  argTypes.reserve(1 + binding.getMembers().size());
+  fieldNames.reserve(1 + binding.getMembers().size());
+
+  materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames);
+  ComponentBuilder cb;
+  for (auto [memberName, memberType] : llvm::zip_equal(fieldNames, argTypes)) {
+    cb.field(memberName, memberType);
+  }
+
+  cb.name(binding.getName()).isClosure();
+  cb.fillBody(argTypes, {componentType}, [&](mlir::ValueRange args, mlir::OpBuilder &B) {
+    // Reference to self
+    auto self = B.create<SelfOp>(loc, componentType);
+    // Store the fields
+    for (auto [fieldName, arg] : llvm::zip_equal(fieldNames, args)) {
+      B.create<WriteFieldOp>(loc, self, fieldName, arg);
+    }
+    // Return self
+    B.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
+  });
+
+  auto compOp = cb.build(builder);
+  auto actualName = st.insert(compOp);
+  llvm::dbgs() << "Created POD with name " << actualName << "\n";
+  binding.setName(actualName.getValue());
 }
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
@@ -189,7 +302,6 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
 
   // Create the field
   auto name = createSlot(compSlot, builder, callerComponentOp, loc);
-
   auto slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
 
   compValue = storeAndLoadSlot(

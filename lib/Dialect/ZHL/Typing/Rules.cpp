@@ -91,6 +91,7 @@ mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
   }
   return operands[0];
 }
+
 mlir::FailureOr<TypeBinding> SuperTypingRule::
     typeCheck(zirgen::Zhl::SuperOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -98,8 +99,17 @@ mlir::FailureOr<TypeBinding> SuperTypingRule::
     return mlir::failure();
   }
   scope.declareSuperType(operands[0]);
+  // If this super is the terminator of a block we create a type that represents it.
+  if (mlir::isa<BlockOp>(op->getParentOp())) {
+    auto blockBinding = scope.createBinding("block$", op->getParentOp()->getLoc());
+    scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), blockBinding);
+    scope.declareSuperType(blockBinding); // Override supertype with the binding we created.
+    return blockBinding;
+  }
+
   return operands[0];
 }
+
 mlir::FailureOr<TypeBinding> DeclareTypingRule::
     typeCheck(zirgen::Zhl::DeclarationOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -107,11 +117,11 @@ mlir::FailureOr<TypeBinding> DeclareTypingRule::
     scope.declareMember(op.getMember());
     return getBindings().Bottom();
   }
-  scope.declareMember(op.getMember(), operands[0]);
   auto binding = operands[0]; // Make a copy for marking the slot
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(
       getBindings(), binding, op.getMember()
   ); // Allocate a named slot with the declared type
+  scope.declareMember(op.getMember(), binding);
   return binding;
 }
 
@@ -288,7 +298,6 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // this rule does not link to a slot since the expression op already does.
     if (declBinding == exprBinding) {
       LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 2\n");
-      // exprSlot->rename(decl->getMember());
       scope.declareMember(decl->getMember(), operands[1]);
       return maybeUpdateExprSlot(operands[1]);
     }
@@ -309,7 +318,6 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
   // Case 4: Rename the slot with the name of the member.
   if (exprSlot) {
     LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 4\n");
-    // exprSlot->rename(decl->getMember());
     scope.declareMember(decl->getMember(), operands[1]);
     return maybeUpdateExprSlot(operands[1]);
   }
@@ -503,7 +511,7 @@ FailureOr<TypeBinding> BlockTypeRule::typeCheck(
   if (failed(super)) {
     return op->emitOpError() << "could not deduce type of block because couldn't get super type";
   }
-  return super;
+  return TypeBinding::WithoutClosure(*super);
 }
 
 FailureOr<Frame> BlockTypeRule::allocate(Frame frame) const {

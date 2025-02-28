@@ -1,0 +1,12 @@
+// RUN: zklang -o - %s
+
+component Foo() {
+  public values := for i : 1..8 {
+    public x := Reg(i);
+  };
+}
+
+component Bar() {
+  f := Foo();
+  f.values[0].x
+}
