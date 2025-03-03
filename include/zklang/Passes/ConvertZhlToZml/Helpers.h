@@ -55,7 +55,7 @@ mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentType> v, ml
 /// type value. The rest of the fields of the POD component are read from the actual component using
 /// the slots associated with the member's bindings.
 ///
-/// The super type's value is provided with a lazy callback that will get called iif the function
+/// The super type's value is provided with a lazy callback that will get called iff the function
 /// knowns it will succeed. This makes safe to create operations and other conversion modifications
 /// for obtaining the value of the super type.
 mlir::FailureOr<mlir::Value> constructPODComponent(
