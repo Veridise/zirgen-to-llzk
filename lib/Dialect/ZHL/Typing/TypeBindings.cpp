@@ -1,7 +1,10 @@
 #include <cassert>
 #include <iterator>
+#include <memory>
 #include <mlir/IR/Types.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
@@ -103,11 +106,21 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
   return os;
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBindingName &name) {
+  os << name.ref();
+  return os;
+}
+
 mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const zhl::TypeBinding &b) {
   std::string s;
   llvm::raw_string_ostream ss(s);
   b.print(ss);
   diag << s;
+  return diag;
+}
+
+mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const zhl::TypeBindingName &name) {
+  diag << Twine(name.ref());
   return diag;
 }
 
@@ -365,7 +378,20 @@ bool TypeBinding::operator==(const TypeBinding &other) const {
 const Params &TypeBinding::getConstructorParams() const { return constructorParams; }
 Params &TypeBinding::getConstructorParams() { return constructorParams; }
 
-void TypeBinding::setName(StringRef newName) { name = newName; }
+void TypeBinding::setName(StringRef newName) {
+  // If the binding has a slot check if it can be converted to a ComponentSlot,
+  // assert that the type is equal (before the change of name)
+  // and then rename the inner binding in the slot.
+  if (auto *compSlot = mlir::dyn_cast_if_present<ComponentSlot>(slot)) {
+    assert(compSlot->contains(*this));
+    compSlot->editInnerBinding([&](TypeBinding &inner) {
+      if (this != &inner) {
+        inner.setName(newName);
+      }
+    });
+  }
+  name = newName;
+}
 
 void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   if (isConst()) {
@@ -377,7 +403,7 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   } else if (isGenericParam()) {
     os << *genericParamName;
   } else {
-    os << name;
+    os << name.ref();
     if (specialized) {
       genericParams.printParams(os);
     } else {
@@ -439,7 +465,7 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   }
 }
 
-std::string_view zhl::TypeBinding::getName() const { return name; }
+std::string_view zhl::TypeBinding::getName() const { return name.ref(); }
 
 std::string_view zhl::Params::getName(size_t i) const {
   assert(i < names.size());
@@ -448,19 +474,19 @@ std::string_view zhl::Params::getName(size_t i) const {
 
 size_t zhl::Params::size() const { return params.size(); }
 
-bool zhl::TypeBinding::isBottom() const { return name == BOTTOM; }
+bool zhl::TypeBinding::isBottom() const { return name.ref() == BOTTOM; }
 
-bool zhl::TypeBinding::isTypeMarker() const { return name == "Type"; }
+bool zhl::TypeBinding::isTypeMarker() const { return name.ref() == "Type"; }
 
-bool zhl::TypeBinding::isVal() const { return name == "Val"; }
+bool zhl::TypeBinding::isVal() const { return name.ref() == "Val"; }
 
 bool zhl::TypeBinding::isArray() const {
-  return name == "Array" || (hasSuperType() && getSuperType().isArray());
+  return name.ref() == "Array" || (hasSuperType() && getSuperType().isArray());
 }
 
 bool zhl::TypeBinding::isBuiltin() const { return builtin; }
 
-bool zhl::TypeBinding::isConst() const { return name == CONST; }
+bool zhl::TypeBinding::isConst() const { return name.ref() == CONST; }
 
 bool zhl::TypeBinding::isKnownConst() const { return isConst() && constVal.has_value(); }
 
@@ -475,7 +501,14 @@ void TypeBinding::markAsSpecialized() {
 
 ArrayRef<std::string> TypeBinding::getGenericParamNames() const { return genericParams.getNames(); }
 
-void TypeBinding::markSlot(FrameSlot *newSlot) { slot = newSlot; }
+void TypeBinding::markSlot(FrameSlot *newSlot) {
+  llvm::dbgs() << "slot = " << slot << " | newSlot = " << newSlot << "\n";
+  if (slot == newSlot) {
+    return;
+  }
+  assert((!slot == !!newSlot) && "Writing over an existing slot!");
+  slot = newSlot;
+}
 
 FrameSlot *TypeBinding::getSlot() const { return slot; }
 
@@ -639,3 +672,33 @@ zhl::TypeBinding &zhl::TypeBinding::getSuperType() {
   assert(superType != nullptr);
   return *superType;
 }
+
+struct TypeBindingName::Impl {
+  Impl(mlir::StringRef nameRef) : name(nameRef) {}
+
+  std::string name;
+};
+
+TypeBindingName::TypeBindingName(const TypeBindingName &) = default;
+TypeBindingName &TypeBindingName::operator=(const TypeBindingName &) = default;
+TypeBindingName::TypeBindingName(TypeBindingName &&) = default;
+TypeBindingName &TypeBindingName::operator=(TypeBindingName &&) = default;
+
+TypeBindingName::TypeBindingName(mlir::StringRef name) : impl(std::make_shared<Impl>(name)) {}
+
+TypeBindingName::~TypeBindingName() = default;
+
+TypeBindingName &TypeBindingName::operator=(mlir::StringRef newName) {
+  impl->name = newName;
+  return *this;
+}
+
+TypeBindingName::operator mlir::StringRef() const { return impl->name; }
+
+StringRef TypeBindingName::ref() const { return impl->name; }
+
+bool TypeBindingName::operator==(const TypeBindingName &other) const {
+  return ref() == other.ref();
+}
+
+bool TypeBindingName::operator==(mlir::StringRef s) const { return ref() == s; }

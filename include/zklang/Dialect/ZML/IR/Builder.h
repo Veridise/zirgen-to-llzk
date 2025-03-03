@@ -38,6 +38,7 @@ private:
     mlir::FunctionType constructorType = nullptr;
     std::vector<mlir::Location> argLocs;
     std::unique_ptr<BodySrc> body;
+    std::function<void(ComponentOp)> deferCb = nullptr;
     bool isBuiltin = false;
     bool isClosure = false;
     bool forceSetGeneric = false;
@@ -47,6 +48,7 @@ private:
     ComponentOp buildBare(mlir::OpBuilder &builder);
 
     void checkRequirements();
+    void checkBareRequirements();
 
     void addFields(mlir::OpBuilder &builder);
 
@@ -77,7 +79,7 @@ private:
     void set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const override;
 
   private:
-    mlir::ArrayRef<mlir::Type> argTypes, results;
+    mlir::SmallVector<mlir::Type, 1> argTypes, results;
     std::function<void(mlir::ValueRange, mlir::OpBuilder &)> delegate;
   };
 
@@ -113,6 +115,12 @@ public:
   ComponentBuilder &typeParam(mlir::StringRef param);
 
   ComponentBuilder &typeParams(mlir::ArrayRef<std::string> params);
+
+  /// Stores a callback that gets executed right after the component op is created but before it is
+  /// filled with the rest of the configuration. Allows configuring the builder with information
+  /// that depends on the ComponentOp operation having already been created, such as inserting the
+  /// op in a symbol table and getting potentially renamed.
+  ComponentBuilder &defer(std::function<void(ComponentOp)>);
 
   ComponentOp build(mlir::OpBuilder &builder);
 };

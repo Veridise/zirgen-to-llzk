@@ -100,7 +100,7 @@ mlir::FailureOr<TypeBinding> SuperTypingRule::
   }
   scope.declareSuperType(operands[0]);
   // If this super is the terminator of a block we create a type that represents it.
-  if (mlir::isa<BlockOp>(op->getParentOp())) {
+  if (mlir::isa<BlockOp>(op->getParentOp()) && scope.memberCount() > 0) {
     auto blockBinding = scope.createBinding("block$", op->getParentOp()->getLoc());
     scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), blockBinding);
     scope.declareSuperType(blockBinding); // Override supertype with the binding we created.
@@ -276,7 +276,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
           llvm::dbgs() << "Allocating a new slot '" << decl->getMember() << "' for type " << binding
                        << "\n"
       );
-      auto copy = binding;
+      auto copy = copyWithoutSlot(binding);
       auto *slot = scope.getCurrentFrame().allocateSlot<ComponentSlot>(
           getBindings(), copy, decl->getMember()
       );
@@ -511,7 +511,9 @@ FailureOr<TypeBinding> BlockTypeRule::typeCheck(
   if (failed(super)) {
     return op->emitOpError() << "could not deduce type of block because couldn't get super type";
   }
-  return TypeBinding::WithoutClosure(*super);
+  auto binding = TypeBinding::WithoutClosure(*super);
+  binding.markSlot(nullptr);
+  return binding;
 }
 
 FailureOr<Frame> BlockTypeRule::allocate(Frame frame) const {

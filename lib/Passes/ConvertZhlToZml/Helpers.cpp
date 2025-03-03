@@ -111,6 +111,7 @@ void storeSlot(
   auto compSlotIVs = slot.collectIVs();
 
   if (compSlotIVs.empty()) {
+    llvm::dbgs() << "slotType = " << slotType << " | value.getType() = " << value.getType() << "\n";
     assert(slotType == value.getType() && "result of construction and slot type must be the same");
     // Write the construction in a temporary
     builder.create<WriteFieldOp>(loc, self, slotName, value);
@@ -125,6 +126,8 @@ void storeSlot(
     );
     // Read the array from the slot field
     auto arrayData = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
+    assert(arrayData);
+    assert(value);
     // Write into the array the value
     builder.create<WriteArrayOp>(loc, arrayData, compSlotIVs, value, true);
 
@@ -221,37 +224,50 @@ FailureOr<Value> constructPODComponent(
 void createPODComponent(
     zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::SymbolTable &st
 ) {
-  auto componentType = materializeTypeBinding(builder.getContext(), binding);
-  auto superType = materializeTypeBinding(builder.getContext(), binding.getSuperType());
-  auto loc = binding.getLocation();
+  SmallVector<Type> argTypes;
+  SmallVector<StringRef> fieldNames;
 
-  SmallVector<Type> argTypes({superType});
-  SmallVector<StringRef> fieldNames({"$super"});
+  ComponentBuilder cb;
+  auto loc = binding.getLocation();
+  cb.name(binding.getName()).isClosure().location(loc);
+
+  auto superType = materializeTypeBinding(builder.getContext(), binding.getSuperType());
+  argTypes = {superType};
+  fieldNames = {"$super"};
   argTypes.reserve(1 + binding.getMembers().size());
   fieldNames.reserve(1 + binding.getMembers().size());
 
   materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames);
-  ComponentBuilder cb;
   for (auto [memberName, memberType] : llvm::zip_equal(fieldNames, argTypes)) {
     cb.field(memberName, memberType);
   }
 
-  cb.name(binding.getName()).isClosure();
-  cb.fillBody(argTypes, {componentType}, [&](mlir::ValueRange args, mlir::OpBuilder &B) {
-    // Reference to self
-    auto self = B.create<SelfOp>(loc, componentType);
-    // Store the fields
-    for (auto [fieldName, arg] : llvm::zip_equal(fieldNames, args)) {
-      B.create<WriteFieldOp>(loc, self, fieldName, arg);
-    }
-    // Return self
-    B.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
-  });
+  if (!binding.getGenericParamNames().empty()) {
+    cb.forceGeneric().typeParams(binding.getGenericParamNames());
+  }
+  cb.defer([&](ComponentOp compOp) {
+    auto actualName = st.insert(compOp);
+    llvm::dbgs() << "Created POD with name " << actualName << "\n";
+    binding.setName(actualName.getValue());
 
+    // Now that we know the final name of the component we can configure the rest
+    cb.fillBody(
+        argTypes, {materializeTypeBinding(builder.getContext(), binding)},
+        [&](mlir::ValueRange args, mlir::OpBuilder &B) {
+      auto componentType = materializeTypeBinding(B.getContext(), binding);
+      // Reference to self
+      auto self = B.create<SelfOp>(loc, componentType);
+      // Store the fields
+      for (auto [fieldName, arg] : llvm::zip_equal(fieldNames, args)) {
+        B.create<WriteFieldOp>(loc, self, fieldName, arg);
+      }
+      // Return self
+      B.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
+    }
+    );
+  });
   auto compOp = cb.build(builder);
-  auto actualName = st.insert(compOp);
-  llvm::dbgs() << "Created POD with name " << actualName << "\n";
-  binding.setName(actualName.getValue());
+  assert(compOp);
 }
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
@@ -297,8 +313,12 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
     return buildPrologue(compValue);
   }
 
+  compBinding.print(llvm::dbgs() << "compBinding = ", true);
+  llvm::dbgs() << "\n";
   auto compSlot = mlir::cast<zhl::ComponentSlot>(compBinding.getSlot());
   auto compSlotBinding = compSlot->getBinding();
+  compSlotBinding.print(llvm::dbgs() << "compSlotBinding = ", true);
+  llvm::dbgs() << "\n";
 
   // Create the field
   auto name = createSlot(compSlot, builder, callerComponentOp, loc);

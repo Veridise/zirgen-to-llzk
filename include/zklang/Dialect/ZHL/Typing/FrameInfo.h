@@ -28,6 +28,7 @@ public:
 private:
   FrameSlot *parent = nullptr;
   SlotsList slots;
+  size_t nCreatedSlots = 0;
 };
 
 } // namespace detail

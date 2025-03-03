@@ -50,7 +50,7 @@ FrameSlot *FrameSlot::getParentSlot() const {
   return parentFrame->getParentSlot();
 }
 
-bool FrameSlot::belongsTo(Frame frame) const {
+bool FrameSlot::belongsTo(const Frame &frame) const {
   // If the given frame points to the same as my parent then the slot belongs to the frame.
   if (frame.info.get() == parentFrame) {
     return true;
@@ -94,7 +94,10 @@ mlir::Value ArrayFrame::getInductionVar() const {
 
 namespace detail {
 
-FrameInfo::~FrameInfo() { slots.clearAndDispose(std::default_delete<FrameSlot>()); }
+FrameInfo::~FrameInfo() {
+  assert(slots.size() == nCreatedSlots);
+  slots.clearAndDispose(std::default_delete<FrameSlot>());
+}
 
 FrameInfo::SlotsList::iterator FrameInfo::begin() { return slots.begin(); }
 FrameInfo::SlotsList::const_iterator FrameInfo::begin() const { return slots.begin(); }
@@ -178,12 +181,18 @@ TypeBinding ComponentSlot::getBinding() const {
   );
 }
 
-mlir::ValueRange ComponentSlot::collectIVs() const {
+mlir::SmallVector<mlir::Value> ComponentSlot::collectIVs() const {
   mlir::SmallVector<mlir::Value> vec;
   traverseNestedArrayFrames(this, this, [&](const ArrayFrame *frame) {
     vec.insert(vec.begin(), frame->getInductionVar());
   });
-  return mlir::ValueRange{vec};
+  return vec;
+}
+
+bool ComponentSlot::contains(const TypeBinding &other) const { return binding == other; }
+
+void ComponentSlot::editInnerBinding(llvm::function_ref<void(TypeBinding &)> edit) {
+  edit(binding);
 }
 
 } // namespace zhl

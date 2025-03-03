@@ -1,6 +1,8 @@
 #include <cassert>
 #include <cstdint>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/ADT/StringSet.h>
+#include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/Scope.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
@@ -36,6 +38,7 @@ bool ComponentScope::memberDeclaredWithType(StringRef name) {
   return memberDeclaredWithTypeImpl(name);
 }
 
+size_t ComponentScope::memberCount() const { return members.size(); }
 Frame &ComponentScope::getCurrentFrame() { return frame; }
 
 const Frame &ComponentScope::getCurrentFrame() const { return frame; }
@@ -69,6 +72,7 @@ void ChildScope::declareMember(mlir::StringRef name, TypeBinding type) {
   parent->declareMember(name, type);
 }
 
+size_t ChildScope::memberCount() const { return parent->memberCount(); }
 bool ChildScope::memberDeclaredWithType(mlir::StringRef name) {
   return parent->memberDeclaredWithType(name);
 }
@@ -102,14 +106,34 @@ void BlockScope::declareMember(StringRef name, TypeBinding type) { declareMember
 
 bool BlockScope::memberDeclaredWithType(StringRef name) { return memberDeclaredWithTypeImpl(name); }
 
+size_t BlockScope::memberCount() const { return members.size(); }
+
+void collectTypeVarsFromGenericParams(
+    const TypeBinding &binding, llvm::StringMap<const TypeBinding *> &varNames
+) {
+  for (auto &param : binding.getGenericParams()) {
+    if (param.isGenericParam()) {
+      varNames.insert({param.getGenericParamName(), &param});
+    } else {
+      collectTypeVarsFromGenericParams(param, varNames);
+    }
+  }
+}
+
 TypeBinding BlockScope::createBinding(StringRef name, Location loc) const {
   assert(succeeded(superType));
   ParamsMap ctorArgs({{{"super", 0}, *superType}});
   std::vector<std::string_view> sortedFieldNames;
   sortedFieldNames.reserve(members.size());
-  std::transform(members.begin(), members.end(), std::back_inserter(sortedFieldNames), [](auto &p) {
+  llvm::StringMap<const TypeBinding *> varNames;
+
+  std::transform(
+      members.begin(), members.end(), std::back_inserter(sortedFieldNames),
+      [&](auto &p) {
+    collectTypeVarsFromGenericParams(*p.second, varNames);
     return p.first;
-  });
+  }
+  );
   std::sort(sortedFieldNames.begin(), sortedFieldNames.end());
   size_t argNo = 1;
   for (auto &fieldName : sortedFieldNames) {
@@ -118,9 +142,16 @@ TypeBinding BlockScope::createBinding(StringRef name, Location loc) const {
     ctorArgs.insert({{fieldName, argNo}, *memberBinding});
     argNo++;
   }
+  collectTypeVarsFromGenericParams(*superType, varNames);
+  ParamsMap genericParams;
+  size_t paramNo = 0;
+  for (auto &[varName, type] : varNames) {
+    genericParams.insert({{varName, paramNo}, *type});
+    paramNo++;
+  }
 
-  return TypeBinding::WithClosure(bindings->Create(
-      name, loc, bindings->Manage(*superType), ParamsMap(), ctorArgs, members, getCurrentFrame()
+  return TypeBinding::WithClosure(bindings->CreateAnon(
+      name, loc, bindings->Manage(*superType), genericParams, ctorArgs, members, getCurrentFrame()
   ));
 }
 

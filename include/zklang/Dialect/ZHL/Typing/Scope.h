@@ -24,6 +24,7 @@ public:
   virtual void declareConstructorParam(mlir::StringRef, uint64_t, TypeBinding) = 0;
   virtual void declareMember(mlir::StringRef) = 0;
   virtual void declareMember(mlir::StringRef, TypeBinding) = 0;
+  virtual size_t memberCount() const = 0;
   virtual bool memberDeclaredWithType(mlir::StringRef) = 0;
   virtual void declareSuperType(TypeBinding) = 0;
   virtual zirgen::Zhl::ComponentOp getOp() const = 0;
@@ -65,6 +66,8 @@ public:
   /// Allows overriding a member if the current value is None
   void declareMember(mlir::StringRef name, TypeBinding type) override;
 
+  size_t memberCount() const override;
+
   bool memberDeclaredWithType(mlir::StringRef name) override;
 
   zirgen::Zhl::ComponentOp getOp() const override;
@@ -96,6 +99,7 @@ public:
   void declareMember(mlir::StringRef) override;
   void declareMember(mlir::StringRef, TypeBinding) override;
   bool memberDeclaredWithType(mlir::StringRef) override;
+  size_t memberCount() const override;
   void declareSuperType(TypeBinding) override;
   zirgen::Zhl::ComponentOp getOp() const override;
   mlir::FailureOr<TypeBinding> getSuperType() const override;
@@ -140,6 +144,8 @@ public:
 
   /// Allows overriding a member if the current value is None
   void declareMember(mlir::StringRef name, TypeBinding type) override;
+
+  size_t memberCount() const override;
 
   bool memberDeclaredWithType(mlir::StringRef name) override;
 

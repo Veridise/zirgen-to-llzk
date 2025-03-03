@@ -103,7 +103,7 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
   for (auto &name : dst->getGenericParamNames()) {
 
     LLVM_DEBUG(spaces(ident);
-               llvm::dbgs() << "Variable " << name << " binds to " << *params[name] << "\n");
+               llvm::dbgs() << "Variable '" << name << "' binds to '" << *params[name] << "'\n");
     if (!params[name]->isGenericParam()) {
       LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Specializing " << *params[name] << "\n");
       auto result = specializeTypeBindingImpl(params[name], scopes, FV, ident + 1);
@@ -114,13 +114,13 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
 
       continue;
     }
-    LLVM_DEBUG(spaces(ident);
-               llvm::dbgs() << "Specializing variable " << params[name]->getGenericParamName());
+    LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Specializing variable '"
+                                           << params[name]->getGenericParamName() << "'");
     auto replacement = scopes[params[name]->getGenericParamName()];
     // Fail the materialization if the name was not found. A well typed program should not have
     // this issue.
     if (replacement == nullptr) {
-      LLVM_DEBUG(llvm::dbgs() << " failed to convert because " << name << " was not found\n");
+      LLVM_DEBUG(llvm::dbgs() << " failed to convert because '" << name << "' was not found\n");
       return failure();
     }
 

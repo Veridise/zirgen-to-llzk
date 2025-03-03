@@ -897,24 +897,25 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
     return op->emitOpError() << "failed to type check value";
   }
 
-  auto getSuperTypeValue = [&]() -> Value {
-    return getCastedValue(
-        adaptor.getValue(), *valueBinding, rewriter,
-        materializeTypeBinding(getContext(), binding->getSuperType())
-    );
-  };
-
   Value yieldValue;
   if (binding->hasClosure()) {
     auto self = op->getParentOfType<SelfOp>().getSelfValue();
     assert(self);
-    auto pod = constructPODComponent(op, *binding, rewriter, self, getSuperTypeValue);
+    auto pod = constructPODComponent(op, *binding, rewriter, self, [&]() -> Value {
+      return getCastedValue(
+          adaptor.getValue(), *valueBinding, rewriter,
+          materializeTypeBinding(getContext(), binding->getSuperType())
+      );
+    });
     if (failed(pod)) {
       return failure();
     }
     yieldValue = *pod;
   } else {
-    yieldValue = getSuperTypeValue();
+    yieldValue = getCastedValue(
+        adaptor.getValue(), *valueBinding, rewriter, materializeTypeBinding(getContext(), *binding)
+    );
+    ;
   }
 
   rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, yieldValue);

@@ -1,4 +1,4 @@
-
+// RUN: zklang -o - %s
 
 component Foo(v: Val) {
 public bits := for i : 0..8 { NondetReg(Isz(i - v)) };

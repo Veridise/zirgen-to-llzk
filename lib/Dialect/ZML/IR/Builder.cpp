@@ -1,3 +1,4 @@
+#include <functional>
 #include <zklang/Dialect/ZML/IR/Builder.h>
 
 namespace zml {
@@ -35,8 +36,9 @@ void ComponentBuilder::Ctx::addFields(mlir::OpBuilder &builder) {
     );
   }
 }
-void ComponentBuilder::Ctx::checkRequirements() {
-  assert(body != nullptr);
+void ComponentBuilder::Ctx::checkRequirements() { assert(body != nullptr); }
+
+void ComponentBuilder::Ctx::checkBareRequirements() {
   assert(loc.has_value());
   assert(!compName.empty());
   assert((isBuiltin || isClosure) == compAttrs.empty());
@@ -44,8 +46,11 @@ void ComponentBuilder::Ctx::checkRequirements() {
 
 ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   auto builtin = builtinAttrs(builder);
+  std::vector<mlir::NamedAttribute> closure;
   mlir::ArrayRef<mlir::NamedAttribute> attrs;
-  if (!isClosure) {
+  if (isClosure) {
+    attrs = closure;
+  } else {
     attrs = isBuiltin ? mlir::ArrayRef<mlir::NamedAttribute>(builtin) : compAttrs;
   }
 
@@ -57,13 +62,19 @@ ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
 }
 
 ComponentBuilder::TakeRegion::TakeRegion(mlir::Region *body) : body(body) {}
+
 ComponentOp ComponentBuilder::build(mlir::OpBuilder &builder) {
   if (!ctx.loc.has_value()) {
     ctx.loc = builder.getUnknownLoc();
   }
+  ctx.checkBareRequirements();
+  auto op = ctx.buildBare(builder);
+  if (ctx.deferCb) {
+    ctx.deferCb(op);
+  }
+
   ctx.checkRequirements();
 
-  auto op = ctx.buildBare(builder);
   mlir::OpBuilder::InsertionGuard guard(builder);
   auto block = builder.createBlock(&op.getRegion());
   builder.setInsertionPointToStart(block);
@@ -73,6 +84,7 @@ ComponentOp ComponentBuilder::build(mlir::OpBuilder &builder) {
   ctx = Ctx();
   return op;
 }
+
 ComponentBuilder &ComponentBuilder::typeParams(mlir::ArrayRef<std::string> params) {
   for (auto &name : params) {
     typeParam(name);
@@ -135,36 +147,45 @@ ComponentBuilder &ComponentBuilder::forceGeneric() {
   ctx.forceSetGeneric = true;
   return *this;
 }
-void ComponentBuilder::FillBody::set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const {
-  ctx.constructorType = builder.getFunctionType(argTypes, results);
-  std::vector<mlir::NamedAttribute> attrs = ctx.funcBodyAttrs(builder);
+
+ComponentBuilder &ComponentBuilder::defer(std::function<void(ComponentOp)> cb) {
+  ctx.deferCb = cb;
+  return *this;
+}
+
+void ComponentBuilder::FillBody::set(ComponentOp op, Ctx &buildCtx, mlir::OpBuilder &builder)
+    const {
+  buildCtx.constructorType = builder.getFunctionType(argTypes, results);
+  std::vector<mlir::NamedAttribute> attrs = buildCtx.funcBodyAttrs(builder);
 
   auto bodyOp = builder.create<mlir::func::FuncOp>(
-      builder.getUnknownLoc(), op.getBodyFuncName(), ctx.constructorType, attrs
+      builder.getUnknownLoc(), op.getBodyFuncName(), buildCtx.constructorType, attrs
   );
   mlir::OpBuilder::InsertionGuard insertionGuard(builder);
   builder.setInsertionPointToStart(bodyOp.addEntryBlock());
   delegate(bodyOp.getArguments(), builder);
 }
+
 ComponentBuilder::FillBody::FillBody(
     mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results,
     std::function<void(mlir::ValueRange, mlir::OpBuilder &)> delegate
 )
     : argTypes(argTypes), results(results), delegate(delegate) {}
 
-void ComponentBuilder::TakeRegion::set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const {
-  auto constructorAttrs = ctx.funcBodyAttrs(builder);
+void ComponentBuilder::TakeRegion::set(ComponentOp op, Ctx &buildCtx, mlir::OpBuilder &builder)
+    const {
+  auto constructorAttrs = buildCtx.funcBodyAttrs(builder);
 
-  assert(ctx.constructorType);
+  assert(buildCtx.constructorType);
   assert(body);
   auto bodyOp = builder.create<mlir::func::FuncOp>(
-      *ctx.loc, op.getBodyFuncName(), ctx.constructorType, constructorAttrs
+      *buildCtx.loc, op.getBodyFuncName(), buildCtx.constructorType, constructorAttrs
   );
 
   // Create arguments for the entry block (aka region arguments)
   auto &entryBlock = bodyOp.getRegion().emplaceBlock();
   assert(bodyOp.getRegion().hasOneBlock());
-  entryBlock.addArguments(ctx.constructorType.getInputs(), ctx.argLocs);
+  entryBlock.addArguments(buildCtx.constructorType.getInputs(), buildCtx.argLocs);
 
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(&entryBlock);

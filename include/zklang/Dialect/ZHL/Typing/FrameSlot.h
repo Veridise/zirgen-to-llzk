@@ -32,7 +32,7 @@ public:
 
   void setParent(const detail::FrameInfo *);
   FrameSlot *getParentSlot() const;
-  bool belongsTo(Frame) const;
+  bool belongsTo(const Frame &) const;
 
   friend llvm::ilist_node_with_parent<FrameSlot, detail::FrameInfo>;
 

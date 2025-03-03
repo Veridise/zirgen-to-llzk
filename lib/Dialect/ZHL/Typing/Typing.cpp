@@ -6,6 +6,7 @@
 #include <llvm/Support/raw_ostream.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/OpBindings.h>
 #include <zklang/Dialect/ZHL/Typing/Rules.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
@@ -196,7 +197,11 @@ private:
       return failure();
     }
     auto finalBinding = result->ReplaceFrame(frame);
-    finalBinding.markSlot(frame.getParentSlot());
+    auto *parent = frame.getParentSlot();
+    // finalBinding.markSlot(parent);
+    if (auto *compParent = mlir::dyn_cast_if_present<ComponentSlot>(parent)) {
+      compParent->setBinding(finalBinding);
+    }
     return finalBinding;
   }
 
