@@ -40,6 +40,9 @@ Value Converter::lowerOp(
   return getTypeHelper().collectValues(subs, op.getLoc(), rewriter);
 }
 
+// These two methods below are based on the equivalent operations found in
+// third-party/zirgen/zirgen/components/fpext.cpp
+
 Value Converter::lowerOp(
     ExtMulOp op, ExtMulOp::Adaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
