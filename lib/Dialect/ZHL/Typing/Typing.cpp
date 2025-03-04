@@ -2,12 +2,26 @@
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringSet.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/raw_ostream.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/OpBindings.h>
 #include <zklang/Dialect/ZHL/Typing/Rules.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZHL/Typing/Typing.h>
+
+#define DEBUG_TYPE "type-checker"
+
+#ifndef NDEBUG
+static uint8_t ident;
+
+inline llvm::raw_ostream &logLine() {
+  llvm::dbgs() << "[Typing] ";
+  llvm::dbgs().indent(ident * 4);
+  return llvm::dbgs();
+}
+#endif
 
 using namespace mlir;
 using namespace zirgen::Zhl;
@@ -26,10 +40,13 @@ void checkComponent(
     ComponentOp comp, ZhlOpBindings &bindings, TypeBindings &typeBindings,
     const FrozenTypingRuleSet &rules
 ) {
+  LLVM_DEBUG(llvm::dbgs() << "\n"; logLine() << "Checking component " << comp.getName() << ":\n";
+             ident++);
   ComponentScope scope(comp, typeBindings);
   for (auto &op : comp.getRegion().getOps()) {
     (void)typeCheckOp(&op, bindings, scope, rules);
   }
+  LLVM_DEBUG(ident--; logLine() << "Finished checking component " << comp.getName() << "\n");
 }
 
 FailureOr<TypeBinding>
@@ -133,26 +150,39 @@ FailureOr<TypeBinding> typeCheckOp(
     Operation *op, ZhlOpBindings &bindings, Scope &scope, const FrozenTypingRuleSet &rules
 ) {
   assert(op != nullptr);
+  LLVM_DEBUG(logLine() << "Checking " << op->getName() << "\n";
+             if (op->getNumRegions() == 0) { logLine() << "  " << *op << "\n"; });
   if (bindings.contains(op)) {
-    return bindings.get(op);
+    auto &cachedBinding = bindings.get(op);
+    LLVM_DEBUG(logLine() << "Pulled from cache: "; if (failed(cachedBinding)) {
+      llvm::dbgs() << "<<FAILURE>>\n";
+    } else { llvm::dbgs() << *cachedBinding << "\n"; });
+    return cachedBinding;
   }
+  LLVM_DEBUG(ident++);
   auto operands = getOperandTypes(op, bindings, scope, rules);
+  LLVM_DEBUG(ident--);
   if (failed(operands)) {
+    LLVM_DEBUG(logLine() << "Failed to obtain bindings of the operation's operands\n");
     return failure();
   }
   for (auto &rule : rules) {
     if (failed(rule->match(op))) {
       continue;
     }
+    LLVM_DEBUG(llvm::dbgs() << "\n");
     auto frame = rule->allocate(scope.getCurrentFrame());
     FailureOr<TypeBinding> ruleResult =
         succeeded(frame) ? applyRuleWithFrame(*frame, op, bindings, scope, rules, *rule, *operands)
                          : applyRule(op, bindings, scope, rules, *rule, *operands);
 
+    LLVM_DEBUG(llvm::dbgs() << "\n");
     if (succeeded(ruleResult)) {
+      LLVM_DEBUG(logLine() << "SUCCESS: Storing binding " << *ruleResult << "\n");
       return bindings.add(op, ruleResult);
     }
   }
+  LLVM_DEBUG(logLine() << " FAILURE: Not rule was matched\n");
   return bindings.add(
       op, op->emitError() << "could not deduce the type of op '" << op->getName() << "'"
   );
@@ -292,7 +322,7 @@ FrozenTypingRuleSet zhlTypingRules(TypeBindings &bindings) {
       GetGlobalTypingRule, ConstructTypingRule, ExternTypingRule, DeclareTypingRule,
       SubscriptTypeRule, SpecializeTypeRule, ConstrainTypeRule, DefineTypeRule, ArrayTypeRule,
       BlockTypeRule, ReduceTypeRule, RangeTypeRule, BackTypeRule, GenericParamTypeRule, MapTypeRule,
-      LookupTypeRule, SwitchTypeRule, ConstructGlobalTypeRule>(bindings);
+      DirectiveTypeRule, LookupTypeRule, SwitchTypeRule, ConstructGlobalTypeRule>(bindings);
 
   return rules;
 }

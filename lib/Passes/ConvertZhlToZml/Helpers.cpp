@@ -1,4 +1,5 @@
 #include <mlir/IR/Builders.h>
+#include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/Operation.h>
 #include <mlir/IR/ValueRange.h>
@@ -52,15 +53,62 @@ FlatSymbolRefAttr createSlot(
   return mlir::FlatSymbolRefAttr::get(component.getContext(), st.insert(fieldDef));
 }
 
-Value storeAndLoadSlot(
-    Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc, Type compType,
-    OpBuilder &builder, Value self
-) {
-  // Write the construction in a temporary
-  builder.create<WriteFieldOp>(loc, self, slotName, value);
+TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
+  if (count == 0) {
+    return type;
+  }
+  assert(type.isArray());
+  auto inner = type.getArrayElement([]() { return mlir::InFlightDiagnostic(); });
+  assert(succeeded(inner));
+  return unwrapArrayNTimes(*inner, count - 1);
+}
 
-  // Read the temporary back to a SSA value
-  return builder.create<ReadFieldOp>(loc, slotType, self, slotName);
+Value storeAndLoadSlot(
+    ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
+    Type compType, OpBuilder &builder, Value self
+) {
+  auto compSlotBinding = slot.getBinding();
+  auto compSlotIVs = slot.collectIVs();
+  storeSlot(slot, value, slotName, slotType, loc, compType, builder, self);
+
+  if (compSlotIVs.empty()) {
+    // Read the temporary back to a SSA value
+    return builder.create<ReadFieldOp>(loc, slotType, self, slotName);
+  } else {
+    // Read the array back to a SSA value
+    auto arrayDataBis = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
+
+    // Read the value we wrote into the array back to a SSA value
+    return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, compSlotIVs);
+  }
+}
+
+void storeSlot(
+    ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
+    Type compType, OpBuilder &builder, Value self
+) {
+  auto compSlotBinding = slot.getBinding();
+  auto compSlotIVs = slot.collectIVs();
+
+  if (compSlotIVs.empty()) {
+    assert(slotType == value.getType() && "result of construction and slot type must be the same");
+    // Write the construction in a temporary
+    builder.create<WriteFieldOp>(loc, self, slotName, value);
+  } else {
+    auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size());
+    auto unwrappedType = materializeTypeBinding(builder.getContext(), unwrappedBinding);
+    assert(
+        unwrappedType == value.getType() &&
+        "result of construction and slot inner array type must be the same"
+    );
+    // Read the array from the slot field
+    auto arrayData = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
+    // Write into the array the value
+    builder.create<WriteArrayOp>(loc, arrayData, compSlotIVs, value, true);
+
+    // Write the array back into the field
+    builder.create<WriteFieldOp>(loc, self, slotName, arrayData);
+  }
 }
 
 Value storeAndLoadArraySlot(
@@ -105,21 +153,9 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   auto constructorType = materializeTypeBindingConstructor(builder, binding);
 
   return CtorCallBuilder(
-      constructorType, binding, mlir::dyn_cast<ComponentInterface>(calleeComp),
-      op->getParentOfType<ComponentInterface>(), self, calleeIsBuiltin(calleeComp)
+      constructorType, binding, op->getParentOfType<ComponentInterface>(), self,
+      calleeIsBuiltin(calleeComp)
   );
-}
-
-TypeBinding unwrapArrayNTimes(
-    const TypeBinding &type, size_t count, std::function<mlir::InFlightDiagnostic()> emitError
-) {
-  if (count == 0) {
-    return type;
-  }
-  assert(type.isArray());
-  auto inner = type.getArrayElement(emitError);
-  assert(succeeded(inner));
-  return unwrapArrayNTimes(*inner, count - 1, emitError);
 }
 
 mlir::Value
@@ -139,33 +175,16 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
 
   auto compSlot = mlir::cast<zhl::ComponentSlot>(compBinding.getSlot());
   auto compSlotBinding = compSlot->getBinding();
-  auto compSlotIVs = compSlot->collectIVs();
 
   // Create the field
   auto name = createSlot(compSlot, builder, callerComponentOp, loc);
 
   auto slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
 
-  if (compSlotIVs.empty()) {
-    assert(
-        slotType == compValue.getType() && "result of construction and slot type must be the same"
-    );
-    compValue = storeAndLoadSlot(
-        compValue, name, slotType, loc, callerComponentOp.getType(), builder, self
-    );
-  } else {
-    auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size(), [&]() {
-      return callerComponentOp->emitError();
-    });
-    auto unwrappedType = materializeTypeBinding(builder.getContext(), unwrappedBinding);
-    assert(
-        unwrappedType == compValue.getType() &&
-        "result of construction and slot inner array type must be the same"
-    );
-    compValue = storeAndLoadArraySlot(
-        compValue, name, slotType, loc, callerComponentOp.getType(), builder, compSlotIVs, self
-    );
-  }
+  compValue = storeAndLoadSlot(
+      *compSlot, compValue, name, slotType, loc, callerComponentOp.getType(), builder, self
+  );
+
   return buildPrologue(compValue);
 }
 
@@ -173,15 +192,12 @@ mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }
 
 const zhl::TypeBinding &CtorCallBuilder::getBinding() const { return compBinding; }
 
-ComponentInterface CtorCallBuilder::getCalleeComp() const { return calleeComponentOp; }
-
 CtorCallBuilder::CtorCallBuilder(
-    mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface callee,
-    ComponentInterface caller, mlir::Value selfValue, bool builtin
+    mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
+    mlir::Value selfValue, bool builtin
 )
-    : ctorType(type), compBinding(binding), isBuiltin(builtin), calleeComponentOp(callee),
-      callerComponentOp(caller), self(selfValue) {
-  assert(calleeComponentOp);
+    : ctorType(type), compBinding(binding), isBuiltin(builtin), callerComponentOp(caller),
+      self(selfValue) {
   assert(callerComponentOp);
   assert(self);
 }

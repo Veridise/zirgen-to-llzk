@@ -29,8 +29,16 @@ mlir::FlatSymbolRefAttr createSlot(
 /// Stores a value into the field defined by the slotName symbol and immediately reads it back.
 /// Returns the value read from the field.
 mlir::Value storeAndLoadSlot(
-    mlir::Value value, mlir::FlatSymbolRefAttr slotName, mlir::Type slotType, mlir::Location loc,
-    mlir::Type compType, mlir::OpBuilder &builder, mlir::Value
+    zhl::ComponentSlot &slot, mlir::Value value, mlir::FlatSymbolRefAttr slotName,
+    mlir::Type slotType, mlir::Location loc, mlir::Type compType, mlir::OpBuilder &builder,
+    mlir::Value
+);
+
+/// Stores a value into the field defined by the slotName symbol.
+void storeSlot(
+    zhl::ComponentSlot &slot, mlir::Value value, mlir::FlatSymbolRefAttr slotName,
+    mlir::Type slotType, mlir::Location loc, mlir::Type compType, mlir::OpBuilder &builder,
+    mlir::Value
 );
 
 /// Helper for creating the ops that represent the call to a component's constructor.
@@ -57,19 +65,18 @@ public:
   mlir::Value build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args);
   mlir::FunctionType getCtorType() const;
   const zhl::TypeBinding &getBinding() const;
-  ComponentInterface getCalleeComp() const;
   ComponentInterface getCallerComp() const;
 
 private:
   CtorCallBuilder(
-      mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface callee,
-      ComponentInterface caller, mlir::Value self, bool builtin
+      mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
+      mlir::Value self, bool builtin
   );
 
   mlir::FunctionType ctorType;
   const zhl::TypeBinding compBinding;
   bool isBuiltin;
-  ComponentInterface calleeComponentOp, callerComponentOp;
+  ComponentInterface callerComponentOp;
   mlir::Value self;
 };
 

@@ -29,6 +29,7 @@ class TypeBinding;
 
 using ParamsMap = std::map<std::pair<std::string_view, uint64_t>, TypeBinding>;
 using MembersMap = std::map<std::string_view, std::optional<TypeBinding>>;
+using EmitErrorFn = llvm::function_ref<mlir::InFlightDiagnostic()>;
 
 class Params {
 public:
@@ -113,6 +114,7 @@ public:
   const Params &getConstructorParams() const;
   Params &getConstructorParams();
   const Params &getGenericParamsMapping() const;
+  Params &getGenericParamsMapping();
   const MembersMap &getMembers() const;
   MembersMap &getMembers();
   mlir::Location getLocation() const;
@@ -121,8 +123,12 @@ public:
   uint64_t getConst() const;
   llvm::StringRef getGenericParamName() const;
 
-  mlir::FailureOr<TypeBinding> getArrayElement(std::function<mlir::InFlightDiagnostic()> emitError
-  ) const;
+  mlir::FailureOr<TypeBinding> getArrayElement(EmitErrorFn emitError) const;
+  mlir::FailureOr<TypeBinding> getArraySize(EmitErrorFn emitError) const;
+
+  /// Returns the type of the concrete array type this binding supports. Either because the binding
+  /// itself is an array type or because one of the types in the super chain is an Array type.
+  mlir::FailureOr<TypeBinding> getConcreteArrayType() const;
 
   void replaceGenericParamByName(std::string_view name, const TypeBinding &binding);
 
@@ -203,11 +209,13 @@ public:
   TypeBinding Const(uint64_t value, mlir::Location loc) const;
   TypeBinding UnkConst(mlir::Location loc) const;
   TypeBinding Array(TypeBinding type, uint64_t size, mlir::Location loc) const;
+  TypeBinding Array(TypeBinding type, TypeBinding size, mlir::Location loc) const;
   TypeBinding UnkArray(TypeBinding type, mlir::Location loc) const;
 
   TypeBinding Const(uint64_t value) const;
   TypeBinding UnkConst() const;
   TypeBinding Array(TypeBinding type, uint64_t size) const;
+  TypeBinding Array(TypeBinding type, TypeBinding size) const;
   TypeBinding UnkArray(TypeBinding type) const;
 
   [[nodiscard]] bool Exists(std::string_view name) const;

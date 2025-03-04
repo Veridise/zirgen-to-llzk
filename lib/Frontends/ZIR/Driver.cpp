@@ -63,11 +63,25 @@ static cl::opt<std::string>
 // They are defined with external storage to avoid having to wrap
 // the code that uses them in preprocessor checks too
 bool DisableMultiThreadingFlag = false;
+// Disabled by default until LLZK-177 is resolved
+bool DisableCleanupPassesFlag = true;
+bool DisableCastReconciliationFlag = true;
 
 #ifndef NDEBUG
 static cl::opt<bool, true> DisableMultiThreading(
     "disable-multithreading", cl::desc("Disable multithreading of the lowering pipeline"),
     cl::Hidden, cl::location(DisableMultiThreadingFlag)
+);
+
+static cl::opt<bool, true> DisableCleanupPasses(
+    "disable-cleanup-passes", cl::desc("Disables running cse and canonicalize in the pipeline"),
+    cl::Hidden, cl::location(DisableCleanupPassesFlag)
+);
+
+static cl::opt<bool, true> DisableCastReconciliation(
+    "disable-reconciliation-passes",
+    cl::desc("Disables running reconcile-unrealized-casts in the pipeline"), cl::Hidden,
+    cl::location(DisableCastReconciliationFlag)
 );
 #endif
 
@@ -142,7 +156,9 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zklang::createStripTestsPass());
   pm.addPass(zml::createInjectBuiltInsPass());
   pm.addPass(zklang::createConvertZhlToZmlPass());
-  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  if (!DisableCastReconciliationFlag) {
+    pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  }
 
   if (emitAction == Action::PrintZML) {
     return;
@@ -155,16 +171,21 @@ void Driver::configureLoweringPipeline() {
   auto &splitCompFuncsPipeline = splitCompPipeline.nest<mlir::func::FuncOp>();
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalComputeOpsPass());
   splitCompFuncsPipeline.addPass(zml::createRemoveIllegalConstrainOpsPass());
-  splitCompFuncsPipeline.addPass(mlir::createCSEPass());
+  if (!DisableCleanupPassesFlag) {
+    splitCompFuncsPipeline.addPass(mlir::createCSEPass());
+  }
 
   if (emitAction == Action::OptimizeZML) {
     return;
   }
-
   pm.addPass(zklang::createConvertZmlToLlzkPass());
   auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
-  llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
-  llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
+  if (!DisableCastReconciliationFlag) {
+    llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
+  }
+  if (!DisableCleanupPassesFlag) {
+    llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
+  }
 }
 
 zirgen::dsl::ast::Module::Ptr Driver::parse() {
@@ -255,7 +276,7 @@ LogicalResult Driver::run() {
   pm.dump();
   if (failed(pm.run(*mod))) {
     DEBUG_WITH_TYPE("zir-driver-dump-on-error", llvm::errs() << "Module contents:\n";
-                    mod->print(llvm::errs()));
+                    mod->print(llvm::errs(), OpPrintingFlags(std::nullopt).printGenericOpForm()));
     llvm::WithColor(llvm::errs(), llvm::raw_ostream::RED, true)
         << "An internal compiler error ocurred while lowering this module.\n";
     return failure();

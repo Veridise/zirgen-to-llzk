@@ -8,7 +8,9 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/IR/OpDefinition.h>
 #include <mlir/IR/OperationSupport.h>
+#include <mlir/IR/PatternMatch.h>
 #include <mlir/IR/Region.h>
 #include <mlir/Interfaces/FunctionImplementation.h>
 #include <mlir/Support/LLVM.h>
@@ -23,6 +25,8 @@
 // TableGen'd implementation files
 #define GET_OP_CLASSES
 #include <zklang/Dialect/ZML/IR/Ops.cpp.inc>
+
+using namespace mlir;
 
 namespace zml {
 
@@ -286,6 +290,52 @@ mlir::LogicalResult GetGlobalOp::inferReturnTypes(
   // TODO
   inferredReturnTypes.push_back(ComponentType::Val(ctx));
   return mlir::success();
+}
+
+mlir::OpFoldResult LitValOp::fold(LitValOp::FoldAdaptor) { return getValueAttr(); }
+
+mlir::OpFoldResult LitValArrayOp::fold(LitValArrayOp::FoldAdaptor) { return getElementsAttr(); }
+
+mlir::OpFoldResult ValToIndexOp::fold(ValToIndexOp::FoldAdaptor adaptor) {
+  return adaptor.getVal();
+}
+
+OpFoldResult GetArrayLenOp::fold(GetArrayLenOp::FoldAdaptor adaptor) {
+  if (auto compType = dyn_cast<ComponentType>(getArray().getType())) {
+    auto arrSize = compType.getArraySize();
+    if (failed(arrSize)) {
+      return nullptr;
+    }
+    if (isa<IntegerAttr>(*arrSize)) {
+      return *arrSize;
+    }
+  }
+  return nullptr;
+}
+
+LogicalResult NopOp::fold(NopOp::FoldAdaptor adaptor, SmallVectorImpl<OpFoldResult> &results) {
+  if (adaptor.getIns().size() != getNumResults()) {
+    return failure();
+  }
+
+  bool atLeastOne = false;
+  for (auto in : adaptor.getIns()) {
+    if (in) {
+      atLeastOne = true;
+      results.push_back(in);
+    } else {
+      results.push_back(nullptr);
+    }
+  }
+  return success(atLeastOne);
+}
+
+LogicalResult NopOp::canonicalize(NopOp op, PatternRewriter &rewriter) {
+  if (op.getIns().size() == op.getNumResults()) {
+    rewriter.replaceAllUsesWith(op.getResults(), op.getIns());
+    return success();
+  }
+  return failure();
 }
 
 } // namespace zml

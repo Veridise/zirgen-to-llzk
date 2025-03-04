@@ -2,6 +2,7 @@
 
 #include <mlir/IR/Value.h>
 #include <mlir/Pass/AnalysisManager.h>
+#include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
@@ -16,6 +17,8 @@ public:
   const mlir::FailureOr<TypeBinding> &getType(mlir::Value value) const;
 
   mlir::FailureOr<TypeBinding> getType(mlir::StringRef name) const;
+
+  mlir::LogicalResult addType(mlir::Value value, const TypeBinding &binding);
 
   const TypeBindings &getBindings() const;
 

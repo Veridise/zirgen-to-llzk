@@ -10,6 +10,8 @@
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 
+#define DEBUG_TYPE "type-checker"
+
 namespace zhl {
 
 using namespace zirgen::Zhl;
@@ -221,18 +223,20 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     return copy;
   };
 
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Type checking op " << op << "\n");
   auto decl = getDeclaration(op);
   if (mlir::failed(decl)) {
-    return op->emitError() << "Malformed IR: Definition must have a declaration operand";
+    return op->emitError() << "malformed IR: Definition must have a declaration operand";
   }
   if (operands.size() < 2) {
-    return mlir::failure();
+    return op->emitError() << "not enough arguments for define op";
   }
   if (!operands[0].isBottom() && failed(operands[1].subtypeOf(operands[0]))) {
     return op->emitError() << "was expecting a subtype of '" << operands[0] << "', but got '"
                            << operands[1] << "'";
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Validation passed\n");
   auto *declSlot = operands[0].getSlot();
   auto *exprSlot = operands[1].getSlot();
 
@@ -247,6 +251,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // expression op is renamed to the member's name. The type binding returned by
     // this rule does not link to a slot since the expression op already does.
     if (declBinding == exprBinding) {
+      LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 2\n");
       exprSlot->rename(decl->getMember());
       scope.declareMember(decl->getMember(), operands[1]);
       return copyWithoutSlot(operands[1]);
@@ -255,16 +260,19 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // Case 1: In this case the result of this rule is a copy of the type binding of the declaration
     // op. The slot allocated by the expression needs to be maintained to avoid losing the type
     // information.
+    LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 1\n");
     return copyWithoutSlot(operands[0]);
   }
 
   // Case 3: The result is a copy of the type binding of the declaration op.
   if (declSlot) {
+    LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 3\n");
     return copyWithoutSlot(operands[0]);
   }
 
   // Case 4: Rename the slot with the name of the member.
   if (exprSlot) {
+    LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 4\n");
     exprSlot->rename(decl->getMember());
     scope.declareMember(decl->getMember(), operands[1]);
     return copyWithoutSlot(operands[1]);
@@ -272,6 +280,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
 
   // Case 5: Allocate a slot of the type binding of the expression and the name of the member.
   // Return a type binding that links to the allocated slot.
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 5\n");
   auto binding = operands[1];
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), binding, decl->getMember());
   scope.declareMember(decl->getMember(), binding);
@@ -281,9 +290,27 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
 mlir::FailureOr<TypeBinding> ConstrainTypeRule::
     typeCheck(zirgen::Zhl::ConstraintOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  // TODO: Check that the argument types are correct
-  // XXX: Improvement idea; return the least common super type of the arguments instead of
-  // `Component`.
+  if (operands.size() != 2) {
+    return op.emitError() << "constraint expression expects 2 operands, but got "
+                          << operands.size();
+  }
+  auto &lhs = operands[0];
+  auto &rhs = operands[1];
+
+  auto leastCommon = lhs.commonSupertypeWith(rhs);
+  if (leastCommon.isArray()) {
+    auto leastCommonArray = leastCommon.getConcreteArrayType();
+    if (mlir::failed(leastCommonArray)) {
+      return op.emitError()
+             << "constraint operands have Array supertype but it could not be deduced";
+    }
+    return leastCommonArray;
+  }
+  auto &Val = getBindings().Get("Val");
+  if (succeeded(leastCommon.subtypeOf(Val))) {
+    return Val;
+  }
+
   return getBindings().Component();
 }
 
@@ -294,8 +321,9 @@ mlir::FailureOr<TypeBinding> GenericParamTypeRule::
     return mlir::failure();
   }
 
-  scope.declareGenericParam(op.getName(), op.getIndex(), operands[0]);
-  return TypeBinding::MakeGenericParam(getBindings().Manage(operands[0]), op.getName());
+  auto param = TypeBinding::MakeGenericParam(getBindings().Manage(operands[0]), op.getName());
+  scope.declareGenericParam(op.getName(), op.getIndex(), param);
+  return param;
 }
 
 mlir::FailureOr<TypeBinding> SpecializeTypeRule::
@@ -304,6 +332,23 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
   if (operands.empty()) {
     return mlir::failure();
   }
+
+  auto I = op.getArgs().begin();
+  auto E = op.getArgs().end();
+  bool failed = false;
+  for (; I != E; ++I) {
+    auto argOp = (*I).getDefiningOp();
+    assert(argOp && "cannot have values that do not come from operations in ZHL");
+    if (!mlir::isa<TypeParamOp, LiteralOp, SpecializeOp, GlobalOp>(argOp)) {
+      op->emitError() << "was expecting a type, a literal value or a generic parameter, but got "
+                      << argOp->getName().stripDialect();
+      failed = true;
+    }
+  }
+  if (failed) {
+    return failure();
+  }
+
   auto typeToSpecialize = operands[0];
   return typeToSpecialize.specialize([&]() { return op->emitOpError(); }, operands.drop_front());
 }
@@ -325,10 +370,18 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
     return op->emitOpError() << "could not infer the type of the array";
   }
 
-  auto commonType = std::reduce(
-      operands.drop_front().begin(), operands.end(), operands.front(),
-      [](auto a, auto b) { return a.commonSupertypeWith(b); }
-  );
+  auto get = [](const TypeBinding &t) -> const TypeBinding & {
+    if (t.isKnownConst()) {
+      return t.getSuperType();
+    }
+    return t;
+  };
+
+  auto &fst = get(operands.front());
+  auto commonType =
+      std::reduce(operands.drop_front().begin(), operands.end(), fst, [&](auto &lhs, auto &rhs) {
+    return get(lhs).commonSupertypeWith(get(rhs));
+  });
 
   return getBindings().Array(commonType, operands.size());
 }
@@ -350,7 +403,24 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
     return mlir::failure();
   }
 
+  if (failed(operands[0].subtypeOf(getBindings().Get("Val")))) {
+    return op->emitError()
+           << "expected left side of range to be 'Val' or subtype of 'Val', but got '"
+           << operands[0].getName() << "'";
+  }
+  if (failed(operands[1].subtypeOf(getBindings().Get("Val")))) {
+    return op->emitError()
+           << "expected right side of range to be 'Val' or subtype of 'Val', but got '"
+           << operands[1].getName() << "'";
+  }
   auto common = operands[0].commonSupertypeWith(operands[1]);
+
+  if (operands[0].isKnownConst() && operands[1].isKnownConst()) {
+    if (operands[1].getConst() < operands[0].getConst()) {
+      return op->emitError() << "right side of range must be greater or equal than the left side";
+    }
+    return getBindings().Array(common, operands[1].getConst() - operands[0].getConst());
+  }
   return getBindings().UnkArray(common);
 }
 
@@ -364,6 +434,11 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
   // TODO: Validation that the inner type of the array is a subtype of the first argument of
   // operands[2]
   // TODO: Validation that the init type is a subtype of the second arguments of operands[2]
+
+  // If the init value is a constant then return its super type (Val)
+  if (operands[1].isConst()) {
+    return operands[1].getSuperType();
+  }
   return operands[1];
 }
 
@@ -432,6 +507,10 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return op->emitOpError() << "was expecting a array as input. Got '" << operands[0].getName()
                              << "'";
   }
+  auto arrayLen = operands[0].getArraySize([&] { return op->emitError(); });
+  if (failed(arrayLen)) {
+    return failure();
+  }
 
   assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
@@ -439,7 +518,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return op->emitOpError() << "failed to deduce the super type";
   }
 
-  return getBindings().UnkArray(*super);
+  return getBindings().Array(*super, *arrayLen, op.getLoc());
 }
 
 FailureOr<Frame> MapTypeRule::allocate(Frame frame) const {
@@ -476,6 +555,12 @@ FailureOr<TypeBinding> LookupTypeRule::
   auto &comp = operands[0];
 
   return comp.getMember(op.getMember(), [&]() { return op->emitError(); });
+}
+
+FailureOr<TypeBinding>
+DirectiveTypeRule::typeCheck(DirectiveOp, ArrayRef<TypeBinding>, Scope &, ArrayRef<const Scope *>)
+    const {
+  return getBindings().Component();
 }
 
 } // namespace zhl

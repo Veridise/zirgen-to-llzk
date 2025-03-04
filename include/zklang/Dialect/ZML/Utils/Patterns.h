@@ -1,6 +1,8 @@
 #pragma once
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 
@@ -16,10 +18,16 @@ namespace zml {
 template <int ArgN, typename Parent = mlir::func::FuncOp> class Arg {
 public:
   template <typename Op>
-  mlir::FailureOr<mlir::ValueRange>
-  generate(Op op, mlir::ConversionPatternRewriter &, const mlir::TypeConverter *) const {
+  static mlir::LogicalResult generate(
+      Op op, mlir::ConversionPatternRewriter &, const mlir::TypeConverter *,
+      mlir::SmallVector<mlir::Value, 1> &values
+  ) {
     auto func = op->template getParentOfType<Parent>();
-    return mlir::ValueRange(func.getArgument(ArgN));
+    if (func.getNumArguments() <= ArgN) {
+      return mlir::failure();
+    }
+    values.push_back(func.getArgument(ArgN));
+    return mlir::success();
   }
 };
 
@@ -29,14 +37,17 @@ public:
 template <typename Op> class NewOp {
 public:
   template <typename InOp>
-  mlir::FailureOr<mlir::ValueRange> generate(
-      InOp op, mlir::ConversionPatternRewriter &rewriter, const mlir::TypeConverter *typeConverter
-  ) const {
+  static mlir::LogicalResult generate(
+      InOp op, mlir::ConversionPatternRewriter &rewriter, const mlir::TypeConverter *typeConverter,
+      mlir::SmallVector<mlir::Value, 1> &values
+  ) {
     mlir::SmallVector<mlir::Type, 1> convertedTypes;
     if (mlir::failed(typeConverter->convertTypes(op->getResultTypes(), convertedTypes))) {
       return mlir::failure();
     }
-    return mlir::ValueRange(rewriter.create<Op>(op.getLoc(), convertedTypes, mlir::ValueRange()));
+    auto newOp = rewriter.create<Op>(op.getLoc(), convertedTypes, mlir::ValueRange());
+    values.push_back(newOp);
+    return mlir::success();
   }
 };
 
@@ -44,29 +55,21 @@ public:
 /// replacement is defined by the Strategy type. All ops defined inside the SelfOp's region are
 /// hoisted out before removing the op.
 template <typename Strategy> class ReplaceSelfWith : public mlir::OpConversionPattern<SelfOp> {
-  static_assert(std::is_default_constructible_v<Strategy>);
-
 public:
-  template <typename... Args>
-  ReplaceSelfWith(Args &&...args)
-      : mlir::OpConversionPattern<SelfOp>(std::forward<Args>(args)...), strategy{} {}
+  using mlir::OpConversionPattern<SelfOp>::OpConversionPattern;
 
   mlir::LogicalResult matchAndRewrite(
       SelfOp op, typename mlir::OpConversionPattern<SelfOp>::OpAdaptor adaptor,
       mlir::ConversionPatternRewriter &rewriter
   ) const override {
-    mlir::FailureOr<mlir::ValueRange> selfReplacement =
-        strategy.generate(op, rewriter, getTypeConverter());
-    if (mlir::failed(selfReplacement)) {
+    mlir::SmallVector<mlir::Value, 1> selfReplacement;
+    if (mlir::failed(Strategy::generate(op, rewriter, getTypeConverter(), selfReplacement))) {
       return mlir::failure();
     }
-    rewriter.inlineBlockBefore(&op.getRegion().front(), op, *selfReplacement);
-    rewriter.replaceOp(op, *selfReplacement);
+    rewriter.inlineBlockBefore(&op.getRegion().front(), op, selfReplacement);
+    rewriter.replaceOp(op, selfReplacement);
     return mlir::success();
   }
-
-private:
-  Strategy strategy;
 };
 
 } // namespace zml

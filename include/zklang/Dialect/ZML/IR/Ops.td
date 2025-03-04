@@ -69,7 +69,7 @@ def SelfOp : ZMLOp<"self", [NoTerminator]> {
   let description = "Returns the current component after executing its content";
 
   let results = (outs Component);
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region MaxSizedRegion<1>:$body);
 
   let assemblyFormat = [{
      $body attr-dict `:` type(results) 
@@ -123,6 +123,12 @@ def ConstructorRefOp : ZMLOp<"constructor", [Pure]> {
   }];
 
   let hasVerifier = 1;
+}
+
+def ExternFnRefOp : ZMLOp<"extern_fn", [Pure]> {
+  let arguments = (ins FlatSymbolRefAttr:$name);
+  let results = (outs FunctionType);
+  let assemblyFormat = "attr-dict $name `:` type(results)";
 }
 
 def FieldDefOp : ZMLOp<"field", [HasParent<"::zml::ComponentOp, "
@@ -185,6 +191,10 @@ def NopOp : ZMLOp<"nop", [Pure]> {
   let results = (outs Variadic<AnyZMLType>:$outs);
 
   let assemblyFormat = "($ins `:` type($ins)^ `->`)? type($outs) attr-dict";
+
+  let hasFolder = 1;
+
+  let hasCanonicalizeMethod = 1;
 }
 
 def GlobalDefOp : ZMLOp<"global", [HasParent<"::mlir::ModuleOp">]> {
@@ -229,14 +239,25 @@ def ConstrainOp : ZMLOp<"constrain"> {
   }];
 }
 
-def NewArrayOp : ZMLOp<"new_array"> {
+def NewArrayOp : ZMLOp<"new_array", [Pure, SameTypeOperands]> {
   let summary = "creates a new array with data";
 
   let arguments = (ins Variadic<AnyZMLType>:$elements);
   let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat =
-      "$elements attr-dict `:` `[` type($elements) `]` `->` type($result)";
+      "$elements attr-dict `:` `[` type($elements) `]` `,` type($result)";
+}
+
+def LitValArrayOp : ZMLOp<"litval_array", [Pure, ConstantLike]> {
+  let summary = "literal array definition";
+
+  let arguments = (ins DenseI64ArrayAttr:$elements);
+  let results = (outs Component:$result);
+
+  let assemblyFormat = "$elements attr-dict `:` type($result)";
+
+  let hasFolder = 1;
 }
 
 def VarArgsTypeCheckPred : TypesMatchWith<"inner type matches input operands",
@@ -291,23 +312,29 @@ def WriteArrayOp : ZMLOp<"write_array"> {
   }];
 }
 
-def GetArrayLenOp : ZMLOp<"array_len"> {
+def GetArrayLenOp : ZMLOp<"array_len", [Pure]> {
   let summary = "returns the length of an array";
 
   let arguments = (ins TypeVarOr<Component>:$array);
   let results = (outs Index:$length);
+
+  let assemblyFormat = "$array attr-dict `:` type($array)";
+
+  let hasFolder = 1;
 }
 
-def ValToIndexOp : ZMLOp<"toindex"> {
+def ValToIndexOp : ZMLOp<"toindex", [Pure]> {
   let summary = "convert val to index";
 
   let arguments = (ins TypeVarOr<Component>:$val);
   let results = (outs Index:$result);
 
   let assemblyFormat = "$val `:` type($val) attr-dict";
+
+  let hasFolder = 1;
 }
 
-def ValToI1Op : ZMLOp<"tobool"> {
+def ValToI1Op : ZMLOp<"tobool", [Pure]> {
   let summary = "convert val to i1";
 
   let arguments = (ins TypeVarOr<Component>:$val);
@@ -315,7 +342,7 @@ def ValToI1Op : ZMLOp<"tobool"> {
   let assemblyFormat = "$val `:` type($val) attr-dict";
 }
 
-def IndexToValOp : ZMLOp<"fromindex"> {
+def IndexToValOp : ZMLOp<"fromindex", [Pure]> {
   let summary = "convert index to val";
 
   let arguments = (ins Index:$index);
@@ -323,17 +350,19 @@ def IndexToValOp : ZMLOp<"fromindex"> {
   let assemblyFormat = "$index `:` type($result) attr-dict";
 }
 
-def LitValOp : ZMLOp<"literal"> {
+def LitValOp : ZMLOp<"literal", [Pure, ConstantLike]> {
   let summary = "a literal value";
-  let arguments = (ins UI64Attr:$value);
+  let arguments = (ins I64Attr:$value);
   let results = (outs Component:$val);
 
   let assemblyFormat = [{
     $value `:` type($val) attr-dict
   }];
+
+  let hasFolder = 1;
 }
 
-def LitStrOp : ZMLOp<"string"> {
+def LitStrOp : ZMLOp<"string", [Pure]> {
   let summary = "a literal value";
   let arguments = (ins StrAttr:$value);
   let results = (outs Component:$val);
@@ -353,7 +382,7 @@ def AssertOp : ZMLOp<"assert"> {
     }];
 }
 
-def LoadValParamOp : ZMLOp<"load_param"> {
+def LoadValParamOp : ZMLOp<"load_param", [Pure]> {
   let summary = "loads val from parameter";
   let arguments = (ins SymbolNameAttr:$param);
   let results = (outs Component:$val);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
@@ -10,22 +11,6 @@
 
 namespace zml {
 
-class UpdateScfForOpTypes : public mlir::OpConversionPattern<mlir::scf::ForOp> {
-public:
-  using OpConversionPattern<mlir::scf::ForOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::scf::ForOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
-};
-
-class UpdateScfYieldOpTypes : public mlir::OpConversionPattern<mlir::scf::YieldOp> {
-public:
-  using OpConversionPattern<mlir::scf::YieldOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::scf::YieldOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
-};
-
 class UpdateScfExecuteRegionOpTypes : public mlir::OpConversionPattern<mlir::scf::ExecuteRegionOp> {
 public:
   using OpConversionPattern<mlir::scf::ExecuteRegionOp>::OpConversionPattern;
@@ -33,14 +18,6 @@ public:
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::ExecuteRegionOp, OpAdaptor, mlir::ConversionPatternRewriter &)
       const override;
-};
-
-class UpdateScfIfOpTypes : public mlir::OpConversionPattern<mlir::scf::IfOp> {
-public:
-  using OpConversionPattern<mlir::scf::IfOp>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::scf::IfOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 /// Lowers literal Vals
@@ -85,13 +62,14 @@ public:
       const override;
 };
 
-class CallOpLowering : public mlir::OpConversionPattern<mlir::func::CallOp> {
+class ExternCallOpLowering : public mlir::OpConversionPattern<mlir::func::CallIndirectOp> {
 
 public:
-  using OpConversionPattern<mlir::func::CallOp>::OpConversionPattern;
+  using OpConversionPattern<mlir::func::CallIndirectOp>::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+  matchAndRewrite(mlir::func::CallIndirectOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
 };
 
 class CallIndirectOpLoweringInCompute
@@ -121,6 +99,15 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(ConstructorRefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class RemoveExternFnRefOp : public mlir::OpConversionPattern<ExternFnRefOp> {
+
+public:
+  using OpConversionPattern<ExternFnRefOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(ExternFnRefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 template <typename FromOp, typename ToOp>
@@ -199,6 +186,14 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(NewArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerLitValArrayOp : public mlir::OpConversionPattern<LitValArrayOp> {
+public:
+  using mlir::OpConversionPattern<LitValArrayOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(LitValArrayOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerReadArrayOp : public mlir::OpConversionPattern<ReadArrayOp> {
