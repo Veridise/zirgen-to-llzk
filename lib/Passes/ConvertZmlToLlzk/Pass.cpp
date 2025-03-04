@@ -65,7 +65,7 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   mlir::MLIRContext *ctx = op->getContext();
   LLZKTypeConverterPtr typeConverter;
   ConverterPtr extValConverter;
-  // Only BabyBear is supported for now
+  // Only BabyBear is supported for now. More to come (LLZK-180)
   if (failed(configureField(selectedExtValField, typeConverter, extValConverter, [&]() {
     return op->emitError();
   }))) {
