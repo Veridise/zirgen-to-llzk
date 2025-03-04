@@ -449,3 +449,15 @@ zhl::TypeBinding &zhl::TypeBinding::getSuperType() {
   assert(superType != nullptr);
   return *superType;
 }
+
+TypeBinding TypeBinding::WithExpr(const TypeBinding &b, expr::ConstExpr constExpr) {
+  auto copy = b;
+  copy.constExpr = constExpr;
+  return copy;
+}
+
+TypeBinding TypeBinding::NoExpr(const TypeBinding &b) {
+  auto copy = b;
+  copy.constExpr = expr::ConstExpr();
+  return copy;
+}

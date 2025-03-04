@@ -170,6 +170,8 @@ public:
 
   static TypeBinding WrapVariadic(const TypeBinding &t);
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name);
+  static TypeBinding WithExpr(const TypeBinding &, expr::ConstExpr);
+  static TypeBinding NoExpr(const TypeBinding &);
 
   friend TypeBindings;
   friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const zhl::TypeBinding &b);
