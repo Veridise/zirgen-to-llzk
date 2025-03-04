@@ -602,7 +602,7 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   }
   auto elementType = materializeTypeBinding(getContext(), *elementTypeBinding);
 
-  llvm::SmallVector<FailureOr<TypeBinding>> argBindings;
+  llvm::SmallVector<FailureOr<TypeBinding>, 1> argBindings;
   std::transform(
       op.getElements().begin(), op.getElements().end(), std::back_inserter(argBindings),
       [&](auto element) { return getType(element); }

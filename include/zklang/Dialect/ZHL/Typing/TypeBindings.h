@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <llvm/ADT/StringRef.h>
@@ -15,6 +16,7 @@
 #include <mlir/Support/LogicalResult.h>
 #include <string_view>
 #include <unordered_map>
+#include <zklang/Dialect/ZHL/Typing/Expr.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 
@@ -52,9 +54,11 @@ public:
   const TypeBinding *operator[](std::string_view name) const;
   TypeBinding *operator[](std::string_view name);
 
-  void printMapping(llvm::raw_ostream &os) const;
+  void printMapping(llvm::raw_ostream &os, bool fullPrintout = false) const;
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
-  void printParams(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
+  void printParams(
+      llvm::raw_ostream &os, bool fullPrintout = false, char header = '<', char footer = '>'
+  ) const;
 
   ParamsList::iterator begin();
   ParamsList::const_iterator begin() const;
@@ -190,6 +194,7 @@ private:
   llvm::StringRef name;
   mlir::Location loc;
   std::optional<uint64_t> constVal;
+  expr::ConstExpr constExpr;
   std::optional<llvm::StringRef> genericParamName;
   TypeBinding *superType;
   MembersMap members;
