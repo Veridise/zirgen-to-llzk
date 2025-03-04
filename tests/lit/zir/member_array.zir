@@ -1,10 +1,20 @@
-// RUN: zklang -o - %s
+// RUN: zklang -o - %s | FileCheck --enable-var-scope %s
 
 component Foo(v: Val) {
-public bits := for i : 0..8 { NondetReg(Isz(i - v)) };
+  public bits := for i : 0..8 { NondetReg(Isz(i - v)) };
+// CHECK-LABEL: llzk.struct @Foo<[]> {
+//       CHECK:   field @bits : !llzk.array<8 x !llzk.struct<@NondetReg<[]>>>
 }
 
 component Bar() {
   f := Foo(2);
   f.bits[0]
+
+// CHECK-LABEL: func @compute() -> !llzk.struct<@Bar<[]>> {
+// CHECK:     %[[T0:[0-9a-zA-Z_\.]+]] = new_struct : <@Bar<[]>>
+// CHECK:     %[[T1:[0-9a-zA-Z_\.]+]] = constfelt  2
+// CHECK:     %[[T2:[0-9a-zA-Z_\.]+]] = call @Foo::@compute(%[[T1]]) : (!llzk.felt) -> !llzk.struct<@Foo<[]>> 
+// CHECK:     writef %[[T0]][@f] = %[[T2]] : <@Bar<[]>>, !llzk.struct<@Foo<[]>>
+// CHECK:     %[[T3:[0-9a-zA-Z_\.]+]] = readf %[[T0]][@f] : <@Bar<[]>>, !llzk.struct<@Foo<[]>>
+// CHECK:     %[[T4:[0-9a-zA-Z_\.]+]] = readf %[[T3]][@bits] : <@Foo<[]>>, !llzk.array<8 x !llzk.struct<@NondetReg<[]>>>
 }
