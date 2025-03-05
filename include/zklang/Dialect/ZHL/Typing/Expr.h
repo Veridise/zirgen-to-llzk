@@ -4,7 +4,13 @@
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/simple_ilist.h>
 #include <llvm/Support/raw_ostream.h>
+#include <mlir/IR/AffineExpr.h>
 #include <mlir/Support/LLVM.h>
+
+namespace mlir {
+class Attribute;
+class Builder;
+} // namespace mlir
 
 namespace zhl::expr {
 
@@ -24,6 +30,8 @@ public:
   virtual ExprBase *clone() const = 0;
   virtual bool operator==(const ExprBase &) const = 0;
   virtual void print(llvm::raw_ostream &) const = 0;
+  virtual mlir::Attribute convertIntoAttribute(mlir::Builder &) const = 0;
+  virtual mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const = 0;
 
 private:
   ExprKind kind;
@@ -45,13 +53,15 @@ public:
   const ExprBase &operator*() const;
 
   static ConstExpr Val(uint64_t);
-  static ConstExpr Symbol(mlir::StringRef);
+  static ConstExpr Symbol(mlir::StringRef, size_t);
   static ConstExpr Ctor(mlir::StringRef, mlir::ArrayRef<ConstExpr>);
 
   /// Returns true if the inner pointer points to a valid expression, false otherwise.
   operator bool() const;
 
   bool operator==(const ConstExpr &) const;
+
+  mlir::Attribute convertIntoAttribute(mlir::Builder &) const;
 
 private:
   explicit ConstExpr(ExprBase *);
@@ -69,6 +79,8 @@ public:
   ExprBase *clone() const override;
   bool operator==(const ExprBase &) const override;
   void print(llvm::raw_ostream &) const override;
+  mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
+  mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
 
   uint64_t getValue() const;
 
@@ -78,17 +90,21 @@ private:
 
 class Symbol : public ExprBase {
 public:
-  explicit Symbol(mlir::StringRef);
+  explicit Symbol(mlir::StringRef, size_t);
   static bool classof(const ExprBase *);
 
   ExprBase *clone() const override;
   bool operator==(const ExprBase &) const override;
   void print(llvm::raw_ostream &) const override;
+  mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
+  mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
 
   mlir::StringRef getName() const;
+  size_t getPos() const;
 
 private:
   mlir::SmallString<5> name;
+  size_t pos;
 };
 
 class Ctor : public ExprBase {
@@ -133,6 +149,8 @@ public:
   ExprBase *clone() const override;
   bool operator==(const ExprBase &) const override;
   void print(llvm::raw_ostream &) const override;
+  mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
+  mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
 
   Arguments &arguments();
   const Arguments &arguments() const;
@@ -174,6 +192,7 @@ public:
   static bool classof(const ConstExpr *);
 
   mlir::StringRef getName() const;
+  size_t getPos() const;
 
   /// Returns true if the inner pointer points to a valid expression, false otherwise.
   operator bool() const;

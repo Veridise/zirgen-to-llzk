@@ -7,6 +7,9 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSwitch.h>
 #include <memory>
+#include <mlir/IR/Attributes.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinTypes.h>
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/Expr.h>
 
@@ -56,9 +59,13 @@ const ExprBase &ConstExpr::operator*() const { return *expr; }
 
 ConstExpr ConstExpr::Val(uint64_t value) { return ConstExpr(new detail::Val(value)); }
 
-ConstExpr ConstExpr::Symbol(StringRef name) { return ConstExpr(new detail::Symbol(name)); }
+ConstExpr ConstExpr::Symbol(StringRef name, size_t pos) {
+  return ConstExpr(new detail::Symbol(name, pos));
+}
 
-template <typename T> bool asBool(const T &t) { return t; }
+namespace {
+template <typename T> inline bool asBool(const T &t) { return t; }
+} // namespace
 
 ConstExpr ConstExpr::Ctor(StringRef name, ArrayRef<ConstExpr> args) {
   if (std::all_of(args.begin(), args.end(), asBool<ConstExpr>)) {
@@ -69,6 +76,13 @@ ConstExpr ConstExpr::Ctor(StringRef name, ArrayRef<ConstExpr> args) {
     return ConstExpr(expr);
   }
   return ConstExpr();
+}
+
+Attribute ConstExpr::convertIntoAttribute(Builder &builder) const {
+  if (expr) {
+    return expr->convertIntoAttribute(builder);
+  }
+  return nullptr;
 }
 
 //==-----------------------------------------------------------------------==//
@@ -161,15 +175,19 @@ void Val::print(llvm::raw_ostream &os) const { os << "Val(" << value << ")"; }
 
 uint64_t Val::getValue() const { return value; }
 
+Attribute Val::convertIntoAttribute(Builder &builder) const {
+  return builder.getIntegerAttr(builder.getI64Type(), value);
+}
+
 //==-----------------------------------------------------------------------==//
 // Symbol
 //==-----------------------------------------------------------------------==//
 
-Symbol::Symbol(StringRef Name) : ExprBase(Ex_Symbol), name(Name) {}
+Symbol::Symbol(StringRef Name, size_t Pos) : ExprBase(Ex_Symbol), name(Name), pos(Pos) {}
 
 bool Symbol::classof(const ExprBase *expr) { return expr->getKind() == Ex_Symbol; }
 
-ExprBase *Symbol::clone() const { return new Symbol(name); }
+ExprBase *Symbol::clone() const { return new Symbol(name, pos); }
 
 bool Symbol::operator==(const ExprBase &other) const {
   if (auto *otherSym = mlir::dyn_cast<Symbol>(&other)) {
@@ -181,6 +199,12 @@ bool Symbol::operator==(const ExprBase &other) const {
 void Symbol::print(llvm::raw_ostream &os) const { os << "Sym(" << name << ")"; }
 
 StringRef Symbol::getName() const { return name; }
+
+size_t Symbol::getPos() const { return pos; }
+
+Attribute Symbol::convertIntoAttribute(Builder &builder) const {
+  return SymbolRefAttr::get(builder.getStringAttr(name));
+}
 
 //==-----------------------------------------------------------------------==//
 // Ctor
@@ -261,6 +285,9 @@ Ctor::Arguments &Ctor::arguments() { return args; }
 const Ctor::Arguments &Ctor::arguments() const { return args; }
 
 StringRef Ctor::getTypeName() const { return typeName; }
+
+// Ctor::convertIntoAttribute implementation is in Interpreter.cpp because it needs information
+// about semi-affine expressions
 
 //==-----------------------------------------------------------------------==//
 // Ctor::Arguments

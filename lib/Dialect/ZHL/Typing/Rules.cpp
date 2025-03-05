@@ -387,6 +387,86 @@ mlir::FailureOr<TypeBinding> GenericParamTypeRule::
   return param;
 }
 
+namespace {
+
+/// Checks that the source value and type binding are valid for the parameter they are going to
+/// specialize.
+inline LogicalResult checkSpecializationArg(
+    Value value, const TypeBinding &type, const TypeBinding &paramType,
+    llvm::function_ref<InFlightDiagnostic()> emitError
+) {
+  if (!paramType.isGenericParam()) {
+    return emitError() << "non generic param type";
+  }
+  auto &paramSuperType = paramType.getSuperType();
+  bool paramIsVal = paramSuperType.isVal();
+  bool paramIsType = paramSuperType.isTypeMarker();
+  if (!(paramIsVal || paramIsType)) {
+    return emitError() << "generic param that is neither 'Val' nor 'Type': '" << paramType
+                       << "' (super type: '" << paramSuperType << "')";
+  }
+  // The Value must come from a closed set of operations
+  auto op = value.getDefiningOp();
+  if (!mlir::isa_and_present<TypeParamOp, LiteralOp, SpecializeOp, GlobalOp, ConstructOp>(op)) {
+    return emitError() << "was expecting a type, literal value, constant expression or generic "
+                          "parameter, but got a value";
+  }
+  // If it comes from a TypeParamOp depends on the type of the generic param.
+  //  If it's Type then TypeParamOp's binding must not have a ConstExpr
+  //  If it's Val then TypeParamOp's binding must have a ConstExpr
+  if (mlir::isa<TypeParamOp>(op)) {
+    auto hasCE = type.hasConstExpr();
+    if (paramIsVal && hasCE) {
+      return success();
+    }
+    if (paramIsVal && !hasCE) {
+      return emitError() << "parameter '" << paramType
+                         << "' of type 'Val' expects a parameter of the same type, but got '"
+                         << type.getSuperType() << "'";
+    }
+    if (paramIsType && !hasCE) {
+      return success();
+    }
+    if (paramIsType && hasCE) {
+      return emitError() << "parameter '" << paramType
+                         << "' of type 'Type' expects a parameter of the same type, but got '"
+                         << type.getSuperType() << "'";
+    }
+  }
+  // If it comes from a LiteralOp then the type of the generic param must be Val
+  if (mlir::isa<LiteralOp>(op)) {
+    if (!paramIsVal) {
+      return emitError() << "parameter '" << paramType << "' was expecting a type but got " << type;
+    }
+    return success();
+  }
+
+  // If it comes from a SpecializeOp or a GlobalOp the type of the generic param must be Type
+  if (mlir::isa<SpecializeOp, GlobalOp>(op)) {
+    if (!paramIsType) {
+      return emitError() << "parameter '" << paramType
+                         << "' was expecting a constant 'Val' but got '" << type << "'";
+    }
+    return success();
+  }
+
+  // If it comes from a ConstructOp the type of the generic param must be Val and the type of the op
+  // must have a ConstExpr
+  if (mlir::isa<ConstructOp>(op)) {
+    if (!paramIsVal) {
+      return emitError() << "parameter '" << paramType
+                         << "' was expecting a type but got an expression";
+    }
+    if (!type.hasConstExpr()) {
+      return op->emitError() << "expression is not constant";
+    }
+    return success();
+  }
+  return failure();
+}
+
+} // namespace
+
 mlir::FailureOr<TypeBinding> SpecializeTypeRule::
     typeCheck(zirgen::Zhl::SpecializeOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -394,17 +474,24 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
     return mlir::failure();
   }
 
-  auto I = op.getArgs().begin();
-  auto E = op.getArgs().end();
+  if (operands[0].isSpecialized()) {
+    return op->emitError() << "type '" << operands[0] << "' cannot be specialized";
+  }
+
+  assert(op.getArgs().size() == operands.size() - 1);
+
+  auto genericParams = operands[0].getGenericParams();
+  if (op.getArgs().size() != genericParams.size()) {
+    return op->emitError() << "type '" << operands[0] << "' expects " << genericParams.size()
+                           << " generic parameters but got " << op.getArgs().size();
+  }
+
   bool failed = false;
-  for (; I != E; ++I) {
-    auto argOp = (*I).getDefiningOp();
-    assert(argOp && "cannot have values that do not come from operations in ZHL");
-    if (!mlir::isa<TypeParamOp, LiteralOp, SpecializeOp, GlobalOp>(argOp)) {
-      op->emitError() << "was expecting a type, a literal value or a generic parameter, but got "
-                      << argOp->getName().stripDialect();
-      failed = true;
-    }
+  for (auto [argValue, argBinding, param] :
+       llvm::zip_equal(op.getArgs(), operands.drop_front(), operands[0].getGenericParams())) {
+    failed = failed || mlir::failed(checkSpecializationArg(argValue, argBinding, param, [&]() {
+      return op->emitError();
+    }));
   }
   if (failed) {
     return failure();

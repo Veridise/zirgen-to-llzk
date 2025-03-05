@@ -342,12 +342,12 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   } else {
     os << name.ref();
     if (specialized) {
-      genericParams.printParams(os, fullPrintout);
+      genericParams.printParams(os, false);
     } else {
       genericParams.printNames(os);
     }
     if (fullPrintout) {
-      constructorParams.printParams(os, fullPrintout, '(', ')');
+      constructorParams.printParams(os, false, '(', ')');
     }
     if (variadic) {
       os << "...";
@@ -391,7 +391,7 @@ void zhl::TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
       for (auto &[memberName, type] : members) {
         os << memberName << ": ";
         if (type.has_value()) {
-          type->print(os, fullPrintout);
+          type->print(os, false);
         } else {
           os << "⊥";
         }

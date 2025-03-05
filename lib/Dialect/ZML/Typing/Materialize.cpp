@@ -24,6 +24,12 @@ void errMsg(const TypeBinding &binding, StringRef reason) {
 
 namespace {
 
+inline void assertValidSuperType(Type superType) {
+  auto validSuperType = mlir::isa<ComponentType, TypeVarType>(superType);
+  (void)validSuperType;
+  assert(validSuperType && "supertype is not a component type or a type variable");
+}
+
 class Materializer {
 public:
   explicit Materializer(MLIRContext *ctx) : context(ctx) {}
@@ -46,55 +52,73 @@ private:
     return base;
   }
 
+  SmallVector<Attribute, 2> materializeGenericParamNames(const TypeBinding &binding) {
+    SmallVector<Attribute, 2> params;
+    auto names = binding.getGenericParamNames();
+    params.reserve(names.size());
+    std::transform(names.begin(), names.end(), std::back_inserter(params), [&](const auto &name) {
+      return SymbolRefAttr::get(StringAttr::get(context, name));
+    });
+    return params;
+  }
+
+  Attribute materializeAttribute(const TypeBinding &binding) {
+    // Special case for constants that do not have a known value
+    if (binding.isConst() && !binding.isKnownConst()) {
+      return mlir::IntegerAttr::get(
+          mlir::IntegerType::get(context, 64), mlir::ShapedType::kDynamic
+      );
+    }
+
+    if (binding.hasConstExpr()) {
+      mlir::Builder builder(context);
+      return binding.getConstExpr().convertIntoAttribute(builder);
+    }
+
+    return mlir::TypeAttr::get(materializeImpl(binding));
+  }
+
+  Type materializeGenericType(const TypeBinding &binding, Type superType) {
+    if (!binding.isSpecialized()) {
+      auto params = materializeGenericParamNames(binding);
+      return ComponentType::get(context, binding.getName(), superType, params, binding.isBuiltin());
+    }
+
+    auto paramBindings = binding.getGenericParams();
+    SmallVector<Attribute, 2> params;
+    params.reserve(paramBindings.size());
+    std::transform(
+        paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
+        std::bind(&Materializer::materializeAttribute, this, std::placeholders::_1)
+    );
+
+    return ComponentType::get(context, binding.getName(), superType, params, binding.isBuiltin());
+  }
+
   Type materializeBaseType(const TypeBinding &binding) {
     if (!binding.hasSuperType() || binding.isTypeMarker()) {
       return ComponentType::Component(context);
     }
-    if (binding.isGenericParam() && binding.getSuperType().isTypeMarker()) {
-      return TypeVarType::get(
-          context, SymbolRefAttr::get(StringAttr::get(context, binding.getGenericParamName()))
-      );
-    }
-    if (binding.isGenericParam() && binding.getSuperType().isVal()) {
+    if (binding.isConst()) {
       return ComponentType::Val(context);
     }
-    auto superType = materializeImpl(binding.getSuperType());
-    if (!mlir::isa<ComponentType, TypeVarType>(superType)) {
-      errMsg(binding, "supertype is not a component type or a type variable");
-      return nullptr;
-    }
-    if (binding.isGeneric()) {
-      std::vector<Attribute> params;
-      if (binding.isSpecialized()) {
-        // Put the types associated with the specialization
-        auto paramBindings = binding.getGenericParams();
-        std::transform(
-            paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
-            [&](const auto &b) -> Attribute {
-          if (b.isConst()) {
-            return mlir::IntegerAttr::get(
-                mlir::IntegerType::get(context, 64),
-                b.isKnownConst() ? b.getConst() : mlir::ShapedType::kDynamic
-            );
-          } else if (b.isGenericParam() && b.getSuperType().isVal()) {
-            return SymbolRefAttr::get(StringAttr::get(context, b.getGenericParamName()));
-          } else {
-            return mlir::TypeAttr::get(materializeImpl(b));
-          }
-        }
-        );
-      } else {
-        // Put the names of the parameters
-        auto names = binding.getGenericParamNames();
-        std::transform(
-            names.begin(), names.end(), std::back_inserter(params),
-            [&](const auto &name) { return SymbolRefAttr::get(StringAttr::get(context, name)); }
+
+    if (binding.isGenericParam()) {
+      if (binding.getSuperType().isTypeMarker()) {
+        return TypeVarType::get(
+            context, SymbolRefAttr::get(StringAttr::get(context, binding.getGenericParamName()))
         );
       }
+      if (binding.getSuperType().isVal()) {
+        return ComponentType::Val(context);
+      }
+      assert(false && "Generic param that is neither Val or Type");
+    }
+    auto superType = materializeImpl(binding.getSuperType());
+    assertValidSuperType(superType);
 
-      return ComponentType::get(context, binding.getName(), superType, params, binding.isBuiltin());
-    } else if (binding.isConst()) {
-      return ComponentType::Val(context);
+    if (binding.isGeneric()) {
+      return materializeGenericType(binding, superType);
     }
     return ComponentType::get(context, binding.getName(), superType, binding.isBuiltin());
   }
