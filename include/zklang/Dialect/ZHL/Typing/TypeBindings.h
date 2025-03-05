@@ -186,6 +186,9 @@ public:
 
   Frame getFrame() const;
 
+  bool hasConstExpr() const;
+  const expr::ConstExpr &getConstExpr() const;
+
 private:
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
 

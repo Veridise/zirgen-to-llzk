@@ -76,9 +76,9 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
   if (operands[0].isBuiltin() && zml::isBuiltinDontNeedAlloc(operands[0].getName())) {
-    return interpretateOp(op, operands[0]);
+    return interpretateOp(op, operands[0], operands.drop_front());
   }
-  auto component = interpretateOp(op, operands[0]);
+  auto component = interpretateOp(op, operands[0], operands.drop_front());
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
   return component;
 }

@@ -11,5 +11,6 @@ target_sources(ZIRC PRIVATE
   Expr.cpp
   TypeBinding.cpp
   Params.cpp
+  Interpreter.cpp
 )
 

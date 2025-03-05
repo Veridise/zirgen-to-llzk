@@ -16,6 +16,14 @@ TypeBinding interpretateOp(Op, const TypeBinding &binding, Args &&...) {
   return TypeBinding::NoExpr(binding);
 }
 
+template <> TypeBinding interpretateOp(zirgen::Zhl::TypeParamOp, const TypeBinding &);
+
+template <> TypeBinding interpretateOp(zirgen::Zhl::LiteralOp, const TypeBinding &);
+
+template <>
+TypeBinding
+interpretateOp(zirgen::Zhl::ConstructOp, const TypeBinding &, mlir::ArrayRef<TypeBinding> &&);
+
 template <typename Op, typename... Args>
 mlir::FailureOr<TypeBinding>
 interpretateOp(Op op, const mlir::FailureOr<TypeBinding> &binding, Args &&...args) {
