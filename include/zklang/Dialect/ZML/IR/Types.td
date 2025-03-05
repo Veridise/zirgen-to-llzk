@@ -55,6 +55,7 @@ def Component : ZMLType<"Component", "comp"> {
     static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
     static ComponentType Component(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
     static ComponentType Val(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "Val", Component(ctx), true); }
+    static ComponentType ExtVal(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "ExtVal", Component(ctx), true); }
     static ComponentType String(mlir::MLIRContext *ctx) { return ComponentType::get(ctx, "String", Component(ctx), true); }
     static ComponentType Array(mlir::MLIRContext *ctx) { 
       auto symT = mlir::SymbolRefAttr::get(mlir::StringAttr::get(ctx, "T"));
