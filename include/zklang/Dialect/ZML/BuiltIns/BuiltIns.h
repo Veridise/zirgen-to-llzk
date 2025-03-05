@@ -13,12 +13,13 @@ void addBuiltins(mlir::OpBuilder &, const std::unordered_set<std::string_view> &
 mlir::Operation *getBuiltInOp(mlir::StringRef);
 
 static const std::unordered_set<std::string> BuiltInComponentNames = {
-    "BitAnd", "Add", "Sub", "Mul", "Inv", "Isz", "Neg", "Val", "String", "Array", "Mod", "InRange"
+    "BitAnd", "Add", "Sub",     "Mul",    "Inv",    "Isz",    "Neg",    "Val",     "String",
+    "Array",  "Mod", "InRange", "ExtInv", "ExtAdd", "ExtSub", "ExtMul", "MakeExt", "ExtVal"
 };
 
-static const std::unordered_set<std::string_view> BuiltinsDontNeedAlloc = {"Add",    "Sub", "Mul",
-                                                                           "Isz",    "Neg", "Mod",
-                                                                           "InRange"};
+static const std::unordered_set<std::string_view> BuiltinsDontNeedAlloc = {
+    "Add", "Sub", "Mul", "Isz", "Neg", "Mod", "InRange", "ExtAdd", "ExtSub", "ExtMul", "MakeExt"
+};
 
 inline bool isBuiltinDontNeedAlloc(std::string_view name) {
   return BuiltinsDontNeedAlloc.find(name) != BuiltinsDontNeedAlloc.end();
@@ -29,9 +30,16 @@ static const char AddStr[] = "Add";
 static const char SubStr[] = "Sub";
 static const char MulStr[] = "Mul";
 static const char InvStr[] = "Inv";
+static const char ExtAddStr[] = "ExtAdd";
+static const char ExtSubStr[] = "ExtSub";
+static const char ExtMulStr[] = "ExtMul";
+static const char ExtInvStr[] = "ExtInv";
+static const char MakeExtStr[] = "MakeExt";
+static const char EqzExtStr[] = "EqzExt";
 static const char IszStr[] = "Isz";
 static const char NegStr[] = "Neg";
 static const char ValStr[] = "Val";
+static const char ExtValStr[] = "ExtVal";
 static const char StrStr[] = "String";
 static const char ComponentStr[] = "Component";
 static const char ArrayStr[] = "Array";
@@ -48,6 +56,12 @@ component Reg(v: Val) {
    reg
 }
 
+component ExtReg(v: ExtVal) {
+   reg := NondetExtReg(v);
+   EqzExt(ExtSub(reg, v));
+   reg
+}
+
 function Div(lhs: Val, rhs: Val) {
    reciprocal := Inv(rhs);
    reciprocal * rhs = 1;
@@ -56,6 +70,10 @@ function Div(lhs: Val, rhs: Val) {
 }
 
 extern Log(message: String, vals: Val...);
+extern Abort();
+extern Assert(x: Val, message: String);
+
+
 
 )";
 

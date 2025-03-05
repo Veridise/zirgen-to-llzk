@@ -107,8 +107,13 @@ using BitAndPattern = ReplaceConstructorCallWithBuiltIn<BitAndOp, BitAndStr>;
 using AddPattern = ReplaceConstructorCallWithBuiltIn<AddOp, AddStr>;
 using SubPattern = ReplaceConstructorCallWithBuiltIn<SubOp, SubStr>;
 using MulPattern = ReplaceConstructorCallWithBuiltIn<MulOp, MulStr>;
+using ExtAddPattern = ReplaceConstructorCallWithBuiltIn<ExtAddOp, ExtAddStr>;
+using ExtSubPattern = ReplaceConstructorCallWithBuiltIn<ExtSubOp, ExtSubStr>;
+using ExtMulPattern = ReplaceConstructorCallWithBuiltIn<ExtMulOp, ExtMulStr>;
 using ModPattern = ReplaceConstructorCallWithBuiltIn<ModOp, ModStr>;
 using InvPattern = ReplaceConstructorCallWithBuiltIn<InvOp, InvStr>;
+using ExtInvPattern = ReplaceConstructorCallWithBuiltIn<ExtInvOp, ExtInvStr>;
+using MakeExtPattern = ReplaceConstructorCallWithBuiltIn<MakeExtOp, MakeExtStr>;
 using IszPattern = ReplaceConstructorCallWithBuiltIn<IsZeroOp, IszStr>;
 using NegPattern = ReplaceConstructorCallWithBuiltIn<NegOp, NegStr>;
 using InRangePattern = ReplaceConstructorCallWithBuiltIn<InRangeOp, InRangeStr>;
@@ -125,7 +130,8 @@ class LowerBuiltInsPass : public LowerBuiltInsBase<LowerBuiltInsPass> {
 
     patterns.add<
         BitAndPattern, AddPattern, SubPattern, MulPattern, InvPattern, IszPattern, NegPattern,
-        ModPattern, InRangePattern, RemoveConstructorRef>(typeConverter, ctx);
+        ModPattern, InRangePattern, RemoveConstructorRef, ExtAddPattern, ExtSubPattern,
+        ExtMulPattern, ExtInvPattern, MakeExtPattern>(typeConverter, ctx);
 
     // Set conversion target
     mlir::ConversionTarget target(*ctx);

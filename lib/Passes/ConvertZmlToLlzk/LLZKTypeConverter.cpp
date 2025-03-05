@@ -5,12 +5,16 @@
 #include <llvm/Support/FileSystem.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/IR/Types.h>
+#include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
 #include <optional>
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
+
+using namespace llzk;
+using namespace mlir;
 
 std::optional<mlir::Value> unrealizedCastMaterialization(
     mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs, mlir::Location loc
@@ -56,8 +60,10 @@ mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   return sym;
 }
 
-llzk::LLZKTypeConverter::LLZKTypeConverter()
-    : feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz", "InRange"}) {
+llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
+    : field(Field),
+      feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz", "InRange", "Neg"}),
+      extValBuiltins({"ExtVal", "ExtAdd", "ExtSub", "ExtMul", "ExtInv", "MakeExt"}) {
 
   addConversion([](mlir::Type t) { return t; });
 
@@ -67,6 +73,13 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
     llvm::SmallVector<mlir::Attribute> convertedAttrs;
     convertParamAttrs(t.getParams(), convertedAttrs, *this);
     return llzk::StructType::get(t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs));
+  });
+
+  addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {
+    if (extValBuiltins.find(t.getName().getValue()) != extValBuiltins.end() && t.getBuiltin()) {
+      return createArrayRepr(t.getContext());
+    }
+    return std::nullopt;
   });
 
   addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {
@@ -127,4 +140,85 @@ llzk::LLZKTypeConverter::LLZKTypeConverter()
   addSourceMaterialization(unrealizedCastMaterialization);
   addTargetMaterialization(unrealizedCastMaterialization);
   addArgumentMaterialization(unrealizedCastMaterialization);
+}
+
+mlir::Type LLZKTypeConverter::createArrayRepr(mlir::MLIRContext *ctx) const {
+  return llzk::ArrayType::get(llzk::FeltType::get(ctx), {static_cast<long>(field.degree)});
+}
+
+mlir::Value LLZKTypeConverter::collectValues(
+    mlir::ValueRange vals, mlir::Location loc, mlir::OpBuilder &builder
+) const {
+  return builder.create<CreateArrayOp>(
+      loc, cast<ArrayType>(createArrayRepr(builder.getContext())), vals
+  );
+}
+
+using ValueWrap = zml::extval::BaseConverter::ValueWrap;
+using Values = mlir::SmallVector<zml::extval::BaseConverter::ValueWrap>;
+
+Values LLZKTypeConverter::wrapArrayValues(mlir::Value v, mlir::OpBuilder &builder) const {
+  assertIsValidRepr(v);
+  Values vals;
+  vals.reserve(field.degree);
+  for (uint64_t i = 0; i < field.degree; i++) {
+    auto idx = builder.create<index::ConstantOp>(v.getLoc(), i);
+    vals.push_back(
+        ValueWrap(builder.create<ReadArrayOp>(v.getLoc(), v, ValueRange(idx)), builder, *this)
+    );
+  }
+
+  return vals;
+}
+
+mlir::Value
+LLZKTypeConverter::createAddOp(mlir::Value lhs, mlir::Value rhs, mlir::OpBuilder &builder) const {
+  return builder.create<AddFeltOp>(lhs.getLoc(), lhs, rhs);
+}
+
+mlir::Value
+LLZKTypeConverter::createSubOp(mlir::Value lhs, mlir::Value rhs, mlir::OpBuilder &builder) const {
+  return builder.create<SubFeltOp>(lhs.getLoc(), lhs, rhs);
+}
+
+mlir::Value
+LLZKTypeConverter::createMulOp(mlir::Value lhs, mlir::Value rhs, mlir::OpBuilder &builder) const {
+  return builder.create<MulFeltOp>(lhs.getLoc(), lhs, rhs);
+}
+
+mlir::Value LLZKTypeConverter::createNegOp(mlir::Value v, mlir::OpBuilder &builder) const {
+  return builder.create<NegFeltOp>(v.getLoc(), v);
+}
+
+mlir::Value LLZKTypeConverter::createInvOp(mlir::Value v, mlir::OpBuilder &builder) const {
+  return builder.create<InvFeltOp>(v.getLoc(), v);
+}
+
+mlir::Value LLZKTypeConverter::createLitOp(uint64_t v, mlir::OpBuilder &builder) const {
+  llzk::FeltType felt = llzk::FeltType::get(builder.getContext());
+  return builder.create<llzk::FeltConstantOp>(
+      builder.getUnknownLoc(), felt,
+      llzk::FeltConstAttr::get(builder.getContext(), llvm::APInt(64, v))
+  );
+}
+
+mlir::Value LLZKTypeConverter::createIszOp(mlir::Value v, mlir::OpBuilder &builder) const {
+  auto zero = builder.create<llzk::FeltConstantOp>(
+      v.getLoc(), llzk::FeltConstAttr::get(builder.getContext(), mlir::APInt::getZero(64))
+  );
+  return builder.create<llzk::CmpOp>(
+      v.getLoc(), llzk::FeltCmpPredicateAttr::get(builder.getContext(), llzk::FeltCmpPredicate::EQ),
+      v, zero
+  );
+}
+
+mlir::Operation *LLZKTypeConverter::createAssertOp(
+    mlir::Value cond, mlir::StringAttr msg, mlir::OpBuilder &builder
+) const {
+  return builder.create<AssertOp>(cond.getLoc(), cond, msg);
+}
+
+mlir::Value
+LLZKTypeConverter::createAndOp(mlir::Value lhs, mlir::Value rhs, mlir::OpBuilder &builder) const {
+  return builder.create<AndBoolOp>(lhs.getLoc(), lhs, rhs);
 }

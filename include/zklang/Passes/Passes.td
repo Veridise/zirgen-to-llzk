@@ -29,6 +29,10 @@ def ConvertZmlToLlzk : Pass<"zml-to-llzk", "mlir::ModuleOp"> {
   let dependentDialects = ["llzk::LLZKDialect", "zml::ZMLDialect",
                            "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
                            "mlir::index::IndexDialect"];
+
+  let options = [Option<"selectedExtValField", "extval-field", "std::string",
+                        /*default=*/"\"babybear\"",
+                        "The field ExtVal types operate on.">];
 }
 
 def InjectLlzkModAttrs : Pass<"inject-llzk-mod-attrs", "mlir::ModuleOp"> {

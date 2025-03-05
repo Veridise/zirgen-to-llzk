@@ -1,0 +1,131 @@
+// RUN: zklang -o - %s | FileCheck --enable-var-scope %s
+
+component Foo(x: ExtVal, y: ExtVal) {
+// CHECK-LABEL: llzk.struct @Foo<[]> {
+// CHECK: field @"$super" : !llzk.array<2,4 x !llzk.felt>
+
+// CHECK-LABEL: func @compute
+// CHECK-SAME: (%[[A0:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>, %[[A1:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>) -> !llzk.struct<@Foo<[]>> {
+
+// CHECK-DAG: %[[C0:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C1:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C2:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C3:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T0:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C0]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T1:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C1]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T2:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C2]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T3:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C3]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[C4:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C5:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C6:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C7:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T4:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C4]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T5:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C5]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T6:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C6]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T7:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C7]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[T8:[0-9a-zA-Z_\.]+]] = add %[[T0]], %[[T4]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T9:[0-9a-zA-Z_\.]+]] = add %[[T1]], %[[T5]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T10:[0-9a-zA-Z_\.]+]] = add %[[T2]], %[[T6]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T11:[0-9a-zA-Z_\.]+]] = add %[[T3]], %[[T7]] : !llzk.felt, !llzk.felt
+
+// CHECK-DAG: %[[T12:[0-9a-zA-Z_\.]+]] = new_array %[[T8]], %[[T9]], %[[T10]], %[[T11]] : <4 x !llzk.felt>
+
+// CHECK-DAG: %[[C8:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C9:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C10:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C11:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T13:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C8]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T14:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C9]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T15:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C10]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T16:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C11]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[C12:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C13:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C14:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C15:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T17:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C12]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T18:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C13]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T19:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C14]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T20:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C15]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[T21:[0-9a-zA-Z_\.]+]] = sub %[[T13]], %[[T17]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T22:[0-9a-zA-Z_\.]+]] = sub %[[T14]], %[[T18]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T23:[0-9a-zA-Z_\.]+]] = sub %[[T15]], %[[T19]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T24:[0-9a-zA-Z_\.]+]] = sub %[[T16]], %[[T20]] : !llzk.felt, !llzk.felt
+
+// CHECK-DAG: %[[T25:[0-9a-zA-Z_\.]+]] = new_array %[[T21]], %[[T22]], %[[T23]], %[[T24]] : <4 x !llzk.felt>
+// CHECK-DAG: %[[T26:[0-9a-zA-Z_\.]+]] = new_array : <2,4 x !llzk.felt>
+// CHECK-DAG: %[[I0:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: insertarr %[[T26]][%[[I0]]] = %[[T12]] : <2,4 x !llzk.felt>, <4 x !llzk.felt>
+// CHECK-DAG: %[[I1:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: insertarr %[[T26]][%[[I1]]] = %[[T25]] : <2,4 x !llzk.felt>, <4 x !llzk.felt>
+
+// CHECK-DAG: %[[SELF:[0-9a-zA-Z_\.]+]] = new_struct : <@Foo<[]>>
+// CHECK-DAG: writef %[[SELF]][@"$super"] = %[[T26]] : <@Foo<[]>>, !llzk.array<2,4 x !llzk.felt>
+
+// CHECK-LABEL: func @constrain(%arg0: !llzk.struct<@Foo<[]>>, 
+// CHECK-SAME: %[[A0:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>, 
+// CHECK-SAME: %[[A1:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>) {
+
+// CHECK-DAG: %[[C0:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C1:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C2:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C3:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T0:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C0]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T1:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C1]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T2:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C2]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T3:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C3]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[C4:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C5:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C6:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C7:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T4:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C4]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T5:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C5]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T6:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C6]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T7:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C7]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[T8:[0-9a-zA-Z_\.]+]] = add %[[T0]], %[[T4]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T9:[0-9a-zA-Z_\.]+]] = add %[[T1]], %[[T5]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T10:[0-9a-zA-Z_\.]+]] = add %[[T2]], %[[T6]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T11:[0-9a-zA-Z_\.]+]] = add %[[T3]], %[[T7]] : !llzk.felt, !llzk.felt
+
+// CHECK-DAG: %[[T12:[0-9a-zA-Z_\.]+]] = new_array %[[T8]], %[[T9]], %[[T10]], %[[T11]] : <4 x !llzk.felt>
+
+// CHECK-DAG: %[[C8:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C9:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C10:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C11:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T13:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C8]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T14:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C9]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T15:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C10]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T16:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[C11]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[C12:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C13:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C14:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C15:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[T17:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C12]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T18:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C13]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T19:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C14]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[T20:[0-9a-zA-Z_\.]+]] = readarr %[[A1]][%[[C15]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[T21:[0-9a-zA-Z_\.]+]] = sub %[[T13]], %[[T17]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T22:[0-9a-zA-Z_\.]+]] = sub %[[T14]], %[[T18]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T23:[0-9a-zA-Z_\.]+]] = sub %[[T15]], %[[T19]] : !llzk.felt, !llzk.felt
+// CHECK-DAG: %[[T24:[0-9a-zA-Z_\.]+]] = sub %[[T16]], %[[T20]] : !llzk.felt, !llzk.felt
+
+// CHECK-DAG: %[[T25:[0-9a-zA-Z_\.]+]] = new_array %[[T21]], %[[T22]], %[[T23]], %[[T24]] : <4 x !llzk.felt>
+// CHECK-DAG: %[[T26:[0-9a-zA-Z_\.]+]] = new_array : <2,4 x !llzk.felt>
+// CHECK-DAG: %[[I0:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: insertarr %[[T26]][%[[I0]]] = %[[T12]] : <2,4 x !llzk.felt>, <4 x !llzk.felt>
+// CHECK-DAG: %[[I1:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: insertarr %[[T26]][%[[I1]]] = %[[T25]] : <2,4 x !llzk.felt>, <4 x !llzk.felt>
+
+  [
+    ExtAdd(x, y),
+    ExtSub(x, y)
+  ]
+}
