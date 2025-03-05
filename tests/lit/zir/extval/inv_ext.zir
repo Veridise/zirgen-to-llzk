@@ -1,0 +1,113 @@
+// RUN: zklang -o - %s
+
+component Foo(x: ExtVal) {
+  ExtInv(x)
+
+
+// CHECK-LABEL: llzk.struct @Foo<[]> {
+// CHECK: field @"$super" : !llzk.array<4 x !llzk.felt>
+
+// CHECK-LABEL: func @compute
+// CHECK-SAME: (%[[A:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>, %[[B:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>) -> !llzk.struct<@Foo<[]>> {
+
+// CHECK-DAG: %[[C0:[0-9a-zA-Z_\.]+]] = index.constant  0
+// CHECK-DAG: %[[C1:[0-9a-zA-Z_\.]+]] = index.constant  1
+// CHECK-DAG: %[[C2:[0-9a-zA-Z_\.]+]] = index.constant  2
+// CHECK-DAG: %[[C3:[0-9a-zA-Z_\.]+]] = index.constant  3
+// CHECK-DAG: %[[A0:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C0]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[A1:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C1]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[A2:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C2]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[A3:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C3]]] : <4 x !llzk.felt>, !llzk.felt
+
+// CHECK-DAG: %[[BETA:[0-9a-zA-Z_\.]+]] = constfelt  11
+
+// COM:      a[0] * a[0]
+// CHECK-DAG: %[[T0:[0-9a-zA-Z_\.]+]] = mul %[[A0]], %[[A0]]
+// COM:                                    a[3] + a[3]
+// CHECK-DAG: %[[T1:[0-9a-zA-Z_\.]+]] = add %[[A3]], %[[A3]]
+// COM:                                                   a[2] * a[2]
+// CHECK-DAG: %[[T2:[0-9a-zA-Z_\.]+]] = mul %[[A2]], %[[A2]]
+// COM:                            a[1] * (a[3] + a[3])
+// CHECK-DAG: %[[T3:[0-9a-zA-Z_\.]+]] = mul %[[A1]], %[[T1]]
+// COM:                            a[1] * (a[3] + a[3]) - a[2] * a[2]
+// CHECK-DAG: %[[T4:[0-9a-zA-Z_\.]+]] = sub %[[T3]], %[[T2]]
+// COM:                    BETA * (a[1] * (a[3] + a[3]) - a[2] * a[2])
+// CHECK-DAG: %[[T5:[0-9a-zA-Z_\.]+]] = mul %[[BETA]], %[[T4]]
+// COM: b0 = a[0] * a[0] + BETA * (a[1] * (a[3] + a[3]) - a[2] * a[2])
+// CHECK-DAG: %[[B0:[0-9a-zA-Z_\.]+]] = add %[[T0]], %[[T5]]
+
+// COM:              a[2] + a[2]
+// CHECK-DAG: %[[T6:[0-9a-zA-Z_\.]+]] = add %[[A2]], %[[A2]]
+// COM:      a[0] * (a[2] + a[2])
+// CHECK-DAG: %[[T7:[0-9a-zA-Z_\.]+]] = mul %[[A0]], %[[T6]]
+// COM:                             a[1] * a[1]
+// CHECK-DAG: %[[T8:[0-9a-zA-Z_\.]+]] = mul %[[A1]], %[[A1]]
+// COM:                                                   a[3] * a[3]
+// CHECK-DAG: %[[T9:[0-9a-zA-Z_\.]+]] = mul %[[A3]], %[[A3]]
+// COM:                                           BETA * (a[3] * a[3])
+// CHECK-DAG: %[[T10:[0-9a-zA-Z_\.]+]] = mul %[[BETA]], %[[T9]]
+// COM:      a[0] * (a[2] + a[2]) - a[1] * a[1]
+// CHECK-DAG: %[[T11:[0-9a-zA-Z_\.]+]] = sub %[[T7]], %[[T8]]
+// COM: b2 = a[0] * (a[2] + a[2]) - a[1] * a[1] + BETA * (a[3] * a[3])
+// CHECK-DAG: %[[B2:[0-9a-zA-Z_\.]+]] = add %[[T11]], %[[T10]]
+
+// COM:     b0 * b0
+// CHECK-DAG: %[[T12:[0-9a-zA-Z_\.]+]] = mul %[[B0]], %[[B0]]
+// COM:               BETA * b2
+// CHECK-DAG: %[[T13:[0-9a-zA-Z_\.]+]] = mul %[[BETA]], %[[B2]]
+// COM:               BETA * b2 * b2
+// CHECK-DAG: %[[T14:[0-9a-zA-Z_\.]+]] = mul %[[T13]], %[[B2]]
+// COM: c = b0 * b0 + BETA * b2 * b2
+// CHECK-DAG: %[[C:[0-9a-zA-Z_\.]+]] = add %[[T12]], %[[T14]]
+
+// COM: ic = c.inv()
+// CHECK-DAG: %[[IC:[0-9a-zA-Z_\.]+]] = inv %[[c]]
+
+// COM: b0' = b0 * ic
+// CHECK-DAG: %[[B0bis:[0-9a-zA-Z_\.]+]] = mul %[[B0]], %[[IC]]
+
+// COM: b2' = b2 * ic
+// CHECK-DAG: %[[B2bis:[0-9a-zA-Z_\.]+]] = mul %[[B0]], %[[IC]]
+
+// COM:         a[0] * b0'
+// CHECK-DAG: %[[T15:[0-9a-zA-Z_\.]+]] = mul %[[A0]], %[[B0bis]]
+// COM:                      BETA * a[2]
+// CHECK-DAG: %[[T16:[0-9a-zA-Z_\.]+]] = mul %[[BETA]], %[[A2]]
+// COM:                      BETA * a[2] * b2'
+// CHECK-DAG: %[[T17:[0-9a-zA-Z_\.]+]] = mul %[[T16]], %[[B2bis]]
+// COM: out_0 = a[0] * b0' + BETA * a[2] * b2'
+// CHECK-DAG: %[[OUT0:[0-9a-zA-Z_\.]+]] = add %[[T15]], %[[T17]]
+
+// COM:         -a[1]
+// CHECK-DAG: %[[T18:[0-9a-zA-Z_\.]+]] = neg %[[A1]]
+// COM:         -a[1] * b0'
+// CHECK-DAG: %[[T19:[0-9a-zA-Z_\.]+]] = mul %[[T18]], %[[B0bis]]
+// COM:                       BETA * a[3]
+// CHECK-DAG: %[[T20:[0-9a-zA-Z_\.]+]] = mul %[[BETA]], %[[A3]]
+// COM:                       BETA * a[3] * b2'
+// CHECK-DAG: %[[T21:[0-9a-zA-Z_\.]+]] = mul %[[T20]], %[[B2bis]]
+// COM: out_1 = -a[1] * b0' - BETA * a[3] * b2'
+// CHECK-DAG: %[[OUT1:[0-9a-zA-Z_\.]+]] = sub %[[T19]], %[[T21]]
+
+// COM:         -a[0]
+// CHECK-DAG: %[[T22:[0-9a-zA-Z_\.]+]] = neg %[[A0]]
+// COM:         -a[0] * b2'
+// CHECK-DAG: %[[T23:[0-9a-zA-Z_\.]+]] = mul %[[T22]], %[[B2bis]]
+// COM:                       a[2] * b0'
+// CHECK-DAG: %[[T24:[0-9a-zA-Z_\.]+]] = mul %[[A2]], %[[B0bis]]
+// COM: out_2 = -a[0] * b2' + a[2] * b0'
+// CHECK-DAG: %[[OUT2:[0-9a-zA-Z_\.]+]] = add %[[T23]], %[[T24]]
+
+// COM:         a[1] * b2'
+// CHECK-DAG: %[[T25:[0-9a-zA-Z_\.]+]] = mul %[[A1]], %[[B2bis]]
+// COM:                      a[3] * b0'
+// CHECK-DAG: %[[T26:[0-9a-zA-Z_\.]+]] = mul %[[A3]], %[[B0bis]]
+// COM: out_3 = a[1] * b2' - a[3] * b0'
+// CHECK-DAG: %[[OUT3:[0-9a-zA-Z_\.]+]] = sub %[[T25]], %[[T26]]
+
+// CHECK-DAG: %[[T27:[0-9a-zA-Z_\.]+]] = new_array %[[OUT0]], %[[OUT1]], %[[OUT2]], %[[OUT3]] : <4 x !llzk.felt>
+
+// CHECK-LABEL: func @constrain(%arg0: !llzk.struct<@Foo<[]>>, 
+
+
+}

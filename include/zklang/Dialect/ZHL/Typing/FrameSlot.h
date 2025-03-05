@@ -18,7 +18,7 @@ class FrameRef;
 /// Base class for anything that can be allocated in a frame.
 class FrameSlot : public llvm::ilist_node_with_parent<FrameSlot, detail::FrameInfo> {
 public:
-  enum FrameSlotKind { FS_Array, FS_Component, FS_Frame };
+  enum FrameSlotKind { FS_Component, FS_Array, FS_Frame, FS_ComponentEnd };
 
   virtual ~FrameSlot() = default;
   /// Returns the name of the slot, or "$temp" if the slot is nameless.
@@ -32,8 +32,11 @@ public:
 
   void setParent(const detail::FrameInfo *);
   FrameSlot *getParentSlot() const;
+  bool belongsTo(const Frame &) const;
 
   friend llvm::ilist_node_with_parent<FrameSlot, detail::FrameInfo>;
+
+  virtual void print(llvm::raw_ostream &) const;
 
 protected:
   FrameSlot(FrameSlotKind);

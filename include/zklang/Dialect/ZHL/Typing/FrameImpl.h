@@ -9,6 +9,7 @@ namespace detail {
 
 template <typename Slot, typename... Args> FrameSlot *FrameInfo::allocateSlot(Args &&...args) {
   FrameSlot *slot = new Slot(std::forward<Args>(args)...);
+  nCreatedSlots++;
   slots.push_back(*slot);
   slot->setParent(this);
   return slot;

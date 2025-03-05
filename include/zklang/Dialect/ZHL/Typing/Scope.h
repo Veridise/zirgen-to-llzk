@@ -9,6 +9,14 @@ namespace zhl {
 
 class Scope {
 public:
+  enum ScopeKind {
+    Sco_Component,
+    Sco_Child,
+    Sco_Frame,
+    Sco_Block,
+    Sco_ChildEnd,
+  };
+  explicit Scope(ScopeKind Kind) : kind(Kind) {}
   virtual ~Scope() = default;
 
   // TODO: Global declarations
@@ -16,11 +24,19 @@ public:
   virtual void declareConstructorParam(mlir::StringRef, uint64_t, TypeBinding) = 0;
   virtual void declareMember(mlir::StringRef) = 0;
   virtual void declareMember(mlir::StringRef, TypeBinding) = 0;
+  virtual size_t memberCount() const = 0;
   virtual bool memberDeclaredWithType(mlir::StringRef) = 0;
   virtual void declareSuperType(TypeBinding) = 0;
   virtual zirgen::Zhl::ComponentOp getOp() const = 0;
   virtual mlir::FailureOr<TypeBinding> getSuperType() const = 0;
+  virtual TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const = 0;
   virtual Frame &getCurrentFrame() = 0;
+  virtual const Frame &getCurrentFrame() const = 0;
+
+  ScopeKind getKind() const { return kind; }
+
+private:
+  ScopeKind kind;
 };
 
 /// Mixin that implements the logic for defining members
@@ -29,7 +45,6 @@ protected:
   void declareMemberImpl(mlir::StringRef);
   void declareMemberImpl(mlir::StringRef, TypeBinding);
   bool memberDeclaredWithTypeImpl(mlir::StringRef);
-
   MembersMap members;
 };
 
@@ -51,13 +66,20 @@ public:
   /// Allows overriding a member if the current value is None
   void declareMember(mlir::StringRef name, TypeBinding type) override;
 
+  size_t memberCount() const override;
+
   bool memberDeclaredWithType(mlir::StringRef name) override;
 
   zirgen::Zhl::ComponentOp getOp() const override;
 
   mlir::FailureOr<TypeBinding> getSuperType() const override;
 
+  TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const override;
+
   Frame &getCurrentFrame() override;
+  const Frame &getCurrentFrame() const override;
+
+  static bool classof(const Scope *sco) { return sco->getKind() == Sco_Component; }
 
 private:
   TypeBindings *bindings;
@@ -77,10 +99,20 @@ public:
   void declareMember(mlir::StringRef) override;
   void declareMember(mlir::StringRef, TypeBinding) override;
   bool memberDeclaredWithType(mlir::StringRef) override;
+  size_t memberCount() const override;
   void declareSuperType(TypeBinding) override;
   zirgen::Zhl::ComponentOp getOp() const override;
   mlir::FailureOr<TypeBinding> getSuperType() const override;
   Frame &getCurrentFrame() override;
+  const Frame &getCurrentFrame() const override;
+  TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const override;
+
+  static bool classof(const Scope *sco) {
+    return sco->getKind() >= Sco_Child && sco->getKind() < Sco_ChildEnd;
+  }
+
+protected:
+  ChildScope(ScopeKind, Scope &);
 
 private:
   Scope *parent;
@@ -92,6 +124,9 @@ public:
   explicit FrameScope(Scope &, Frame);
 
   Frame &getCurrentFrame() override;
+  const Frame &getCurrentFrame() const override;
+
+  static bool classof(const Scope *sco) { return sco->getKind() == Sco_Frame; }
 
 private:
   Frame frame;
@@ -101,7 +136,7 @@ private:
 /// It has its own super type.
 class BlockScope : public ChildScope, LexicalScopeImpl {
 public:
-  explicit BlockScope(Scope &);
+  BlockScope(Scope &, TypeBindings &);
 
   void declareMember(mlir::StringRef name) override;
 
@@ -110,11 +145,18 @@ public:
   /// Allows overriding a member if the current value is None
   void declareMember(mlir::StringRef name, TypeBinding type) override;
 
+  size_t memberCount() const override;
+
   bool memberDeclaredWithType(mlir::StringRef name) override;
 
   mlir::FailureOr<TypeBinding> getSuperType() const override;
 
+  TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const override;
+
+  static bool classof(const Scope *sco) { return sco->getKind() == Sco_Block; }
+
 private:
+  TypeBindings *bindings;
   mlir::FailureOr<TypeBinding> superType;
 };
 

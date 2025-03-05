@@ -34,6 +34,8 @@
 #include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
+#define DEBUG_TYPE "lower-zhl-pass"
+
 using namespace zirgen;
 using namespace zhl;
 using namespace mlir;
@@ -488,17 +490,23 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto comp = adaptor.getComponent();
+  LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << "\n");
   auto originalComp = getType(op.getComponent());
   if (mlir::failed(originalComp)) {
     return op->emitOpError() << "failed to type check component reference";
   }
+  LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << "\n";
+             llvm::dbgs() << "Full printout: \n"; originalComp->print(llvm::dbgs(), true);
+             llvm::dbgs() << "\n");
   auto materializedType = materializeTypeBinding(getContext(), *originalComp);
+  LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << "\n");
   auto compType = mlir::dyn_cast<ComponentType>(materializedType);
   if (!compType) {
     return op->emitError() << "type mismatch, cannot access a member for a non-component type "
                            << materializedType;
   }
   if (comp.getType() != compType) {
+    LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << "\n");
     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
     comp = cast.getResult(0);
   }
@@ -507,19 +515,29 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
   auto compDef = compType.getDefinition(st, mod);
   assert(compDef && "Component type without a definition!");
 
+  LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << "\n");
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Starting search for member " << adaptor.getMember() << " starting with type "
+                   << compType << "\n"
+  );
   auto nameSym = mlir::SymbolRefAttr::get(adaptor.getMemberAttr());
   while (mlir::failed(compDef.lookupFieldType(nameSym))) {
+    LLVM_DEBUG(llvm::dbgs() << "  Failed! Trying with the super type\n");
     auto superType = compType.getSuperType();
     if (!superType) {
+      LLVM_DEBUG(llvm::dbgs() << "  Failed to get the super type\n");
       return op->emitError() << "member " << adaptor.getMember() << " was not found";
     }
     compType = mlir::dyn_cast<ComponentType>(superType);
     if (!compType) {
+      LLVM_DEBUG(llvm::dbgs() << "  Super type is not a component\n");
       return op->emitError() << "type mismatch, cannot access a member for a non-component type "
                              << superType;
     }
 
     compDef = compType.getDefinition(st, mod);
+    LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << "\n");
   }
 
   auto fieldType = compDef.lookupFieldType(nameSym);
@@ -777,6 +795,9 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
 
   auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
   assert(succeeded(arrValue) && "this binding was validated above");
+  auto concreteArrValue =
+      coerceToArray(mlir::dyn_cast<TypedValue<ComponentType>>(*arrValue), rewriter);
+  assert(succeeded(concreteArrValue));
 
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), outputType);
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
@@ -787,7 +808,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     arrayFrame->setInductionVar(iv);
-    auto itVal = builder.create<ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv));
+    auto itVal = builder.create<ReadArrayOp>(loc, itType, *concreteArrValue, mlir::ValueRange(iv));
     // Cast it to a zhl Expr type for the block inlining
     auto itValCast = builder.create<mlir::UnrealizedConversionCastOp>(
         loc, mlir::TypeRange(Zhl::ExprType::get(getContext())), mlir::ValueRange(itVal)
@@ -800,8 +821,20 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     );
   }
   );
-
-  rewriter.replaceOp(op, arrAlloc);
+  if (auto compSlot = dyn_cast_if_present<ComponentSlot>(binding->getSlot())) {
+    auto self = op->getParentOfType<SelfOp>().getSelfValue();
+    ComponentInterface comp = op->getParentOfType<ComponentInterface>();
+    assert(comp);
+    auto name = createSlot(compSlot, rewriter, comp, op.getLoc());
+    auto slotType = materializeTypeBinding(getContext(), compSlot->getBinding());
+    Type compType = comp.getType();
+    auto val = storeAndLoadSlot(
+        *compSlot, arrAlloc, name, slotType, op.getLoc(), compType, rewriter, self
+    );
+    rewriter.replaceOp(op, val);
+  } else {
+    rewriter.replaceOp(op, arrAlloc);
+  }
   loop->setAttr("original_op", rewriter.getStringAttr("map"));
 
   return mlir::success();
@@ -859,15 +892,33 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
-
-  auto value = adaptor.getValue();
-  auto type = materializeTypeBinding(getContext(), *binding);
-  if (value.getType() != type) {
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), type, value);
-    value = cast.getResult(0);
+  auto valueBinding = getType(op.getValue());
+  if (failed(valueBinding)) {
+    return op->emitOpError() << "failed to type check value";
   }
 
-  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, value);
+  Value yieldValue;
+  if (binding->hasClosure()) {
+    auto self = op->getParentOfType<SelfOp>().getSelfValue();
+    assert(self);
+    auto pod = constructPODComponent(op, *binding, rewriter, self, [&]() -> Value {
+      return getCastedValue(
+          adaptor.getValue(), *valueBinding, rewriter,
+          materializeTypeBinding(getContext(), binding->getSuperType())
+      );
+    });
+    if (failed(pod)) {
+      return failure();
+    }
+    yieldValue = *pod;
+  } else {
+    yieldValue = getCastedValue(
+        adaptor.getValue(), *valueBinding, rewriter, materializeTypeBinding(getContext(), *binding)
+    );
+    ;
+  }
+
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, yieldValue);
   return mlir::success();
 }
 
@@ -948,11 +999,16 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   }
   auto itType = materializeTypeBinding(getContext(), *innerInputBinding);
 
-  auto arrValue = getCastedValue(adaptor.getArray(), *inputBinding, rewriter);
+  auto arrValue = coerceToArray(
+      mlir::cast<TypedValue<ComponentType>>(
+          getCastedValue(adaptor.getArray(), *inputBinding, rewriter)
+      ),
+      rewriter
+  );
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
 
-  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), arrValue);
+  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *arrValue);
 
   auto maybeSuperCoerce = [&](Value v, Type t) -> Value {
     if (v.getType() == t) {
@@ -966,7 +1022,7 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     arrayFrame->setInductionVar(iv);
     mlir::Value lhs = maybeSuperCoerce(
-        builder.create<ReadArrayOp>(loc, itType, arrValue, mlir::ValueRange(iv)),
+        builder.create<ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv)),
         constructorType.getInput(0)
     );
 

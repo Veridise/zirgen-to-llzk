@@ -34,12 +34,38 @@ mlir::Value storeAndLoadSlot(
     mlir::Value
 );
 
+/// Returns the value read from a field created from a slot.
+mlir::Value loadSlot(
+    zhl::ComponentSlot &slot, mlir::Type valueType, mlir::FlatSymbolRefAttr slotName,
+    mlir::Type slotType, mlir::Location loc, mlir::OpBuilder &builder, mlir::Value
+);
+
 /// Stores a value into the field defined by the slotName symbol.
 void storeSlot(
     zhl::ComponentSlot &slot, mlir::Value value, mlir::FlatSymbolRefAttr slotName,
     mlir::Type slotType, mlir::Location loc, mlir::Type compType, mlir::OpBuilder &builder,
     mlir::Value
 );
+
+/// Given a Value of type ComponentType it returns a value of type Array<T,N> where
+/// said array is one of the super types of the input's type.
+mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentType> v, mlir::OpBuilder &);
+
+/// Calls the constructor of the POD component associated with the binding using the provided super
+/// type value. The rest of the fields of the POD component are read from the actual component using
+/// the slots associated with the member's bindings.
+///
+/// The super type's value is provided with a lazy callback that will get called iff the function
+/// knowns it will succeed. This makes safe to create operations and other conversion modifications
+/// for obtaining the value of the super type.
+mlir::FailureOr<mlir::Value> constructPODComponent(
+    mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self,
+    llvm::function_ref<mlir::Value()> superTypeValueCb
+);
+
+/// Creates a component used to represent a closure. This component will have a constructor that
+/// takes as input the values for all fields including the super type's value.
+void createPODComponent(zhl::TypeBinding &, mlir::OpBuilder &, mlir::SymbolTable &);
 
 /// Helper for creating the ops that represent the call to a component's constructor.
 /// If the associated binding is linked to a frame slot it also creates the field and writes the

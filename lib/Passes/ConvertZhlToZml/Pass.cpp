@@ -19,6 +19,7 @@
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
+#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Pass.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
@@ -34,6 +35,22 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertZhlToZmlPass() {
 
 namespace zml {
 
+namespace {
+
+void createPODComponentsFromClosures(
+    zhl::ZIRTypeAnalysis &typeAnalysis, OpBuilder &builder, SymbolTable &st, Block *insertionPoint
+) {
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToEnd(insertionPoint);
+  for (auto *clo : typeAnalysis.getClosures()) {
+    assert(clo && clo->hasClosure());
+    createPODComponent(*clo, builder, st);
+  }
+}
+
+} // namespace
+
 void ConvertZhlToZmlPass::runOnOperation() {
   auto &typeAnalysis = getAnalysis<zhl::ZIRTypeAnalysis>();
   if (failed(typeAnalysis)) {
@@ -43,6 +60,10 @@ void ConvertZhlToZmlPass::runOnOperation() {
   mlir::SmallVector<mlir::Attribute> builtinOverrideSet;
   mlir::ModuleOp module = getOperation();
   mlir::MLIRContext *ctx = module->getContext();
+
+  OpBuilder builder(module);
+  SymbolTable st(module);
+  createPODComponentsFromClosures(typeAnalysis, builder, st, &module.getRegion().front());
 
   ZMLTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);

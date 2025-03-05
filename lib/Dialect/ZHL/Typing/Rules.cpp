@@ -111,6 +111,14 @@ mlir::FailureOr<TypeBinding> SuperTypingRule::
   }
   auto super = interpretateOp(op, operands[0]);
   scope.declareSuperType(super);
+  // If this super is the terminator of a block we create a type that represents it.
+  if (mlir::isa<BlockOp>(op->getParentOp()) && scope.memberCount() > 0) {
+    auto blockBinding = scope.createBinding("block$", op->getParentOp()->getLoc());
+    scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), blockBinding);
+    scope.declareSuperType(blockBinding); // Override supertype with the binding we created.
+    return blockBinding;
+  }
+
   return super;
 }
 
@@ -122,10 +130,10 @@ mlir::FailureOr<TypeBinding> DeclareTypingRule::
     return interpretateOp(op, getBindings().Bottom());
   }
   auto binding = interpretateOp(op, operands[0]); // Make a copy for marking the slot
-  scope.declareMember(op.getMember(), binding);
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(
       getBindings(), binding, op.getMember()
   ); // Allocate a named slot with the declared type
+  scope.declareMember(op.getMember(), binding);
   return binding;
 }
 
@@ -192,6 +200,16 @@ mlir::FailureOr<zirgen::Zhl::DeclarationOp> getDeclaration(zirgen::Zhl::Definiti
 /// literal Val expression) then the binding of the expression will not have a slot associated
 /// with it.
 ///
+/// Another thing to consider is if the slot allocated by the expression is from the current frame
+/// or not. It could happen that a member is declared by reading some other member:
+///
+/// ```
+/// x := foo.bar
+/// ```
+///
+/// Simply renaming the slot from the expression will actually change the name of the member from
+/// 'bar' to 'x'.
+///
 /// This leaves us with 5 cases that need to be considered:
 ///
 /// 1. Both operands allocated a slot and have different type bindings: In this case the result of
@@ -257,6 +275,32 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
   auto *declSlot = operands[0].getSlot();
   auto *exprSlot = operands[1].getSlot();
 
+  // For cases 2 & 4 we want to reuse the slot used by the expression binding. However, this is only
+  // safe to do if the frame of that binding belongs to the current frame. If that's not the case
+  // then we need to allocate a new frame like in Case 5.
+  auto maybeUpdateExprSlot = [&](const TypeBinding &binding) -> TypeBinding {
+    assert(exprSlot);
+    if (exprSlot->belongsTo(scope.getCurrentFrame())) {
+      LLVM_DEBUG(
+          llvm::dbgs() << "Renaming slot " << exprSlot << " to '" << decl->getMember() << "'\n"
+      );
+      exprSlot->rename(decl->getMember());
+      return copyWithoutSlot(binding);
+    } else {
+      LLVM_DEBUG(
+          llvm::dbgs() << "Allocating a new slot '" << decl->getMember() << "' for type " << binding
+                       << "\n"
+      );
+      auto copy = copyWithoutSlot(binding);
+      auto *slot = scope.getCurrentFrame().allocateSlot<ComponentSlot>(
+          getBindings(), copy, decl->getMember()
+      );
+      (void)slot;
+      LLVM_DEBUG(llvm::dbgs() << "Created a new slot " << slot << "\n");
+      return copy;
+    }
+  };
+
   // Case 1 & 2
   if (declSlot && exprSlot) {
     auto *declCompSlot = mlir::cast<ComponentSlot>(declSlot);
@@ -269,9 +313,8 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // this rule does not link to a slot since the expression op already does.
     if (declBinding == exprBinding) {
       LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 2\n");
-      exprSlot->rename(decl->getMember());
       scope.declareMember(decl->getMember(), interpretatedOperand1);
-      return copyWithoutSlot(interpretatedOperand1);
+      return maybeUpdateExprSlot(interpretatedOperand1);
     }
 
     // Case 1: In this case the result of this rule is a copy of the type binding of the declaration
@@ -290,9 +333,8 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
   // Case 4: Rename the slot with the name of the member.
   if (exprSlot) {
     LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 4\n");
-    exprSlot->rename(decl->getMember());
     scope.declareMember(decl->getMember(), interpretatedOperand1);
-    return copyWithoutSlot(interpretatedOperand1);
+    return maybeUpdateExprSlot(interpretatedOperand1);
   }
 
   // Case 5: Allocate a slot of the type binding of the expression and the name of the member.
@@ -466,7 +508,7 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
 }
 
 mlir::FailureOr<Frame> ReduceTypeRule::allocate(Frame frame) const {
-  return frame.allocateSlot<ArrayFrame>()->getFrame();
+  return frame.allocateSlot<ArrayFrame>(getBindings())->getFrame();
 }
 
 mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
@@ -490,11 +532,14 @@ FailureOr<TypeBinding> BlockTypeRule::typeCheck(
   if (failed(super)) {
     return op->emitOpError() << "could not deduce type of block because couldn't get super type";
   }
-  return interpretateOp(op, super);
+  super = interpretateOp(op, super);
+  auto binding = TypeBinding::WithoutClosure(*super);
+  binding.markSlot(nullptr);
+  return binding;
 }
 
 FailureOr<Frame> BlockTypeRule::allocate(Frame frame) const {
-  return frame.allocateSlot<InnerFrame>()->getFrame();
+  return frame.allocateSlot<InnerFrame>(getBindings())->getFrame();
 }
 
 FailureOr<TypeBinding> SwitchTypeRule::typeCheck(
@@ -538,17 +583,38 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return failure();
   }
 
+  assert(arrayLen->isConst());
+
   assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
   if (failed(super)) {
     return op->emitOpError() << "failed to deduce the super type";
   }
 
-  return interpretateOp(op, getBindings().Array(*super, *arrayLen, op.getLoc()));
+  auto binding = interpretateOp(op, getBindings().Array(*super, *arrayLen, op.getLoc()));
+  if (auto slot = scope.getCurrentFrame().getParentSlot()) {
+    if (auto compSlot = dyn_cast<ComponentSlot>(slot)) {
+      LLVM_DEBUG(
+          llvm::dbgs() << "Setting binding  of slot " << compSlot << " to " << binding << "\n"
+      );
+      // Is a component slot so we change the type
+      compSlot->setBinding(binding);
+    } else {
+      LLVM_DEBUG(
+          llvm::dbgs() << "Marking binding " << binding << " with slot " << slot
+                       << " (name = " << slot->getSlotName() << ")\n"
+      );
+      // Any other slot simply gets forwarded
+      binding.markSlot(slot);
+    }
+  } else {
+    LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << "\n");
+  }
+  return binding;
 }
 
 FailureOr<Frame> MapTypeRule::allocate(Frame frame) const {
-  return frame.allocateSlot<ArrayFrame>()->getFrame();
+  return frame.allocateSlot<ArrayFrame>(getBindings())->getFrame();
 }
 
 FailureOr<std::vector<TypeBinding>> MapTypeRule::bindRegionArguments(
