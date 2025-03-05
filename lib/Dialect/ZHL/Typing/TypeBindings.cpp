@@ -502,7 +502,6 @@ void TypeBinding::markAsSpecialized() {
 ArrayRef<std::string> TypeBinding::getGenericParamNames() const { return genericParams.getNames(); }
 
 void TypeBinding::markSlot(FrameSlot *newSlot) {
-  llvm::dbgs() << "slot = " << slot << " | newSlot = " << newSlot << "\n";
   if (slot == newSlot) {
     return;
   }

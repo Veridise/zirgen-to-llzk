@@ -198,7 +198,6 @@ private:
     }
     auto finalBinding = result->ReplaceFrame(frame);
     auto *parent = frame.getParentSlot();
-    // finalBinding.markSlot(parent);
     if (auto *compParent = mlir::dyn_cast_if_present<ComponentSlot>(parent)) {
       compParent->setBinding(finalBinding);
     }

@@ -111,15 +111,12 @@ void storeSlot(
   auto compSlotIVs = slot.collectIVs();
 
   if (compSlotIVs.empty()) {
-    llvm::dbgs() << "slotType = " << slotType << " | value.getType() = " << value.getType() << "\n";
     assert(slotType == value.getType() && "result of construction and slot type must be the same");
     // Write the construction in a temporary
     builder.create<WriteFieldOp>(loc, self, slotName, value);
   } else {
     auto unwrappedBinding = unwrapArrayNTimes(compSlotBinding, compSlotIVs.size());
     auto unwrappedType = materializeTypeBinding(builder.getContext(), unwrappedBinding);
-    llvm::dbgs() << "unwrappedType = " << unwrappedType
-                 << " | value.getType() = " << value.getType() << "\n";
     assert(
         unwrappedType == value.getType() &&
         "result of construction and slot inner array type must be the same"
@@ -247,7 +244,6 @@ void createPODComponent(
   }
   cb.defer([&](ComponentOp compOp) {
     auto actualName = st.insert(compOp);
-    llvm::dbgs() << "Created POD with name " << actualName << "\n";
     binding.setName(actualName.getValue());
 
     // Now that we know the final name of the component we can configure the rest
@@ -313,12 +309,8 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
     return buildPrologue(compValue);
   }
 
-  compBinding.print(llvm::dbgs() << "compBinding = ", true);
-  llvm::dbgs() << "\n";
   auto compSlot = mlir::cast<zhl::ComponentSlot>(compBinding.getSlot());
   auto compSlotBinding = compSlot->getBinding();
-  compSlotBinding.print(llvm::dbgs() << "compSlotBinding = ", true);
-  llvm::dbgs() << "\n";
 
   // Create the field
   auto name = createSlot(compSlot, builder, callerComponentOp, loc);
