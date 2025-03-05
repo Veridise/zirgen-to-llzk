@@ -1,0 +1,32 @@
+// RUN: zklang -o - %s | FileCheck --enable-var-scope %s
+
+// COM: Here we are testing if the block structure's compute method is called, 
+// COM: if the dot-chain expression is computed properly,
+// COM: and if the block structure is generated with the necessary fields.
+
+component Foo() {
+  public values := for i : 1..8 {
+    public x := Reg(i);
+  };
+
+// CHECK-LABEL: func @compute() -> !llzk.struct<@Foo<[]>> {
+// CHECK: llzk.call @block$::@compute(%{{[0-9a-zA-Z_\.]+}}, %{{[0-9a-zA-Z_\.]+}}) : (!llzk.struct<@Component<[]>>, !llzk.struct<@Reg<[]>>) -> !llzk.struct<@block$<[]>>
+}
+
+component Bar() {
+  f := Foo();
+  f.values[0].x
+
+// CHECK-LABEL: func @compute() -> !llzk.struct<@Bar<[]>> {
+// CHECK: %[[T0:[0-9a-zA-Z_\.]+]] = new_struct : <@Bar<[]>>
+// CHECK: %[[T1:[0-9a-zA-Z_\.]+]] = readf %[[T0]][@f] : <@Bar<[]>>, !llzk.struct<@Foo<[]>>
+// CHECK: %[[T2:[0-9a-zA-Z_\.]+]] = readf %[[T1]][@values] : <@Foo<[]>>, !llzk.array<7 x !llzk.struct<@block$<[]>>>
+// CHECK: %[[C:[0-9a-zA-Z_\.]+]] = constfelt  0
+// CHECK: %[[T3:[0-9a-zA-Z_\.]+]] = toindex %[[C]]
+// CHECK: %[[T4:[0-9a-zA-Z_\.]+]] = readarr %[[T2]][%[[T3]]] : <7 x !llzk.struct<@block$<[]>>>, !llzk.struct<@block$<[]>>
+// CHECK: %[[T5:[0-9a-zA-Z_\.]+]] = readf %[[T4]][@x] : <@block$<[]>>, !llzk.struct<@Reg<[]>>
+}
+
+// CHECK-LABEL: llzk.struct @block$<[]> {
+//       CHECK:   field @"$super" : !llzk.struct<@Component<[]>>
+//       CHECK:   field @x : !llzk.struct<@Reg<[]>>

@@ -9,6 +9,8 @@
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
+#define DEBUG_TYPE "zhl-frame"
+
 namespace zhl {
 
 Frame::Frame() : info(std::make_shared<detail::FrameInfo>()) {}
@@ -20,6 +22,8 @@ Frame &Frame::operator=(const Frame &other) {
   return *this;
 }
 
+void Frame::print(llvm::raw_ostream &os) const { info->print(os); }
+
 detail::FrameInfo::SlotsList::iterator Frame::begin() { return info->begin(); }
 detail::FrameInfo::SlotsList::const_iterator Frame::begin() const { return info->begin(); }
 detail::FrameInfo::SlotsList::iterator Frame::end() { return info->end(); }
@@ -27,6 +31,8 @@ detail::FrameInfo::SlotsList::const_iterator Frame::end() const { return info->e
 
 void Frame::setParentSlot(FrameSlot *slot) { info->setParentSlot(slot); }
 FrameSlot *Frame::getParentSlot() const { return info->getParentSlot(); }
+
+// FrameSlot
 
 FrameSlot::FrameSlot(FrameSlotKind slotKind) : FrameSlot(slotKind, "$temp") {}
 
@@ -48,9 +54,29 @@ FrameSlot *FrameSlot::getParentSlot() const {
   return parentFrame->getParentSlot();
 }
 
+bool FrameSlot::belongsTo(const Frame &frame) const {
+  // If the given frame points to the same as my parent then the slot belongs to the frame.
+  if (frame.info.get() == parentFrame) {
+    return true;
+  }
+
+  // If the frame has a parent slot, then the slot belongs to the frame if the parent slot belongs
+  // to the frame.
+  if (auto *parentSlot = getParentSlot()) {
+    return parentSlot->belongsTo(frame);
+  }
+  // Otherwise the slot does not belong to the frame.
+  return false;
+}
+
 const detail::FrameInfo *FrameSlot::getParent() const { return parentFrame; }
 
-InnerFrame::InnerFrame() : FrameSlot(FS_Frame, "$inner"), innerFrame{} {
+void FrameSlot::print(llvm::raw_ostream &os) const {
+  os << "slot { parent = " << parentFrame << ", name = " << name << " }";
+}
+
+InnerFrame::InnerFrame(const TypeBindings &bindings)
+    : ComponentSlot(FS_Frame, bindings, bindings.Component(), "$inner"), innerFrame{} {
   innerFrame.setParentSlot(this);
 }
 
@@ -58,7 +84,15 @@ Frame &InnerFrame::getFrame() { return innerFrame; }
 
 bool InnerFrame::classof(const FrameSlot *S) { return S->getKind() == FS_Frame; }
 
-ArrayFrame::ArrayFrame() : FrameSlot(FS_Array, "$array"), iv(nullptr), innerFrame{} {
+void InnerFrame::print(llvm::raw_ostream &os) const {
+  ComponentSlot::print(os);
+  os << " + { frame = ";
+  innerFrame.print(os);
+  os << " }";
+}
+
+ArrayFrame::ArrayFrame(const TypeBindings &bindings)
+    : ComponentSlot(FS_Array, bindings, bindings.Component(), "$array"), iv(nullptr), innerFrame{} {
   innerFrame.setParentSlot(this);
 }
 
@@ -73,9 +107,19 @@ mlir::Value ArrayFrame::getInductionVar() const {
   return iv;
 }
 
+void ArrayFrame::print(llvm::raw_ostream &os) const {
+  ComponentSlot::print(os);
+  os << " + { iv = " << iv << ", frame = ";
+  innerFrame.print(os);
+  os << " }";
+}
+
 namespace detail {
 
-FrameInfo::~FrameInfo() { slots.clearAndDispose(std::default_delete<FrameSlot>()); }
+FrameInfo::~FrameInfo() {
+  assert(slots.size() == nCreatedSlots);
+  slots.clearAndDispose(std::default_delete<FrameSlot>());
+}
 
 FrameInfo::SlotsList::iterator FrameInfo::begin() { return slots.begin(); }
 FrameInfo::SlotsList::const_iterator FrameInfo::begin() const { return slots.begin(); }
@@ -87,6 +131,12 @@ void FrameInfo::setParentSlot(FrameSlot *slot) {
   parent = slot;
 }
 FrameSlot *FrameInfo::getParentSlot() const { return parent; }
+
+void FrameInfo::print(llvm::raw_ostream &os) const {
+  os << "frame " << this << " [";
+  llvm::interleaveComma(slots, os, [&](auto &slot) { slot.print(os); });
+  os << "]";
+}
 
 } // namespace detail
 
@@ -104,49 +154,78 @@ ComponentSlot::ComponentSlot(const TypeBindings &bindings, TypeBinding &type, ml
   type.markSlot(this);
 }
 
-bool ComponentSlot::classof(const FrameSlot *S) { return S->getKind() == FS_Component; }
+ComponentSlot::ComponentSlot(
+    FrameSlotKind Kind, const TypeBindings &bindings, const TypeBinding &type, mlir::StringRef name
+)
+    : FrameSlot(Kind, name), binding(type), bindingsCtx(&bindings) {
+  binding.markSlot(this);
+}
+
+bool ComponentSlot::classof(const FrameSlot *S) {
+  return S->getKind() >= FS_Component && S->getKind() < FS_ComponentEnd;
+}
+
+void ComponentSlot::print(llvm::raw_ostream &os) const {
+  FrameSlot::print(os);
+  os << " + { binding = " << binding << " }";
+}
 
 template <typename T>
 T traverseNestedArrayFramesT(
-    const FrameSlot *slot, const T &t, std::function<T(const ArrayFrame *, const T &)> onArrayFrame
+    const FrameSlot *root, const FrameSlot *slot, const T &t,
+    std::function<T(const ArrayFrame *, const T &)> onArrayFrame
 ) {
   if (!slot) {
     return t;
   }
-  if (auto arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
-    /// Make a copy of the array just created to make sure it survives until the recursive function
-    /// finishes
-    auto arrayT = onArrayFrame(arrayFrame, t);
-    return traverseNestedArrayFramesT(slot->getParentSlot(), arrayT, onArrayFrame);
+  if (root != slot) {
+    if (auto arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
+      /// Make a copy of the array just created to make sure it survives until the recursive
+      /// function finishes
+      auto arrayT = onArrayFrame(arrayFrame, t);
+      return traverseNestedArrayFramesT(root, slot->getParentSlot(), arrayT, onArrayFrame);
+    }
   }
-  return traverseNestedArrayFramesT(slot->getParentSlot(), t, onArrayFrame);
+  return traverseNestedArrayFramesT(root, slot->getParentSlot(), t, onArrayFrame);
 }
 
 void traverseNestedArrayFrames(
-    const FrameSlot *slot, std::function<void(const ArrayFrame *)> onArrayFrame
+    const FrameSlot *root, const FrameSlot *slot,
+    std::function<void(const ArrayFrame *)> onArrayFrame
 ) {
   size_t dummy = 0;
-  traverseNestedArrayFramesT<size_t>(slot, dummy, [&](const ArrayFrame *frame, auto &) {
+  traverseNestedArrayFramesT<size_t>(root, slot, dummy, [&](const ArrayFrame *frame, auto &) {
     onArrayFrame(frame);
     return 0;
   });
 }
 
+void ComponentSlot::setBinding(TypeBinding &newBinding) {
+  newBinding.markSlot(this);
+  binding = newBinding;
+}
+
 TypeBinding ComponentSlot::getBinding() const {
   return traverseNestedArrayFramesT<TypeBinding>(
-      this, binding,
+      this, this, binding,
       [&](const ArrayFrame *, const TypeBinding &b) {
     return bindingsCtx->UnkArray(b, b.getLocation());
   }
   );
 }
 
-mlir::ValueRange ComponentSlot::collectIVs() const {
+mlir::SmallVector<mlir::Value> ComponentSlot::collectIVs() const {
   mlir::SmallVector<mlir::Value> vec;
-  traverseNestedArrayFrames(this, [&](const ArrayFrame *frame) {
+  traverseNestedArrayFrames(this, this, [&](const ArrayFrame *frame) {
     vec.insert(vec.begin(), frame->getInductionVar());
   });
-  return mlir::ValueRange{vec};
+  return vec;
+}
+
+bool ComponentSlot::contains(const TypeBinding &other) const { return binding == other; }
+
+void ComponentSlot::editInnerBinding(llvm::function_ref<void(TypeBinding &)> edit) {
+  edit(binding);
 }
 
 } // namespace zhl

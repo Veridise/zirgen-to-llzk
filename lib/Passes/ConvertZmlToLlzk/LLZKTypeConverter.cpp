@@ -1,4 +1,3 @@
-
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
@@ -13,8 +12,12 @@
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
 
+
+#define DEBUG_TYPE "llzk-type-converter"
+
 using namespace llzk;
 using namespace mlir;
+
 
 std::optional<mlir::Value> unrealizedCastMaterialization(
     mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs, mlir::Location loc
@@ -25,6 +28,7 @@ std::optional<mlir::Value> unrealizedCastMaterialization(
 }
 
 mlir::Type deduceArrayType(mlir::Attribute attr) {
+  LLVM_DEBUG(llvm::dbgs() << "deduceArrayType(" << attr << ")\n");
   if (auto typeAttr = mlir::dyn_cast<mlir::TypeAttr>(attr)) {
     return typeAttr.getValue();
   }
@@ -55,6 +59,7 @@ void convertParamAttrs(
 }
 
 mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
+  LLVM_DEBUG(llvm::dbgs() << "getSizeSym(" << attr << ")\n");
   auto sym = mlir::dyn_cast<mlir::SymbolRefAttr>(attr);
   assert(sym && "was expecting a symbol");
   return sym;
@@ -86,6 +91,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
     if (t.getName().getValue() != "Array") {
       return std::nullopt;
     }
+    LLVM_DEBUG(llvm::dbgs() << "addConversion: " << t << "\n");
     assert(t.getParams().size() == 2);
     auto typeAttr = t.getParams()[0];
     auto sizeAttr = t.getParams()[1];

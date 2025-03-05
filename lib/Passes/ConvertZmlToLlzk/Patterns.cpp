@@ -448,7 +448,7 @@ mlir::LogicalResult LowerValToIndexOp::matchAndRewrite(
 mlir::LogicalResult LowerWriteArrayOp::matchAndRewrite(
     WriteArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  if (isa<llzk::ArrayType>(adaptor.getValue().getType())) {
+  if (mlir::isa<llzk::ArrayType>(adaptor.getValue().getType())) {
     rewriter.replaceOpWithNewOp<llzk::InsertArrayOp>(
         op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
     );

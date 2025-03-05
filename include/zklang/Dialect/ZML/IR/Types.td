@@ -44,7 +44,10 @@ def Component : ZMLType<"Component", "comp"> {
 
     /// Returns wether the component associated to this type is the root 'Component'
     bool isRoot() const { return getName().getValue() == "Component"; }
-    bool isArray() const { return getName().getValue() == "Array" || (getSuperTypeAsComp() != nullptr && getSuperTypeAsComp().isArray()); }
+    bool isConcreteArray() const { return getName().getValue() == "Array"; }
+    bool isArray() const { return isConcreteArray() || (getSuperTypeAsComp() != nullptr && getSuperTypeAsComp().isArray()); }
+    /// Climbs the chain and returns the first super type (including self) that matches the predicate, or failure() otherwise.
+    mlir::FailureOr<mlir::Type> getFirstMatchingSuperType(llvm::function_ref<bool(mlir::Type)>) const;
 
     mlir::FailureOr<mlir::Attribute> getArraySize() const;
     ComponentType getSuperTypeAsComp() const;

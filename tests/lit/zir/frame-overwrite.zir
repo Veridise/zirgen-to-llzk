@@ -1,0 +1,24 @@
+// RUN: zklang -o - %s | FileCheck %s
+
+component Foo() {
+  x := 1 + 1;
+
+// CHECK-LABEL: llzk.struct @Foo<[]> {
+//       CHECK:   field @x : !llzk.felt
+}
+
+component Bar() {
+  f := Foo();
+  y := f.x;
+
+// CHECK-LABEL: llzk.struct @Bar<[]> {
+//       CHECK:   field @y : !llzk.felt
+}
+
+component Baz() {
+  f := Foo();
+  f.x = 2;
+
+// CHECK-LABEL: func @compute() -> !llzk.struct<@Baz<[]>> {
+//       CHECK:   %{{[0-9a-zA-Z_\.]+}} = readf %{{[0-9a-zA-Z_\.]+}}[@x] : <@Foo<[]>>, !llzk.felt
+}

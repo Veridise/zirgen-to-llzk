@@ -3,6 +3,7 @@
 #include <cassert>
 #include <deque>
 #include <functional>
+#include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
@@ -78,6 +79,32 @@ private:
   ParamNames names;
 };
 
+class TypeBindingName {
+public:
+  TypeBindingName(const TypeBindingName &);
+  TypeBindingName(TypeBindingName &&);
+  TypeBindingName &operator=(const TypeBindingName &);
+  TypeBindingName &operator=(TypeBindingName &&);
+
+  TypeBindingName(mlir::StringRef);
+  ~TypeBindingName();
+
+  TypeBindingName &operator=(mlir::StringRef);
+  operator mlir::StringRef() const;
+
+  bool operator==(const TypeBindingName &) const;
+  bool operator==(mlir::StringRef) const;
+
+  mlir::StringRef ref() const;
+
+  friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBindingName &);
+
+private:
+  struct Impl;
+
+  std::shared_ptr<Impl> impl;
+};
+
 /// Binding to a ZIR type
 class TypeBinding {
 public:
@@ -85,6 +112,7 @@ public:
   using ParamNames = std::vector<std::string>;
   /// Returns the name of the type.
   std::string_view getName() const;
+  void setName(mlir::StringRef);
 
   void print(llvm::raw_ostream &os, bool fullPrintout = false) const;
 
@@ -166,6 +194,9 @@ public:
 
   static TypeBinding WrapVariadic(const TypeBinding &t);
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name);
+  static const TypeBinding &StripConst(const TypeBinding &);
+  static TypeBinding WithClosure(const TypeBinding &);
+  static TypeBinding WithoutClosure(const TypeBinding &);
 
   friend TypeBindings;
   friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const zhl::TypeBinding &b);
@@ -180,6 +211,8 @@ public:
 
   Frame getFrame() const;
 
+  bool hasClosure() const;
+
 private:
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
 
@@ -187,7 +220,8 @@ private:
   bool specialized = false;
   bool selfConstructor = false;
   bool builtin = false;
-  llvm::StringRef name;
+  bool closure = false;
+  TypeBindingName name;
   mlir::Location loc;
   std::optional<uint64_t> constVal;
   std::optional<llvm::StringRef> genericParamName;
@@ -231,6 +265,17 @@ public:
     return Create(name, unk, std::forward<Args>(args)...);
   }
 
+  /// Creates a type binding and keeps track of its memory, but it is not registered in the
+  /// named bindings table.
+  template <typename... Args>
+  const TypeBinding &CreateAnon(std::string_view name, mlir::Location loc, Args &&...args) {
+    return Manage(TypeBinding(name, loc, std::forward<Args>(args)...));
+  }
+
+  template <typename... Args> const TypeBinding &CreateAnon(std::string_view name, Args &&...args) {
+    return CreateAnon(name, unk, std::forward<Args>(args)...);
+  }
+
   template <typename... Args>
   const TypeBinding &CreateBuiltin(std::string_view name, mlir::Location loc, Args &&...args) {
     assert(bindings.find(name) == bindings.end() && "double binding write");
@@ -256,4 +301,5 @@ private:
 
 } // namespace zhl
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBindingName &);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding &b);

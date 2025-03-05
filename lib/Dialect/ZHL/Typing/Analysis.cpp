@@ -23,6 +23,7 @@ public:
   virtual const TypeBindings &getBindings() const = 0;
   virtual void print(llvm::raw_ostream &) const = 0;
   virtual operator mlir::LogicalResult() const = 0;
+  virtual mlir::ArrayRef<TypeBinding *> getClosures() = 0;
 };
 
 namespace {
@@ -52,6 +53,8 @@ public:
   void print(llvm::raw_ostream &os) const final { delegate->print(os); }
 
   operator mlir::LogicalResult() const final { return *delegate; }
+
+  mlir::ArrayRef<TypeBinding *> getClosures() final { return delegate->getClosures(); }
 
 private:
   ZIRTypeAnalysis *const delegate;
@@ -117,12 +120,20 @@ public:
     return typeCheckingFailed || failed(*opBindings) ? failure() : success();
   }
 
+  mlir::ArrayRef<TypeBinding *> getClosures() final {
+    if (!cachedClosures.has_value()) {
+      cachedClosures = opBindings->getClosures();
+    }
+    return *cachedClosures;
+  }
+
 private:
   TypeBindings typeBindings;
   bool typeCheckingFailed = false;
   // Because the methods return references to a FailureOr
   mlir::FailureOr<TypeBinding> failureRef;
   std::unique_ptr<ZhlOpBindings> opBindings;
+  std::optional<SmallVector<TypeBinding *>> cachedClosures;
 };
 } // namespace
 
@@ -168,5 +179,6 @@ ZIRTypeAnalysis::operator mlir::LogicalResult() const {
   }
   return *impl;
 }
+mlir::ArrayRef<TypeBinding *> ZIRTypeAnalysis::getClosures() { return impl->getClosures(); }
 
 } // namespace zhl
