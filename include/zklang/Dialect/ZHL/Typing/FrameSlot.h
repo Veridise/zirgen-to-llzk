@@ -36,6 +36,8 @@ public:
 
   friend llvm::ilist_node_with_parent<FrameSlot, detail::FrameInfo>;
 
+  virtual void print(llvm::raw_ostream &) const;
+
 protected:
   FrameSlot(FrameSlotKind);
   FrameSlot(FrameSlotKind, mlir::StringRef);

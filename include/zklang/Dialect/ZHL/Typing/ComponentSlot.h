@@ -31,6 +31,8 @@ public:
 
   void editInnerBinding(llvm::function_ref<void(TypeBinding &)>);
 
+  void print(llvm::raw_ostream &) const override;
+
 protected:
   ComponentSlot(
       FrameSlotKind, const TypeBindings &bindings, const TypeBinding &binding, mlir::StringRef name

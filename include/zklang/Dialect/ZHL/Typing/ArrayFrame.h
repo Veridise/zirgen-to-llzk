@@ -22,6 +22,8 @@ public:
   void setInductionVar(mlir::Value);
   mlir::Value getInductionVar() const;
 
+  void print(llvm::raw_ostream &) const override;
+
 private:
   mlir::Value iv;
   Frame innerFrame;

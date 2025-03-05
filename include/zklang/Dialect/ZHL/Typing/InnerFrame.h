@@ -14,6 +14,8 @@ public:
 
   static bool classof(const FrameSlot *);
 
+  void print(llvm::raw_ostream &) const override;
+
 private:
   Frame innerFrame;
 };

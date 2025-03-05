@@ -9,6 +9,8 @@
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
+#define DEBUG_TYPE "zhl-frame"
+
 namespace zhl {
 
 Frame::Frame() : info(std::make_shared<detail::FrameInfo>()) {}
@@ -19,6 +21,8 @@ Frame &Frame::operator=(const Frame &other) {
   info = other.info;
   return *this;
 }
+
+void Frame::print(llvm::raw_ostream &os) const { info->print(os); }
 
 detail::FrameInfo::SlotsList::iterator Frame::begin() { return info->begin(); }
 detail::FrameInfo::SlotsList::const_iterator Frame::begin() const { return info->begin(); }
@@ -67,6 +71,10 @@ bool FrameSlot::belongsTo(const Frame &frame) const {
 
 const detail::FrameInfo *FrameSlot::getParent() const { return parentFrame; }
 
+void FrameSlot::print(llvm::raw_ostream &os) const {
+  os << "slot { parent = " << parentFrame << ", name = " << name << " }";
+}
+
 InnerFrame::InnerFrame(const TypeBindings &bindings)
     : ComponentSlot(FS_Frame, bindings, bindings.Component(), "$inner"), innerFrame{} {
   innerFrame.setParentSlot(this);
@@ -75,6 +83,13 @@ InnerFrame::InnerFrame(const TypeBindings &bindings)
 Frame &InnerFrame::getFrame() { return innerFrame; }
 
 bool InnerFrame::classof(const FrameSlot *S) { return S->getKind() == FS_Frame; }
+
+void InnerFrame::print(llvm::raw_ostream &os) const {
+  ComponentSlot::print(os);
+  os << " + { frame = ";
+  innerFrame.print(os);
+  os << " }";
+}
 
 ArrayFrame::ArrayFrame(const TypeBindings &bindings)
     : ComponentSlot(FS_Array, bindings, bindings.Component(), "$array"), iv(nullptr), innerFrame{} {
@@ -90,6 +105,13 @@ void ArrayFrame::setInductionVar(mlir::Value val) { iv = val; }
 mlir::Value ArrayFrame::getInductionVar() const {
   assert(iv && "induction var retrieved before having been set");
   return iv;
+}
+
+void ArrayFrame::print(llvm::raw_ostream &os) const {
+  ComponentSlot::print(os);
+  os << " + { iv = " << iv << ", frame = ";
+  innerFrame.print(os);
+  os << " }";
 }
 
 namespace detail {
@@ -109,6 +131,12 @@ void FrameInfo::setParentSlot(FrameSlot *slot) {
   parent = slot;
 }
 FrameSlot *FrameInfo::getParentSlot() const { return parent; }
+
+void FrameInfo::print(llvm::raw_ostream &os) const {
+  os << "frame " << this << " [";
+  llvm::interleaveComma(slots, os, [&](auto &slot) { slot.print(os); });
+  os << "]";
+}
 
 } // namespace detail
 
@@ -135,6 +163,11 @@ ComponentSlot::ComponentSlot(
 
 bool ComponentSlot::classof(const FrameSlot *S) {
   return S->getKind() >= FS_Component && S->getKind() < FS_ComponentEnd;
+}
+
+void ComponentSlot::print(llvm::raw_ostream &os) const {
+  FrameSlot::print(os);
+  os << " + { binding = " << binding << " }";
 }
 
 template <typename T>

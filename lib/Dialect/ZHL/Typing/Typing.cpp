@@ -199,6 +199,11 @@ private:
     auto finalBinding = result->ReplaceFrame(frame);
     auto *parent = frame.getParentSlot();
     if (auto *compParent = mlir::dyn_cast_if_present<ComponentSlot>(parent)) {
+      if (mlir::isa_and_present<ComponentSlot>(finalBinding.getSlot())) {
+        // Remove the slot if it is a ComponentSlot since we are
+        // going to store that component in the parent slot instead
+        finalBinding.markSlot(nullptr);
+      }
       compParent->setBinding(finalBinding);
     }
     return finalBinding;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <llvm/ADT/simple_ilist.h>
+#include <llvm/Support/raw_ostream.h>
 #include <memory>
 #include <zklang/Dialect/ZHL/Typing/FrameInfo.h>
 
@@ -37,6 +38,8 @@ public:
   FrameSlot *getParentSlot() const;
 
   friend FrameSlot;
+
+  void print(llvm::raw_ostream &) const;
 
 private:
   // A pointer to the unique information about the frame

@@ -9,6 +9,8 @@
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
+#define DEBUG_TYPE "zhl-type-bindings"
+
 using namespace zhl;
 using namespace mlir;
 
@@ -501,10 +503,23 @@ void TypeBinding::markAsSpecialized() {
 
 ArrayRef<std::string> TypeBinding::getGenericParamNames() const { return genericParams.getNames(); }
 
+#ifndef NDEBUG
+llvm::raw_ostream &p(FrameSlot *slot) {
+  if (slot) {
+    slot->print(llvm::dbgs() << slot << " ");
+  } else {
+    llvm::dbgs() << "<<NULL>>";
+  }
+  return llvm::dbgs();
+}
+#endif
+
 void TypeBinding::markSlot(FrameSlot *newSlot) {
   if (slot == newSlot) {
     return;
   }
+  LLVM_DEBUG(print(llvm::dbgs() << "Binding "); llvm::dbgs() << ": Current slot is ";
+             p(slot) << " and the new slot is "; p(newSlot) << "\n");
   assert((!slot == !!newSlot) && "Writing over an existing slot!");
   slot = newSlot;
 }
