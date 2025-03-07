@@ -21,9 +21,9 @@ namespace zhl {
 
 class Params {
 public:
-  using iterator = mlir::SmallVector<TypeBinding, 0>::iterator;
-  using const_iterator = mlir::SmallVector<TypeBinding>::const_iterator;
+  using iterator = mlir::SmallVector<TypeBinding>::const_iterator;
 
+  Params(const ParamsStorage &);
   Params(ParamsStorage &);
   size_t size() const;
 
@@ -34,11 +34,9 @@ public:
   TypeBinding getParam(size_t i) const;
 
   mlir::ArrayRef<ParamName> getNames() const;
-  mlir::MutableArrayRef<TypeBinding> getParams();
   mlir::ArrayRef<TypeBinding> getParams() const;
 
   const TypeBinding *operator[](mlir::StringRef name) const;
-  TypeBinding *operator[](mlir::StringRef name);
 
   void printMapping(llvm::raw_ostream &os, bool fullPrintout = false) const;
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
@@ -46,17 +44,18 @@ public:
       llvm::raw_ostream &os, bool fullPrintout = false, char header = '<', char footer = '>'
   ) const;
 
-  iterator begin();
-  const_iterator begin() const;
-  iterator end();
-  const_iterator end() const;
+  iterator begin() const;
+  iterator end() const;
+
+  bool contains(mlir::StringRef) const;
 
   bool empty() const;
 
-  void replaceParam(mlir::StringRef name, const TypeBinding &binding);
-
   bool operator==(const Params &) const;
 
+  const ParamsStorage *data() const;
+
+protected:
 private:
   template <typename Elt>
   void print(
@@ -64,7 +63,22 @@ private:
       char header, char footer
   ) const;
 
-  ParamsStorage *sto;
+  const ParamsStorage *sto;
+};
+
+class MutableParams : public Params {
+public:
+  using iterator = mlir::SmallVector<TypeBinding, 0>::iterator;
+  MutableParams(ParamsStorage &);
+
+  void replaceParam(mlir::StringRef name, const TypeBinding &binding);
+
+  mlir::MutableArrayRef<TypeBinding> getParams() const;
+  TypeBinding *operator[](mlir::StringRef name) const;
+
+  iterator begin() const;
+  iterator end() const;
+  ParamsStorage *data() const;
 };
 
 } // namespace zhl

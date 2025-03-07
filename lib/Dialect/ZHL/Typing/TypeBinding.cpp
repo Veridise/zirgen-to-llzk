@@ -112,10 +112,7 @@ FailureOr<TypeBinding> TypeBinding::getMember(
   return **memberLookupRes;
 }
 
-TypeBinding::~TypeBinding() {
-  delete genericParams;
-  delete constructorParams;
-}
+TypeBinding::~TypeBinding() = default;
 
 TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
@@ -123,8 +120,8 @@ TypeBinding::TypeBinding(
     bool isBuiltin
 )
     : builtin(isBuiltin), name(name), loc(loc), superType(&const_cast<TypeBinding &>(superType)),
-      members(members), genericParams(new ParamsStorage(t_genericParams)),
-      constructorParams(new ParamsStorage(t_constructorParams)), frame(t_frame) {}
+      members(members), genericParams(t_genericParams), constructorParams(t_constructorParams),
+      frame(t_frame) {}
 
 TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
@@ -146,9 +143,8 @@ TypeBinding::TypeBinding(const TypeBinding &other)
       selfConstructor(other.selfConstructor), builtin(other.builtin), closure(other.closure),
       name(other.name), loc(other.loc), constExpr(other.constExpr),
       genericParamName(other.genericParamName), superType(other.superType), members(other.members),
-      genericParams(new ParamsStorage(*other.genericParams)),
-      constructorParams(new ParamsStorage(*other.constructorParams)), frame(other.frame),
-      slot(other.slot) {}
+      genericParams(other.genericParams), constructorParams(other.constructorParams),
+      frame(other.frame), slot(other.slot) {}
 
 TypeBinding::TypeBinding(TypeBinding &&other)
     : variadic(std::move(other.variadic)), specialized(std::move(other.specialized)),
@@ -156,13 +152,39 @@ TypeBinding::TypeBinding(TypeBinding &&other)
       closure(std::move(other.closure)), name(std::move(other.name)), loc(std::move(other.loc)),
       constExpr(std::move(other.constExpr)), genericParamName(std::move(other.genericParamName)),
       superType(std::move(other.superType)), members(std::move(other.members)),
-      genericParams(other.genericParams), constructorParams(other.constructorParams),
-      frame(other.frame), slot(std::move(other.slot)) {
-  other.genericParams = nullptr;
-  other.constructorParams = nullptr;
-}
+      genericParams(std::move(other.genericParams)),
+      constructorParams(std::move(other.constructorParams)), frame(other.frame),
+      slot(std::move(other.slot)) {}
 
 TypeBinding &TypeBinding::operator=(const TypeBinding &other) {
+#if 0
+#define paddr(x) llvm::dbgs() << "&" #x " = " << &x << "\n";
+  paddr(variadic);
+  paddr(specialized);
+  paddr(selfConstructor);
+  paddr(builtin);
+  paddr(closure);
+  paddr(name);
+  paddr(loc);
+  paddr(constExpr);
+  paddr(genericParamName);
+  paddr(superType);
+  paddr(members);
+
+  paddr(genericParams);
+  llvm::dbgs() << "genericParams.get() = " << genericParams.get() << "\n";
+  llvm::dbgs() << "&genericParams.get()->params = " << &genericParams.get()->params << "\n";
+  llvm::dbgs() << "genericParams.get()->params.data() = " << genericParams.get()->params.data()
+               << "\n";
+  llvm::dbgs() << "&genericParams.get()->names = " << &genericParams.get()->names << "\n";
+  llvm::dbgs() << "genericParams.get()->names.data() = " << genericParams.get()->names.data()
+               << "\n";
+  paddr(constructorParams);
+  llvm::dbgs() << "constructorParams.get() = " << constructorParams.get() << "\n";
+  paddr(frame);
+  paddr(slot);
+#undef paddr
+#endif
   variadic = other.variadic;
   specialized = other.specialized;
   selfConstructor = other.selfConstructor;
@@ -174,8 +196,8 @@ TypeBinding &TypeBinding::operator=(const TypeBinding &other) {
   genericParamName = other.genericParamName;
   superType = other.superType;
   members = other.members;
-  genericParams = new ParamsStorage(*other.genericParams);
-  constructorParams = new ParamsStorage(*other.constructorParams);
+  genericParams = other.genericParams;
+  constructorParams = other.constructorParams;
   frame = other.frame;
   slot = other.slot;
   return *this;
@@ -194,10 +216,8 @@ TypeBinding &TypeBinding::operator=(TypeBinding &&other) {
     genericParamName = std::move(other.genericParamName);
     superType = std::move(other.superType);
     members = std::move(other.members);
-    genericParams = other.genericParams;
-    other.genericParams = nullptr;
-    constructorParams = other.constructorParams;
-    other.constructorParams = nullptr;
+    genericParams = std::move(other.genericParams);
+    constructorParams = std::move(other.constructorParams);
     frame = other.frame;
     slot = std::move(other.slot);
   }
@@ -207,9 +227,15 @@ TypeBinding &TypeBinding::operator=(TypeBinding &&other) {
 TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
     print(llvm::dbgs());
+    other.print(llvm::dbgs() << " is a subtype of ");
+    llvm::dbgs() << "\n";
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
+    other.print(llvm::dbgs());
+    print(llvm::dbgs() << " is a subtype of ");
+    llvm::dbgs() << "\n";
+
     return *this;
   }
 
@@ -218,6 +244,12 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   while (type != nullptr && failed(other.subtypeOf(*type))) {
     type = type->superType;
   }
+  if (type != nullptr) {
+    type->print(llvm::dbgs() << "Deduced type is ");
+  } else {
+    TypeBinding(loc).print(llvm::dbgs() << "Failed to deduce type, falling back to ");
+  }
+  llvm::dbgs() << "\n";
   return type != nullptr ? *type : TypeBinding(loc);
 }
 mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
@@ -277,11 +309,12 @@ TypeBinding TypeBinding::ReplaceFrame(Frame newFrame) const {
 SmallVector<Location> TypeBinding::getConstructorParamLocations() const {
   SmallVector<Location> locs;
   std::transform(
-      Params(*constructorParams).begin(), Params(*constructorParams).end(),
-      std::back_inserter(locs), [](auto &binding) { return binding.loc; }
+      getConstructorParams().begin(), getConstructorParams().end(), std::back_inserter(locs),
+      [](auto &binding) { return binding.loc; }
   );
   return locs;
 }
+
 bool TypeBinding::operator==(const TypeBinding &other) const {
   bool superTypeIsEqual;
   if (superType == nullptr && other.superType == nullptr) {
@@ -296,11 +329,29 @@ bool TypeBinding::operator==(const TypeBinding &other) const {
          selfConstructor == other.selfConstructor && builtin == other.builtin &&
          name == other.name && constExpr == other.constExpr &&
          genericParamName == other.genericParamName && members == other.members &&
-         genericParams == other.genericParams && constructorParams == other.constructorParams;
+         getGenericParamsMapping() == other.getGenericParamsMapping() &&
+         getConstructorParams() == other.getConstructorParams();
 }
 
-const Params TypeBinding::getConstructorParams() const { return Params(*constructorParams); }
-Params TypeBinding::getConstructorParams() { return Params(*constructorParams); }
+Params TypeBinding::getConstructorParams() const { return constructorParams; }
+MutableParams TypeBinding::getConstructorParams() { return constructorParams; }
+
+ParamsStorage *TypeBinding::ParamsStorageFactory::init() { return new ParamsStorage(); }
+
+TypeBinding::ParamsStoragePtr::operator Params() const { return Params(this->operator*()); }
+TypeBinding::ParamsStoragePtr::operator MutableParams() { return MutableParams(this->operator*()); }
+
+TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMap &map) {
+  set(new ParamsStorage(map));
+  return *this;
+}
+TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMap &&map) {
+  set(new ParamsStorage(map));
+  return *this;
+}
+
+TypeBinding::ParamsStoragePtr::ParamsStoragePtr(ParamsMap &map)
+    : zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>(new ParamsStorage(map)) {}
 
 const TypeBinding &TypeBinding::StripConst(const TypeBinding &binding) {
   if (binding.isConst()) {
@@ -355,7 +406,7 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
       getGenericParamsMapping().printNames(os);
     }
     if (fullPrintout) {
-      Params(*constructorParams).printParams(os, false, '(', ')');
+      getConstructorParams().printParams(os, false, '(', ')');
     }
     if (variadic) {
       os << "...";
@@ -449,7 +500,7 @@ ArrayRef<ParamName> TypeBinding::getGenericParamNames() const {
 }
 
 #ifndef NDEBUG
-llvm::raw_ostream &p(FrameSlot *slot) {
+static llvm::raw_ostream &p(FrameSlot *slot) {
   if (slot) {
     slot->print(llvm::dbgs() << slot << " ");
   } else {
@@ -478,12 +529,9 @@ void TypeBinding::selfConstructs() {
     return;
   }
   selfConstructor = true;
-  ParamsMap map = Params(*constructorParams);
-  map.clear();
-  map.insert({"x", {*this, 0}});
-
-  constructorParams = new ParamsStorage(map);
+  constructorParams = ParamsMap({{"x", {*this, 0}}});
 }
+
 const MembersMap &TypeBinding::getMembers() const { return members; }
 MembersMap &TypeBinding::getMembers() { return members; }
 mlir::Location TypeBinding::getLocation() const { return loc; }
@@ -523,11 +571,13 @@ llvm::StringRef TypeBinding::getGenericParamName() const {
   return *genericParamName;
 }
 
-const Params TypeBinding::getGenericParamsMapping() const { return Params(*genericParams); }
+Params TypeBinding::getGenericParamsMapping() const { return genericParams; }
 
-Params TypeBinding::getGenericParamsMapping() { return Params(*genericParams); }
+MutableParams TypeBinding::getGenericParamsMapping() { return genericParams; }
 
 void TypeBinding::replaceGenericParamByName(StringRef paramName, const TypeBinding &binding) {
+  binding.print(llvm::dbgs() << "Replacing " << paramName << " with ", true);
+  llvm::dbgs() << "\n";
   getGenericParamsMapping().replaceParam(paramName, binding);
 }
 TypeBinding &TypeBinding::getSuperType() {

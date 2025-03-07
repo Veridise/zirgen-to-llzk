@@ -169,7 +169,7 @@ Type specializeAndMaterializeTypeBinding(
 }
 
 FunctionType materializeTypeBindingConstructor(OpBuilder &builder, const TypeBinding &binding) {
-  auto &genericParams = binding.getGenericParamsMapping();
+  auto genericParams = binding.getGenericParamsMapping();
   // Create the type of the binding and of each argument
   // then return a function type using the generated types.
   // If any of the given types is a null just return nullptr for the whole thing.
@@ -181,7 +181,7 @@ FunctionType materializeTypeBindingConstructor(OpBuilder &builder, const TypeBin
   }
 
   LLVM_DEBUG(llvm::dbgs() << "For binding " << binding << " constructor types are: \n");
-  auto &params = binding.getConstructorParams();
+  auto params = binding.getConstructorParams();
   std::transform(params.begin(), params.end(), std::back_inserter(args), [&](auto &argBinding) {
     LLVM_DEBUG(llvm::dbgs() << "|  " << argBinding << "\n");
     auto materializedType =

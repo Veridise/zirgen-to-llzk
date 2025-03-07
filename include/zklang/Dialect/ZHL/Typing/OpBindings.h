@@ -81,6 +81,9 @@ private:
 };
 
 class ValueBindings : public OpBindingsMap<mlir::Value> {
+public:
+  void emitRemarks() const;
+
 protected:
   mlir::Value opToKey(mlir::Operation *op) const final;
   void validateOp(mlir::Operation *op) const final;
@@ -88,6 +91,9 @@ protected:
 };
 
 class StmtBindings : public OpBindingsMap<mlir::Operation *> {
+public:
+  void emitRemarks() const;
+
 protected:
   mlir::Operation *opToKey(mlir::Operation *op) const final;
   void validateOp(mlir::Operation *op) const final;
@@ -107,6 +113,7 @@ public:
   bool contains(mlir::Operation *op) const final;
   bool containsValue(mlir::Value v) const;
   void print(llvm::raw_ostream &os) const final;
+  void emitRemarks() const;
   bool missingBindings() const final;
 
   mlir::SmallVector<TypeBinding *> getClosures();

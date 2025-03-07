@@ -95,7 +95,7 @@ ComponentOp ComponentBuilder::build(mlir::OpBuilder &builder) {
   return op;
 }
 
-ComponentBuilder &ComponentBuilder::typeParams(mlir::ArrayRef<SmallString<10>> params) {
+ComponentBuilder &ComponentBuilder::typeParams(mlir::ArrayRef<std::string> params) {
   ctx.typeParams.insert(ctx.typeParams.end(), params.begin(), params.end());
   return *this;
 }

@@ -19,6 +19,7 @@
 #include <zklang/Dialect/ZHL/Typing/Expr.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
+#include <zklang/Support/CopyablePointer.h>
 
 namespace llvm {
 class raw_ostream;
@@ -33,16 +34,34 @@ class TypeBindings;
 
 using MembersMap = llvm::StringMap<std::optional<TypeBinding>>;
 using EmitErrorFn = llvm::function_ref<mlir::InFlightDiagnostic()>;
-using ParamName = mlir::SmallString<10>;
+using ParamName = std::string;
 using ParamsMap = llvm::StringMap<std::pair<TypeBinding, uint64_t>>;
 using ParamsList = mlir::SmallVector<TypeBinding, 0>;
 using ParamNames = mlir::SmallVector<ParamName>;
 
 struct ParamsStorage;
 class Params;
+class MutableParams;
 
 /// Binding to a ZIR type
 class TypeBinding {
+private:
+  struct ParamsStorageFactory {
+    /// Initializes empty storage
+    static ParamsStorage *init();
+  };
+
+  struct ParamsStoragePtr : public zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory> {
+    using zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>::CopyablePointer;
+
+    ParamsStoragePtr(ParamsMap &);
+    operator MutableParams();
+    operator Params() const;
+
+    ParamsStoragePtr &operator=(ParamsMap &);
+    ParamsStoragePtr &operator=(ParamsMap &&);
+  };
+
 public:
   class Name {
   public:
@@ -100,10 +119,10 @@ public:
   mlir::MutableArrayRef<TypeBinding> getGenericParams();
   mlir::ArrayRef<TypeBinding> getGenericParams() const;
   mlir::SmallVector<mlir::Location> getConstructorParamLocations() const;
-  const Params getConstructorParams() const;
-  Params getConstructorParams();
-  const Params getGenericParamsMapping() const;
-  Params getGenericParamsMapping();
+  Params getConstructorParams() const;
+  MutableParams getConstructorParams();
+  Params getGenericParamsMapping() const;
+  MutableParams getGenericParamsMapping();
   const MembersMap &getMembers() const;
   MembersMap &getMembers();
   mlir::Location getLocation() const;
@@ -191,11 +210,11 @@ private:
   mlir::Location loc;
   // std::optional<uint64_t> constVal;
   expr::ConstExpr constExpr;
-  std::optional<llvm::SmallString<2>> genericParamName;
+  std::optional<std::string> genericParamName;
   TypeBinding *superType;
   MembersMap members;
-  ParamsStorage *genericParams;
-  ParamsStorage *constructorParams;
+  ParamsStoragePtr genericParams;
+  ParamsStoragePtr constructorParams;
   Frame frame;
   FrameSlot *slot = nullptr;
 };

@@ -94,7 +94,7 @@ ValExpr::ValExpr() = default;
 ValExpr::ValExpr(const ConstExpr &Expr) : expr(Expr) {}
 
 bool ValExpr::classof(const ConstExpr *expr) {
-  if (!expr && !*expr) {
+  if (!(expr && expr->get())) {
     return false;
   }
   return mlir::isa<detail::Val>(**expr);
@@ -113,7 +113,7 @@ SymExpr::SymExpr() = default;
 SymExpr::SymExpr(const ConstExpr &Expr) : expr(Expr) {}
 
 bool SymExpr::classof(const ConstExpr *expr) {
-  if (!expr && !*expr) {
+  if (!(expr && expr->get())) {
     return false;
   }
   return mlir::isa<detail::Symbol>(**expr);
@@ -132,7 +132,7 @@ CtorExpr::CtorExpr() = default;
 CtorExpr::CtorExpr(const ConstExpr &Expr) : expr(Expr) {}
 
 bool CtorExpr::classof(const ConstExpr *expr) {
-  if (!expr && !*expr) {
+  if (!(expr && expr->get())) {
     return false;
   }
   return mlir::isa<detail::Ctor>(**expr);

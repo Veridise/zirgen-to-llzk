@@ -26,6 +26,38 @@ void ValueBindings::validateOp(Operation *op) const {
 
 void ValueBindings::printKey(Value k, raw_ostream &os) const { os << k; }
 
+static Operation *findOpFromValue(Value v) {
+  if (auto op = v.getDefiningOp()) {
+    return op;
+  }
+  auto region = v.getParentRegion();
+  if (!region) {
+    return nullptr;
+  }
+  return region->getParentOp();
+}
+
+void ValueBindings::emitRemarks() const {
+  for (auto &[val, binding] : *this) {
+    auto op = findOpFromValue(val);
+    auto valIsOp = val.getDefiningOp() != nullptr;
+    assert(op);
+    if (mlir::failed(binding)) {
+      if (valIsOp) {
+        op->emitError() << "type check failed";
+      } else {
+        op->emitError() << "type check for value " << val << " failed ";
+      }
+    } else {
+      if (valIsOp) {
+        op->emitRemark() << "type: " << *binding;
+      } else {
+        op->emitRemark() << "type for value " << val << ": " << *binding;
+      }
+    }
+  }
+}
+
 Operation *StmtBindings::opToKey(Operation *op) const { return op; }
 
 void StmtBindings::validateOp(Operation *op) const {
@@ -33,6 +65,16 @@ void StmtBindings::validateOp(Operation *op) const {
 }
 
 void StmtBindings::printKey(Operation *k, raw_ostream &os) const { os << *k; }
+
+void StmtBindings::emitRemarks() const {
+  for (auto &[op, binding] : *this) {
+    if (mlir::failed(binding)) {
+      op->emitError() << "type check failed";
+    } else {
+      op->emitRemark() << "type: " << *binding;
+    }
+  }
+}
 
 FailureOr<TypeBinding> ZhlOpBindings::addValue(Value v, FailureOr<TypeBinding> type) {
   return values.addType(v, type);
@@ -80,4 +122,10 @@ mlir::SmallVector<TypeBinding *> ZhlOpBindings::getClosures() {
 
   return closures;
 }
+
+void ZhlOpBindings::emitRemarks() const {
+  values.emitRemarks();
+  stmts.emitRemarks();
+}
+
 } // namespace zhl

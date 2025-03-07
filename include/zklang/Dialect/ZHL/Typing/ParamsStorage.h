@@ -7,7 +7,7 @@
 
 namespace zhl {
 
-using ParamName = mlir::SmallString<10>;
+using ParamName = std::string;
 using ParamsList = mlir::SmallVector<TypeBinding, 0>;
 using ParamNames = mlir::SmallVector<ParamName>;
 using ParamsMap = llvm::StringMap<std::pair<TypeBinding, uint64_t>>;
@@ -16,7 +16,10 @@ struct ParamsStorage {
   ParamsList params;
   ParamNames names;
 
-  ParamsStorage(ParamsMap map);
+  ParamsStorage();
+  ParamsStorage(ParamsMap &map);
+
+  bool operator==(const ParamsStorage &) const;
 };
 
 } // namespace zhl

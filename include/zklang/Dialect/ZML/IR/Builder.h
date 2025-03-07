@@ -116,7 +116,7 @@ public:
 
   ComponentBuilder &typeParam(mlir::StringRef param);
 
-  ComponentBuilder &typeParams(mlir::ArrayRef<llvm::SmallString<10>> params);
+  ComponentBuilder &typeParams(mlir::ArrayRef<std::string> params);
 
   /// Stores a callback that gets executed right after the component op is created but before it is
   /// filled with the rest of the configuration. Allows configuring the builder with information

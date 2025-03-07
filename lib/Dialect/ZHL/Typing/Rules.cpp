@@ -546,15 +546,19 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
   }
 
   auto get = [](const TypeBinding &t) -> const TypeBinding & {
-    if (t.isKnownConst()) {
-      return t.getSuperType();
-    }
+    // if (t.isKnownConst()) {
+    //   return t.getSuperType();
+    // }
     return t;
   };
 
   auto &fst = get(operands.front());
   auto commonType =
       std::reduce(operands.drop_front().begin(), operands.end(), fst, [&](auto &lhs, auto &rhs) {
+    llvm::dbgs() << "lhs == rhs? " << (lhs == rhs) << "\n";
+    lhs.print(llvm::dbgs() << "\nlhs = ", true);
+    rhs.print(llvm::dbgs() << "\nrhs = ", true);
+    llvm::dbgs() << "\n";
     return get(lhs).commonSupertypeWith(get(rhs));
   });
 

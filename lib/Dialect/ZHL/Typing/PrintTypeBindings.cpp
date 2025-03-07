@@ -25,18 +25,12 @@ namespace {
 class PrintTypeBindingsPass : public PrintTypeBindingsBase<PrintTypeBindingsPass> {
 
   void runOnOperation() override {
-    /*ModuleOp mod = getOperation();*/
-
-    /*TypeBindings bindings;*/
-    /*zkc::Zmir::addBuiltinBindings(bindings);*/
-
-    /*auto result = typeCheck(mod, bindings, zhlTypingRules(bindings));*/
     auto &analysis = getAnalysis<ZIRTypeAnalysis>();
-
-    analysis.dump();
     if (mlir::failed(analysis)) {
       signalPassFailure();
+      return;
     }
+    analysis.emitRemarks();
   }
 };
 
