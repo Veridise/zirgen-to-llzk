@@ -279,104 +279,104 @@ void zml::addBuiltinBindings(
 
   MAYBE("NondetReg") {
     bindings.CreateBuiltin(
-        "NondetReg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+        "NondetReg", Val, zhl::ParamsMap(), zhl::ParamsMap({{"v", {Val, 0}}}), zhl::MembersMap()
     );
   }
   MAYBE("NondetExtReg") {
     bindings.CreateBuiltin(
-        "NondetExtReg", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, ExtVal}}),
+        "NondetExtReg", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{"v", {ExtVal, 0}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("InRange") {
     bindings.CreateBuiltin(
         "InRange", Val, zhl::ParamsMap(),
-        zhl::ParamsMap({{{"low", 0}, Val}, {{"mid", 1}, Val}, {{"high", 2}, Val}}),
+        zhl::ParamsMap({{"low", {Val, 0}}, {"mid", {Val, 1}}, {"high", {Val, 2}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("BitAnd") {
     bindings.CreateBuiltin(
-        "BitAnd", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+        "BitAnd", Val, zhl::ParamsMap(), zhl::ParamsMap({{"lhs", {Val, 0}}, {"rhs", {Val, 1}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("Add") {
     bindings.CreateBuiltin(
-        "Add", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+        "Add", Val, zhl::ParamsMap(), zhl::ParamsMap({{"lhs", {Val, 0}}, {"rhs", {Val, 1}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("ExtAdd") {
     bindings.CreateBuiltin(
         "ExtAdd", ExtVal, zhl::ParamsMap(),
-        zhl::ParamsMap({{{"lhs", 0}, ExtVal}, {{"rhs", 1}, ExtVal}}), zhl::MembersMap()
+        zhl::ParamsMap({{"lhs", {ExtVal, 0}}, {"rhs", {ExtVal, 1}}}), zhl::MembersMap()
     );
   }
   MAYBE("Sub") {
     bindings.CreateBuiltin(
-        "Sub", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+        "Sub", Val, zhl::ParamsMap(), zhl::ParamsMap({{"lhs", {Val, 0}}, {"rhs", {Val, 1}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("ExtSub") {
     bindings.CreateBuiltin(
         "ExtSub", ExtVal, zhl::ParamsMap(),
-        zhl::ParamsMap({{{"lhs", 0}, ExtVal}, {{"rhs", 1}, ExtVal}}), zhl::MembersMap()
+        zhl::ParamsMap({{"lhs", {ExtVal, 0}}, {"rhs", {ExtVal, 1}}}), zhl::MembersMap()
     );
   }
   MAYBE("Mul") {
     bindings.CreateBuiltin(
-        "Mul", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+        "Mul", Val, zhl::ParamsMap(), zhl::ParamsMap({{"lhs", {Val, 0}}, {"rhs", {Val, 1}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("ExtMul") {
     bindings.CreateBuiltin(
         "ExtMul", ExtVal, zhl::ParamsMap(),
-        zhl::ParamsMap({{{"lhs", 0}, ExtVal}, {{"rhs", 1}, ExtVal}}), zhl::MembersMap()
+        zhl::ParamsMap({{"lhs", {ExtVal, 0}}, {"rhs", {ExtVal, 1}}}), zhl::MembersMap()
     );
   }
   MAYBE("Mod") {
     bindings.CreateBuiltin(
-        "Mod", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"lhs", 0}, Val}, {{"rhs", 1}, Val}}),
+        "Mod", Val, zhl::ParamsMap(), zhl::ParamsMap({{"lhs", {Val, 0}}, {"rhs", {Val, 1}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("Inv") {
     bindings.CreateBuiltin(
-        "Inv", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+        "Inv", Val, zhl::ParamsMap(), zhl::ParamsMap({{"v", {Val, 0}}}), zhl::MembersMap()
     );
   }
   MAYBE("ExtInv") {
     bindings.CreateBuiltin(
-        "ExtInv", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, ExtVal}}), zhl::MembersMap()
+        "ExtInv", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{"v", {ExtVal, 0}}}), zhl::MembersMap()
     );
   }
   MAYBE("Isz") {
     bindings.CreateBuiltin(
-        "Isz", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+        "Isz", Val, zhl::ParamsMap(), zhl::ParamsMap({{"v", {Val, 0}}}), zhl::MembersMap()
     );
   }
   MAYBE("Neg") {
     bindings.CreateBuiltin(
-        "Neg", Val, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+        "Neg", Val, zhl::ParamsMap(), zhl::ParamsMap({{"v", {Val, 0}}}), zhl::MembersMap()
     );
   }
   MAYBE("MakeExt") {
     bindings.CreateBuiltin(
-        "MakeExt", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, Val}}), zhl::MembersMap()
+        "MakeExt", ExtVal, zhl::ParamsMap(), zhl::ParamsMap({{"v", {Val, 0}}}), zhl::MembersMap()
     );
   }
   MAYBE("EqzExt") {
     bindings.CreateBuiltin(
-        "EqzExt", bindings.Component(), zhl::ParamsMap(), zhl::ParamsMap({{{"v", 0}, ExtVal}}),
+        "EqzExt", bindings.Component(), zhl::ParamsMap(), zhl::ParamsMap({{"v", {ExtVal, 0}}}),
         zhl::MembersMap()
     );
   }
   MAYBE("Array") {
     auto &Array = bindings.CreateBuiltin(
-        "Array", bindings.Component(), zhl::ParamsMap({{{"T", 0}, T}, {{"N", 1}, N}})
+        "Array", bindings.Component(), zhl::ParamsMap({{"T", {T, 0}}, {"N", {N, 1}}})
     );
     const_cast<zhl::TypeBinding &>(Array).selfConstructs();
   }

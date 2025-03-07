@@ -17,11 +17,24 @@ ComponentScope::ComponentScope(ComponentOp component, TypeBindings &bindings)
 ComponentScope::~ComponentScope() { createBinding(component.getName(), component.getLoc()); }
 
 void ComponentScope::declareGenericParam(StringRef name, uint64_t index, TypeBinding type) {
-  genericParams.insert({{name, index}, type});
+  genericParams.insert({name, {type, index}});
+}
+
+TypeBinding ComponentScope::declareLiftedAffineToGenericParam(const TypeBinding &type) {
+  assert(type.hasConstExpr() && "Can't lift a non constant binding");
+  assert(
+      mlir::isa<expr::CtorExpr>(type.getConstExpr()) &&
+      "Can't lift a constant binding that is not a constructor expression"
+  );
+
+  Twine name("Aff$" + Twine(liftedParams.size()));
+  auto allocName = name.str();
+  liftedParams.insert({allocName, {type, liftedParams.size()}});
+  return TypeBinding::MakeGenericParam(bindings->Manage(type), allocName);
 }
 
 void ComponentScope::declareConstructorParam(StringRef name, uint64_t index, TypeBinding type) {
-  constructorParams.insert({{name, index}, type});
+  constructorParams.insert({name, {type, index}});
 }
 
 void ComponentScope::declareSuperType(TypeBinding type) { superType = type; }
@@ -60,6 +73,10 @@ ChildScope::ChildScope(ScopeKind Kind, Scope &parentScope) : Scope(Kind), parent
 
 void ChildScope::declareGenericParam(StringRef name, uint64_t index, TypeBinding type) {
   parent->declareGenericParam(name, index, type);
+}
+
+TypeBinding ChildScope::declareLiftedAffineToGenericParam(const TypeBinding &type) {
+  return parent->declareLiftedAffineToGenericParam(type);
 }
 
 void ChildScope::declareConstructorParam(StringRef name, uint64_t index, TypeBinding type) {
@@ -122,7 +139,7 @@ void collectTypeVarsFromGenericParams(
 
 TypeBinding BlockScope::createBinding(StringRef name, Location loc) const {
   assert(succeeded(superType));
-  ParamsMap ctorArgs({{{"super", 0}, *superType}});
+  ParamsMap ctorArgs({{"super", {*superType, 0}}});
   std::vector<std::string_view> sortedFieldNames;
   sortedFieldNames.reserve(members.size());
   llvm::StringMap<const TypeBinding *> varNames;
@@ -131,7 +148,7 @@ TypeBinding BlockScope::createBinding(StringRef name, Location loc) const {
       members.begin(), members.end(), std::back_inserter(sortedFieldNames),
       [&](auto &p) {
     collectTypeVarsFromGenericParams(*p.second, varNames);
-    return p.first;
+    return p.first();
   }
   );
   std::sort(sortedFieldNames.begin(), sortedFieldNames.end());
@@ -139,14 +156,14 @@ TypeBinding BlockScope::createBinding(StringRef name, Location loc) const {
   for (auto &fieldName : sortedFieldNames) {
     auto memberBinding = members.at(fieldName);
     assert(memberBinding.has_value());
-    ctorArgs.insert({{fieldName, argNo}, *memberBinding});
+    ctorArgs.insert({fieldName, {*memberBinding, argNo}});
     argNo++;
   }
   collectTypeVarsFromGenericParams(*superType, varNames);
   ParamsMap genericParams;
   size_t paramNo = 0;
   for (auto &[varName, type] : varNames) {
-    genericParams.insert({{varName, paramNo}, *type});
+    genericParams.insert({varName, {*type, paramNo}});
     paramNo++;
   }
 
@@ -165,10 +182,9 @@ void LexicalScopeImpl::declareMemberImpl(StringRef name) {
 void LexicalScopeImpl::declareMemberImpl(StringRef name, TypeBinding type) {
   // If the value is present and we are (re-)declaring it
   // we can only do so if it has not value.
-  if (members.find(name) != members.end() && members[name].has_value()) {
-    return;
+  if (!memberDeclaredWithTypeImpl(name)) {
+    members[name] = type;
   }
-  members[name] = type;
 }
 
 bool LexicalScopeImpl::memberDeclaredWithTypeImpl(StringRef name) {

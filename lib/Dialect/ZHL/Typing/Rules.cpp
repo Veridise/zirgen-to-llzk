@@ -41,18 +41,43 @@ mlir::FailureOr<TypeBinding> GlobalTypingRule::
   return interpretateOp(op, *binding);
 }
 
+// If the type we are going to declare as constructor parameter has a parameter that would
+// generate an AffineMap (i.e. a CtorExpr) then we declare a new generic parameter that has the
+// type of the binding that would generate the AffineMap and replace it in the type with a
+// variable that points to the binding.
+
+static void liftCtorExpressions(TypeBinding &binding, Scope &scope) {
+  if (mlir::isa<expr::CtorExpr>(binding.getConstExpr())) {
+    binding = scope.declareLiftedAffineToGenericParam(binding);
+    return;
+  }
+
+  assert(binding.isSpecialized());
+  for (auto &param : binding.getGenericParams()) {
+    liftCtorExpressions(param, scope);
+  }
+}
+
 mlir::FailureOr<TypeBinding> ParameterTypingRule::
     typeCheck(zirgen::Zhl::ConstructorParamOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
     return mlir::failure();
   }
-  auto arg = interpretateOp(
-      op, (op.getVariadic() ? TypeBinding::WrapVariadic(operands[0]) : operands[0])
-              .WithUpdatedLocation(op.getLoc())
+  auto &arg = operands[0];
+  if (!arg.isSpecialized()) {
+    return op->emitError() << "cannot use on non-concrete type '" << arg
+                           << "' as component argument #" << op.getIndex();
+  }
+  if (arg.hasConstExpr()) {
+    return op->emitError() << "cannot use a constant expression as parameter type";
+  }
+  auto interpretatedArg = interpretateOp(
+      op, (op.getVariadic() ? TypeBinding::WrapVariadic(arg) : arg).WithUpdatedLocation(op.getLoc())
   );
-  scope.declareConstructorParam(op.getName(), op.getIndex(), arg);
-  return arg;
+  liftCtorExpressions(interpretatedArg, scope);
+  scope.declareConstructorParam(op.getName(), op.getIndex(), interpretatedArg);
+  return interpretatedArg;
 }
 
 mlir::FailureOr<TypeBinding> ExternTypingRule::

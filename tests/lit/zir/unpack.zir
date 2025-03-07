@@ -3,3 +3,7 @@
 component Unpack<N: Val, P: Val>(in: Array<Val, N/P>) {
   in[0]
 }
+
+component User1() {
+  Unpack<8,2>([0,0,0,0])
+}

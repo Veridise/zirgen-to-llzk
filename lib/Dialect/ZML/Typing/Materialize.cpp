@@ -4,6 +4,7 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <unordered_set>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
 #include <zklang/Dialect/ZHL/Typing/Specialization.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/IR/Types.h>

@@ -51,6 +51,11 @@ void storeSlot(
 /// said array is one of the super types of the input's type.
 mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentType> v, mlir::OpBuilder &);
 
+/// Given a list of types, populates a map with pairs of AffineMap and SymbolRefAttr that represents
+/// the parameter each AffineMap may get replaced with. The AffineMaps are extracted from the
+/// parameters of the types that are ComponentTypes.
+void populateAffineMapsToSymbolsMap(mlir::ArrayRef<mlir::Type>, mlir::DenseMap<mlir::AffineMap, mlir::SymbolRefAttr> &, mlir::MLIRContext *);
+
 /// Calls the constructor of the POD component associated with the binding using the provided super
 /// type value. The rest of the fields of the POD component are read from the actual component using
 /// the slots associated with the member's bindings.

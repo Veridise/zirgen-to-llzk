@@ -7,7 +7,7 @@
 #include <zklang/Dialect/ZHL/Typing/Expr.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
-#include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 
 #define DEBUG_TYPE "zhl-type-bindings"
 
@@ -16,34 +16,34 @@ using namespace mlir;
 
 namespace zhl {
 
-struct TypeBindingName::Impl {
+struct TypeBinding::Name::Impl {
   Impl(mlir::StringRef nameRef) : name(nameRef) {}
 
-  std::string name;
+  llvm::SmallString<10> name;
 };
 
-TypeBindingName::TypeBindingName(const TypeBindingName &) = default;
-TypeBindingName &TypeBindingName::operator=(const TypeBindingName &) = default;
-TypeBindingName::TypeBindingName(TypeBindingName &&) = default;
-TypeBindingName &TypeBindingName::operator=(TypeBindingName &&) = default;
+TypeBinding::Name::Name(const Name &) = default;
+TypeBinding::Name &TypeBinding::Name::operator=(const Name &) = default;
+TypeBinding::Name::Name(Name &&) = default;
+TypeBinding::Name &TypeBinding::Name::operator=(Name &&) = default;
 
-TypeBindingName::TypeBindingName(mlir::StringRef name) : impl(std::make_shared<Impl>(name)) {}
+TypeBinding::Name::Name(mlir::StringRef name) : impl(std::make_shared<Impl>(name)) {}
 
-TypeBindingName::~TypeBindingName() = default;
+TypeBinding::Name::~Name() = default;
 
-TypeBindingName &TypeBindingName::operator=(mlir::StringRef newName) {
+TypeBinding::Name &TypeBinding::Name::operator=(mlir::StringRef newName) {
   impl->name = newName;
   return *this;
 }
 
-TypeBindingName::operator mlir::StringRef() const { return impl->name; }
+TypeBinding::Name::operator mlir::StringRef() const { return impl->name; }
 
-StringRef TypeBindingName::ref() const { return impl->name; }
+StringRef TypeBinding::Name::ref() const { return impl->name; }
 
-bool TypeBindingName::operator==(const TypeBindingName &other) const {
+bool TypeBinding::Name::operator==(const TypeBinding::Name &other) const {
   return ref() == other.ref();
 }
 
-bool TypeBindingName::operator==(mlir::StringRef s) const { return ref() == s; }
+bool TypeBinding::Name::operator==(mlir::StringRef s) const { return ref() == s; }
 
 } // namespace zhl

@@ -1,6 +1,8 @@
 #include <functional>
 #include <zklang/Dialect/ZML/IR/Builder.h>
 
+using namespace mlir;
+
 namespace zml {
 
 ComponentBuilder::BodySrc::~BodySrc() = default;
@@ -17,17 +19,20 @@ bool ComponentBuilder::Ctx::isGeneric() {
   });
 }
 
-std::vector<mlir::NamedAttribute> ComponentBuilder::Ctx::builtinAttrs(mlir::OpBuilder &builder) {
+SmallVector<mlir::NamedAttribute> ComponentBuilder::Ctx::builtinAttrs(mlir::OpBuilder &builder) {
   return {mlir::NamedAttribute(builder.getStringAttr("builtin"), builder.getUnitAttr())};
 }
-std::vector<mlir::NamedAttribute> ComponentBuilder::Ctx::funcBodyAttrs(mlir::OpBuilder &builder) {
+
+SmallVector<mlir::NamedAttribute> ComponentBuilder::Ctx::funcBodyAttrs(mlir::OpBuilder &builder) {
   return {
       mlir::NamedAttribute(builder.getStringAttr("sym_visibility"), builder.getStringAttr("public"))
   };
 }
+
 void ComponentBuilder::Ctx::addBody(ComponentOp op, mlir::OpBuilder &builder) {
   body->set(op, *this, builder);
 }
+
 void ComponentBuilder::Ctx::addFields(mlir::OpBuilder &builder) {
   for (auto &field : fields) {
     builder.create<FieldDefOp>(
@@ -46,7 +51,7 @@ void ComponentBuilder::Ctx::checkBareRequirements() {
 
 ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   auto builtin = builtinAttrs(builder);
-  std::vector<mlir::NamedAttribute> closure;
+  SmallVector<mlir::NamedAttribute> closure;
   mlir::ArrayRef<mlir::NamedAttribute> attrs;
   if (isClosure) {
     attrs = closure;
@@ -55,7 +60,12 @@ ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   }
 
   if (isGeneric()) {
-    return builder.create<ComponentOp>(*loc, compName, typeParams, attrs);
+    SmallVector<StringRef> typeParamsRefs;
+    std::transform(
+        typeParams.begin(), typeParams.end(), std::back_inserter(typeParamsRefs),
+        [](auto &s) { return s.str(); }
+    );
+    return builder.create<ComponentOp>(*loc, compName, typeParamsRefs, attrs);
   } else {
     return builder.create<ComponentOp>(*loc, compName, attrs);
   }
@@ -85,44 +95,49 @@ ComponentOp ComponentBuilder::build(mlir::OpBuilder &builder) {
   return op;
 }
 
-ComponentBuilder &ComponentBuilder::typeParams(mlir::ArrayRef<std::string> params) {
-  for (auto &name : params) {
-    typeParam(name);
-  }
+ComponentBuilder &ComponentBuilder::typeParams(mlir::ArrayRef<SmallString<10>> params) {
+  ctx.typeParams.insert(ctx.typeParams.end(), params.begin(), params.end());
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::typeParam(mlir::StringRef param) {
   ctx.typeParams.push_back(param);
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::attrs(mlir::ArrayRef<mlir::NamedAttribute> attrs) {
-  ctx.compAttrs = attrs;
+  ctx.compAttrs = SmallVector<NamedAttribute>(attrs);
   return *this;
 }
-ComponentBuilder &ComponentBuilder::field(std::string_view name, mlir::Type type) {
+
+ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type) {
   ctx.fields.push_back({.name = name, .type = type, .loc = std::nullopt});
   return *this;
 }
-ComponentBuilder &
-ComponentBuilder::field(std::string_view name, mlir::Type type, mlir::Location loc) {
+
+ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type, mlir::Location loc) {
   ctx.fields.push_back({.name = name, .type = type, .loc = loc});
   return *this;
 }
-ComponentBuilder &ComponentBuilder::name(std::string_view name) {
+
+ComponentBuilder &ComponentBuilder::name(StringRef name) {
   ctx.compName = name;
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::location(mlir::Location loc) {
   ctx.loc = loc;
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::constructor(
-    mlir::FunctionType constructorType, std::vector<mlir::Location> argLocs
+    mlir::FunctionType constructorType, ArrayRef<mlir::Location> argLocs
 ) {
   ctx.constructorType = constructorType;
-  ctx.argLocs = argLocs;
+  ctx.argLocs = SmallVector<Location>(argLocs);
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::fillBody(
     mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results,
     std::function<void(mlir::ValueRange, mlir::OpBuilder &)> fn
@@ -130,10 +145,12 @@ ComponentBuilder &ComponentBuilder::fillBody(
   ctx.body = std::make_unique<FillBody>(argTypes, results, fn);
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::takeRegion(mlir::Region *region) {
   ctx.body = std::make_unique<TakeRegion>(region);
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::isBuiltin() {
   ctx.isBuiltin = true;
   return *this;
@@ -143,6 +160,7 @@ ComponentBuilder &ComponentBuilder::isClosure() {
   ctx.isClosure = true;
   return *this;
 }
+
 ComponentBuilder &ComponentBuilder::forceGeneric() {
   ctx.forceSetGeneric = true;
   return *this;
@@ -156,7 +174,7 @@ ComponentBuilder &ComponentBuilder::defer(std::function<void(ComponentOp)> cb) {
 void ComponentBuilder::FillBody::set(ComponentOp op, Ctx &buildCtx, mlir::OpBuilder &builder)
     const {
   buildCtx.constructorType = builder.getFunctionType(argTypes, results);
-  std::vector<mlir::NamedAttribute> attrs = buildCtx.funcBodyAttrs(builder);
+  SmallVector<mlir::NamedAttribute> attrs = buildCtx.funcBodyAttrs(builder);
 
   auto bodyOp = builder.create<mlir::func::FuncOp>(
       builder.getUnknownLoc(), op.getBodyFuncName(), buildCtx.constructorType, attrs

@@ -1,6 +1,8 @@
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/Specialization.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
@@ -49,8 +51,8 @@ void ParamsScopeStack::print(llvm::raw_ostream &os) const {
 
 class ScopeGuard {
 public:
-  explicit ScopeGuard(ParamsScopeStack &stack, const Params &param) : stack(&stack) {
-    stack.pushScope(param);
+  explicit ScopeGuard(ParamsScopeStack &Stack, const Params &param) : stack(&Stack) {
+    stack->pushScope(param);
   }
   ~ScopeGuard() { stack->popScope(); }
 
@@ -99,7 +101,7 @@ inline LogicalResult specializeTypeBinding_genericParamCase(
 inline LogicalResult specializeTypeBinding_genericTypeCase(
     TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t ident
 ) {
-  auto &params = dst->getGenericParamsMapping();
+  auto params = dst->getGenericParamsMapping();
   for (auto &name : dst->getGenericParamNames()) {
 
     LLVM_DEBUG(spaces(ident);
@@ -144,13 +146,10 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     auto copy = *replacement;
     LLVM_DEBUG(llvm::dbgs() << " replaced with " << copy << "\n");
     // And specialize it if necessary
-    auto &newScope = copy.getGenericParamsMapping();
-    {
-      auto result = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
-      if (failed(result)) {
-        LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");
-        return failure();
-      }
+    auto result = specializeTypeBindingImpl(&copy, scopes, FV, ident + 1);
+    if (failed(result)) {
+      LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Failure\n");
+      return failure();
     }
     LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << copy << "  (param)\n");
     // Replace the type binding with the specialization we just generated.
@@ -158,7 +157,7 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
   }
   // After the replacement follow the chain on super types and apply specializations.
   if (dst->hasSuperType()) {
-    auto &superTypeScope = dst->getSuperType().getGenericParamsMapping();
+    auto superTypeScope = dst->getSuperType().getGenericParamsMapping();
     LLVM_DEBUG(spaces(ident);
                llvm::dbgs() << "Specializing super type " << dst->getSuperType() << "\n");
     TypeBinding copy = dst->getSuperType();
@@ -179,9 +178,8 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Into " << dst->getSuperType() << "  (super type)\n");
   }
   // Specialize the types of the constructor's arguments
-  auto &constructorParams = dst->getConstructorParams();
+  auto constructorParams = dst->getConstructorParams();
   for (auto &param : constructorParams) {
-    auto &paramScope = param.getGenericParamsMapping();
     LLVM_DEBUG(spaces(ident);
                llvm::dbgs() << "Specializing constructor argument's type " << param << "\n");
     {
@@ -199,7 +197,7 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
   auto &members = dst->getMembers();
   for (auto &[name, type] : members) {
     if (type.has_value()) {
-      auto &memberScope = type->getGenericParamsMapping();
+      auto memberScope = type->getGenericParamsMapping();
       LLVM_DEBUG(spaces(ident);
                  llvm::dbgs() << "Specializing member " << name << " of type " << *type << "\n");
       {
@@ -273,12 +271,12 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   if (specialized) {
     return emitError() << "can't respecialize type '" << getName() << "'";
   }
-  if (genericParams.size() == 0) {
+  if (getGenericParamsMapping().size() == 0) {
     return emitError() << "type '" << name << "' is not generic";
   }
-  if (genericParams.size() != params.size()) {
+  if (getGenericParamsMapping().size() != params.size()) {
     return emitError() << "wrong number of specialization parameters. Expected "
-                       << genericParams.size() << " but got " << params.size();
+                       << getGenericParamsMapping().size() << " but got " << params.size();
   }
 
   // The root scope for specialization is a mapping between the n-th generic
@@ -289,7 +287,7 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   for (unsigned i = 0; i < params.size(); i++) {
     // TODO: Validate that for a parameter of type Val only constant values or generic parameters of
     // type Val are passed.
-    generics.insert({{genericParams.getName(i), i}, params[i]});
+    generics.insert({getGenericParamsMapping().getName(i), {params[i], i}});
     if (params[i].isGenericParam()) {
       freeVariables.insert(params[i].getGenericParamName());
     }
@@ -297,7 +295,8 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
 
   TypeBinding specializedBinding(*this); // Make a copy to create the specialization
 
-  Params initialScope(generics);
+  ParamsStorage sto(generics);
+  Params initialScope(sto);
   ParamsScopeStack scopeStack(initialScope);
   auto result = specializeTypeBindingImpl(&specializedBinding, scopeStack, freeVariables, 2);
   if (failed(result)) {
