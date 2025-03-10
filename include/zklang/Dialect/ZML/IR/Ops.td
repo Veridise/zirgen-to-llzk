@@ -107,40 +107,33 @@ def ConstructorRefOp : ZMLOp<"constructor", [Pure]> {
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$component,
-      VariadicOfVariadic<Index, "mapOpGroupSizes">:$mapOperands,
-      DefaultValuedAttr<DenseI32ArrayAttr, "{}">:$numDimsPerMap,
-      DenseI32ArrayAttr:$mapOpGroupSizes, UnitAttr:$builtin);
+  let arguments = (ins FlatSymbolRefAttr:$component, IndexAttr:$numLiftedParams,
+      UnitAttr:$builtin);
   let results = (outs FunctionType);
   let assemblyFormat = [{
     attr-dict $component 
-    ( `{` custom<MultiDimAndSymbolList>($mapOperands, $numDimsPerMap)^ `}` )?
     `:` type(results)
   }];
 
   let builders =
-      [OpBuilder<(ins "ComponentInterface":$comp,
-           "llvm::ArrayRef<::mlir::ValueRange>":$mapOperands,
-           "mlir::DenseI32ArrayAttr":$numDimsPerMap, "mlir::FunctionType":$fn)>,
+      [OpBuilder<(ins "ComponentInterface":$comp, "uint64_t":$liftedParams,
+           "mlir::FunctionType":$fn)>,
        OpBuilder<(ins "ComponentInterface":$comp, "mlir::FunctionType":$fn)>,
        OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
-           "llvm::ArrayRef<::mlir::ValueRange>":$mapOperands,
-           "mlir::DenseI32ArrayAttr":$numDimsPerMap, "mlir::FunctionType":$fn,
+           "uint64_t":$liftedParams, "mlir::FunctionType":$fn,
            "bool":$isBuiltin)>,
        OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
            "mlir::FunctionType":$fn, "bool":$isBuiltin)>,
 
-       OpBuilder<(ins "mlir::StringRef":$compSym,
-                     "llvm::ArrayRef<::mlir::ValueRange>":$mapOperands,
-                     "mlir::DenseI32ArrayAttr":$numDimsPerMap,
+       OpBuilder<(ins "mlir::StringRef":$compSym, "uint64_t":$liftedParams,
                      "mlir::FunctionType":$fn, "bool":$isBuiltin),
                  [{
-        build($_builder, $_state, mlir::SymbolRefAttr::get($_builder.getStringAttr(compSym)), mapOperands, numDimsPerMap, fn, isBuiltin);
+        build($_builder, $_state, mlir::SymbolRefAttr::get($_builder.getStringAttr(compSym)), liftedParams, fn, isBuiltin);
        }]>,
        OpBuilder<(ins "mlir::StringRef":$compSym, "mlir::FunctionType":$fn,
                      "bool":$isBuiltin),
                  [{
-        build($_builder, $_state, compSym, {}, {}, fn, isBuiltin);
+        build($_builder, $_state, compSym, 0, fn, isBuiltin);
        }]>,
 
   ];

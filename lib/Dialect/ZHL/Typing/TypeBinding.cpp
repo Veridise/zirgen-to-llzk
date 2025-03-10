@@ -157,34 +157,6 @@ TypeBinding::TypeBinding(TypeBinding &&other)
       slot(std::move(other.slot)) {}
 
 TypeBinding &TypeBinding::operator=(const TypeBinding &other) {
-#if 0
-#define paddr(x) llvm::dbgs() << "&" #x " = " << &x << "\n";
-  paddr(variadic);
-  paddr(specialized);
-  paddr(selfConstructor);
-  paddr(builtin);
-  paddr(closure);
-  paddr(name);
-  paddr(loc);
-  paddr(constExpr);
-  paddr(genericParamName);
-  paddr(superType);
-  paddr(members);
-
-  paddr(genericParams);
-  llvm::dbgs() << "genericParams.get() = " << genericParams.get() << "\n";
-  llvm::dbgs() << "&genericParams.get()->params = " << &genericParams.get()->params << "\n";
-  llvm::dbgs() << "genericParams.get()->params.data() = " << genericParams.get()->params.data()
-               << "\n";
-  llvm::dbgs() << "&genericParams.get()->names = " << &genericParams.get()->names << "\n";
-  llvm::dbgs() << "genericParams.get()->names.data() = " << genericParams.get()->names.data()
-               << "\n";
-  paddr(constructorParams);
-  llvm::dbgs() << "constructorParams.get() = " << constructorParams.get() << "\n";
-  paddr(frame);
-  paddr(slot);
-#undef paddr
-#endif
   variadic = other.variadic;
   specialized = other.specialized;
   selfConstructor = other.selfConstructor;
@@ -226,16 +198,9 @@ TypeBinding &TypeBinding::operator=(TypeBinding &&other) {
 
 TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   if (mlir::succeeded(subtypeOf(other))) {
-    print(llvm::dbgs());
-    other.print(llvm::dbgs() << " is a subtype of ");
-    llvm::dbgs() << "\n";
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
-    other.print(llvm::dbgs());
-    print(llvm::dbgs() << " is a subtype of ");
-    llvm::dbgs() << "\n";
-
     return *this;
   }
 
@@ -244,12 +209,6 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   while (type != nullptr && failed(other.subtypeOf(*type))) {
     type = type->superType;
   }
-  if (type != nullptr) {
-    type->print(llvm::dbgs() << "Deduced type is ");
-  } else {
-    TypeBinding(loc).print(llvm::dbgs() << "Failed to deduce type, falling back to ");
-  }
-  llvm::dbgs() << "\n";
   return type != nullptr ? *type : TypeBinding(loc);
 }
 mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
@@ -474,7 +433,22 @@ bool TypeBinding::isBottom() const { return name.ref() == BOTTOM; }
 
 bool TypeBinding::isTypeMarker() const { return name.ref() == "Type"; }
 
+static bool isTransitivelyValImpl(const TypeBinding &type) {
+  const auto *t = &type;
+  while (t->hasSuperType()) {
+    t = &t->getSuperType();
+    if (t->getName() == "Val") {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool TypeBinding::isVal() const { return name.ref() == "Val"; }
+
+bool TypeBinding::isTransitivelyVal() const {
+  return hasConstExpr() && isTransitivelyValImpl(*this);
+}
 
 bool TypeBinding::isArray() const {
   return name == "Array" || (hasSuperType() && getSuperType().isArray());
@@ -562,7 +536,8 @@ bool TypeBinding::isGenericParam() const {
   if (superType == nullptr) {
     return false;
   }
-  return genericParamName.has_value() && (superType->isTypeMarker() || superType->isVal());
+  return genericParamName.has_value() &&
+         (superType->isTypeMarker() || superType->isVal() || superType->isTransitivelyVal());
 }
 
 TypeBinding TypeBinding::MakeGenericParam(const TypeBinding &t, llvm::StringRef name) {
@@ -580,8 +555,6 @@ Params TypeBinding::getGenericParamsMapping() const { return genericParams; }
 MutableParams TypeBinding::getGenericParamsMapping() { return genericParams; }
 
 void TypeBinding::replaceGenericParamByName(StringRef paramName, const TypeBinding &binding) {
-  binding.print(llvm::dbgs() << "Replacing " << paramName << " with ", true);
-  llvm::dbgs() << "\n";
   getGenericParamsMapping().replaceParam(paramName, binding);
 }
 TypeBinding &TypeBinding::getSuperType() {

@@ -106,6 +106,7 @@ public:
   bool isBottom() const;
   bool isTypeMarker() const;
   bool isVal() const;
+  bool isTransitivelyVal() const;
   bool isArray() const;
   bool isConst() const;
   bool isKnownConst() const;

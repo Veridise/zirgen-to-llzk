@@ -29,8 +29,9 @@ TypeBinding ComponentScope::declareLiftedAffineToGenericParam(const TypeBinding 
 
   Twine name("Aff$" + Twine(liftedParams.size()));
   auto allocName = name.str();
-  liftedParams.declare(allocName, type, liftedParams.size(), true);
-  return TypeBinding::MakeGenericParam(bindings->Manage(type), allocName);
+  auto paramBinding = TypeBinding::MakeGenericParam(bindings->Manage(type), allocName);
+  liftedParams.declare(allocName, paramBinding, liftedParams.size(), true);
+  return paramBinding;
 }
 
 void ComponentScope::declareConstructorParam(StringRef name, uint64_t index, TypeBinding type) {

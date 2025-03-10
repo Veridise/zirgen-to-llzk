@@ -122,7 +122,9 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
     // Fail the materialization if the name was not found. A well typed program should not have
     // this issue.
     if (replacement == nullptr) {
-      LLVM_DEBUG(llvm::dbgs() << " failed to convert because '" << name << "' was not found\n");
+      LLVM_DEBUG(
+          llvm::dbgs() << " failed to convert because '" << *params[name] << "' was not found\n"
+      );
       return failure();
     }
 
@@ -220,6 +222,10 @@ inline LogicalResult specializeTypeBinding_genericTypeCase(
 }
 
 void printFVs(const llvm::StringSet<> &FV, llvm::raw_ostream &os) {
+  if (FV.empty()) {
+    os << "No FVs\n";
+    return;
+  }
   size_t c = 1;
   os << "{ ";
   for (auto name : FV.keys()) {
@@ -250,7 +256,7 @@ LogicalResult specializeTypeBindingImpl(
   }
 
   // Do nothing in the other cases.
-  LLVM_DEBUG(spaces(ident); llvm::dbgs() << "Nothing\n");
+  LLVM_DEBUG(spaces(ident); dst->print(llvm::dbgs() << "Ignoring: ", true); llvm::dbgs() << "\n");
   return success();
 }
 
@@ -290,6 +296,15 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
     if (params[i].isGenericParam()) {
       freeVariables.insert(params[i].getGenericParamName());
     }
+  }
+  // Convert the lifted parameters to their expressions, contained in their super type
+  auto genericParamsMapping = getGenericParamsMapping();
+  auto totalSize = genericParamsMapping.size();
+  for (unsigned i = params.size(); i < totalSize; i++) {
+    assert(genericParamsMapping.getParam(i).hasSuperType());
+    generics.declare(
+        genericParamsMapping.getName(i), genericParamsMapping.getParam(i).getSuperType(), i
+    );
   }
 
   TypeBinding specializedBinding(*this); // Make a copy to create the specialization

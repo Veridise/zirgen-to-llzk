@@ -146,8 +146,6 @@ bool Params::empty() const { return data()->names.empty(); }
 void MutableParams::replaceParam(StringRef name, const TypeBinding &binding) {
   auto found = this->operator[](name);
   if (found != nullptr) {
-    found->print(llvm::dbgs() << "Replacing binding at address " << found << ":", true);
-    llvm::dbgs() << "\n";
     *found = binding;
   }
 }

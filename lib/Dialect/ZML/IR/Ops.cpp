@@ -212,55 +212,26 @@ void ConstructorRefOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op,
     mlir::FunctionType fnType
 ) {
-  build(
-      builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), {}, {}, fnType, op.getBuiltin()
-  );
+  build(builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), 0, fnType, op.getBuiltin());
 }
 
 void ConstructorRefOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op,
-    ArrayRef<ValueRange> mapOperands, DenseI32ArrayAttr numDimsPerMap, mlir::FunctionType fnType
+    uint64_t liftedParams, mlir::FunctionType fnType
 ) {
   build(
-      builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), mapOperands, numDimsPerMap,
-      fnType, op.getBuiltin()
+      builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), liftedParams, fnType,
+      op.getBuiltin()
   );
 }
-
-namespace affineMapHelpers {
-
-/// Utility for build() functions that initializes the `operandSegmentSizes`, `mapOpGroupSizes`, and
-/// `numDimsPerMap` attributes for an Op that performs affine map instantiations.
-/// Copied from LLZK with the operand segment support removed.
-template <typename OpType>
-static typename OpType::Properties &buildInstantiationAttrs(
-    mlir::OpBuilder &odsBuilder, mlir::OperationState &odsState,
-    mlir::ArrayRef<mlir::ValueRange> mapOperands, mlir::DenseI32ArrayAttr numDimsPerMap
-) {
-  mlir::SmallVector<int32_t> rangeSegments;
-  for (mlir::ValueRange r : mapOperands) {
-    odsState.addOperands(r);
-    int32_t s = static_cast<int32_t>(r.size());
-    rangeSegments.push_back(s);
-  }
-  typename OpType::Properties &props = odsState.getOrAddProperties<typename OpType::Properties>();
-  props.setMapOpGroupSizes(odsBuilder.getDenseI32ArrayAttr(rangeSegments));
-  if (numDimsPerMap) {
-    props.setNumDimsPerMap(numDimsPerMap);
-  }
-  return props;
-}
-
-} // namespace affineMapHelpers
 
 void ConstructorRefOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, mlir::FlatSymbolRefAttr sym,
-    ArrayRef<ValueRange> mapOperands, DenseI32ArrayAttr numDimsPerMap, mlir::FunctionType fnType,
-    bool isBuiltin
+    uint64_t liftedParams, mlir::FunctionType fnType, bool isBuiltin
 ) {
-  auto &properties = affineMapHelpers::buildInstantiationAttrs<ConstructorRefOp>(
-      builder, state, mapOperands, numDimsPerMap
-  );
+  Properties &properties = state.getOrAddProperties<Properties>();
+
+  properties.numLiftedParams = builder.getIntegerAttr(builder.getIndexType(), liftedParams);
   properties.component = sym;
   if (isBuiltin) {
     properties.builtin = mlir::UnitAttr::get(builder.getContext());
@@ -273,7 +244,7 @@ void ConstructorRefOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, mlir::FlatSymbolRefAttr sym,
     mlir::FunctionType fnType, bool isBuiltin
 ) {
-  build(builder, state, sym, {}, {}, fnType, isBuiltin);
+  build(builder, state, sym, 0, fnType, isBuiltin);
 }
 
 mlir::LogicalResult checkConstructorTypeIsValid(

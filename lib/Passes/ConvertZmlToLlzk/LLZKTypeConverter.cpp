@@ -9,15 +9,14 @@
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
 #include <optional>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
-
 
 #define DEBUG_TYPE "llzk-type-converter"
 
 using namespace llzk;
 using namespace mlir;
-
 
 std::optional<mlir::Value> unrealizedCastMaterialization(
     mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs, mlir::Location loc
@@ -53,6 +52,9 @@ void convertParamAttrs(
     if (auto typeAttr = mlir::dyn_cast<mlir::TypeAttr>(attr)) {
       return mlir::TypeAttr::get(converter.convertType(typeAttr.getValue()));
     }
+    if (auto constExprAttr = mlir::dyn_cast<zml::ConstExprAttr>(attr)) {
+      return mlir::AffineMapAttr::get(constExprAttr.getMap());
+    }
     return attr;
   }
   );
@@ -63,6 +65,12 @@ mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   auto sym = mlir::dyn_cast<mlir::SymbolRefAttr>(attr);
   assert(sym && "was expecting a symbol");
   return sym;
+}
+
+bool arrayLenIsAffineMap(Attribute attr) { return mlir::isa<zml::ConstExprAttr>(attr); }
+
+AffineMapAttr getSizeMap(Attribute attr) {
+  return AffineMapAttr::get(mlir::cast<zml::ConstExprAttr>(attr).getMap());
 }
 
 llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
@@ -114,6 +122,8 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
     }
     if (arrayLenIsKnown(sizeAttr)) {
       return llzk::ArrayType::get(inner, {getSize(sizeAttr)});
+    } else if (arrayLenIsAffineMap(sizeAttr)) {
+      return llzk::ArrayType::get(inner, {getSizeMap(sizeAttr)});
     } else {
       return llzk::ArrayType::get(inner, {getSizeSym(sizeAttr)});
     }

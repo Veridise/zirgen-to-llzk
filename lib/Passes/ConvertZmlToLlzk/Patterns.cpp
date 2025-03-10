@@ -18,6 +18,7 @@
 #include <mlir/Transforms/DialectConversion.h>
 #include <unordered_set>
 #include <vector>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Passes/ConvertZmlToLlzk/Patterns.h>
@@ -218,6 +219,24 @@ LogicalResult LowerLoadValParamOp::matchAndRewrite(
   return success();
 }
 
+/// Given an attribute materializes it into a Value if it's either a SymbolRefAttr or an
+/// IntegerAttr. Any other kind of Attribute is considered malformed IR and will abort.
+static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) {
+  if (auto symAttr = mlir::dyn_cast<SymbolRefAttr>(attr)) {
+    auto param = builder.create<llzk::ConstReadOp>(
+        loc, ComponentType::Val(builder.getContext()), symAttr.getRootReference()
+    );
+    return builder.create<llzk::FeltToIndexOp>(loc, param);
+  }
+  if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
+    return builder.create<arith::ConstantOp>(
+        loc, builder.getIndexType(),
+        builder.getIntegerAttr(builder.getIndexType(), intAttr.getValue())
+    );
+  }
+  assert(false && "Cannot materialize something that is not a symbol or a literal integer");
+}
+
 mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
     mlir::func::CallIndirectOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
@@ -232,6 +251,34 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
   }
   auto comp = callee.getComponentAttr();
 
+  auto compParams = mlir::cast<ComponentType>(op.getResult(0).getType()).getParams();
+  auto liftedCompParams =
+      compParams.drop_front(compParams.size() - callee.getNumLiftedParams().getZExtValue());
+
+  // Allocate here the values we may generate
+  SmallVector<SmallVector<Value>> mapOperandsMem(liftedCompParams.size());
+  // And store a ValueRange pointing to the vector here
+  SmallVector<ValueRange> mapOperands;
+  // This idiom does not use any dimensions
+  SmallVector<int32_t> dimsPerMap(liftedCompParams.size(), 0);
+  mapOperands.reserve(liftedCompParams.size());
+
+  size_t idx = 0;
+  for (auto attr : liftedCompParams) {
+    auto liftedConstExpr = mlir::cast<ConstExprAttr>(attr);
+    auto &values = mapOperandsMem[idx];
+    for (auto formal : liftedConstExpr.getFormals()) {
+      assert(
+          formal < (compParams.size() - liftedCompParams.size()) &&
+          "Can only use as map operands declared parameters"
+      );
+      values.push_back(materializeParam(compParams[formal], rewriter, op->getLoc()));
+    }
+
+    mapOperands.push_back(values);
+    idx++;
+  }
+
   auto sym =
       mlir::SymbolRefAttr::get(comp.getAttr(), {mlir::SymbolRefAttr::get(parent.getNameAttr())});
 
@@ -244,7 +291,7 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
       mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
   );
 
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, types, sym, args);
+  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, types, sym, mapOperands, dimsPerMap, args);
   return mlir::success();
 }
 

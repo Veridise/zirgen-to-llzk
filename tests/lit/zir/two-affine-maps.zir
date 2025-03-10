@@ -1,0 +1,9 @@
+// RUN: zklang -o - %s
+
+component Unpack<N: Val, P: Val, M: Val, Q: Val>(in1: Array<Val, N/P>, in2: Array<Val,M/P>) {
+  in1[0] + in2[0]
+}
+
+component User1() {
+  Unpack<8,2, 4,1>([0,0,0,0], [0,0,0,0])
+}
