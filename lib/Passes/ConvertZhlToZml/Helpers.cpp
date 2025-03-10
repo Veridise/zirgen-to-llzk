@@ -1,3 +1,4 @@
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
@@ -5,6 +6,8 @@
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Builder.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
@@ -347,6 +350,24 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   );
 }
 
+/// Given an attribute materializes it into a Value if it's either a SymbolRefAttr or an
+/// IntegerAttr. Any other kind of Attribute is considered malformed IR and will abort.
+static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) {
+  if (auto symAttr = mlir::dyn_cast<SymbolRefAttr>(attr)) {
+    auto param = builder.create<LoadValParamOp>(
+        loc, ComponentType::Val(builder.getContext()), symAttr.getRootReference()
+    );
+    return builder.create<ValToIndexOp>(loc, param);
+  }
+  if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
+    return builder.create<arith::ConstantOp>(
+        loc, builder.getIndexType(),
+        builder.getIntegerAttr(builder.getIndexType(), intAttr.getValue())
+    );
+  }
+  assert(false && "Cannot materialize something that is not a symbol or a literal integer");
+}
+
 mlir::Value
 CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args) {
   auto buildPrologue = [&](mlir::Value v) {
@@ -354,7 +375,39 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
     return v;
   };
 
-  auto ref = builder.create<ConstructorRefOp>(loc, ctorType, compBinding.getName(), isBuiltin);
+  auto genericParams = compBinding.getGenericParamsMapping();
+  auto declaredParamsCount = genericParams.sizeOfDeclared();
+  auto compParams = mlir::cast<ComponentType>(ctorType.getResult(0)).getParams();
+  auto liftedCompParams = compParams.drop_front(declaredParamsCount);
+
+  // Allocate here the values we may generate
+  SmallVector<SmallVector<Value>> mapOperandsMem(liftedCompParams.size());
+  // And store a ValueRange pointing to the vector here
+  SmallVector<ValueRange> mapOperands;
+  // This idiom does not use any dimensions
+  SmallVector<int32_t> dimsPerMap(liftedCompParams.size(), 0);
+  mapOperands.reserve(liftedCompParams.size());
+
+  size_t idx = 0;
+  for (auto attr : liftedCompParams) {
+    auto liftedConstExpr = mlir::cast<ConstExprAttr>(attr);
+    auto &values = mapOperandsMem[idx];
+    for (auto formal : liftedConstExpr.getFormals()) {
+      assert(
+          formal < (compParams.size() - liftedCompParams.size()) &&
+          "Can only use as map operands declared parameters"
+      );
+      values.push_back(materializeParam(compParams[formal], builder, loc));
+    }
+
+    mapOperands.push_back(values);
+    idx++;
+  }
+
+  auto ref = builder.create<ConstructorRefOp>(
+      loc, compBinding.getName(), mapOperands, builder.getDenseI32ArrayAttr(dimsPerMap), ctorType,
+      isBuiltin
+  );
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
 

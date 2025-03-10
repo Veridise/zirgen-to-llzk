@@ -13,13 +13,15 @@ using namespace mlir;
 
 ParamsStorage::ParamsStorage() = default;
 
-ParamsStorage::ParamsStorage(ParamsMap &map) : names(ParamNames(map.size())) {
+ParamsStorage::ParamsStorage(ParamsMap &map)
+    : names(ParamNames(map.size())), injected(BitVector(map.size())) {
   // Hack to get the bindings ordered without having a default constructor
   SmallVector<TypeBinding *> tmp(map.size());
   for (auto &entry : map) {
-    auto pos = entry.getValue().second;
-    tmp[pos] = &entry.getValue().first;
+    auto pos = entry.getValue().Pos;
+    tmp[pos] = &entry.getValue().Type;
     names[pos] = entry.getKey();
+    injected[pos] = entry.getValue().Injected;
   }
   for (auto *type : tmp) {
     params.push_back(*type);
@@ -34,7 +36,7 @@ MutableParams::MutableParams(ParamsStorage &params) : Params(params) {}
 Params::operator ParamsMap() const {
   ParamsMap map;
   for (size_t i = 0; i < data()->params.size(); i++) {
-    map.insert({data()->names[i], {data()->params[i], i}});
+    map.declare(data()->names[i], data()->params[i], i, data()->injected[i]);
   }
   return map;
 }
@@ -106,8 +108,24 @@ StringRef Params::getName(size_t i) const {
 }
 
 size_t Params::size() const { return data()->params.size(); }
+
+size_t Params::sizeOfDeclared() const { return data()->params.size() - data()->injected.count(); }
+
 mlir::MutableArrayRef<TypeBinding> MutableParams::getParams() const { return data()->params; }
+
 mlir::ArrayRef<TypeBinding> Params::getParams() const { return data()->params; }
+
+mlir::SmallVector<TypeBinding, 0> Params::getDeclaredParams() const {
+  SmallVector<TypeBinding> params;
+
+  for (size_t i = 0; i < data()->params.size(); i++) {
+    if (!data()->injected[i]) {
+      params.push_back(data()->params[i]);
+    }
+  }
+
+  return params;
+}
 
 const TypeBinding *Params::operator[](StringRef name) const {
   for (size_t i = 0; i < data()->names.size(); i++) {

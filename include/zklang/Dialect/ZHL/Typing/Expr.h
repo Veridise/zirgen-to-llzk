@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <llvm/ADT/SmallString.h>
+#include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/simple_ilist.h>
 #include <llvm/Support/raw_ostream.h>
 #include <mlir/IR/AffineExpr.h>
@@ -32,6 +33,7 @@ public:
   virtual void print(llvm::raw_ostream &) const = 0;
   virtual mlir::Attribute convertIntoAttribute(mlir::Builder &) const = 0;
   virtual mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const = 0;
+  virtual void collectFreeSymbols(llvm::StringSet<> &) const = 0;
 
 private:
   ExprKind kind;
@@ -81,6 +83,7 @@ public:
   void print(llvm::raw_ostream &) const override;
   mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
   mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
+  void collectFreeSymbols(llvm::StringSet<> &) const override;
 
   uint64_t getValue() const;
 
@@ -98,6 +101,7 @@ public:
   void print(llvm::raw_ostream &) const override;
   mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
   mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
+  void collectFreeSymbols(llvm::StringSet<> &) const override;
 
   mlir::StringRef getName() const;
   size_t getPos() const;
@@ -151,6 +155,7 @@ public:
   void print(llvm::raw_ostream &) const override;
   mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
   mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
+  void collectFreeSymbols(llvm::StringSet<> &) const override;
 
   Arguments &arguments();
   const Arguments &arguments() const;

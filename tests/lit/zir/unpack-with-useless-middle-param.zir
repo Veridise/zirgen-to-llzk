@@ -1,0 +1,13 @@
+// RUN: zklang -o - %s
+
+// COM: This test case has a useless parameter in the middle to make sure 
+// COM: the formals and the symbols in the affine map match properly when
+// COM: when creating the ConstExpr attribute
+
+component Unpack<N: Val, U: Val, P: Val>(in: Array<Val, N/P>) {
+  in[0]
+}
+
+component User1() {
+  Unpack<8,0,2>([0,0,0,0])
+}

@@ -7,6 +7,7 @@
 #include <zklang/Dialect/ZHL/Typing/Params.h>
 #include <zklang/Dialect/ZHL/Typing/Specialization.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
 

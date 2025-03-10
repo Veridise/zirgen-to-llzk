@@ -26,6 +26,7 @@ public:
   Params(const ParamsStorage &);
   Params(ParamsStorage &);
   size_t size() const;
+  size_t sizeOfDeclared() const;
 
   operator ParamsMap() const;
 
@@ -35,6 +36,7 @@ public:
 
   mlir::ArrayRef<ParamName> getNames() const;
   mlir::ArrayRef<TypeBinding> getParams() const;
+  mlir::SmallVector<TypeBinding, 0> getDeclaredParams() const;
 
   const TypeBinding *operator[](mlir::StringRef name) const;
 

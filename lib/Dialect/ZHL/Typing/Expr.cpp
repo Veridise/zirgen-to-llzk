@@ -1,3 +1,5 @@
+#include <zklang/Dialect/ZHL/Typing/Expr.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -6,12 +8,15 @@
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSwitch.h>
+#include <llvm/Support/Debug.h>
 #include <memory>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/Support/LLVM.h>
-#include <zklang/Dialect/ZHL/Typing/Expr.h>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
+
+#define DEBUG_TYPE "zhl-const-exprs"
 
 using namespace mlir;
 
@@ -179,6 +184,8 @@ Attribute Val::convertIntoAttribute(Builder &builder) const {
   return builder.getIntegerAttr(builder.getI64Type(), value);
 }
 
+void Val::collectFreeSymbols(llvm::StringSet<> &symbols) const {}
+
 //==-----------------------------------------------------------------------==//
 // Symbol
 //==-----------------------------------------------------------------------==//
@@ -205,6 +212,8 @@ size_t Symbol::getPos() const { return pos; }
 Attribute Symbol::convertIntoAttribute(Builder &builder) const {
   return SymbolRefAttr::get(builder.getStringAttr(name));
 }
+
+void Symbol::collectFreeSymbols(llvm::StringSet<> &symbols) const { symbols.insert(name); }
 
 //==-----------------------------------------------------------------------==//
 // Ctor
@@ -286,8 +295,51 @@ const Ctor::Arguments &Ctor::arguments() const { return args; }
 
 StringRef Ctor::getTypeName() const { return typeName; }
 
-// Ctor::convertIntoAttribute implementation is in Interpreter.cpp because it needs information
-// about semi-affine expressions
+void Ctor::collectFreeSymbols(llvm::StringSet<> &symbols) const {
+  for (auto &arg : args) {
+    arg.collectFreeSymbols(symbols);
+  }
+}
+
+Attribute Ctor::convertIntoAttribute(Builder &builder) const {
+  auto expr = convertIntoAffineExpr(builder);
+  if (failed(expr)) {
+    return nullptr;
+  }
+  LLVM_DEBUG(llvm::dbgs() << "Generated expression: " << expr << "\n");
+  std::optional<unsigned int> largest;
+  expr->walk([&](AffineExpr e) {
+    if (!mlir::isa<AffineSymbolExpr>(e)) {
+      return;
+    }
+    auto symExpr = mlir::cast<AffineSymbolExpr>(e);
+    largest = std::max(largest.value_or(0), symExpr.getPosition());
+  });
+  auto symbolCount = 0;
+  if (largest.has_value()) {
+    symbolCount = *largest + 1;
+  }
+  auto map = AffineMap::get(0, symbolCount, *expr);
+
+  // After constructing the map reduce the number of symbols and compute what formals they refer to
+  SmallVector<uint64_t> formals;
+  SmallVector<AffineExpr> formalsToSymbols;
+  uint64_t shift = 0;
+  for (size_t i = 0; i < map.getNumSymbols(); i++) {
+    if (map.isFunctionOfSymbol(i)) {
+      formals.push_back(i);
+      // Map the i-th formal to the position the symbol will have in the affine map after
+      // removing dead symbols
+      formalsToSymbols.push_back(builder.getAffineSymbolExpr(i - shift));
+    } else {
+      shift++;
+      formalsToSymbols.push_back(builder.getAffineConstantExpr(0));
+    }
+  }
+  assert(formalsToSymbols.size() == map.getNumSymbols());
+  map = map.replaceDimsAndSymbols({}, formalsToSymbols, 0, formals.size());
+  return zml::ConstExprAttr::get(map, formals);
+}
 
 //==-----------------------------------------------------------------------==//
 // Ctor::Arguments

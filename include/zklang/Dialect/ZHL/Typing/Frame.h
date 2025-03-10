@@ -8,7 +8,6 @@
 namespace zhl {
 
 class FrameSlot;
-class TypeBinding;
 
 // Represents the memory used by a component. Collects slots that contain
 // components or other frames. This information is later used to generate

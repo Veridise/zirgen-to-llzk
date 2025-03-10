@@ -31,15 +31,17 @@ const mlir::StringRef BOTTOM = "!";
 const mlir::StringRef CONST = "$";
 
 class TypeBindings;
+class TypeBinding;
+struct ParamData;
 
 using MembersMap = llvm::StringMap<std::optional<TypeBinding>>;
 using EmitErrorFn = llvm::function_ref<mlir::InFlightDiagnostic()>;
 using ParamName = std::string;
-using ParamsMap = llvm::StringMap<std::pair<TypeBinding, uint64_t>>;
 using ParamsList = mlir::SmallVector<TypeBinding, 0>;
 using ParamNames = mlir::SmallVector<ParamName>;
 
 struct ParamsStorage;
+struct ParamsMap;
 class Params;
 class MutableParams;
 
@@ -118,6 +120,7 @@ public:
   mlir::ArrayRef<ParamName> getGenericParamNames() const;
   mlir::MutableArrayRef<TypeBinding> getGenericParams();
   mlir::ArrayRef<TypeBinding> getGenericParams() const;
+  mlir::SmallVector<TypeBinding, 0> getDeclaredGenericParams() const;
   mlir::SmallVector<mlir::Location> getConstructorParamLocations() const;
   Params getConstructorParams() const;
   MutableParams getConstructorParams();

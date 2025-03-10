@@ -529,7 +529,7 @@ void TypeBinding::selfConstructs() {
     return;
   }
   selfConstructor = true;
-  constructorParams = ParamsMap({{"x", {*this, 0}}});
+  constructorParams = ParamsMap().declare("x", *this);
 }
 
 const MembersMap &TypeBinding::getMembers() const { return members; }
@@ -547,6 +547,10 @@ MutableArrayRef<TypeBinding> TypeBinding::getGenericParams() {
 
 ArrayRef<TypeBinding> TypeBinding::getGenericParams() const {
   return getGenericParamsMapping().getParams();
+}
+
+SmallVector<TypeBinding, 0> TypeBinding::getDeclaredGenericParams() const {
+  return getGenericParamsMapping().getDeclaredParams();
 }
 
 uint64_t TypeBinding::getConst() const {

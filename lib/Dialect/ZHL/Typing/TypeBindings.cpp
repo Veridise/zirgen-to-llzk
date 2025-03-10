@@ -5,6 +5,7 @@
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 #define DEBUG_TYPE "zhl-type-bindings"
@@ -50,8 +51,8 @@ TypeBinding TypeBindings::Array(TypeBinding type, uint64_t size, Location loc) c
 TypeBinding TypeBindings::Array(TypeBinding type, TypeBinding size, Location loc) const {
   ParamsMap arrayGenericParams;
   auto cleanedType = TypeBinding::StripConst(type);
-  arrayGenericParams.insert({"T", {cleanedType, 0}});
-  arrayGenericParams.insert({"N", {size, 1}});
+  arrayGenericParams.declare("T", cleanedType);
+  arrayGenericParams.declare("N", size);
   TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
   array.specialized = true;
   return array;

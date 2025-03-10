@@ -184,6 +184,7 @@ TypeBinding interpretateOp(
       LLVM_DEBUG(llvm::dbgs() << "  valid affine Neg\n");
       return TypeBinding::WithExpr(binding, UnaryOp("Neg", args));
     }
+    // XXX: May have to do tricks for negations of non literal integers like -N => 0 - N
     LLVM_DEBUG(llvm::dbgs() << "  invalid affine Neg\n");
     break;
   }
@@ -238,32 +239,6 @@ FailureOr<AffineExpr> Ctor::convertIntoAffineExpr(Builder &builder) const {
   }
 
   return failure();
-}
-
-Attribute Ctor::convertIntoAttribute(Builder &builder) const {
-  auto expr = convertIntoAffineExpr(builder);
-  if (failed(expr)) {
-    return nullptr;
-  }
-  LLVM_DEBUG(llvm::dbgs() << "Generated expression: " << expr << "\n");
-  std::optional<unsigned int> largest;
-  expr->walk([&](AffineExpr e) {
-    if (!mlir::isa<AffineSymbolExpr>(e)) {
-      return;
-    }
-    auto symExpr = mlir::cast<AffineSymbolExpr>(e);
-    if (largest.has_value()) {
-      largest = std::max(*largest, symExpr.getPosition());
-    } else {
-      largest = symExpr.getPosition();
-    }
-  });
-  auto symbolCount = 0;
-  if (largest.has_value()) {
-    symbolCount = *largest + 1;
-  }
-  auto map = AffineMap::get(0, symbolCount, *expr);
-  return AffineMapAttr::get(map);
 }
 
 } // namespace detail

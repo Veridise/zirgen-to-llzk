@@ -505,7 +505,7 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
 
   assert(op.getArgs().size() == operands.size() - 1);
 
-  auto genericParams = operands[0].getGenericParams();
+  auto genericParams = operands[0].getDeclaredGenericParams();
   if (op.getArgs().size() != genericParams.size()) {
     return op->emitError() << "type '" << operands[0] << "' expects " << genericParams.size()
                            << " generic parameters but got " << op.getArgs().size();
@@ -513,7 +513,7 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
 
   bool failed = false;
   for (auto [argValue, argBinding, param] :
-       llvm::zip_equal(op.getArgs(), operands.drop_front(), operands[0].getGenericParams())) {
+       llvm::zip_equal(op.getArgs(), operands.drop_front(), genericParams)) {
     failed = failed || mlir::failed(checkSpecializationArg(argValue, argBinding, param, [&]() {
       return op->emitError();
     }));

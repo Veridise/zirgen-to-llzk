@@ -1,3 +1,5 @@
+#include <zklang/Dialect/ZML/IR/Types.h>
+
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/STLFunctionalExtras.h>
@@ -7,8 +9,8 @@
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
-#include <zklang/Dialect/ZML/IR/Types.h>
 
 using namespace mlir;
 
@@ -30,8 +32,7 @@ checkValidZmirType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mli
 
 mlir::LogicalResult
 checkValidParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Attribute attr) {
-  if (llvm::isa<mlir::SymbolRefAttr, mlir::IntegerAttr, mlir::TypeAttr, mlir::AffineMapAttr>(attr
-      )) {
+  if (llvm::isa<mlir::SymbolRefAttr, mlir::IntegerAttr, mlir::TypeAttr, ConstExprAttr>(attr)) {
     return mlir::success();
   }
   return emitError() << "expected either a symbol or a literal integer but got " << attr;

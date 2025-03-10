@@ -271,12 +271,13 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   if (specialized) {
     return emitError() << "can't respecialize type '" << getName() << "'";
   }
-  if (getGenericParamsMapping().size() == 0) {
+  auto declaredParamsSize = getGenericParamsMapping().sizeOfDeclared();
+  if (declaredParamsSize == 0) {
     return emitError() << "type '" << name << "' is not generic";
   }
-  if (getGenericParamsMapping().size() != params.size()) {
+  if (declaredParamsSize != params.size()) {
     return emitError() << "wrong number of specialization parameters. Expected "
-                       << getGenericParamsMapping().size() << " but got " << params.size();
+                       << declaredParamsSize << " but got " << params.size();
   }
 
   // The root scope for specialization is a mapping between the n-th generic
@@ -285,9 +286,7 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   // Any type variable introduced by the specialization is a free variable.
   llvm::StringSet<> freeVariables;
   for (unsigned i = 0; i < params.size(); i++) {
-    // TODO: Validate that for a parameter of type Val only constant values or generic parameters of
-    // type Val are passed.
-    generics.insert({getGenericParamsMapping().getName(i), {params[i], i}});
+    generics.declare(getGenericParamsMapping().getName(i), params[i], i);
     if (params[i].isGenericParam()) {
       freeVariables.insert(params[i].getGenericParamName());
     }

@@ -3,6 +3,7 @@
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
