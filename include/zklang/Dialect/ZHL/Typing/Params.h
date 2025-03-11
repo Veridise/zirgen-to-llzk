@@ -32,7 +32,7 @@ public:
 
   mlir::StringRef getName(size_t i) const;
 
-  TypeBinding getParam(size_t i) const;
+  const TypeBinding &getParam(size_t i) const;
 
   mlir::ArrayRef<ParamName> getNames() const;
   mlir::ArrayRef<TypeBinding> getParams() const;
@@ -75,6 +75,7 @@ public:
 
   void replaceParam(mlir::StringRef name, const TypeBinding &binding);
 
+  TypeBinding &getParam(size_t i) const;
   mlir::MutableArrayRef<TypeBinding> getParams() const;
   TypeBinding *operator[](mlir::StringRef name) const;
 

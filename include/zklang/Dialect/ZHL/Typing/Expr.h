@@ -46,6 +46,7 @@ protected:
 class ConstExpr {
 public:
   ConstExpr();
+  ConstExpr(const ExprBase &);
 
   ExprBase *get();
   const ExprBase *get() const;
@@ -175,12 +176,18 @@ private:
 class ValExpr {
 public:
   ValExpr();
-  explicit ValExpr(const ConstExpr &);
+  ValExpr(std::nullptr_t);
+  ValExpr(const ValExpr &);
+  ValExpr &operator=(const ValExpr &);
+  ValExpr(ValExpr &&) = delete;
+  ValExpr &operator=(ValExpr &&) = delete;
+  ValExpr(const ConstExpr &);
 
   static bool classof(const ConstExpr *);
 
   uint64_t getValue() const;
-
+  detail::Val &operator*();
+  const detail::Val &operator*() const;
   /// Returns true if the inner pointer points to a valid expression, false otherwise.
   operator bool() const;
 
@@ -192,10 +199,12 @@ private:
 class SymExpr {
 public:
   SymExpr();
-  explicit SymExpr(const ConstExpr &);
+  SymExpr(std::nullptr_t);
+  SymExpr(const ConstExpr &);
 
   static bool classof(const ConstExpr *);
-
+  detail::Symbol &operator*();
+  const detail::Symbol &operator*() const;
   mlir::StringRef getName() const;
   size_t getPos() const;
 
@@ -212,8 +221,11 @@ public:
   using Arguments = detail::Ctor::Arguments;
 
   CtorExpr();
-  explicit CtorExpr(const ConstExpr &);
+  CtorExpr(std::nullptr_t);
+  CtorExpr(const ConstExpr &);
 
+  detail::Ctor &operator*();
+  const detail::Ctor &operator*() const;
   static bool classof(const ConstExpr *);
   Arguments &arguments();
   const Arguments &arguments() const;
@@ -230,16 +242,21 @@ private:
 } // namespace zhl::expr
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::ConstExpr &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::detail::Val &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::detail::Symbol &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::detail::Ctor &);
 
 template <>
 struct llvm::CastInfo<zhl::expr::ValExpr, zhl::expr::ConstExpr>
     : public llvm::CastIsPossible<zhl::expr::ValExpr, zhl::expr::ConstExpr> {
-  static inline zhl::expr::ValExpr doCast(const zhl::expr::ConstExpr &a) {
-    return zhl::expr::ValExpr(a);
-  }
-  static inline zhl::expr::ValExpr castFailed() { return zhl::expr::ValExpr(); }
-  static inline zhl::expr::ValExpr doCastIfPossible(const zhl::expr::ConstExpr &b) {
-    if (!CastInfo<zhl::expr::ValExpr, zhl::expr::ConstExpr>::isPossible(b)) {
+  using from = zhl::expr::ConstExpr;
+  using to = zhl::expr::ValExpr;
+  using self = llvm::CastInfo<to, from>;
+
+  static inline to doCast(const from &a) { return to(a); }
+  static inline to castFailed() { return to(); }
+  static inline to doCastIfPossible(const from &b) {
+    if (!self::isPossible(b)) {
       return castFailed();
     }
     return doCast(b);
@@ -249,12 +266,14 @@ struct llvm::CastInfo<zhl::expr::ValExpr, zhl::expr::ConstExpr>
 template <>
 struct llvm::CastInfo<zhl::expr::SymExpr, zhl::expr::ConstExpr>
     : public llvm::CastIsPossible<zhl::expr::SymExpr, zhl::expr::ConstExpr> {
-  static inline zhl::expr::SymExpr doCast(const zhl::expr::ConstExpr &a) {
-    return zhl::expr::SymExpr(a);
-  }
-  static inline zhl::expr::SymExpr castFailed() { return zhl::expr::SymExpr(); }
-  static inline zhl::expr::SymExpr doCastIfPossible(const zhl::expr::ConstExpr &b) {
-    if (!CastInfo<zhl::expr::SymExpr, zhl::expr::ConstExpr>::isPossible(b)) {
+  using from = zhl::expr::ConstExpr;
+  using to = zhl::expr::SymExpr;
+  using self = llvm::CastInfo<to, from>;
+
+  static inline to doCast(const from &a) { return to(a); }
+  static inline to castFailed() { return to(); }
+  static inline to doCastIfPossible(const from &b) {
+    if (!self::isPossible(b)) {
       return castFailed();
     }
     return doCast(b);
@@ -264,12 +283,14 @@ struct llvm::CastInfo<zhl::expr::SymExpr, zhl::expr::ConstExpr>
 template <>
 struct llvm::CastInfo<zhl::expr::CtorExpr, zhl::expr::ConstExpr>
     : public llvm::CastIsPossible<zhl::expr::CtorExpr, zhl::expr::ConstExpr> {
-  static inline zhl::expr::CtorExpr doCast(const zhl::expr::ConstExpr &a) {
-    return zhl::expr::CtorExpr(a);
-  }
-  static inline zhl::expr::CtorExpr castFailed() { return zhl::expr::CtorExpr(); }
-  static inline zhl::expr::CtorExpr doCastIfPossible(const zhl::expr::ConstExpr &b) {
-    if (!CastInfo<zhl::expr::CtorExpr, zhl::expr::ConstExpr>::isPossible(b)) {
+  using from = zhl::expr::ConstExpr;
+  using to = zhl::expr::CtorExpr;
+  using self = llvm::CastInfo<to, from>;
+
+  static inline to doCast(const from &a) { return to(a); }
+  static inline to castFailed() { return to(); }
+  static inline to doCastIfPossible(const from &b) {
+    if (!self::isPossible(b)) {
       return castFailed();
     }
     return doCast(b);

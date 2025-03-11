@@ -1,0 +1,10 @@
+// RUN: zklang -o - %s
+
+component Unpack<N: Val, P: Val>(in: Array<Val, N/P>) {
+  in[0]
+}
+
+
+component User1<N: Val, P: Val>() {
+  Unpack<N,P>(0..N/P);
+}

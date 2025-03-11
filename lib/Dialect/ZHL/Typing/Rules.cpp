@@ -592,6 +592,13 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
         op, getBindings().Array(common, operands[1].getConst() - operands[0].getConst())
     );
   }
+  if (operands[0].hasConstExpr() && operands[1].hasConstExpr()) {
+    auto size = TypeBinding::WithExpr(
+        getBindings().Get("Val"),
+        expr::ConstExpr::Ctor("Sub", {operands[1].getConstExpr(), operands[0].getConstExpr()})
+    );
+    return interpretateOp(op, getBindings().Array(common, size));
+  }
   return interpretateOp(op, getBindings().UnkArray(common));
 }
 

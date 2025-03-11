@@ -200,6 +200,7 @@ public:
 
   bool hasConstExpr() const;
   const expr::ConstExpr &getConstExpr() const;
+  void setConstExpr(expr::ConstExpr);
   bool hasClosure() const;
 
 private:

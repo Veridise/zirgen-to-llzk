@@ -361,4 +361,30 @@ LogicalResult NopOp::canonicalize(NopOp op, PatternRewriter &rewriter) {
   return failure();
 }
 
+static bool isTypeVar(Type t) { return mlir::isa<TypeVarType>(t); }
+static bool isComp(Type t) { return mlir::isa<ComponentType>(t); }
+
+LogicalResult SuperCoerceOp::verify() {
+  Type inputType = getComponent().getType();
+  Type outputType = getVal().getType();
+
+  if (isTypeVar(inputType) || isTypeVar(outputType)) {
+    return success();
+  }
+
+  Type t = inputType;
+  // Climb the super type chain until we either find the output type, a type variable, or we run out
+  // of types.
+  while (t) {
+    if (isTypeVar(t) || t == outputType) {
+      return success();
+    }
+    if (!isComp(t)) {
+      return emitError() << "type " << t << " is neither a component nor a type variable";
+    }
+    t = mlir::cast<ComponentType>(t).getSuperType();
+  }
+  return emitError() << "type " << outputType << " is not a valid super type of type " << inputType;
+}
+
 } // namespace zml

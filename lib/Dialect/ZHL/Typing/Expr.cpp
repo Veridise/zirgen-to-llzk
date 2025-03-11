@@ -38,6 +38,8 @@ ConstExpr::ConstExpr() : expr(nullptr) {}
 
 ConstExpr::ConstExpr(ExprBase *exprPtr) : expr(exprPtr) {}
 
+ConstExpr::ConstExpr(const ExprBase &Expr) : expr(Expr.clone()) {}
+
 ConstExpr::operator bool() const { return expr != nullptr; }
 
 bool ConstExpr::operator==(const ConstExpr &other) const {
@@ -96,18 +98,44 @@ Attribute ConstExpr::convertIntoAttribute(Builder &builder) const {
 
 ValExpr::ValExpr() = default;
 
-ValExpr::ValExpr(const ConstExpr &Expr) : expr(Expr) {}
+ValExpr::ValExpr(std::nullptr_t) {
+  LLVM_DEBUG(llvm::dbgs() << "[ValExpr(std::nullptr_t)] Created " << this << "\n");
+}
+
+ValExpr::ValExpr(const ConstExpr &Expr) : ValExpr() {
+  if (mlir::isa<detail::Val>(Expr.get())) {
+    expr = Expr;
+  }
+}
+
+ValExpr::ValExpr(const ValExpr &other) : expr{} {
+  LLVM_DEBUG(
+      llvm::dbgs() << "[ValExpr(const ValExpr &other)] constructed with ValExpr at " << &other
+                   << "\n"
+  );
+  expr = other.expr;
+}
+
+ValExpr &ValExpr::operator=(const ValExpr &other) {
+  expr = other.expr;
+  return *this;
+}
 
 bool ValExpr::classof(const ConstExpr *expr) {
-  if (!(expr && expr->get())) {
+  LLVM_DEBUG(llvm::dbgs() << "Checking if ValExpr\n");
+  if (!expr) {
     return false;
   }
-  return mlir::isa<detail::Val>(**expr);
+  return mlir::isa_and_present<detail::Val>(expr->get());
 }
 
 uint64_t ValExpr::getValue() const { return mlir::cast<detail::Val>(expr.get())->getValue(); }
 
 ValExpr::operator bool() const { return expr; }
+
+detail::Val &ValExpr::operator*() { return *mlir::cast<detail::Val>(expr.get()); }
+
+const detail::Val &ValExpr::operator*() const { return *mlir::cast<detail::Val>(expr.get()); }
 
 //==-----------------------------------------------------------------------==//
 // SymExpr
@@ -115,18 +143,29 @@ ValExpr::operator bool() const { return expr; }
 
 SymExpr::SymExpr() = default;
 
-SymExpr::SymExpr(const ConstExpr &Expr) : expr(Expr) {}
+SymExpr::SymExpr(std::nullptr_t) : expr{} {}
+
+SymExpr::SymExpr(const ConstExpr &Expr) : SymExpr() {
+  if (mlir::isa<detail::Symbol>(Expr.get())) {
+    expr = Expr;
+  }
+}
 
 bool SymExpr::classof(const ConstExpr *expr) {
-  if (!(expr && expr->get())) {
+  LLVM_DEBUG(llvm::dbgs() << "Checking if SymExpr\n");
+  if (!expr) {
     return false;
   }
-  return mlir::isa<detail::Symbol>(**expr);
+  return mlir::isa_and_present<detail::Symbol>(expr->get());
 }
 
 StringRef SymExpr::getName() const { return mlir::cast<detail::Symbol>(expr.get())->getName(); }
 
 SymExpr::operator bool() const { return expr; }
+
+detail::Symbol &SymExpr::operator*() { return *mlir::cast<detail::Symbol>(expr.get()); }
+
+const detail::Symbol &SymExpr::operator*() const { return *mlir::cast<detail::Symbol>(expr.get()); }
 
 //==-----------------------------------------------------------------------==//
 // CtorExpr
@@ -134,13 +173,20 @@ SymExpr::operator bool() const { return expr; }
 
 CtorExpr::CtorExpr() = default;
 
-CtorExpr::CtorExpr(const ConstExpr &Expr) : expr(Expr) {}
+CtorExpr::CtorExpr(std::nullptr_t) : expr{} {}
+
+CtorExpr::CtorExpr(const ConstExpr &Expr) : CtorExpr() {
+  if (mlir::isa<detail::Ctor>(Expr.get())) {
+    expr = Expr;
+  }
+}
 
 bool CtorExpr::classof(const ConstExpr *expr) {
-  if (!(expr && expr->get())) {
+  LLVM_DEBUG(llvm::dbgs() << "Checking if CtorExpr\n");
+  if (!expr) {
     return false;
   }
-  return mlir::isa<detail::Ctor>(**expr);
+  return mlir::isa_and_present<detail::Ctor>(expr->get());
 }
 
 CtorExpr::Arguments &CtorExpr::arguments() {
@@ -156,6 +202,10 @@ StringRef CtorExpr::getTypeName() const {
 }
 
 CtorExpr::operator bool() const { return expr; }
+
+detail::Ctor &CtorExpr::operator*() { return *mlir::cast<detail::Ctor>(expr.get()); }
+
+const detail::Ctor &CtorExpr::operator*() const { return *mlir::cast<detail::Ctor>(expr.get()); }
 
 namespace detail {
 
@@ -307,6 +357,7 @@ Attribute Ctor::convertIntoAttribute(Builder &builder) const {
     return nullptr;
   }
   LLVM_DEBUG(llvm::dbgs() << "Generated expression: " << expr << "\n");
+
   std::optional<unsigned int> largest;
   expr->walk([&](AffineExpr e) {
     if (!mlir::isa<AffineSymbolExpr>(e)) {
@@ -404,11 +455,30 @@ size_t Ctor::Arguments::size() const { return lst.size(); }
 
 } // namespace zhl::expr
 
+//==-----------------------------------------------------------------------==//
+// Stream overloads
+//==-----------------------------------------------------------------------==//
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::ConstExpr &expr) {
   if (expr) {
     expr->print(os);
   } else {
     os << "ConstExpr(<<NULL>>)";
   }
+  return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::detail::Val &expr) {
+  expr.print(os);
+  return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::detail::Symbol &expr) {
+  expr.print(os);
+  return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::detail::Ctor &expr) {
+  expr.print(os);
   return os;
 }

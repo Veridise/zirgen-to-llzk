@@ -574,6 +574,8 @@ TypeBinding TypeBinding::NoExpr(const TypeBinding &b) {
   return copy;
 }
 
-bool TypeBinding::hasConstExpr() const { return constExpr; }
+bool TypeBinding::hasConstExpr() const { return bool(constExpr); }
 
 const expr::ConstExpr &TypeBinding::getConstExpr() const { return constExpr; }
+
+void TypeBinding::setConstExpr(expr::ConstExpr expr) { constExpr = expr; }

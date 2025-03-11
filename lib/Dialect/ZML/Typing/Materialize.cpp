@@ -243,5 +243,10 @@ zml::materializeTypeBindingConstructor(OpBuilder &builder, const TypeBinding &bi
     return nullptr;
   }
 
-  return builder.getFunctionType(args, retType);
+  auto ctorType = builder.getFunctionType(args, retType);
+  LLVM_DEBUG(
+      llvm::dbgs() << "<== Materializing constructor function of " << binding << " to " << ctorType
+                   << "\n"
+  );
+  return ctorType;
 }

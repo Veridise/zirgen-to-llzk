@@ -203,6 +203,8 @@ def SuperCoerceOp : ZMLOp<"super_coerce"> {
 
   let assemblyFormat =
       "$component attr-dict `:` type($component) `->` type($val)";
+
+  let hasVerifier = 1;
 }
 
 def NopOp : ZMLOp<"nop", [Pure]> {

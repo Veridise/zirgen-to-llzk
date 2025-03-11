@@ -86,7 +86,12 @@ void Params::print(
   os << footer;
 }
 
-TypeBinding Params::getParam(size_t i) const {
+const TypeBinding &Params::getParam(size_t i) const {
+  assert(i < data()->params.size());
+  return data()->params[i];
+}
+
+TypeBinding &MutableParams::getParam(size_t i) const {
   assert(i < data()->params.size());
   return data()->params[i];
 }

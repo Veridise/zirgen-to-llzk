@@ -254,18 +254,21 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
   auto compParams = mlir::cast<ComponentType>(op.getResult(0).getType()).getParams();
   auto liftedCompParams =
       compParams.drop_front(compParams.size() - callee.getNumLiftedParams().getZExtValue());
-
+  SmallVector<ConstExprAttr> affineLiftedCompParams;
+  for (auto attr : liftedCompParams) {
+    if (auto param = mlir::dyn_cast<ConstExprAttr>(attr)) {
+      affineLiftedCompParams.push_back(param);
+    }
+  }
   // Allocate here the values we may generate
-  SmallVector<SmallVector<Value>> mapOperandsMem(liftedCompParams.size());
+  SmallVector<SmallVector<Value>> mapOperandsMem(affineLiftedCompParams.size());
   // And store a ValueRange pointing to the vector here
   SmallVector<ValueRange> mapOperands;
   // This idiom does not use any dimensions
-  SmallVector<int32_t> dimsPerMap(liftedCompParams.size(), 0);
-  mapOperands.reserve(liftedCompParams.size());
+  SmallVector<int32_t> dimsPerMap(affineLiftedCompParams.size(), 0);
+  mapOperands.reserve(affineLiftedCompParams.size());
 
-  size_t idx = 0;
-  for (auto attr : liftedCompParams) {
-    auto liftedConstExpr = mlir::cast<ConstExprAttr>(attr);
+  for (auto [idx, liftedConstExpr] : llvm::enumerate(affineLiftedCompParams)) {
     auto &values = mapOperandsMem[idx];
     for (auto formal : liftedConstExpr.getFormals()) {
       assert(
@@ -276,7 +279,6 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
     }
 
     mapOperands.push_back(values);
-    idx++;
   }
 
   auto sym =
@@ -453,7 +455,34 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
   if (!arrType) {
     return op.emitOpError() << "was expecting an array type";
   }
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, mlir::ValueRange());
+
+  auto compParams = op->getParentOfType<llzk::StructDefOp>().getType().getParams();
+  auto arrayParams = op.getResult().getType().getParams();
+  SmallVector<ConstExprAttr> affineArrayParams;
+  for (auto attr : arrayParams) {
+    if (auto param = mlir::dyn_cast<ConstExprAttr>(attr)) {
+      affineArrayParams.push_back(param);
+    }
+  }
+  // Allocate here the values we may generate
+  SmallVector<SmallVector<Value>> mapOperandsMem(affineArrayParams.size());
+  // And store a ValueRange pointing to the vector here
+  SmallVector<ValueRange> mapOperands;
+  // This idiom does not use any dimensions
+  SmallVector<int32_t> dimsPerMap(affineArrayParams.size(), 0);
+  mapOperands.reserve(affineArrayParams.size());
+
+  for (auto [idx, constExpr] : llvm::enumerate(affineArrayParams)) {
+    auto &values = mapOperandsMem[idx];
+    for (auto formal : constExpr.getFormals()) {
+      assert(formal < compParams.size() && "Can only use as map operands declared parameters");
+      values.push_back(materializeParam(compParams[formal], rewriter, op->getLoc()));
+    }
+
+    mapOperands.push_back(values);
+  }
+
+  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, mapOperands, dimsPerMap);
 
   return mlir::success();
 }
