@@ -269,59 +269,6 @@ void createPODComponent(
   assert(compOp);
 }
 
-namespace {
-
-/// Creates symbols following the pattern 'prefix + counter'.
-/// This class does not own the prefix.
-class IncrementalSymbolizer {
-public:
-  IncrementalSymbolizer(MLIRContext *Ctx, Twine Prefix) : ctx(Ctx), prefix(Prefix), counter(0) {}
-
-  SymbolRefAttr operator*() const {
-    return SymbolRefAttr::get(StringAttr::get(ctx, prefix + "_" + Twine(counter)));
-  }
-
-  IncrementalSymbolizer &operator++() {
-    ++counter;
-    return *this;
-  }
-
-private:
-  MLIRContext *ctx;
-  Twine prefix;
-  uint32_t counter;
-};
-
-} // namespace
-
-static void populateAffineMapsToSymbolsMapImpl(
-    Type Type, DenseMap<AffineMap, SymbolRefAttr> &Symbols, IncrementalSymbolizer &Symbolizer
-) {
-  auto Component = mlir::dyn_cast<ComponentType>(Type);
-  if (!Component) {
-    return;
-  }
-  for (auto Attr : Component.getParams()) {
-    if (auto TypeAttr = mlir::dyn_cast<mlir::TypeAttr>(Attr)) {
-      populateAffineMapsToSymbolsMapImpl(TypeAttr.getValue(), Symbols, Symbolizer);
-    }
-    if (auto AffineMapAttr = mlir::dyn_cast<mlir::AffineMapAttr>(Attr)) {
-      auto Map = AffineMapAttr.getValue();
-      Symbols.insert({Map, *Symbolizer});
-      ++Symbolizer;
-    }
-  }
-}
-
-void populateAffineMapsToSymbolsMap(
-    ArrayRef<Type> Types, DenseMap<AffineMap, SymbolRefAttr> &Symbols, MLIRContext *Ctx
-) {
-  IncrementalSymbolizer Symbolizer(Ctx, "Aff$");
-  for (auto Type : Types) {
-    populateAffineMapsToSymbolsMapImpl(Type, Symbols, Symbolizer);
-  }
-}
-
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
     mlir::OpBuilder &builder, mlir::Value self

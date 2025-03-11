@@ -461,7 +461,8 @@ inline LogicalResult checkSpecializationArg(
   // If it comes from a LiteralOp then the type of the generic param must be Val
   if (mlir::isa<LiteralOp>(op)) {
     if (!paramIsVal) {
-      return emitError() << "parameter '" << paramType << "' was expecting a type but got " << type;
+      return emitError() << "parameter '" << paramType
+                         << "' was expecting a constant 'Val' but got '" << type << "'";
     }
     return success();
   }
@@ -469,8 +470,8 @@ inline LogicalResult checkSpecializationArg(
   // If it comes from a SpecializeOp or a GlobalOp the type of the generic param must be Type
   if (mlir::isa<SpecializeOp, GlobalOp>(op)) {
     if (!paramIsType) {
-      return emitError() << "parameter '" << paramType
-                         << "' was expecting a constant 'Val' but got '" << type << "'";
+      return emitError() << "parameter '" << paramType << "' was expecting a type but got '" << type
+                         << "'";
     }
     return success();
   }
@@ -545,17 +546,10 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
     return op->emitOpError() << "could not infer the type of the array";
   }
 
-  auto get = [](const TypeBinding &t) -> const TypeBinding & {
-    // if (t.isKnownConst()) {
-    //   return t.getSuperType();
-    // }
-    return t;
-  };
-
-  auto &fst = get(operands.front());
+  auto &fst = operands.front();
   auto commonType =
       std::reduce(operands.drop_front().begin(), operands.end(), fst, [&](auto &lhs, auto &rhs) {
-    return get(lhs).commonSupertypeWith(get(rhs));
+    return lhs.commonSupertypeWith(rhs);
   });
 
   return interpretateOp(op, getBindings().Array(commonType, operands.size()));

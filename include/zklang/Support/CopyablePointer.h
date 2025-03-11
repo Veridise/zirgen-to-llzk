@@ -70,22 +70,6 @@ public:
   /// Referential equality
   bool operator==(const self &other) const { return ptr == other.ptr; }
 
-#if 0
-  /// Structural equality
-  template <
-      typename = std::enable_if_t<
-          std::is_same_v<decltype(std::declval<cref>().operator==(std::declval<cref>())), bool>>>
-  bool equalTo(const self &other) const {
-    if (ptr == nullptr && other.ptr == nullptr) {
-      return true;
-    }
-    if (ptr == nullptr || other.ptr == nullptr) {
-      return false;
-    }
-    return *ptr == *other.ptr;
-  }
-#endif
-
   self clone() const { return self(*this); }
 
 private:

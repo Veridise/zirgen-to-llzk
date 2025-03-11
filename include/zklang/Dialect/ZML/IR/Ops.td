@@ -110,10 +110,7 @@ def ConstructorRefOp : ZMLOp<"constructor", [Pure]> {
   let arguments = (ins FlatSymbolRefAttr:$component, IndexAttr:$numLiftedParams,
       UnitAttr:$builtin);
   let results = (outs FunctionType);
-  let assemblyFormat = [{
-    attr-dict $component 
-    `:` type(results)
-  }];
+  let assemblyFormat = "attr-dict $component `:` type(results)";
 
   let builders =
       [OpBuilder<(ins "ComponentInterface":$comp, "uint64_t":$liftedParams,

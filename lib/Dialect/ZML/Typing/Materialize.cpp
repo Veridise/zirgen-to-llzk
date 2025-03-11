@@ -34,7 +34,7 @@ namespace {
 
 class Materializer {
 public:
-  explicit Materializer(MLIRContext *ctx, bool callerPov) : context(ctx), isCallerPov(callerPov) {}
+  explicit Materializer(MLIRContext *ctx) : context(ctx) {}
 
   Type materializeTypeBinding(const TypeBinding &binding) {
     seen.clear();
@@ -140,10 +140,6 @@ private:
         return ComponentType::Val(context);
       }
       if (binding.getSuperType().isTransitivelyVal()) {
-        if (isCallerPov) {
-          LLVM_DEBUG(llvm::dbgs() << "<== Materializing " << binding << " to its super type\n");
-          return materializeBaseType(binding.getSuperType());
-        }
         LLVM_DEBUG(llvm::dbgs() << "<== Materializing " << binding << " to Val\n");
         return ComponentType::Val(context);
       }
@@ -168,26 +164,24 @@ private:
   }
 
   MLIRContext *context;
-  bool isCallerPov;
   std::vector<std::string> seen;
 };
 
 } // namespace
 
-static Type
-materializeTypeBindingImpl(MLIRContext *context, const TypeBinding &binding, bool callerPov) {
-  Materializer m(context, callerPov);
+static Type materializeTypeBindingImpl(MLIRContext *context, const TypeBinding &binding) {
+  Materializer m(context);
   return m.materializeTypeBinding(binding);
 }
 
 Type zml::materializeTypeBinding(MLIRContext *context, const TypeBinding &binding) {
-  return materializeTypeBindingImpl(context, binding, false);
+  return materializeTypeBindingImpl(context, binding);
 }
 
 /// Materializes a type binding after replacing generic parameters that are in scope with the actual
 /// instantiated type.
 static Type specializeAndMaterializeTypeBinding(
-    MLIRContext *ctx, const TypeBinding &binding, const Params &scope, bool callerPov
+    MLIRContext *ctx, const TypeBinding &binding, const Params &scope
 ) {
   // If the scope is empty or the binding we are specializing is not generic then there are no type
   // variables.
@@ -199,32 +193,15 @@ static Type specializeAndMaterializeTypeBinding(
   // Make a copy to assign the params to
   auto copy = binding;
   LogicalResult result = failure();
-  // if (callerPov) {
   ParamsScopeStack scopeStack(scope);
   result = zhl::specializeTypeBinding(&copy, scopeStack);
-  // } else {
-  //   ParamsMap generics;
-  //   for (unsigned i = 0; i < scope.sizeOfDeclared(); i++) {
-  //     generics.declare(scope.getName(i), scope.getParam(i), i);
-  //   }
-  //   // Copy the lifted parameters over
-  //   auto totalSize = scope.size();
-  //   for (unsigned i = scope.sizeOfDeclared(); i < totalSize; i++) {
-  //     generics.declare(scope.getName(i), scope.getParam(i), i);
-  //   }
-  //
-  //   ParamsStorage sto(generics);
-  //   Params initialScope(sto);
-  //   ParamsScopeStack scopeStack(initialScope);
-  //   result = zhl::specializeTypeBinding(&copy, scopeStack);
-  // }
 
   if (failed(result)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << binding << "\n");
     return nullptr;
   }
 
-  return materializeTypeBindingImpl(ctx, copy, callerPov);
+  return materializeTypeBindingImpl(ctx, copy);
 }
 
 #ifndef NDEBUG
@@ -237,17 +214,15 @@ static llvm::raw_ostream &indent(size_t count = 1) {
 }
 #endif
 
-FunctionType zml::materializeTypeBindingConstructor(
-    OpBuilder &builder, const TypeBinding &binding, bool callerPov
-) {
+FunctionType
+zml::materializeTypeBindingConstructor(OpBuilder &builder, const TypeBinding &binding) {
   auto genericParams = binding.getGenericParamsMapping();
   LLVM_DEBUG(llvm::dbgs() << "Materializing constructor type for " << binding << "\n");
   // Create the type of the binding and of each argument
   // then return a function type using the generated types.
   // If any of the given types is a null just return nullptr for the whole thing.
   std::vector<Type> args;
-  auto retType =
-      specializeAndMaterializeTypeBinding(builder.getContext(), binding, genericParams, callerPov);
+  auto retType = specializeAndMaterializeTypeBinding(builder.getContext(), binding, genericParams);
   if (!retType) {
     LLVM_DEBUG(indent() << "failed to materialize the return type for " << binding << "\n");
     return nullptr;
@@ -258,9 +233,8 @@ FunctionType zml::materializeTypeBindingConstructor(
   auto params = binding.getConstructorParams();
   std::transform(params.begin(), params.end(), std::back_inserter(args), [&](auto &argBinding) {
     LLVM_DEBUG(indent(2) << argBinding << "\n");
-    auto materializedType = specializeAndMaterializeTypeBinding(
-        builder.getContext(), argBinding, genericParams, callerPov
-    );
+    auto materializedType =
+        specializeAndMaterializeTypeBinding(builder.getContext(), argBinding, genericParams);
     LLVM_DEBUG(indent() << "Materialized to " << materializedType << "\n");
     return materializedType;
   });

@@ -224,7 +224,7 @@ LogicalResult LowerLoadValParamOp::matchAndRewrite(
 static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) {
   if (auto symAttr = mlir::dyn_cast<SymbolRefAttr>(attr)) {
     auto param = builder.create<llzk::ConstReadOp>(
-        loc, ComponentType::Val(builder.getContext()), symAttr.getRootReference()
+        loc, llzk::FeltType::get(builder.getContext()), symAttr.getRootReference()
     );
     return builder.create<llzk::FeltToIndexOp>(loc, param);
   }

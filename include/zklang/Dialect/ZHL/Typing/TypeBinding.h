@@ -212,7 +212,6 @@ private:
   bool closure = false;
   Name name;
   mlir::Location loc;
-  // std::optional<uint64_t> constVal;
   expr::ConstExpr constExpr;
   std::optional<std::string> genericParamName;
   TypeBinding *superType;
@@ -224,3 +223,6 @@ private:
 };
 
 } // namespace zhl
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding::Name &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding &b);

@@ -90,6 +90,3 @@ private:
 };
 
 } // namespace zhl
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding::Name &);
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding &b);
