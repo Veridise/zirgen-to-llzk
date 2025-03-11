@@ -13,18 +13,41 @@ using namespace mlir;
 
 ParamsStorage::ParamsStorage() = default;
 
-ParamsStorage::ParamsStorage(ParamsMap &map)
-    : names(ParamNames(map.size())), injected(BitVector(map.size())) {
-  // Hack to get the bindings ordered without having a default constructor
-  SmallVector<TypeBinding *> tmp(map.size());
+static void fillVectors(
+    ParamsMap &map, SmallVectorImpl<TypeBinding *> &tmp, SmallVectorImpl<ParamName> &names,
+    BitVector &injected
+) {
   for (auto &entry : map) {
     auto pos = entry.getValue().Pos;
     tmp[pos] = &entry.getValue().Type;
     names[pos] = entry.getKey();
     injected[pos] = entry.getValue().Injected;
   }
+}
+
+ParamsStorage::ParamsStorage(ParamsMap &map)
+    : names(ParamNames(map.size())), injected(BitVector(map.size())) {
+  // Hack to get the bindings ordered without having a default constructor
+  SmallVector<TypeBinding *> tmp(map.size(), nullptr);
+  fillVectors(map, tmp, names, injected);
   for (auto *type : tmp) {
+    assert(type);
     params.push_back(*type);
+  }
+}
+
+ParamsStorage::ParamsStorage(ParamsMap &map, size_t size, const TypeBinding &defaultBinding)
+    : names(ParamNames(size)), injected(BitVector(size)) {
+  // Hack to get the bindings ordered without having a default constructor
+  SmallVector<TypeBinding *> tmp(size, nullptr);
+  fillVectors(map, tmp, names, injected);
+
+  for (auto *type : tmp) {
+    if (type) {
+      params.push_back(*type);
+    } else {
+      params.push_back(defaultBinding);
+    }
   }
 }
 

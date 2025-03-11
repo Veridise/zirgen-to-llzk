@@ -75,7 +75,7 @@ FailureOr<TypeBinding> TypeBindings::MaybeGet(StringRef name) const {
   return mlir::failure();
 }
 
-const TypeBinding &TypeBindings::Manage(const TypeBinding &binding) {
+TypeBinding &TypeBindings::Manage(const TypeBinding &binding) const {
   managedBindings.push_back(binding);
   return managedBindings.back();
 }

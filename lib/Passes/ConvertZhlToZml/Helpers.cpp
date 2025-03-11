@@ -194,9 +194,9 @@ void constructFieldReads(
 
 FailureOr<Value> constructPODComponent(
     Operation *op, zhl::TypeBinding &binding, OpBuilder &builder, Value self,
-    llvm::function_ref<mlir::Value()> superTypeValueCb
+    llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &bindings
 ) {
-  auto ctor = CtorCallBuilder::Make(op, binding, builder, self);
+  auto ctor = CtorCallBuilder::Make(op, binding, builder, self, bindings);
   if (failed(ctor)) {
     return failure();
   }
@@ -271,25 +271,26 @@ void createPODComponent(
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
-    mlir::OpBuilder &builder, mlir::Value self
+    mlir::OpBuilder &builder, mlir::Value self, const zhl::TypeBindings &bindings
 ) {
   auto binding = typeAnalysis.getType(value);
   if (failed(binding)) {
     return op->emitError() << "failed to type check";
   }
 
-  return Make(op, *binding, builder, self);
+  return Make(op, *binding, builder, self, bindings);
 }
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
-    mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self
+    mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+    mlir::Value self, const zhl::TypeBindings &bindings
 ) {
   auto rootModule = op->getParentOfType<mlir::ModuleOp>();
   auto *calleeComp = findCallee(binding.getName(), rootModule);
   if (!calleeComp) {
     return op->emitError() << "could not find component with name " << binding.getName();
   }
-  auto constructorType = materializeTypeBindingConstructor(builder, binding);
+  auto constructorType = materializeTypeBindingConstructor(builder, binding, bindings);
 
   return CtorCallBuilder(
       constructorType, binding, op->getParentOfType<ComponentInterface>(), self,

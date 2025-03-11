@@ -562,6 +562,8 @@ TypeBinding &TypeBinding::getSuperType() {
   return *superType;
 }
 
+void TypeBinding::setSuperType(TypeBinding &newSuperType) { superType = &newSuperType; }
+
 TypeBinding TypeBinding::WithExpr(const TypeBinding &b, expr::ConstExpr constExpr) {
   auto copy = b;
   copy.constExpr = constExpr;

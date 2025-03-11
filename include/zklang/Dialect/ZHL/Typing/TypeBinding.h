@@ -132,6 +132,7 @@ public:
   mlir::Location getLocation() const;
   const TypeBinding &getSuperType() const;
   TypeBinding &getSuperType();
+  void setSuperType(TypeBinding &);
   uint64_t getConst() const;
   llvm::StringRef getGenericParamName() const;
 
@@ -145,9 +146,9 @@ public:
   void replaceGenericParamByName(mlir::StringRef name, const TypeBinding &binding);
 
   /// Attempts to create an specialized version of the type using the provided parameters.
-  mlir::FailureOr<TypeBinding> specialize(
-      std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params
-  ) const;
+  mlir::FailureOr<TypeBinding>
+  specialize(std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params, TypeBindings &)
+      const;
 
   mlir::FailureOr<TypeBinding>
       getMember(mlir::StringRef, std::function<mlir::InFlightDiagnostic()>) const;

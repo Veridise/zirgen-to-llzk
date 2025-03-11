@@ -668,7 +668,8 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
       .attrs(op->getAttrs())
       .typeParams(genericNames)
       .constructor(
-          materializeTypeBindingConstructor(rewriter, *name), name->getConstructorParamLocations()
+          materializeTypeBindingConstructor(rewriter, *name, getTypeBindings()),
+          name->getConstructorParamLocations()
       )
       .takeRegion(&op.getRegion());
   for (auto &[fieldName, binding] : name->getMembers()) {
@@ -906,7 +907,7 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
           adaptor.getValue(), *valueBinding, rewriter,
           materializeTypeBinding(getContext(), binding->getSuperType())
       );
-    });
+    }, getTypeBindings());
     if (failed(pod)) {
       return failure();
     }
@@ -976,7 +977,7 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
   auto self = op->getParentOfType<SelfOp>().getSelfValue();
   arrayFrame->getFrame().allocateSlot<ComponentSlot>(getTypeBindings(), *accBinding);
 
-  auto ctorBuilder = CtorCallBuilder::Make(op, *accBinding, rewriter, self);
+  auto ctorBuilder = CtorCallBuilder::Make(op, *accBinding, rewriter, self, getTypeBindings());
   if (mlir::failed(ctorBuilder)) {
     return mlir::failure();
   }
@@ -986,7 +987,8 @@ mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
     return op->emitError() << "could not find component with name " << accBinding->getName();
   }
 
-  auto constructorType = materializeTypeBindingConstructor(rewriter, *accBinding);
+  auto constructorType =
+      materializeTypeBindingConstructor(rewriter, *accBinding, getTypeBindings());
   assert(constructorType);
   if (constructorType.getInputs().size() != 2) {
     return op->emitOpError() << "was expecting a constructor with two arguments but got "

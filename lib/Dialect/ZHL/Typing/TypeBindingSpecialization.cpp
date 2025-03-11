@@ -72,11 +72,13 @@ private:
 } // namespace
 
 static LogicalResult specializeTypeBindingImpl(
-    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t indent
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
+    const TypeBindings &bindings, size_t indent
 );
 
 static LogicalResult specializeTypeBinding_genericParamCase(
-    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t indent
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
+    const TypeBindings &bindings, size_t indent
 ) {
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Specializing " << *dst << "\n");
   auto varName = dst->getGenericParamName();
@@ -110,7 +112,8 @@ static LogicalResult specializeTypeBinding_genericParamCase(
 }
 
 static LogicalResult specializeTypeBinding_genericTypeCase(
-    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t indent
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
+    const TypeBindings &bindings, size_t indent
 ) {
   auto params = dst->getGenericParamsMapping();
   for (auto &name : dst->getGenericParamNames()) {
@@ -119,7 +122,7 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
                llvm::dbgs() << "Variable '" << name << "' binds to '" << *params[name] << "'\n");
     if (!params[name]->isGenericParam()) {
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Specializing " << *params[name] << "\n");
-      auto result = specializeTypeBindingImpl(params[name], scopes, FV, indent + 1);
+      auto result = specializeTypeBindingImpl(params[name], scopes, FV, bindings, indent + 1);
       if (failed(result)) {
         LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
         return failure();
@@ -159,7 +162,7 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
     auto copy = *replacement;
     LLVM_DEBUG(llvm::dbgs() << " replaced with " << copy << "\n");
     // And specialize it if necessary
-    if (failed(specializeTypeBindingImpl(&copy, scopes, FV, indent + 1))) {
+    if (failed(specializeTypeBindingImpl(&copy, scopes, FV, bindings, indent + 1))) {
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
       return failure();
     }
@@ -174,7 +177,7 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
                llvm::dbgs() << "Specializing super type " << dst->getSuperType() << "\n");
     TypeBinding copy = dst->getSuperType();
     ScopeGuard guard(scopes, superTypeScope);
-    if (failed(specializeTypeBindingImpl(&copy, scopes, FV, indent + 1))) {
+    if (failed(specializeTypeBindingImpl(&copy, scopes, FV, bindings, indent + 1))) {
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
       return failure();
     }
@@ -182,7 +185,8 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
       copy.markAsSpecialized();
     }
     if (!copy.isTypeMarker()) {
-      dst->getSuperType() = copy;
+      dst->setSuperType(bindings.Manage(copy));
+      // dst->getSuperType() = copy;
     }
     LLVM_DEBUG(spaces(indent);
                llvm::dbgs() << "Into " << dst->getSuperType() << "  (super type)\n");
@@ -193,7 +197,7 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
     LLVM_DEBUG(spaces(indent);
                llvm::dbgs() << "Specializing constructor argument's type " << param << "\n");
     {
-      auto paramTypeResult = specializeTypeBindingImpl(&param, scopes, FV, indent + 1);
+      auto paramTypeResult = specializeTypeBindingImpl(&param, scopes, FV, bindings, indent + 1);
       if (failed(paramTypeResult)) {
         LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
         return failure();
@@ -212,7 +216,7 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
                  llvm::dbgs() << "Specializing member " << name << " of type " << *type << "\n");
       {
         ScopeGuard guard(scopes, memberScope);
-        if (failed(specializeTypeBindingImpl(&type.value(), scopes, FV, indent + 1))) {
+        if (failed(specializeTypeBindingImpl(&type.value(), scopes, FV, bindings, indent + 1))) {
           LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
           return failure();
         }
@@ -293,17 +297,28 @@ static uint64_t foldNeg(uint64_t value) {
 
 constexpr uint64_t INVALID = std::numeric_limits<uint64_t>::max();
 
-static uint64_t foldBinaryOp(StringRef name, uint64_t lhs, uint64_t rhs) {
+static FailureOr<uint64_t> foldBinaryOp(StringRef name, uint64_t lhs, uint64_t rhs) {
   ff::babybear::Field BabyBear;
   auto fp = [&](uint64_t v) { return v % BabyBear.prime; };
 
-  return llvm::StringSwitch<uint64_t>(name)
+  if (name == "Div") {
+    if (rhs == 0) {
+      return failure();
+    }
+    return fp(lhs / rhs);
+  }
+  if (name == "Mod") {
+    if (rhs == 0) {
+      return failure();
+    }
+    return fp(lhs % rhs);
+  }
+
+  return llvm::StringSwitch<FailureOr<uint64_t>>(name)
       .Case("Add", fp(lhs + rhs))
       .Case("Sub", fp(lhs - rhs))
       .Case("Mul", fp(lhs * rhs))
-      .Case("Div", fp(lhs / rhs))
-      .Case("Mod", fp(lhs % rhs))
-      .Default(INVALID);
+      .Default(failure());
 }
 
 static FailureOr<ConstExpr>
@@ -355,7 +370,7 @@ constantFoldCtorExpr(const expr::detail::Ctor &expr, ParamsScopeStack &scopes, s
     if (lhsVal && rhsVal) {
       LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Arguments are both constant values\n");
       auto newValue = foldBinaryOp(expr.getTypeName(), lhsVal.getValue(), rhsVal.getValue());
-      if (newValue == INVALID) {
+      if (failed(newValue)) {
         LLVM_DEBUG(spaces(indent + 2);
                    llvm::dbgs()
                    << "Failed to fold constructor because the folder returned an invalid value\n");
@@ -363,8 +378,8 @@ constantFoldCtorExpr(const expr::detail::Ctor &expr, ParamsScopeStack &scopes, s
       }
       LLVM_DEBUG(spaces(indent + 1); llvm::dbgs()
                                      << expr.getTypeName() << " constructor folded into "
-                                     << newValue << "\n");
-      return ConstExpr::Val(newValue);
+                                     << *newValue << "\n");
+      return ConstExpr::Val(*newValue);
     }
     LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Arguments are not both constant values\n");
     return ConstExpr::Ctor(expr.getTypeName(), {*foldedLhs, *foldedRhs});
@@ -390,65 +405,6 @@ constantFoldExpr(const ExprBase &expr, ParamsScopeStack &scopes, size_t indent) 
     return constantFoldCtorExpr(*ctor, scopes, indent);
   }).Default([](auto &) { return failure(); });
 }
-
-#if 0
-template <>
-struct llvm::CastInfo<zhl::expr::ValExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::ValExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::ValExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) {
-    LLVM_DEBUG(llvm::dbgs() << "Casting to a ValExpr\n");
-    return to(a);
-  }
-  static inline to castFailed() {
-    LLVM_DEBUG(llvm::dbgs() << "Casting to a empty ValExpr\n");
-    return to();
-  }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::SymExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::ValExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::SymExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::CtorExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::ValExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::CtorExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-#endif
 
 static FailureOr<ConstExpr>
 constantFoldExpr(ConstExpr expr, ParamsScopeStack &scopes, size_t indent) {
@@ -476,17 +432,19 @@ constantFoldExpr(ConstExpr expr, ParamsScopeStack &scopes, size_t indent) {
 static Params getConstantParams(TypeBinding &binding, ParamsStorage &storage) {
   ParamsMap constants;
   MutableParams params = binding.getGenericParamsMapping();
-  auto declParamsCount = params.sizeOfDeclared();
-  for (size_t param = 0; param < declParamsCount; param++) {
-    if (params.getParam(param).isKnownConst()) {
-      constants.declare(params.getName(param), params.getParam(param), param);
+  // auto declParamsCount = params.sizeOfDeclared();
+  for (auto [pos, param, name] : llvm::enumerate(params, params.getNames())) {
+    if (param.isKnownConst()) {
+      constants.declare(name, param, pos);
     }
   }
-  storage = ParamsStorage(constants);
+  storage = ParamsStorage(constants, params.size(), TypeBinding(binding.getLocation()));
   return Params(storage);
 }
 
-static LogicalResult propagateConstants(TypeBinding *dst, ParamsScopeStack &scopes, size_t indent) {
+static LogicalResult propagateConstants(
+    TypeBinding *dst, ParamsScopeStack &scopes, const TypeBindings &bindings, size_t indent
+) {
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants for type " << *dst << "\n");
 
   MutableParams params = dst->getGenericParamsMapping();
@@ -529,12 +487,12 @@ static LogicalResult propagateConstants(TypeBinding *dst, ParamsScopeStack &scop
                                             << dst->getSuperType() << "\n");
     TypeBinding copy = dst->getSuperType();
     ScopeGuard superTypeGuard(scopes, superTypeScope);
-    if (failed(propagateConstants(&copy, scopes, indent + 1))) {
+    if (failed(propagateConstants(&copy, scopes, bindings, indent + 1))) {
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
       return failure();
     }
     if (!copy.isTypeMarker()) {
-      dst->getSuperType() = copy;
+      dst->setSuperType(bindings.Manage(copy));
     }
     LLVM_DEBUG(spaces(indent);
                llvm::dbgs() << "Into " << dst->getSuperType() << "  (super type)\n");
@@ -545,7 +503,7 @@ static LogicalResult propagateConstants(TypeBinding *dst, ParamsScopeStack &scop
     LLVM_DEBUG(spaces(indent); llvm::dbgs()
                                << "Propagating constants in constructor argument's type " << param
                                << "\n");
-    if (failed(propagateConstants(&param, scopes, indent + 1))) {
+    if (failed(propagateConstants(&param, scopes, bindings, indent + 1))) {
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
       return failure();
     }
@@ -560,7 +518,7 @@ static LogicalResult propagateConstants(TypeBinding *dst, ParamsScopeStack &scop
                                               << " of type " << *type << "\n");
       {
         ScopeGuard memberGuard(scopes, memberScope);
-        if (failed(propagateConstants(&type.value(), scopes, indent + 1))) {
+        if (failed(propagateConstants(&type.value(), scopes, bindings, indent + 1))) {
           LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Failure\n");
           return failure();
         }
@@ -575,7 +533,8 @@ static LogicalResult propagateConstants(TypeBinding *dst, ParamsScopeStack &scop
 }
 
 static LogicalResult specializeTypeBindingImpl(
-    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, size_t indent
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
+    const TypeBindings &bindings, size_t indent
 ) {
   LLVM_DEBUG(spaces(indent); scopes.print(llvm::dbgs()); spaces(indent);
              printFVs(FV, llvm::dbgs()));
@@ -585,17 +544,17 @@ static LogicalResult specializeTypeBindingImpl(
   }
   // If the type binding is a generic param replace it with the actual type.
   if (dst->isGenericParam()) {
-    return specializeTypeBinding_genericParamCase(dst, scopes, FV, indent);
+    return specializeTypeBinding_genericParamCase(dst, scopes, FV, bindings, indent);
   }
   // If the type is a generic type apply the replacement to its generic parameters
   if (dst->isGeneric()) {
-    if (failed(specializeTypeBinding_genericTypeCase(dst, scopes, FV, indent))) {
+    if (failed(specializeTypeBinding_genericTypeCase(dst, scopes, FV, bindings, indent))) {
       return failure();
     }
     ParamsStorage sto;
     Params consts(sto);
     ParamsScopeStack constsScope(consts);
-    return propagateConstants(dst, constsScope, indent);
+    return propagateConstants(dst, constsScope, bindings, indent);
   }
 
   // Do nothing in the other cases.
@@ -625,20 +584,24 @@ private:
 } // namespace
 
 mlir::LogicalResult zhl::specializeTypeBinding(
-    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
+    const TypeBindings &bindings
 ) {
   WrapLog w(*dst);
-  return specializeTypeBindingImpl(dst, scopes, FV, 0);
+  return specializeTypeBindingImpl(dst, scopes, FV, bindings, 0);
 }
 
-mlir::LogicalResult zhl::specializeTypeBinding(TypeBinding *dst, ParamsScopeStack &scopes) {
+mlir::LogicalResult zhl::specializeTypeBinding(
+    TypeBinding *dst, ParamsScopeStack &scopes, const TypeBindings &bindings
+) {
   WrapLog w(*dst);
   llvm::StringSet<> emptyFVs;
-  return specializeTypeBindingImpl(dst, scopes, emptyFVs, 0);
+  return specializeTypeBindingImpl(dst, scopes, emptyFVs, bindings, 0);
 }
 
 mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
-    std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params
+    std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params,
+    TypeBindings &bindings
 ) const {
   if (specialized) {
     return emitError() << "can't respecialize type '" << getName() << "'";
@@ -679,7 +642,8 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   Params initialScope(sto);
   ParamsScopeStack scopeStack(initialScope);
   WrapLog w(*this);
-  auto result = specializeTypeBindingImpl(&specializedBinding, scopeStack, freeVariables, 2);
+  auto result =
+      specializeTypeBindingImpl(&specializedBinding, scopeStack, freeVariables, bindings, 0);
   if (failed(result)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << *this << "\n");
     return failure();

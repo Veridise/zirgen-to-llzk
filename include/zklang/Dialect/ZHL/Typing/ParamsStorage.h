@@ -60,6 +60,7 @@ struct ParamsStorage {
 
   ParamsStorage();
   ParamsStorage(ParamsMap &map);
+  ParamsStorage(ParamsMap &map, size_t, const TypeBinding &);
 
   bool operator==(const ParamsStorage &) const;
 };

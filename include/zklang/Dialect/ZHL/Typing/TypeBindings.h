@@ -80,12 +80,12 @@ public:
 
   [[nodiscard]] const TypeBinding &Get(mlir::StringRef name) const;
   [[nodiscard]] mlir::FailureOr<TypeBinding> MaybeGet(mlir::StringRef name) const;
-  [[nodiscard]] const TypeBinding &Manage(const TypeBinding &);
+  [[nodiscard]] TypeBinding &Manage(const TypeBinding &) const;
 
 private:
   mlir::Location unk;
   llvm::StringMap<TypeBinding> bindings;
-  std::deque<TypeBinding> managedBindings;
+  mutable std::deque<TypeBinding> managedBindings;
   TypeBinding bottom;
 };
 

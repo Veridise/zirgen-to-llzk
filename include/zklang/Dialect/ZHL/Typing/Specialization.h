@@ -27,7 +27,8 @@ private:
 /// variables. This function edits the TypeBinding in place and returns mlir::failure() in case of
 /// error.
 mlir::LogicalResult
-specializeTypeBinding(TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV);
-mlir::LogicalResult specializeTypeBinding(TypeBinding *dst, ParamsScopeStack &scopes);
+specializeTypeBinding(TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, const TypeBindings &);
+mlir::LogicalResult
+specializeTypeBinding(TypeBinding *dst, ParamsScopeStack &scopes, const TypeBindings &);
 
 } // namespace zhl

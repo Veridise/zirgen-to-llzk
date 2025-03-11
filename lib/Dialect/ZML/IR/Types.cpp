@@ -117,4 +117,62 @@ ComponentType ComponentType::getSuperTypeAsComp() const {
   return nullptr;
 }
 
+static bool equivalentParam(Attribute lhs, Attribute rhs) {
+  if (lhs == rhs) {
+    return true;
+  }
+
+  auto lhsType = mlir::dyn_cast_if_present<TypeAttr>(lhs);
+  auto rhsType = mlir::dyn_cast_if_present<TypeAttr>(rhs);
+
+  if (!(lhsType && rhsType)) {
+    return false;
+  }
+
+  auto lhsComp = mlir::dyn_cast_if_present<ComponentType>(lhsType.getValue());
+  auto rhsComp = mlir::dyn_cast_if_present<ComponentType>(rhsType.getValue());
+
+  if (!(lhsComp && rhsComp)) {
+    return false;
+  }
+
+  return lhsComp.subtypeOf(rhsComp);
+}
+
+/// A type T may be a subtype of a type T' if for all parameters that are types p_0 and p_0', p_0 is
+/// a subtype of p_0' and T and T' have the same name.
+static bool subtypeViaParams(const ComponentType &lhs, ComponentType rhs) {
+  // If they have the same name and number of parameters
+  bool sameName = lhs.getName() == rhs.getName();
+  bool sameNParams = lhs.getParams().size() == rhs.getParams().size();
+
+  if (!(sameName && sameNParams)) {
+    return false;
+  }
+
+  for (auto [lhsParam, rhsParam] : llvm::zip_equal(lhs.getParams(), rhs.getParams())) {
+    if (!equivalentParam(lhsParam, rhsParam)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool subtypeViaParams(const ComponentType &lhs, Type rhs) {
+  if (auto rhsAsComp = mlir::dyn_cast_if_present<ComponentType>(rhs)) {
+    return subtypeViaParams(lhs, rhsAsComp);
+  }
+  return false;
+}
+
+bool ComponentType::subtypeOf(Type other) const {
+  if (*this == other || subtypeViaParams(*this, other)) {
+    return true;
+  }
+  if (auto super = getSuperTypeAsComp()) {
+    return super.subtypeOf(other);
+  }
+  return false;
+}
+
 } // namespace zml

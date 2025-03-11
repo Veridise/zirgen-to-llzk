@@ -140,7 +140,9 @@ public:
     if (!selfOp) {
       return op->emitOpError() << "is not within a self region";
     }
-    return CtorCallBuilder::Make(op, value, *typeAnalysis, builder, selfOp.getSelfValue());
+    return CtorCallBuilder::Make(
+        op, value, *typeAnalysis, builder, selfOp.getSelfValue(), getTypeBindings()
+    );
   }
 
   const zhl::TypeBindings &getTypeBindings() const { return typeAnalysis->getBindings(); }

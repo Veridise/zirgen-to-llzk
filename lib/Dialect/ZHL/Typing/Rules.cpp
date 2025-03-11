@@ -526,7 +526,7 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
   auto typeToSpecialize = operands[0];
   return interpretateOp(op, typeToSpecialize.specialize([&]() {
     return op->emitOpError();
-  }, operands.drop_front()));
+  }, operands.drop_front(), getBindings()));
 }
 
 mlir::FailureOr<TypeBinding> SubscriptTypeRule::
@@ -696,7 +696,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return failure();
   }
 
-  assert(arrayLen->isConst());
+  assert(arrayLen->isConst() || arrayLen->hasConstExpr());
 
   assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
