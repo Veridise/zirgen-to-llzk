@@ -5,12 +5,15 @@
 #include <functional>
 #include <iterator>
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
@@ -155,8 +158,8 @@ LogicalResult LowerNopOp::matchAndRewrite(
 // to @constrain that point to structs that get removed during lowering because the implementation
 // of these types gets removed.
 static std::unordered_set<std::string_view> builtinsConvertibleToOps{
-    "Val",     "Add",    "Sub",    "Mul",    "BitAnd", "Inv",    "Isz",    "Neg",
-    "InRange", "ExtVal", "ExtAdd", "ExtSub", "ExtInv", "ExtMul", "MakeExt"
+    "Val", "Add",     "Sub",    "Mul",    "BitAnd", "Inv",    "Isz",    "Neg",
+    "Mod", "InRange", "ExtVal", "ExtAdd", "ExtSub", "ExtInv", "ExtMul", "MakeExt"
 };
 
 bool wasConvertedToPrimitiveType(ComponentType t) {
@@ -237,52 +240,93 @@ static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) 
   assert(false && "Cannot materialize something that is not a symbol or a literal integer");
 }
 
+namespace {
+
+struct Params {
+  ArrayRef<Attribute> callee, caller;
+};
+
+struct AffineParams {
+  SmallVector<ConstExprAttr> decl, lifted;
+
+  size_t size() const { return decl.size() + lifted.size(); }
+};
+
+} // namespace
+
+static void collectAffineParams(ArrayRef<Attribute> attrs, SmallVectorImpl<ConstExprAttr> &out) {
+  for (auto attr : attrs) {
+    if (auto param = mlir::dyn_cast<ConstExprAttr>(attr)) {
+      out.push_back(param);
+    }
+  }
+}
+
+static void materializeValuesForParams(
+    ArrayRef<ConstExprAttr> affineParams, ArrayRef<Attribute> sourceParams,
+    MutableArrayRef<SmallVector<Value>> mem, OpBuilder &builder, Location loc,
+    SmallVectorImpl<ValueRange> &out
+) {
+  auto res = llvm::map_to_vector(llvm::zip_equal(mem, affineParams), [&](auto in) -> ValueRange {
+    auto [values, param] = in;
+    values = llvm::map_to_vector(param.getFormals(), [&](auto formal) {
+      return materializeParam(sourceParams[formal], builder, loc);
+    });
+
+    return values;
+  });
+  out.insert(out.end(), res.begin(), res.end());
+}
+
 mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
     mlir::func::CallIndirectOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto parent = op->getParentOfType<llzk::FuncOp>();
   if (!parent || parent.getName() != "compute") {
-    return mlir::failure(); // Don't operate on non compute calls
+    return failure(); // Don't operate on non compute calls
   }
 
   auto callee = mlir::dyn_cast<ConstructorRefOp>(adaptor.getCallee().getDefiningOp());
   if (!callee) {
     return failure();
   }
-  auto comp = callee.getComponentAttr();
 
-  auto compParams = mlir::cast<ComponentType>(op.getResult(0).getType()).getParams();
-  auto liftedCompParams =
-      compParams.drop_front(compParams.size() - callee.getNumLiftedParams().getZExtValue());
-  SmallVector<ConstExprAttr> affineLiftedCompParams;
-  for (auto attr : liftedCompParams) {
-    if (auto param = mlir::dyn_cast<ConstExprAttr>(attr)) {
-      affineLiftedCompParams.push_back(param);
-    }
-  }
+  Params params{
+      .callee = mlir::cast<ComponentType>(op.getResult(0).getType()).getParams(),
+      .caller = op->getParentOfType<llzk::StructDefOp>()
+                    .getConstParams()
+                    .value_or(rewriter.getArrayAttr({}))
+                    .getValue()
+  };
+
+  auto numDeclParams = params.callee.size() - callee.getNumLiftedParams().getZExtValue();
+
+  AffineParams affineParams;
+  collectAffineParams(params.callee.take_front(numDeclParams), affineParams.decl);
+  collectAffineParams(params.callee.drop_front(numDeclParams), affineParams.lifted);
+
   // Allocate here the values we may generate
-  SmallVector<SmallVector<Value>> mapOperandsMem(affineLiftedCompParams.size());
+  SmallVector<SmallVector<Value>> mapOperandsMem(affineParams.size());
+  // This idiom does not use any dimensions
+  SmallVector<int32_t> dimsPerMap(affineParams.size(), 0);
   // And store a ValueRange pointing to the vector here
   SmallVector<ValueRange> mapOperands;
-  // This idiom does not use any dimensions
-  SmallVector<int32_t> dimsPerMap(affineLiftedCompParams.size(), 0);
-  mapOperands.reserve(affineLiftedCompParams.size());
+  mapOperands.reserve(affineParams.size());
 
-  for (auto [idx, liftedConstExpr] : llvm::enumerate(affineLiftedCompParams)) {
-    auto &values = mapOperandsMem[idx];
-    for (auto formal : liftedConstExpr.getFormals()) {
-      assert(
-          formal < (compParams.size() - liftedCompParams.size()) &&
-          "Can only use as map operands declared parameters"
-      );
-      values.push_back(materializeParam(compParams[formal], rewriter, op->getLoc()));
-    }
+  materializeValuesForParams(
+      affineParams.decl, params.caller,
+      MutableArrayRef(mapOperandsMem).take_front(affineParams.decl.size()), rewriter, op.getLoc(),
+      mapOperands
+  );
+  materializeValuesForParams(
+      affineParams.lifted, params.callee,
+      MutableArrayRef(mapOperandsMem).drop_front(affineParams.decl.size()), rewriter, op.getLoc(),
+      mapOperands
+  );
 
-    mapOperands.push_back(values);
-  }
-
-  auto sym =
-      mlir::SymbolRefAttr::get(comp.getAttr(), {mlir::SymbolRefAttr::get(parent.getNameAttr())});
+  auto sym = mlir::SymbolRefAttr::get(
+      callee.getComponentAttr().getAttr(), {mlir::SymbolRefAttr::get(parent.getNameAttr())}
+  );
 
   llvm::SmallVector<mlir::Type> types;
   auto convRes = getTypeConverter()->convertTypes(op.getResultTypes(), types);

@@ -377,9 +377,12 @@ void zml::addBuiltins(
 
   assert(definedNames.find("Val") == definedNames.end() && "Can't redefine Val type");
   assert(definedNames.find("ExtVal") == definedNames.end() && "Can't redefine ExtVal type");
+  assert(definedNames.find("String") == definedNames.end() && "Can't redefine String type");
+  assert(definedNames.find("Array") == definedNames.end() && "Can't redefine Array type");
   addTrivial(builder, "Val");
   addTrivial(builder, "ExtVal");
-  MAYBE("String") { addTrivial(builder, "String"); }
+  addTrivial(builder, "String");
+  addArrayComponent(builder);
 
   MAYBE("NondetReg") { addNondetReg(builder); }
   MAYBE("NondetExtReg") { addNondetExtReg(builder); }
@@ -398,5 +401,4 @@ void zml::addBuiltins(
   MAYBE("ExtInv") { addExtUnaryOp<ExtInvOp>(builder, "ExtInv"); }
   MAYBE("Isz") { addUnaryOp<IsZeroOp>(builder, "Isz"); }
   MAYBE("Neg") { addUnaryOp<NegOp>(builder, "Neg"); }
-  MAYBE("Array") { addArrayComponent(builder); }
 }

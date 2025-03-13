@@ -82,7 +82,9 @@ AffineMapAttr getSizeMap(Attribute attr) {
 
 llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
     : field(Field),
-      feltEquivalentTypes({"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz", "InRange", "Neg"}),
+      feltEquivalentTypes(
+          {"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz", "InRange", "Neg", "Mod"}
+      ),
       extValBuiltins({"ExtVal", "ExtAdd", "ExtSub", "ExtMul", "ExtInv", "MakeExt"}) {
 
   addConversion([](mlir::Type t) { return t; });
