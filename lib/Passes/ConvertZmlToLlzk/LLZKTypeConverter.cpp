@@ -1,10 +1,14 @@
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/SmallVectorExtras.h>
+#include <llvm/ADT/TypeSwitch.h>
+#include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FileSystem.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
+#include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
@@ -31,7 +35,7 @@ mlir::Type deduceArrayType(mlir::Attribute attr) {
   if (auto typeAttr = mlir::dyn_cast<mlir::TypeAttr>(attr)) {
     return typeAttr.getValue();
   }
-  assert(false && "Failed to convert array type");
+  llvm_unreachable("Failed to convert array type");
   return nullptr;
 }
 
@@ -42,36 +46,40 @@ int64_t getSize(mlir::Attribute attr) {
   return intAttr.getValue().getZExtValue();
 }
 
-void convertParamAttrs(
-    mlir::ArrayRef<mlir::Attribute> in, llvm::SmallVector<mlir::Attribute> &out,
-    llzk::LLZKTypeConverter &converter
-) {
-  std::transform(
-      in.begin(), in.end(), std::back_inserter(out),
-      [&](mlir::Attribute attr) -> mlir::Attribute {
-    if (auto typeAttr = mlir::dyn_cast<mlir::TypeAttr>(attr)) {
-      return mlir::TypeAttr::get(converter.convertType(typeAttr.getValue()));
-    }
-    if (auto constExprAttr = mlir::dyn_cast<zml::ConstExprAttr>(attr)) {
-      return mlir::AffineMapAttr::get(constExprAttr.getMap());
-    }
-    if (auto liftedAttr = mlir::dyn_cast<zml::LiftedExprAttr>(attr)) {
-      return liftedAttr.getSymbol();
-    }
-    return attr;
-  }
-  );
+template <typename Attr> Attribute convert(Attr);
+
+template <> Attribute convert(zml::ConstExprAttr attr) {
+  return mlir::AffineMapAttr::get(attr.getMap());
 }
 
-mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
+template <> Attribute convert(zml::LiftedExprAttr attr) { return attr.getSymbol(); }
+
+template <typename Attr> Attribute pass(Attr a) { return a; }
+
+SmallVector<Attribute>
+convertParamAttrs(ArrayRef<mlir::Attribute> in, LLZKTypeConverter &converter) {
+  return llvm::map_to_vector(in, [&](mlir::Attribute attr) -> mlir::Attribute {
+    return llvm::TypeSwitch<Attribute, Attribute>(attr)
+        .Case([&converter](TypeAttr typeAttr) {
+      return mlir::TypeAttr::get(converter.convertType(typeAttr.getValue()));
+    })
+        .Case(convert<zml::ConstExprAttr>)
+        .Case(convert<zml::LiftedExprAttr>)
+        .Default(pass<Attribute>);
+  });
+}
+
+mlir::Attribute getSizeAttr(mlir::Attribute attr) {
   LLVM_DEBUG(llvm::dbgs() << "getSizeSym(" << attr << ")\n");
-  if (auto sym = mlir::dyn_cast<mlir::SymbolRefAttr>(attr)) {
-    return sym;
-  }
-  if (auto lifted = mlir::dyn_cast<zml::LiftedExprAttr>(attr)) {
-    return lifted.getSymbol();
-  }
-  llvm_unreachable("was expecting a symbol");
+  return llvm::TypeSwitch<Attribute, Attribute>(attr)
+      .Case(pass<SymbolRefAttr>)
+      .Case(pass<IntegerAttr>)
+      .Case(convert<zml::ConstExprAttr>)
+      .Case(convert<zml::LiftedExprAttr>)
+      .Default([](auto) {
+    llvm_unreachable("was expecting a symbol, number, or an affine expression");
+    return nullptr;
+  });
 }
 
 bool arrayLenIsAffineMap(Attribute attr) { return mlir::isa<zml::ConstExprAttr>(attr); }
@@ -92,8 +100,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
   // Conversions from ZML to LLZK
 
   addConversion([&](zml::ComponentType t) -> mlir::Type {
-    llvm::SmallVector<mlir::Attribute> convertedAttrs;
-    convertParamAttrs(t.getParams(), convertedAttrs, *this);
+    auto convertedAttrs = convertParamAttrs(t.getParams(), *this);
     return llzk::StructType::get(t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs));
   });
 
@@ -113,29 +120,15 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
     auto typeAttr = t.getParams()[0];
     auto sizeAttr = t.getParams()[1];
 
+    llvm::SmallVector<mlir::Attribute> dims({getSizeAttr(sizeAttr)});
     auto inner = convertType(deduceArrayType(typeAttr));
     if (auto innerArr = mlir::dyn_cast<llzk::ArrayType>(inner)) {
-      auto innerDimensionSizes = innerArr.getDimensionSizes();
+      auto innerDims = innerArr.getDimensionSizes();
+      dims.insert(dims.end(), innerDims.begin(), innerDims.end());
+      inner = innerArr.getElementType();
+    }
 
-      llvm::SmallVector<mlir::Attribute> newDims;
-      if (arrayLenIsKnown(sizeAttr)) {
-        llvm::SmallVector<int64_t> shape({getSize(sizeAttr)});
-        if (mlir::failed(llzk::computeDimsFromShape(t.getContext(), shape, newDims))) {
-          return nullptr;
-        }
-      } else {
-        newDims.push_back(getSizeSym(sizeAttr));
-      }
-      newDims.insert(newDims.end(), innerDimensionSizes.begin(), innerDimensionSizes.end());
-      return llzk::ArrayType::get(innerArr.getElementType(), newDims);
-    }
-    if (arrayLenIsKnown(sizeAttr)) {
-      return llzk::ArrayType::get(inner, {getSize(sizeAttr)});
-    } else if (arrayLenIsAffineMap(sizeAttr)) {
-      return llzk::ArrayType::get(inner, {getSizeMap(sizeAttr)});
-    } else {
-      return llzk::ArrayType::get(inner, {getSizeSym(sizeAttr)});
-    }
+    return llzk::ArrayType::get(inner, dims);
   });
 
   addConversion([](zml::ComponentType t) -> std::optional<mlir::Type> {
