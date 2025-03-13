@@ -56,6 +56,7 @@ TypeBinding TypeBindings::Array(TypeBinding type, TypeBinding size, Location loc
   arrayGenericParams.declare("N", size);
   TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
   array.specialized = true;
+  array.selfConstructs();
   return array;
 }
 

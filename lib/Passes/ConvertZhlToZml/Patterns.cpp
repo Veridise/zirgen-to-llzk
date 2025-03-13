@@ -5,6 +5,7 @@
 #include <functional>
 #include <iterator>
 #include <llvm/Support/Casting.h>
+#include <llvm/Support/CommandLine.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexAttrs.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
@@ -24,6 +25,7 @@
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/IR/Builder.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
@@ -948,89 +950,156 @@ mlir::LogicalResult ZhlSuperLoweringInSwitch::matchAndRewrite(
   return mlir::success();
 }
 
-mlir::LogicalResult ZhlReduceLowering::matchAndRewrite(
-    Zhl::ReduceOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op->emitOpError() << "failed to type check";
-  }
+template <typename T> static T &slot(const TypeBinding &b) {
+  return *mlir::cast_if_present<T>(b.getSlot());
+}
 
-  assert(binding->getSlot());
-  auto *arrayFrame = cast<ArrayFrame>(binding->getSlot());
-  auto inputBinding = getType(op.getArray());
-  if (mlir::failed(inputBinding)) {
-    return op->emitOpError() << "failed to type check input";
+template <typename T> static T &slot(const FailureOr<TypeBinding> &b) {
+  return *mlir::cast_if_present<T>(b->getSlot());
+}
+
+namespace {
+
+struct Bindings {
+  FailureOr<TypeBinding> op, input, inputInner, acc;
+};
+
+} // namespace
+
+template <typename Pat, typename Op>
+static LogicalResult validateReducePattern(const Pat &pat, Op op, Bindings &bindings) {
+  bindings.op = pat.getType(op);
+  if (mlir::failed(bindings.op)) {
+    return op->emitError() << "failed to type check";
   }
-  if (!inputBinding->isArray()) {
-    return op->emitOpError() << "was expecting 'Array' but got '" << inputBinding->getName() << "'";
+  bindings.input = pat.getType(op.getArray());
+  if (mlir::failed(bindings.input)) {
+    return op->emitError() << "failed to type check input";
   }
-  auto innerInputBinding = inputBinding->getArrayElement([&]() { return op->emitError(); });
-  if (mlir::failed(innerInputBinding)) {
+  if (!bindings.input->isArray()) {
+    return op->emitError() << "was expecting 'Array' but got '" << bindings.input->getName() << "'";
+  }
+  bindings.inputInner = bindings.input->getArrayElement([&] { return op->emitError(); });
+  if (mlir::failed(bindings.inputInner)) {
     return mlir::failure();
   }
-  auto accBinding = getType(op.getType());
-  if (mlir::failed(accBinding)) {
-    return op->emitOpError() << "failed to type check accumulator";
+  bindings.acc = pat.getType(op.getType());
+  if (mlir::failed(bindings.acc)) {
+    return op->emitError() << "failed to type check accumulator";
   }
-  // Allocate a component slot for the output of the accumulator.
-  auto self = op->getParentOfType<SelfOp>().getSelfValue();
-  arrayFrame->getFrame().allocateSlot<ComponentSlot>(getTypeBindings(), *accBinding);
+  return success();
+}
 
-  auto ctorBuilder = CtorCallBuilder::Make(op, *accBinding, rewriter, self, getTypeBindings());
-  if (mlir::failed(ctorBuilder)) {
-    return mlir::failure();
-  }
-  auto rootModule = op->getParentOfType<mlir::ModuleOp>();
-  auto *calleeComp = findCallee(accBinding->getName(), rootModule);
-  if (!calleeComp) {
-    return op->emitError() << "could not find component with name " << accBinding->getName();
-  }
-
-  auto constructorType =
-      materializeTypeBindingConstructor(rewriter, *accBinding, getTypeBindings());
+static LogicalResult validateConstructorType(
+    Operation *op, const FailureOr<TypeBinding> &accBinding, const TypeBindings &bindings,
+    FunctionType &constructorType, OpBuilder &builder
+) {
+  constructorType = materializeTypeBindingConstructor(builder, *accBinding, bindings);
   assert(constructorType);
   if (constructorType.getInputs().size() != 2) {
     return op->emitOpError() << "was expecting a constructor with two arguments but got "
                              << constructorType.getInputs().size() << " arguments";
   }
+  return success();
+}
 
-  auto init = getCastedValue(adaptor.getInit(), rewriter);
-  if (failed(init)) {
+static Value superCoerce(Value v, Type t, OpBuilder &builder) {
+  if (v.getType() == t) {
+    return v;
+  }
+  return builder.create<SuperCoerceOp>(v.getLoc(), t, v);
+};
+
+static FailureOr<CtorCallBuilder> initializeCtorCallBuilder(
+    Operation *op, Bindings &bindings, OpBuilder &builder, const TypeBindings &typeBindings
+) {
+  // Allocate a component slot for the output of the accumulator.
+  auto self = op->getParentOfType<SelfOp>().getSelfValue();
+  slot<ArrayFrame>(bindings.op).getFrame().allocateSlot<ComponentSlot>(typeBindings, *bindings.acc);
+
+  auto ctorBuilder = CtorCallBuilder::Make(op, *bindings.acc, builder, self, typeBindings);
+  if (mlir::failed(ctorBuilder)) {
+    return mlir::failure();
+  }
+  return ctorBuilder;
+}
+
+namespace {
+
+struct LoopValues {
+  Value init, array, stride, from, to;
+};
+
+} // namespace
+
+template <typename Pat, typename Op, typename Adaptor>
+static LogicalResult prepareLoopValues(
+    const Pat &pat, Op op, Adaptor adaptor, LoopValues &loopValues, OpBuilder &builder,
+    Type outputType, Bindings &bindings
+) {
+
+  auto initResult = pat.getCastedValue(adaptor.getInit(), builder, outputType);
+  if (failed(initResult)) {
     return op->emitError() << "failed to type cast init value";
   }
-  auto itType = materializeTypeBinding(getContext(), *innerInputBinding);
+  loopValues.init = *initResult;
 
-  auto arrValue = coerceToArray(
+  auto arrayResult = coerceToArray(
       mlir::cast<TypedValue<ComponentType>>(
-          getCastedValue(adaptor.getArray(), *inputBinding, rewriter)
+          pat.getCastedValue(adaptor.getArray(), *bindings.input, builder)
       ),
-      rewriter
+      builder
   );
-  auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
-  auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
+  // If we cannot coerce to an array here either the IR is malformed or we are lacking checks in the
+  // type analysis.
+  assert(succeeded(arrayResult));
+  loopValues.array = *arrayResult;
+  loopValues.stride = builder.create<mlir::index::ConstantOp>(op.getLoc(), 1);
+  loopValues.from = builder.create<mlir::index::ConstantOp>(op.getLoc(), 0);
+  loopValues.to = builder.create<GetArrayLenOp>(op.getLoc(), *arrayResult);
 
-  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *arrValue);
+  return success();
+}
 
-  auto maybeSuperCoerce = [&](Value v, Type t) -> Value {
-    if (v.getType() == t) {
-      return v;
-    }
-    return rewriter.create<SuperCoerceOp>(v.getLoc(), t, v);
-  };
+LogicalResult ZhlReduceLowering::matchAndRewrite(
+    Zhl::ReduceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  Bindings bindings;
+  FunctionType constructorType;
+
+  if (failed(validateReducePattern(*this, op, bindings)) ||
+      failed(validateConstructorType(op, bindings.acc, getTypeBindings(), constructorType, rewriter)
+      )) {
+    return failure();
+  }
+
+  auto ctorBuilder = initializeCtorCallBuilder(op, bindings, rewriter, getTypeBindings());
+  if (failed(ctorBuilder)) {
+    return failure();
+  }
+
+  auto outputType = materializeTypeBinding(getContext(), *bindings.op);
+
+  LoopValues lv;
+  if (failed(prepareLoopValues(*this, op, adaptor, lv, rewriter, outputType, bindings))) {
+    return failure();
+  }
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(*init),
+      op.getLoc(), lv.from, lv.to, lv.stride, mlir::ValueRange(lv.init),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
-    arrayFrame->setInductionVar(iv);
-    mlir::Value lhs = maybeSuperCoerce(
-        builder.create<ReadArrayOp>(loc, itType, *arrValue, mlir::ValueRange(iv)),
-        constructorType.getInput(0)
+    slot<ArrayFrame>(bindings.op).setInductionVar(iv);
+
+    auto itType = materializeTypeBinding(getContext(), *bindings.inputInner);
+    mlir::Value rhs = superCoerce(
+        builder.create<ReadArrayOp>(loc, itType, lv.array, mlir::ValueRange(iv)),
+        constructorType.getInput(1), builder
     );
 
-    mlir::Value rhs = maybeSuperCoerce(args[0], constructorType.getInput(1));
+    mlir::Value lhs = superCoerce(args[0], constructorType.getInput(0), builder);
     auto accResult = ctorBuilder->build(builder, adaptor.getType().getLoc(), {lhs, rhs});
-    builder.create<mlir::scf::YieldOp>(loc, maybeSuperCoerce(accResult, init->getType()));
+
+    builder.create<mlir::scf::YieldOp>(loc, superCoerce(accResult, outputType, builder));
   }
   );
 

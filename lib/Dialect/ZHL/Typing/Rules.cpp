@@ -1,3 +1,4 @@
+#include <llvm/Support/Debug.h>
 #include <mlir/Support/LogicalResult.h>
 #include <numeric>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
@@ -7,6 +8,7 @@
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
 #include <zklang/Dialect/ZHL/Typing/Interpreter.h>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
 #include <zklang/Dialect/ZHL/Typing/Rules.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
@@ -607,18 +609,44 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
     typeCheck(zirgen::Zhl::ReduceOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 3) {
-    return mlir::failure();
+    return failure();
   }
-  // TODO: Validation that operands[0] is an array
-  // TODO: Validation that the inner type of the array is a subtype of the first argument of
-  // operands[2]
-  // TODO: Validation that the init type is a subtype of the second arguments of operands[2]
+
+  if (!operands[0].isArray()) {
+    return op->emitError() << "reduce expression expects an array, but got '" << operands[0] << "'";
+  }
+  auto ctorParams = operands[2].getConstructorParams();
+  if (ctorParams.size() != 2) {
+    return op->emitError() << "accumulator must be accept 2 constructor arguments, but '"
+                           << operands[2] << "' expects " << ctorParams.size();
+  }
+
+  auto innerType = operands[0].getArrayElement([&] { return op->emitError(); });
+  if (failed(innerType)) {
+    return failure();
+  }
+  if (failed(innerType->subtypeOf(ctorParams.getParam(1)))) {
+    ctorParams.getParam(1).print(llvm::dbgs() << "Argument type: ", true);
+    innerType->print(llvm::dbgs() << "\nInput type: ", true);
+    llvm::dbgs() << "\n";
+    return op->emitError() << "argument #1 '" << ctorParams.getName(1) << "' of type '"
+                           << ctorParams.getParam(1) << "' is not a valid super type for '"
+                           << *innerType << "'";
+  }
+
+  auto output = operands[1].commonSupertypeWith(operands[2]);
+  if (failed(output.subtypeOf(ctorParams.getParam(0)))) {
+    return op->emitError() << "argument #0 '" << ctorParams.getName(0) << "' of type '"
+                           << ctorParams.getParam(0)
+                           << "' is not a valid super type for reduce expression result type '"
+                           << output << "'";
+  }
 
   // If the init value is a constant then return its super type (Val)
-  if (operands[1].isConst()) {
-    return interpretateOp(op, operands[1].getSuperType());
-  }
-  return interpretateOp(op, operands[1]);
+  // if (operands[1].isConst()) {
+  //   return interpretateOp(op, operands[1].getSuperType());
+  // }
+  return interpretateOp(op, output);
 }
 
 mlir::FailureOr<Frame> ReduceTypeRule::allocate(Frame frame) const {

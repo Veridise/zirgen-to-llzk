@@ -71,6 +71,17 @@ mlir::LogicalResult TypeBinding::subtypeOf(const TypeBinding &other) const {
   if (*this == other) {
     return mlir::success();
   }
+  // Special case for arrays
+  if (name == "Array" && other.name == "Array") {
+    auto &arrElt = getGenericParamsMapping().getParam(0);
+    auto &otherArrElt = other.getGenericParamsMapping().getParam(0);
+    auto &arrSize = getGenericParamsMapping().getParam(1);
+    auto &otherArrSize = other.getGenericParamsMapping().getParam(1);
+    if (arrSize == otherArrSize) {
+      return arrElt.subtypeOf(otherArrElt);
+    }
+    return failure();
+  }
 
   if (superType != nullptr) {
     return superType->subtypeOf(other);
