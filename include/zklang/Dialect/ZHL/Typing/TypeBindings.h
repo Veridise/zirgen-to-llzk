@@ -46,9 +46,7 @@ public:
 
   template <typename... Args>
   const TypeBinding &Create(mlir::StringRef name, mlir::Location loc, Args &&...args) {
-    assert(bindings.find(name) == bindings.end() && "double binding write");
-    bindings.try_emplace(name, TypeBinding(name, loc, std::forward<Args>(args)...));
-    return bindings.at(name);
+    return insert(name, TypeBinding(name, loc, std::forward<Args>(args)...));
   }
 
   template <typename... Args> const TypeBinding &Create(mlir::StringRef name, Args &&...args) {
@@ -68,9 +66,7 @@ public:
 
   template <typename... Args>
   const TypeBinding &CreateBuiltin(mlir::StringRef name, mlir::Location loc, Args &&...args) {
-    assert(bindings.find(name) == bindings.end() && "double binding write");
-    bindings.try_emplace(name, TypeBinding(name, loc, std::forward<Args>(args)..., Frame(), true));
-    return bindings.at(name);
+    return insert(name, TypeBinding(name, loc, std::forward<Args>(args)..., Frame(), true));
   }
 
   template <typename... Args>
@@ -83,6 +79,17 @@ public:
   [[nodiscard]] TypeBinding &Manage(const TypeBinding &) const;
 
 private:
+  const TypeBinding &insert(mlir::StringRef, TypeBinding &&);
+
+  template <typename... Args>
+  TypeBinding makeBuiltin(mlir::StringRef name, mlir::Location loc, Args &&...args) {
+    return TypeBinding(name, loc, std::forward<Args>(args)..., Frame(), true);
+  }
+
+  template <typename... Args> TypeBinding makeBuiltin(mlir::StringRef name, Args &&...args) {
+    return makeBuiltin(name, unk, std::forward<Args>(args)...);
+  }
+
   mlir::Location unk;
   llvm::StringMap<TypeBinding> bindings;
   mutable std::deque<TypeBinding> managedBindings;

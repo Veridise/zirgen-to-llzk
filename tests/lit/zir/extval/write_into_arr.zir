@@ -4,6 +4,7 @@ component Foo(x: ExtVal) {
   for i : 1..10 { x }
 // CHECK-LABEL: llzk.struct @Foo<[]> {
 // CHECK: field @"$super" : !llzk.array<9,4 x !llzk.felt>
+// CHECK: field @"$array" : !llzk.array<9,4 x !llzk.felt>
 
 // CHECK: func @compute
 // CHECK-SAME: (%[[A0:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>) -> !llzk.struct<@Foo<[]>> {
@@ -18,7 +19,9 @@ component Foo(x: ExtVal) {
 // CHECK: scf.yield %[[A0]] : !llzk.array<4 x !llzk.felt>
 // CHECK: llzk.insertarr %[[A2]][%[[A1]]] = %[[T1]] : <9,4 x !llzk.felt>, <4 x !llzk.felt>
 // CHECK: scf.yield %[[A2]] : !llzk.array<9,4 x !llzk.felt>
-// CHECK: writef %[[SELF]][@"$super"] = %[[T0]] : <@Foo<[]>>, !llzk.array<9,4 x !llzk.felt>
+// CHECK: writef %[[SELF]][@"$array"] = %[[T0]] : <@Foo<[]>>, !llzk.array<9,4 x !llzk.felt>
+// CHECK: %[[T2:[0-9a-zA-Z_\.]+]] = readf %[[SELF]][@"$array"] : <@Foo<[]>>, !llzk.array<9,4 x !llzk.felt>
+// CHECK: writef %[[SELF]][@"$super"] = %[[T2]] : <@Foo<[]>>, !llzk.array<9,4 x !llzk.felt>
 
 
 // CHECK-LABEL: func @constrain(%arg0: !llzk.struct<@Foo<[]>>, 

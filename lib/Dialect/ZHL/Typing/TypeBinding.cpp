@@ -33,7 +33,7 @@ TypeBinding::TypeBinding(
     uint64_t value, mlir::Location loc, const TypeBindings &bindings, bool isBuiltin
 )
     : builtin(isBuiltin), name(CONST), loc(loc), constExpr(expr::ConstExpr::Val(value)),
-      superType(&const_cast<TypeBinding &>(bindings.Get("Val"))) {}
+      superType(&bindings.Get("Val")) {}
 
 TypeBinding TypeBinding::WithUpdatedLocation(mlir::Location newLoc) const {
   TypeBinding b = *this;
@@ -119,9 +119,8 @@ TypeBinding::TypeBinding(
     ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members, Frame t_frame,
     bool isBuiltin
 )
-    : builtin(isBuiltin), name(name), loc(loc), superType(&const_cast<TypeBinding &>(superType)),
-      members(members), genericParams(t_genericParams), constructorParams(t_constructorParams),
-      frame(t_frame) {}
+    : builtin(isBuiltin), name(name), loc(loc), superType(&superType), members(members),
+      genericParams(t_genericParams), constructorParams(t_constructorParams), frame(t_frame) {}
 
 TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
@@ -227,13 +226,6 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
     return other.commonSupertypeWith(*superType);
   }
   return TypeBinding(loc);
-
-  // // This algorithm is simple but is O(n^2) over the lengths of the subtyping chains.
-  // const TypeBinding *type = superType;
-  // while (type != nullptr && failed(other.subtypeOf(*type))) {
-  //   type = type->superType;
-  // }
-  // return type != nullptr ? *type : TypeBinding(loc);
 }
 
 mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
@@ -380,6 +372,8 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     } else {
       os << "?";
     }
+  } else if (hasConstExpr()) {
+    getConstExpr()->print(os);
   } else if (isGenericParam()) {
     os << *genericParamName;
   } else {
@@ -532,12 +526,16 @@ void TypeBinding::selfConstructs() {
 }
 
 const MembersMap &TypeBinding::getMembers() const { return members; }
+
 MembersMap &TypeBinding::getMembers() { return members; }
+
 mlir::Location TypeBinding::getLocation() const { return loc; }
+
 const TypeBinding &TypeBinding::getSuperType() const {
   assert(superType != nullptr);
   return *superType;
 }
+
 bool TypeBinding::isVariadic() const { return variadic; }
 
 MutableArrayRef<TypeBinding> TypeBinding::getGenericParams() {
@@ -581,10 +579,6 @@ MutableParams TypeBinding::getGenericParamsMapping() { return genericParams; }
 
 void TypeBinding::replaceGenericParamByName(StringRef paramName, const TypeBinding &binding) {
   getGenericParamsMapping().replaceParam(paramName, binding);
-}
-TypeBinding &TypeBinding::getSuperType() {
-  assert(superType != nullptr);
-  return *superType;
 }
 
 void TypeBinding::setSuperType(TypeBinding &newSuperType) { superType = &newSuperType; }

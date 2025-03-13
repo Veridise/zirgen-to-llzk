@@ -131,7 +131,6 @@ public:
   MembersMap &getMembers();
   mlir::Location getLocation() const;
   const TypeBinding &getSuperType() const;
-  TypeBinding &getSuperType();
   void setSuperType(TypeBinding &);
   uint64_t getConst() const;
   llvm::StringRef getGenericParamName() const;
@@ -214,7 +213,7 @@ private:
   mlir::Location loc;
   expr::ConstExpr constExpr;
   std::optional<std::string> genericParamName;
-  TypeBinding *superType;
+  const TypeBinding *superType;
   MembersMap members;
   ParamsStoragePtr genericParams;
   ParamsStoragePtr constructorParams;

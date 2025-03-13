@@ -74,7 +74,7 @@ private:
       );
       return intAttr;
     }
-    if (binding.isGenericParam()) {
+    if (binding.isGenericParam() && !binding.getSuperType().isTypeMarker()) {
       Attribute symAttr =
           FlatSymbolRefAttr::get(StringAttr::get(context, binding.getGenericParamName()));
       if (binding.getSuperType().hasConstExpr()) {

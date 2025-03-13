@@ -266,17 +266,8 @@ void addArrayComponent(mlir::OpBuilder &builder) {
 void zml::addBuiltinBindings(
     zhl::TypeBindings &bindings, const std::unordered_set<std::string_view> &definedNames
 ) {
-  auto &Val = bindings.CreateBuiltin("Val", bindings.Component());
-  const_cast<zhl::TypeBinding &>(Val).selfConstructs();
-  auto &ExtVal = bindings.CreateBuiltin("ExtVal", bindings.Component());
-  const_cast<zhl::TypeBinding &>(ExtVal).selfConstructs();
-  MAYBE("String") {
-    auto &String = bindings.CreateBuiltin("String", bindings.Component());
-    const_cast<zhl::TypeBinding &>(String).selfConstructs();
-  }
-  auto &Type = bindings.CreateBuiltin("Type", bindings.Component());
-  auto T = zhl::TypeBinding::MakeGenericParam(Type, "T");
-  auto N = zhl::TypeBinding::MakeGenericParam(Val, "N");
+  auto &Val = bindings.Get("Val");
+  auto &ExtVal = bindings.Get("ExtVal");
 
   MAYBE("NondetReg") {
     bindings.CreateBuiltin(
@@ -374,12 +365,6 @@ void zml::addBuiltinBindings(
         "EqzExt", bindings.Component(), zhl::ParamsMap(), zhl::ParamsMap().declare("v", ExtVal),
         zhl::MembersMap()
     );
-  }
-  MAYBE("Array") {
-    auto &Array = bindings.CreateBuiltin(
-        "Array", bindings.Component(), zhl::ParamsMap().declare("T", T).declare("N", N)
-    );
-    const_cast<zhl::TypeBinding &>(Array).selfConstructs();
   }
 }
 

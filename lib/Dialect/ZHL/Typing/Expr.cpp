@@ -226,7 +226,7 @@ bool Val::operator==(const ExprBase &other) const {
   return false;
 }
 
-void Val::print(llvm::raw_ostream &os) const { os << "Val(" << value << ")"; }
+void Val::print(llvm::raw_ostream &os) const { os << value; }
 
 uint64_t Val::getValue() const { return value; }
 
@@ -253,7 +253,7 @@ bool Symbol::operator==(const ExprBase &other) const {
   return false;
 }
 
-void Symbol::print(llvm::raw_ostream &os) const { os << "Sym(" << name << ")"; }
+void Symbol::print(llvm::raw_ostream &os) const { os << name; }
 
 StringRef Symbol::getName() const { return name; }
 
@@ -313,25 +313,25 @@ inline bool isInfixExpr(const ExprBase &expr) {
 
 } // namespace
 
+static void printSide(llvm::raw_ostream &os, const ExprBase &expr) {
+  bool needsParen = isInfixExpr(expr);
+  if (needsParen) {
+    os << "(";
+  }
+  expr.print(os);
+  if (needsParen) {
+    os << ")";
+  }
+}
+
 void Ctor::print(llvm::raw_ostream &os) const {
   if (isInfixExpr(*this)) {
-    bool lhsNeedsParen = isInfixExpr(args[0]);
-    if (lhsNeedsParen) {
-      os << "(";
-    }
-    args[0].print(os);
-    if (lhsNeedsParen) {
-      os << ")";
-    }
+    printSide(os, args[0]);
     os << " " << getInfixSymbol(typeName) << " ";
-    bool rhsNeedsParen = isInfixExpr(args[1]);
-    if (rhsNeedsParen) {
-      os << "(";
-    }
-    args[1].print(os);
-    if (rhsNeedsParen) {
-      os << ")";
-    }
+    printSide(os, args[1]);
+  } else if (getTypeName() == "Neg") {
+    os << "-";
+    printSide(os, args[0]);
   } else {
     os << typeName << "(";
     llvm::interleaveComma(args, os, [&](auto &e) { e.print(os); });

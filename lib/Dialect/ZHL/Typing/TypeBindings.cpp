@@ -6,6 +6,7 @@
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 #define DEBUG_TYPE "zhl-type-bindings"
@@ -80,7 +81,35 @@ TypeBinding &TypeBindings::Manage(const TypeBinding &binding) const {
   return managedBindings.back();
 }
 
+static TypeBinding &&selfConstructs(TypeBinding &&t) {
+  t.selfConstructs();
+  return std::move(t);
+}
+
 TypeBindings::TypeBindings(Location defaultLoc)
     : unk(defaultLoc), bottom(TypeBinding(BOTTOM, unk, Component())) {
-  (void)Component();
+  auto trivial = [this](StringRef name) -> const TypeBinding & {
+    return insert(name, selfConstructs(makeBuiltin(name, Component())));
+  };
+
+  auto &Val = trivial("Val");
+  auto &Type = CreateBuiltin("Type", Component());
+
+  trivial("ExtVal");
+  trivial("String");
+
+  auto T = zhl::TypeBinding::MakeGenericParam(Type, "T");
+  auto N = zhl::TypeBinding::MakeGenericParam(Val, "N");
+
+  insert(
+      "Array", selfConstructs(makeBuiltin(
+                   "Array", Component(), zhl::ParamsMap().declare("T", T).declare("N", N)
+               ))
+  );
+}
+
+const TypeBinding &TypeBindings::insert(StringRef name, TypeBinding &&binding) {
+  assert(bindings.find(name) == bindings.end() && "double binding write");
+  bindings.try_emplace(name, binding);
+  return bindings.at(name);
 }

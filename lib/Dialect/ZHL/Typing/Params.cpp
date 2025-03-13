@@ -72,10 +72,16 @@ static void printHelper(It it, llvm::raw_ostream &os, UnaryFn fn, Side header, S
 }
 
 void Params::printNames(llvm::raw_ostream &os, char header, char footer) const {
+  if (size() == 0) {
+    return;
+  }
   printHelper(data()->names, os, [&](const auto &e) { os << e; }, header, footer);
 }
 
 void Params::printParams(llvm::raw_ostream &os, bool fullPrintout, char header, char footer) const {
+  if (size() == 0) {
+    return;
+  }
   printHelper(data()->params, os, [&](const auto &e) {
     e.print(os, fullPrintout);
   }, header, footer);

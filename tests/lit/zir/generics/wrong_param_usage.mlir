@@ -59,7 +59,7 @@ module {
     %0 = zhl.global "Val"
     %1 = zhl.parameter "v"(0) : %0
     %2 = zhl.global "Bar"
-      // expected-error@+2 {{was expecting a type, a literal value or a generic parameter, but got parameter}}
+      // expected-error@+2 {{was expecting a type, literal value, constant expression or generic parameter, but got a value}}
       // expected-error@+1 {{could not deduce the type of op 'zhl.specialize'}}
     %3 = zhl.specialize %2<%1>
     %4 = zhl.literal 1

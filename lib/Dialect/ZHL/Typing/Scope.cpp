@@ -27,8 +27,8 @@ TypeBinding ComponentScope::declareLiftedAffineToGenericParam(const TypeBinding 
       "Can't lift a constant binding that is not a constructor expression"
   );
 
-  Twine name("Aff$" + Twine(liftedParams.size()));
-  auto allocName = name.str();
+  auto size = liftedParams.size();
+  auto allocName = ("Aff$" + Twine(size)).str();
   auto paramBinding = TypeBinding::MakeGenericParam(bindings->Manage(type), allocName);
   liftedParams.declare(allocName, paramBinding, liftedParams.size(), true);
   return paramBinding;

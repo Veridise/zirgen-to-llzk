@@ -72,9 +72,9 @@ module {
     %4 = zhl.global "Array" // expected-remark{{type: Array}}
     %5 = zhl.global "Val" // expected-remark{{type: Val}}
     %6 = zhl.global "Div" // expected-remark{{type: Div}}
-    %7 = zhl.construct %6(%1, %3) // expected-remark{{type: Div}}
-    %8 = zhl.specialize %4<%5, %7> // expected-remark{{type: Array<Val,Div>}}
-    %9 = zhl.parameter "in"(0) : %8 // expected-remark{{type: Array<Val,Aff$0>}}
+    %7 = zhl.construct %6(%1, %3) // expected-remark{{type: N / P}}
+    %8 = zhl.specialize %4<%5, %7> // expected-remark{{type: Array<Val, N / P>}}
+    %9 = zhl.parameter "in"(0) : %8 // expected-remark{{type: Array<Val, Aff$0>}}
     %10 = zhl.literal 0 // expected-remark{{type: 0}}
     %11 = zhl.subscript %9[%10] // expected-remark{{type: Val}}
     zhl.super %11 // expected-remark{{type: Val}}
@@ -83,13 +83,13 @@ module {
     %0 = zhl.global "Unpack" // expected-remark{{type: Unpack}}
     %1 = zhl.literal 8 // expected-remark{{type: 8}}
     %2 = zhl.literal 2 // expected-remark{{type: 2}}
-    %3 = zhl.specialize %0<%1, %2> // expected-remark{{type: Unpack<8,2>}}
+    %3 = zhl.specialize %0<%1, %2> // expected-remark{{type: Unpack<8, 2, 4>}}
     %4 = zhl.literal 0 // expected-remark{{type: 0}}
     %5 = zhl.literal 0 // expected-remark{{type: 0}}
     %6 = zhl.literal 0 // expected-remark{{type: 0}}
     %7 = zhl.literal 0 // expected-remark{{type: 0}}
-    %8 = zhl.array[%4, %5, %6, %7] // expected-remark{{type: Array<Val,4>}}
-    %9 = zhl.construct %3(%8) // expected-remark{{type: Unpack<8,2>}}
-    zhl.super %9 // expected-remark{{type: Unpack<8,2>}}
+    %8 = zhl.array[%4, %5, %6, %7] // expected-remark{{type: Array<Val, 4>}}
+    %9 = zhl.construct %3(%8) // expected-remark{{type: Unpack<8, 2, 4>}}
+    zhl.super %9 // expected-remark{{type: Unpack<8, 2, 4>}}
   }
 }

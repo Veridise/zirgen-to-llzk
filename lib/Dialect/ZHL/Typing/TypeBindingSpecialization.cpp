@@ -429,10 +429,9 @@ constantFoldExpr(ConstExpr expr, ParamsScopeStack &scopes, size_t indent) {
   return failure();
 }
 
-static Params getConstantParams(TypeBinding &binding, ParamsStorage &storage) {
+static Params getConstantParams(const TypeBinding &binding, ParamsStorage &storage) {
   ParamsMap constants;
-  MutableParams params = binding.getGenericParamsMapping();
-  // auto declParamsCount = params.sizeOfDeclared();
+  Params params = binding.getGenericParamsMapping();
   for (auto [pos, param, name] : llvm::enumerate(params, params.getNames())) {
     if (param.isKnownConst()) {
       constants.declare(name, param, pos);
