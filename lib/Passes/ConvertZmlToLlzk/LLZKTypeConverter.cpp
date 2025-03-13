@@ -55,6 +55,9 @@ void convertParamAttrs(
     if (auto constExprAttr = mlir::dyn_cast<zml::ConstExprAttr>(attr)) {
       return mlir::AffineMapAttr::get(constExprAttr.getMap());
     }
+    if (auto liftedAttr = mlir::dyn_cast<zml::LiftedExprAttr>(attr)) {
+      return liftedAttr.getSymbol();
+    }
     return attr;
   }
   );
@@ -62,9 +65,13 @@ void convertParamAttrs(
 
 mlir::SymbolRefAttr getSizeSym(mlir::Attribute attr) {
   LLVM_DEBUG(llvm::dbgs() << "getSizeSym(" << attr << ")\n");
-  auto sym = mlir::dyn_cast<mlir::SymbolRefAttr>(attr);
-  assert(sym && "was expecting a symbol");
-  return sym;
+  if (auto sym = mlir::dyn_cast<mlir::SymbolRefAttr>(attr)) {
+    return sym;
+  }
+  if (auto lifted = mlir::dyn_cast<zml::LiftedExprAttr>(attr)) {
+    return lifted.getSymbol();
+  }
+  llvm_unreachable("was expecting a symbol");
 }
 
 bool arrayLenIsAffineMap(Attribute attr) { return mlir::isa<zml::ConstExprAttr>(attr); }

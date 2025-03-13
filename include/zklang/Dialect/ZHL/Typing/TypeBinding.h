@@ -147,11 +147,9 @@ public:
 
   /// Attempts to create an specialized version of the type using the provided parameters.
   mlir::FailureOr<TypeBinding>
-  specialize(std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params, TypeBindings &)
-      const;
+  specialize(EmitErrorFn emitError, mlir::ArrayRef<TypeBinding> params, TypeBindings &) const;
 
-  mlir::FailureOr<TypeBinding>
-      getMember(mlir::StringRef, std::function<mlir::InFlightDiagnostic()>) const;
+  mlir::FailureOr<TypeBinding> getMember(mlir::StringRef, EmitErrorFn) const;
 
   TypeBinding(const TypeBinding &);
   TypeBinding(TypeBinding &&);

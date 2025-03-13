@@ -32,7 +32,10 @@ checkValidZmirType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mli
 
 mlir::LogicalResult
 checkValidParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Attribute attr) {
-  if (llvm::isa<mlir::SymbolRefAttr, mlir::IntegerAttr, mlir::TypeAttr, ConstExprAttr>(attr)) {
+  if (llvm::isa<
+          mlir::SymbolRefAttr, mlir::IntegerAttr, mlir::TypeAttr, ConstExprAttr, LiftedExprAttr>(
+          attr
+      )) {
     return mlir::success();
   }
   return emitError() << "expected either a symbol or a literal integer but got " << attr;
@@ -117,6 +120,44 @@ ComponentType ComponentType::getSuperTypeAsComp() const {
   return nullptr;
 }
 
+static bool equivalentTypeAttr(TypeAttr lhsType, TypeAttr rhsType) {
+  auto lhsComp = mlir::dyn_cast_if_present<ComponentType>(lhsType.getValue());
+  auto rhsComp = mlir::dyn_cast_if_present<ComponentType>(rhsType.getValue());
+
+  if (lhsComp && rhsComp) {
+    return lhsComp.subtypeOf(rhsComp);
+  }
+
+  return false;
+}
+
+template <typename T> static bool neitherAre(Attribute lhs, Attribute rhs) {
+  if (!mlir::isa<T>(lhs)) {
+    return !mlir::isa<T>(rhs);
+  }
+  return false;
+}
+
+static uint8_t priority(Attribute attr) {
+  return llvm::TypeSwitch<Attribute, uint8_t>(attr).Case([](IntegerAttr) { return 3; }
+  ).Case([](ConstExprAttr) {
+    return 2;
+  }).Case([](LiftedExprAttr) {
+    return 2;
+  }).Case([](SymbolRefAttr) {
+    return 1;
+  }).Default([](auto) { return 0; });
+}
+
+static bool checkSubtypeViaConcreteness(Attribute lhsAttr, Attribute rhsAttr) {
+  auto lhs = priority(lhsAttr);
+  auto rhs = priority(rhsAttr);
+  if (lhs && rhs) {
+    return lhs >= rhs;
+  }
+  return false;
+}
+
 static bool equivalentParam(Attribute lhs, Attribute rhs) {
   if (lhs == rhs) {
     return true;
@@ -125,18 +166,16 @@ static bool equivalentParam(Attribute lhs, Attribute rhs) {
   auto lhsType = mlir::dyn_cast_if_present<TypeAttr>(lhs);
   auto rhsType = mlir::dyn_cast_if_present<TypeAttr>(rhs);
 
-  if (!(lhsType && rhsType)) {
+  if (lhsType && rhsType) {
+    return equivalentTypeAttr(lhsType, rhsType);
+  }
+
+  // Check that we are not in the situation where one side is a TypeAttr and the other isn't
+  if (!neitherAre<TypeAttr>(lhs, rhs)) {
     return false;
   }
 
-  auto lhsComp = mlir::dyn_cast_if_present<ComponentType>(lhsType.getValue());
-  auto rhsComp = mlir::dyn_cast_if_present<ComponentType>(rhsType.getValue());
-
-  if (!(lhsComp && rhsComp)) {
-    return false;
-  }
-
-  return lhsComp.subtypeOf(rhsComp);
+  return checkSubtypeViaConcreteness(lhs, rhs);
 }
 
 /// A type T may be a subtype of a type T' if for all parameters that are types p_0 and p_0', p_0 is

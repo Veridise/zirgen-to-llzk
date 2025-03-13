@@ -488,6 +488,7 @@ inline LogicalResult checkSpecializationArg(
     }
     return success();
   }
+  llvm_unreachable("Exhausted all possible options for valid type arguments");
   return failure();
 }
 

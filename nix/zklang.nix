@@ -34,7 +34,7 @@ stdenv.mkDerivation {
 
   nativeBuildInputs = [ clang cmake ninja ];
   buildInputs =  [
-    mlir  llzk 
+    mlir llzk z3.lib
   ];
 
   # cmakeFlags = [

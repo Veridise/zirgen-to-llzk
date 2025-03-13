@@ -23,6 +23,7 @@ inline bool hasConstValue(const expr::ConstExpr &constExpr) {
 }
 
 inline uint64_t getConstValue(const expr::ConstExpr &constExpr) {
+  assert(hasConstValue(constExpr));
   return mlir::cast<expr::ValExpr>(constExpr).getValue();
 }
 
@@ -84,8 +85,9 @@ inline bool isPrivate(StringRef name) { return name.starts_with("_"); }
 /// Returns failure if it was not found.
 /// If it was found but it couldn't get typechecked returns success wrapping a nullopt.
 FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef memberName) const {
-  if (members.find(memberName) != members.end()) {
-    return members.at(memberName);
+  auto it = members.find(memberName);
+  if (it != members.end()) {
+    return it->second;
   }
   if (superType != nullptr) {
     return superType->locateMember(memberName);
@@ -93,9 +95,7 @@ FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef member
   return failure();
 }
 
-FailureOr<TypeBinding> TypeBinding::getMember(
-    StringRef memberName, std::function<mlir::InFlightDiagnostic()> emitError
-) const {
+FailureOr<TypeBinding> TypeBinding::getMember(StringRef memberName, EmitErrorFn emitError) const {
   auto memberLookupRes = locateMember(memberName);
   if (failed(memberLookupRes)) {
     return emitError() << "member " << getName() << "." << memberName << " was not found";
@@ -197,6 +197,24 @@ TypeBinding &TypeBinding::operator=(TypeBinding &&other) {
 }
 
 TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
+  if (*this == other) {
+    return *this;
+  }
+  // Special case for arrays that if they are the same size the common super type is another array
+  // whose element is the least common type of the two element types
+  if (name == "Array" && other.name == "Array") {
+    auto &arrElt = getGenericParamsMapping().getParam(0);
+    auto &otherArrElt = other.getGenericParamsMapping().getParam(0);
+    auto &arrSize = getGenericParamsMapping().getParam(1);
+    auto &otherArrSize = other.getGenericParamsMapping().getParam(1);
+    if (arrSize == otherArrSize) {
+      auto commonInner = arrElt.commonSupertypeWith(otherArrElt);
+      auto copy = *this;
+      copy.getGenericParamsMapping().getParam(0) = commonInner;
+      return copy;
+    }
+    return TypeBinding(loc);
+  }
   if (mlir::succeeded(subtypeOf(other))) {
     return other;
   }
@@ -204,13 +222,20 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
     return *this;
   }
 
-  // This algorithm is simple but is O(n^2) over the lengths of the subtyping chains.
-  const TypeBinding *type = superType;
-  while (type != nullptr && failed(other.subtypeOf(*type))) {
-    type = type->superType;
+  if (superType) {
+    // Climb alternatively
+    return other.commonSupertypeWith(*superType);
   }
-  return type != nullptr ? *type : TypeBinding(loc);
+  return TypeBinding(loc);
+
+  // // This algorithm is simple but is O(n^2) over the lengths of the subtyping chains.
+  // const TypeBinding *type = superType;
+  // while (type != nullptr && failed(other.subtypeOf(*type))) {
+  //   type = type->superType;
+  // }
+  // return type != nullptr ? *type : TypeBinding(loc);
 }
+
 mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
   if (!isArray()) {
     return emitError() << "non array type '" << name << "' cannot be subscripted";

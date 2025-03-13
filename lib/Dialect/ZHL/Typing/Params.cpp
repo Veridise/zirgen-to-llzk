@@ -25,11 +25,11 @@ static void fillVectors(
   }
 }
 
-ParamsStorage::ParamsStorage(ParamsMap &map)
-    : names(ParamNames(map.size())), injected(BitVector(map.size())) {
+ParamsStorage::ParamsStorage(ParamsMap &map) : names(map.size()), injected(map.size()) {
   // Hack to get the bindings ordered without having a default constructor
   SmallVector<TypeBinding *> tmp(map.size(), nullptr);
   fillVectors(map, tmp, names, injected);
+  params.reserve(map.size());
   for (auto *type : tmp) {
     assert(type);
     params.push_back(*type);
@@ -37,11 +37,11 @@ ParamsStorage::ParamsStorage(ParamsMap &map)
 }
 
 ParamsStorage::ParamsStorage(ParamsMap &map, size_t size, const TypeBinding &defaultBinding)
-    : names(ParamNames(size)), injected(BitVector(size)) {
+    : names(size), injected(size) {
   // Hack to get the bindings ordered without having a default constructor
   SmallVector<TypeBinding *> tmp(size, nullptr);
   fillVectors(map, tmp, names, injected);
-
+  params.reserve(size);
   for (auto *type : tmp) {
     if (type) {
       params.push_back(*type);
@@ -64,49 +64,32 @@ Params::operator ParamsMap() const {
   return map;
 }
 
+template <typename It, typename UnaryFn, typename Side>
+static void printHelper(It it, llvm::raw_ostream &os, UnaryFn fn, Side header, Side footer) {
+  os << header;
+  llvm::interleaveComma(it, os, fn);
+  os << footer;
+}
+
 void Params::printNames(llvm::raw_ostream &os, char header, char footer) const {
-  print<ParamName>(data()->names, os, [&](const auto &e) { os << e; }, header, footer);
+  printHelper(data()->names, os, [&](const auto &e) { os << e; }, header, footer);
 }
 
 void Params::printParams(llvm::raw_ostream &os, bool fullPrintout, char header, char footer) const {
-  print<TypeBinding>(data()->params, os, [&](const auto &e) {
+  printHelper(data()->params, os, [&](const auto &e) {
     e.print(os, fullPrintout);
   }, header, footer);
 }
 
 void Params::printMapping(llvm::raw_ostream &os, bool fullPrintout) const {
-  os << "{ ";
-  size_t c = 1;
-  size_t siz = data()->params.size();
-  for (size_t i = 0; i < siz; i++) {
-    os << data()->names[i] << ": ";
-    data()->params[i].print(os, fullPrintout);
-    if (c < siz) {
-      os << ", ";
-    }
-    c++;
+  if (size() == 0) {
+    return;
   }
-  os << " }";
-}
-template <typename Elt>
-void Params::print(
-    ArrayRef<Elt> lst, llvm::raw_ostream &os, std::function<void(const Elt &)> handler, char header,
-    char footer
-) const {
-  if (data()->params.size() == 0) {
-    return; // Don't print anything if there aren't any parameters
-  }
-
-  os << header;
-  size_t c = 1;
-  for (auto &e : lst) {
-    handler(e);
-    if (c < lst.size()) {
-      os << ",";
-    }
-    c++;
-  }
-  os << footer;
+  printHelper(llvm::zip_equal(data()->names, data()->params), os, [&](auto tup) {
+    auto [name, param] = tup;
+    os << name << ": ";
+    param.print(os, fullPrintout);
+  }, "{ ", " }");
 }
 
 const TypeBinding &Params::getParam(size_t i) const {
@@ -143,8 +126,8 @@ mlir::MutableArrayRef<TypeBinding> MutableParams::getParams() const { return dat
 
 mlir::ArrayRef<TypeBinding> Params::getParams() const { return data()->params; }
 
-mlir::SmallVector<TypeBinding, 0> Params::getDeclaredParams() const {
-  SmallVector<TypeBinding> params;
+ParamsList Params::getDeclaredParams() const {
+  ParamsList params;
 
   for (size_t i = 0; i < data()->params.size(); i++) {
     if (!data()->injected[i]) {

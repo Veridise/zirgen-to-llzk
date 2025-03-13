@@ -600,8 +600,7 @@ mlir::LogicalResult zhl::specializeTypeBinding(
 }
 
 mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
-    std::function<mlir::InFlightDiagnostic()> emitError, mlir::ArrayRef<TypeBinding> params,
-    TypeBindings &bindings
+    EmitErrorFn emitError, mlir::ArrayRef<TypeBinding> params, TypeBindings &bindings
 ) const {
   if (specialized) {
     return emitError() << "can't respecialize type '" << getName() << "'";

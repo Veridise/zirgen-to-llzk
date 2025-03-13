@@ -8,8 +8,11 @@
 namespace zhl {
 
 struct ParamData {
+  /// Marks the parameter as injected, which means that it was not declared by the input ZIR code
   bool Injected;
+  /// The type associated with the parameter
   TypeBinding Type;
+  /// The position in the parameterss list where this parameter was declared
   uint64_t Pos;
 
   ParamData(const TypeBinding &T, uint64_t P, bool I) : Injected(I), Type(T), Pos(P) {}

@@ -118,16 +118,16 @@
         "veridise-pkgs": "veridise-pkgs"
       },
       "locked": {
-        "lastModified": 1739821245,
-        "narHash": "sha256-YVYK7H4Qy+/hwhtoM6IbVcbd/RznHtWC3Y6B5pKqcbI=",
-        "ref": "main",
-        "rev": "8000429c9b7e80e6c08a447d9705f576f16ab394",
-        "revCount": 142,
+        "lastModified": 1741815529,
+        "narHash": "sha256-PHWqDuWaM76Z89vL/wu9wA9xU5MXT+nfZKqY4tGiRVs=",
+        "ref": "dani/literal-string-op",
+        "rev": "f9242583d5efe4dc0f74a46e738c7d7f7d5a9fee",
+        "revCount": 149,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
       "original": {
-        "ref": "main",
+        "ref": "dani/literal-string-op",
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       }
@@ -187,11 +187,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1736897293,
-        "narHash": "sha256-8F0KaGESoQxlHfWZQaqmK+KN6P1tPYnMseiTLAsSLxc=",
+        "lastModified": 1740764545,
+        "narHash": "sha256-YmR5BmELc84zntED0CDHRxD97QCeGHTsqfp2/jkUiOc=",
         "ref": "main",
-        "rev": "baebbb8aa8e35bee9713152f47f4ad2e682d655f",
-        "revCount": 21,
+        "rev": "93684ccb116f03280fcb9606a74b28cef357805e",
+        "revCount": 24,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/veridise-nix-pkgs.git"
       },

@@ -36,7 +36,7 @@ public:
 
   mlir::ArrayRef<ParamName> getNames() const;
   mlir::ArrayRef<TypeBinding> getParams() const;
-  mlir::SmallVector<TypeBinding, 0> getDeclaredParams() const;
+  ParamsList getDeclaredParams() const;
 
   const TypeBinding *operator[](mlir::StringRef name) const;
 
@@ -57,14 +57,7 @@ public:
 
   const ParamsStorage *data() const;
 
-protected:
 private:
-  template <typename Elt>
-  void print(
-      mlir::ArrayRef<Elt> lst, llvm::raw_ostream &os, std::function<void(const Elt &)> handler,
-      char header, char footer
-  ) const;
-
   const ParamsStorage *sto;
 };
 

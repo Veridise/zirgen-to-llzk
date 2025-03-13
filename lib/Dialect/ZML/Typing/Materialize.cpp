@@ -74,26 +74,29 @@ private:
       );
       return intAttr;
     }
-
-    if (binding.hasConstExpr()) {
-      mlir::Builder builder(context);
-      auto attrResult = binding.getConstExpr().convertIntoAttribute(builder);
-
-      LLVM_DEBUG(
-          llvm::dbgs() << "<== Materializing " << binding << " to Attribute: " << attrResult << "\n"
-      );
-      return attrResult;
-    }
-
     if (binding.isGenericParam()) {
-      auto symAttr =
+      Attribute symAttr =
           FlatSymbolRefAttr::get(StringAttr::get(context, binding.getGenericParamName()));
+      if (binding.getSuperType().hasConstExpr()) {
+        if (auto constExprAttr =
+                mlir::dyn_cast<ConstExprAttr>(materializeAttribute(binding.getSuperType()))) {
+          symAttr = LiftedExprAttr::get(mlir::dyn_cast<FlatSymbolRefAttr>(symAttr), constExprAttr);
+        }
+      }
 
       LLVM_DEBUG(
           llvm::dbgs() << "<== Materializing " << binding << " to FlatSymbolRefAttr: " << symAttr
                        << "\n"
       );
       return symAttr;
+    }
+    if (binding.hasConstExpr()) {
+      mlir::Builder builder(context);
+      auto attrResult = binding.getConstExpr().convertIntoAttribute(builder);
+      LLVM_DEBUG(
+          llvm::dbgs() << "<== Materializing " << binding << " to Attribute: " << attrResult << "\n"
+      );
+      return attrResult;
     }
 
     auto typeAttr = mlir::TypeAttr::get(materializeImpl(binding));
@@ -110,12 +113,8 @@ private:
     }
 
     auto paramBindings = binding.getGenericParams();
-    SmallVector<Attribute, 2> params;
-    params.reserve(paramBindings.size());
-    std::transform(
-        paramBindings.begin(), paramBindings.end(), std::back_inserter(params),
-        std::bind(&Materializer::materializeAttribute, this, std::placeholders::_1)
-    );
+    SmallVector<Attribute, 2> params =
+        map_to_vector(paramBindings, std::bind_front(&Materializer::materializeAttribute, this));
 
     return ComponentType::get(context, binding.getName(), superType, params, binding.isBuiltin());
   }
