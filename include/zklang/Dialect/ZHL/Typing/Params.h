@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cassert>
-#include <cstdint>
-#include <functional>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
@@ -11,7 +9,6 @@
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
-// #include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 
 namespace llvm {
 class raw_ostream;
@@ -31,25 +28,42 @@ class Params {
 public:
   using iterator = mlir::ArrayRef<TypeBinding>::const_iterator;
 
-  Params(const ParamsStorage &);
-  Params(ParamsStorage &);
+  Params(const ParamsStorage &params) : sto(&params) {}
+
+  /// Returns the number of parameters.
   size_t size() const;
+
+  /// Returns the number of parameter that were declared in the source language.
   size_t sizeOfDeclared() const;
 
+  /// Creates a copy of the storage in map form.
   operator ParamsMap() const;
 
-  mlir::StringRef getName(size_t i) const;
+  /// Returns the name of the parameter at the given index.
+  mlir::StringRef getName(size_t) const;
 
-  const TypeBinding &getParam(size_t i) const;
+  /// Returns the type binding of the parameter at the given index.
+  const TypeBinding &getParam(size_t) const;
 
+  /// Returns an array of the parameters names.
   mlir::ArrayRef<ParamName> getNames() const;
+
+  /// Returns an array of the type binding of the parameters.
   mlir::ArrayRef<TypeBinding> getParams() const;
+
+  /// Returns a vector of type bindings of the parameters that were declared in the source language.
   ParamsList getDeclaredParams() const;
 
+  /// Returns a pointer to a parameter that matches the given name or nullptr if it was not found.
   const TypeBinding *operator[](mlir::StringRef name) const;
 
+  /// Prints the parameters as a map from the names to the type bindings into the output stream.
   void printMapping(llvm::raw_ostream &os, bool fullPrintout = false) const;
+
+  /// Prints the names of the parameters into the output stream.
   void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
+
+  /// Prints the type bindings of the parameters into the output stream.
   void printParams(
       llvm::raw_ostream &os, bool fullPrintout = false, char header = '<', char footer = '>'
   ) const;
@@ -57,13 +71,15 @@ public:
   iterator begin() const;
   iterator end() const;
 
+  /// Returns true if there is a parameter that matches the given name.
   bool contains(mlir::StringRef) const;
 
+  /// Returns true if there are no parameters.
   bool empty() const;
 
   bool operator==(const Params &) const;
 
-  const ParamsStorage *data() const;
+  const ParamsStorage *data() const { return sto; }
 
 private:
   const ParamsStorage *sto;
@@ -72,17 +88,28 @@ private:
 class MutableParams : public Params {
 public:
   using iterator = mlir::MutableArrayRef<TypeBinding>::iterator;
-  MutableParams(ParamsStorage &);
 
+  MutableParams(ParamsStorage &params) : Params(params) {}
+
+  /// If there is a parameter with the same given name assigns the given binding to it.
   void replaceParam(mlir::StringRef name, const TypeBinding &binding);
 
-  TypeBinding &getParam(size_t i) const;
+  /// Returns the parameter at the specified index.
+  TypeBinding &getParam(size_t) const;
+
+  /// Returns a mutable array of the parameters type bindings.
   mlir::MutableArrayRef<TypeBinding> getParams() const;
-  TypeBinding *operator[](mlir::StringRef name) const;
+
+  /// Returns a pointer to a parameter that matches the given name or nullptr if it was not found.
+  TypeBinding *operator[](mlir::StringRef name) const {
+    auto ptr = Params::operator[](name);
+    return const_cast<TypeBinding *>(ptr);
+  }
 
   iterator begin() const;
   iterator end() const;
-  ParamsStorage *data() const;
+
+  ParamsStorage *data() const { return const_cast<ParamsStorage *>(Params::data()); }
 };
 
 } // namespace zhl

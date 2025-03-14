@@ -1,5 +1,4 @@
 #include <cassert>
-#include <iterator>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
@@ -11,11 +10,13 @@
 using namespace zhl;
 using namespace mlir;
 
-ParamsStorage::ParamsStorage() = default;
+//==-----------------------------------------------------------------------==//
+// ParamsStorage
+//==-----------------------------------------------------------------------==//
 
 static void fillVectors(
-    ParamsMap &map, SmallVectorImpl<TypeBinding *> &tmp, SmallVectorImpl<ParamName> &names,
-    BitVector &injected
+    const ParamsMap &map, SmallVectorImpl<const TypeBinding *> &tmp,
+    SmallVectorImpl<ParamName> &names, BitVector &injected
 ) {
   for (auto &entry : map) {
     auto pos = entry.getValue().Pos;
@@ -25,9 +26,9 @@ static void fillVectors(
   }
 }
 
-ParamsStorage::ParamsStorage(ParamsMap &map) : names(map.size()), injected(map.size()) {
+ParamsStorage::ParamsStorage(const ParamsMap &map) : names(map.size()), injected(map.size()) {
   // Hack to get the bindings ordered without having a default constructor
-  SmallVector<TypeBinding *> tmp(map.size(), nullptr);
+  SmallVector<const TypeBinding *> tmp(map.size(), nullptr);
   fillVectors(map, tmp, names, injected);
   params.reserve(map.size());
   for (auto *type : tmp) {
@@ -36,10 +37,10 @@ ParamsStorage::ParamsStorage(ParamsMap &map) : names(map.size()), injected(map.s
   }
 }
 
-ParamsStorage::ParamsStorage(ParamsMap &map, size_t size, const TypeBinding &defaultBinding)
+ParamsStorage::ParamsStorage(const ParamsMap &map, size_t size, const TypeBinding &defaultBinding)
     : names(size), injected(size) {
   // Hack to get the bindings ordered without having a default constructor
-  SmallVector<TypeBinding *> tmp(size, nullptr);
+  SmallVector<const TypeBinding *> tmp(size, nullptr);
   fillVectors(map, tmp, names, injected);
   params.reserve(size);
   for (auto *type : tmp) {
@@ -51,10 +52,9 @@ ParamsStorage::ParamsStorage(ParamsMap &map, size_t size, const TypeBinding &def
   }
 }
 
-Params::Params(ParamsStorage &params) : sto(&params) {}
-Params::Params(const ParamsStorage &params) : sto(&params) {}
-
-MutableParams::MutableParams(ParamsStorage &params) : Params(params) {}
+//==-----------------------------------------------------------------------==//
+// Params
+//==-----------------------------------------------------------------------==//
 
 Params::operator ParamsMap() const {
   ParamsMap map;
@@ -64,60 +64,12 @@ Params::operator ParamsMap() const {
   return map;
 }
 
-template <typename It, typename UnaryFn, typename Side>
-static void printHelper(It it, llvm::raw_ostream &os, UnaryFn fn, Side header, Side footer) {
-  os << header;
-  llvm::interleaveComma(it, os, fn);
-  os << footer;
-}
-
-void Params::printNames(llvm::raw_ostream &os, char header, char footer) const {
-  if (size() == 0) {
-    return;
-  }
-  printHelper(data()->names, os, [&](const auto &e) { os << e; }, header, footer);
-}
-
-void Params::printParams(llvm::raw_ostream &os, bool fullPrintout, char header, char footer) const {
-  if (size() == 0) {
-    return;
-  }
-  printHelper(data()->params, os, [&](const auto &e) {
-    e.print(os, fullPrintout);
-  }, header, footer);
-}
-
-void Params::printMapping(llvm::raw_ostream &os, bool fullPrintout) const {
-  if (size() == 0) {
-    return;
-  }
-  printHelper(llvm::zip_equal(data()->names, data()->params), os, [&](auto tup) {
-    auto [name, param] = tup;
-    os << name << ": ";
-    param.print(os, fullPrintout);
-  }, "{ ", " }");
-}
-
 const TypeBinding &Params::getParam(size_t i) const {
   assert(i < data()->params.size());
   return data()->params[i];
 }
 
-TypeBinding &MutableParams::getParam(size_t i) const {
-  assert(i < data()->params.size());
-  return data()->params[i];
-}
-
 ArrayRef<ParamName> Params::getNames() const { return data()->names; }
-
-MutableParams::iterator MutableParams::begin() const { return data()->params.begin(); }
-Params::iterator Params::begin() const { return data()->params.begin(); }
-MutableParams::iterator MutableParams::end() const { return data()->params.end(); }
-Params::iterator Params::end() const { return data()->params.end(); }
-
-bool Params::operator==(const Params &other) const {
-  return data()->params == other.data()->params && data()->names == other.data()->names;
-}
 
 StringRef Params::getName(size_t i) const {
   assert(i < data()->names.size());
@@ -127,8 +79,6 @@ StringRef Params::getName(size_t i) const {
 size_t Params::size() const { return data()->params.size(); }
 
 size_t Params::sizeOfDeclared() const { return data()->params.size() - data()->injected.count(); }
-
-mlir::MutableArrayRef<TypeBinding> MutableParams::getParams() const { return data()->params; }
 
 mlir::ArrayRef<TypeBinding> Params::getParams() const { return data()->params; }
 
@@ -153,19 +103,40 @@ const TypeBinding *Params::operator[](StringRef name) const {
   return nullptr;
 }
 
-TypeBinding *MutableParams::operator[](StringRef name) const {
-  auto ptr = Params::operator[](name);
-  return const_cast<TypeBinding *>(ptr);
+template <typename It, typename UnaryFn, typename Side>
+static void printHelper(It it, llvm::raw_ostream &os, UnaryFn fn, Side header, Side footer) {
+  os << header;
+  llvm::interleaveComma(it, os, fn);
+  os << footer;
 }
 
-bool Params::empty() const { return data()->names.empty(); }
-
-void MutableParams::replaceParam(StringRef name, const TypeBinding &binding) {
-  auto found = this->operator[](name);
-  if (found != nullptr) {
-    *found = binding;
+void Params::printMapping(llvm::raw_ostream &os, bool fullPrintout) const {
+  if (!empty()) {
+    printHelper(llvm::zip_equal(data()->names, data()->params), os, [&](auto tup) {
+      auto [name, param] = tup;
+      os << name << ": ";
+      param.print(os, fullPrintout);
+    }, "{ ", " }");
   }
 }
+
+void Params::printNames(llvm::raw_ostream &os, char header, char footer) const {
+  if (!empty()) {
+    printHelper(data()->names, os, [&](const auto &e) { os << e; }, header, footer);
+  }
+}
+
+void Params::printParams(llvm::raw_ostream &os, bool fullPrintout, char header, char footer) const {
+  if (!empty()) {
+    printHelper(data()->params, os, [&](const auto &e) {
+      e.print(os, fullPrintout);
+    }, header, footer);
+  }
+}
+
+Params::iterator Params::begin() const { return data()->params.begin(); }
+
+Params::iterator Params::end() const { return data()->params.end(); }
 
 bool Params::contains(StringRef name) const {
   auto B = data()->names.begin();
@@ -174,6 +145,30 @@ bool Params::contains(StringRef name) const {
   return pos != E;
 }
 
-const ParamsStorage *Params::data() const { return sto; }
+bool Params::empty() const { return data()->names.empty(); }
 
-ParamsStorage *MutableParams::data() const { return const_cast<ParamsStorage *>(Params::data()); }
+bool Params::operator==(const Params &other) const {
+  return data()->params == other.data()->params && data()->names == other.data()->names;
+}
+
+//==-----------------------------------------------------------------------==//
+// MutableParams
+//==-----------------------------------------------------------------------==//
+
+void MutableParams::replaceParam(StringRef name, const TypeBinding &binding) {
+  auto found = this->operator[](name);
+  if (found != nullptr) {
+    *found = binding;
+  }
+}
+
+TypeBinding &MutableParams::getParam(size_t i) const {
+  assert(i < data()->params.size());
+  return data()->params[i];
+}
+
+mlir::MutableArrayRef<TypeBinding> MutableParams::getParams() const { return data()->params; }
+
+MutableParams::iterator MutableParams::begin() const { return data()->params.begin(); }
+
+MutableParams::iterator MutableParams::end() const { return data()->params.end(); }
