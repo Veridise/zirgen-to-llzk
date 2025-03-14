@@ -124,18 +124,11 @@ static bool equivalentTypeAttr(TypeAttr lhsType, TypeAttr rhsType) {
   auto lhsComp = mlir::dyn_cast_if_present<ComponentType>(lhsType.getValue());
   auto rhsComp = mlir::dyn_cast_if_present<ComponentType>(rhsType.getValue());
 
-  if (lhsComp && rhsComp) {
-    return lhsComp.subtypeOf(rhsComp);
-  }
-
-  return false;
+  return lhsComp && rhsComp && lhsComp.subtypeOf(rhsComp);
 }
 
 template <typename T> static bool neitherAre(Attribute lhs, Attribute rhs) {
-  if (!mlir::isa<T>(lhs)) {
-    return !mlir::isa<T>(rhs);
-  }
-  return false;
+  return !mlir::isa<T>(lhs) && !mlir::isa<T>(rhs);
 }
 
 static uint8_t priority(Attribute attr) {
@@ -152,10 +145,7 @@ static uint8_t priority(Attribute attr) {
 static bool checkSubtypeViaConcreteness(Attribute lhsAttr, Attribute rhsAttr) {
   auto lhs = priority(lhsAttr);
   auto rhs = priority(rhsAttr);
-  if (lhs && rhs) {
-    return lhs >= rhs;
-  }
-  return false;
+  return lhs && rhs && lhs >= rhs;
 }
 
 static bool equivalentParam(Attribute lhs, Attribute rhs) {
