@@ -1,3 +1,5 @@
+#include <cstdint>
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/Support/LogicalResult.h>
@@ -186,7 +188,6 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
     }
     if (!copy.isTypeMarker()) {
       dst->setSuperType(bindings.Manage(copy));
-      // dst->getSuperType() = copy;
     }
     LLVM_DEBUG(spaces(indent);
                llvm::dbgs() << "Into " << dst->getSuperType() << "  (super type)\n");
@@ -209,7 +210,9 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
   }
   // Specialize the types of the members
   auto &members = dst->getMembers();
-  for (auto &[name, type] : members) {
+  for (auto &member : members) {
+    auto name = member.getKey();
+    auto &type = member.getValue();
     if (type.has_value()) {
       auto memberScope = type->getGenericParamsMapping();
       LLVM_DEBUG(spaces(indent);
@@ -233,22 +236,18 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
   return success();
 }
 
-void printFVs(const llvm::StringSet<> &FV, llvm::raw_ostream &os) {
+#ifndef NDEBUG
+/// Prints the set of free variables into the output stream
+static void printFVs(const llvm::StringSet<> &FV, llvm::raw_ostream &os) {
   if (FV.empty()) {
     os << "No FVs\n";
     return;
   }
-  size_t c = 1;
   os << "FVs { ";
-  for (auto name : FV.keys()) {
-    os << name;
-    if (c < FV.size()) {
-      os << ", ";
-    }
-    c++;
-  }
+  llvm::interleaveComma(FV.keys(), os);
   os << " }\n";
 }
+#endif
 
 static FailureOr<ConstExpr>
 constantFoldSymExpr(const expr::detail::Symbol &expr, ParamsScopeStack &scopes, size_t indent) {
@@ -295,29 +294,18 @@ static uint64_t foldNeg(uint64_t value) {
   return BabyBear.prime - (value % BabyBear.prime);
 }
 
-constexpr uint64_t INVALID = std::numeric_limits<uint64_t>::max();
-
 static FailureOr<uint64_t> foldBinaryOp(StringRef name, uint64_t lhs, uint64_t rhs) {
   ff::babybear::Field BabyBear;
   auto fp = [&](uint64_t v) { return v % BabyBear.prime; };
-
-  if (name == "Div") {
-    if (rhs == 0) {
-      return failure();
-    }
-    return fp(lhs / rhs);
-  }
-  if (name == "Mod") {
-    if (rhs == 0) {
-      return failure();
-    }
-    return fp(lhs % rhs);
-  }
+  lhs = fp(lhs);
+  rhs = fp(rhs);
 
   return llvm::StringSwitch<FailureOr<uint64_t>>(name)
       .Case("Add", fp(lhs + rhs))
       .Case("Sub", fp(lhs - rhs))
       .Case("Mul", fp(lhs * rhs))
+      .Case("Div", rhs == 0 ? FailureOr<uint64_t>() : fp(lhs / rhs))
+      .Case("Mod", rhs == 0 ? FailureOr<uint64_t>() : fp(lhs % rhs))
       .Default(failure());
 }
 
@@ -448,7 +436,6 @@ static LogicalResult propagateConstants(
 
   MutableParams params = dst->getGenericParamsMapping();
 
-  // auto declParamsCount = params.sizeOfDeclared();
   ParamsStorage sto;
   Params constParams = getConstantParams(*dst, sto);
   ScopeGuard guard(scopes, constParams);
@@ -518,10 +505,12 @@ static LogicalResult propagateConstants(
   }
   // Specialize the types of the members
   auto &members = dst->getMembers();
-  for (auto &[name, type] : members) {
+  for (auto &member : members) {
+    auto name = member.getKey();
+    auto &type = member.getValue();
     if (type.has_value()) {
       ParamsStorage memberSto;
-      auto memberScope = getConstantParams(dst->getSuperType(), memberSto);
+      auto memberScope = getConstantParams(*type, memberSto);
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in member " << name
                                               << " of type " << *type << "\n");
       {

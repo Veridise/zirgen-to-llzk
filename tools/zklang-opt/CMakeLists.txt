@@ -8,6 +8,7 @@ target_link_libraries(zklang-opt PUBLIC   ZklangHeaders
   MLIRIR 
   MLIRTransforms 
   MLIRFuncDialect 
+  MLIRIndexDialect 
   LLZK::LLZKDialect 
   ZIRParser 
   ZIRC

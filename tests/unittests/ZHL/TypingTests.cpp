@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 //=----------------------------------------------------------=//
@@ -53,7 +54,8 @@ TEST_F(MaterializationTest, componentBaseType) {
 }
 
 TEST_F(MaterializationTest, componentBaseConstructorType) {
-  FunctionType output = zml::materializeTypeBindingConstructor(builder, bindings.Component());
+  FunctionType output =
+      zml::materializeTypeBindingConstructor(builder, bindings.Component(), bindings);
   FunctionType expected = builder.getFunctionType(TypeRange(), zml::ComponentType::Component(&ctx));
   ASSERT_EQ(output, expected);
 }
@@ -83,14 +85,14 @@ TEST_F(SpecializationTest, specializationPropagatesProperly) {
   auto T = TypeBinding::MakeGenericParam(Type, "T");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap(), zhl::MembersMap()
+      "Foo", Component, zhl::ParamsMap().declare("T", T), zhl::ParamsMap(), zhl::MembersMap()
   );
   TypeBinding ExpectedSpecializedFoo(
-      "Foo", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}}), zhl::ParamsMap(),
+      "Foo", unkLoc(), Component, zhl::ParamsMap().declare("T", Val), zhl::ParamsMap(),
       zhl::MembersMap()
   );
   ExpectedSpecializedFoo.markAsSpecialized();
-  auto SpecializedFoo = Foo.specialize(diag, {Val});
+  auto SpecializedFoo = Foo.specialize(diag, {Val}, bindings);
   ASSERT_TRUE(succeeded(SpecializedFoo));
   ASSERT_EQ(*SpecializedFoo, ExpectedSpecializedFoo);
 }
@@ -103,12 +105,12 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyForArrays) {
   auto &Val = bindings.Get("Val");
   auto &Arr = bindings.Get("Array");
   TypeBinding ExpectedSpecializedArray(
-      "Array", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}, {{"N", 1}, Const10}}),
+      "Array", unkLoc(), Component, zhl::ParamsMap().declare("T", Val).declare("N", Const10),
       zhl::ParamsMap(), zhl::MembersMap(), Frame(), true
   );
   ExpectedSpecializedArray.markAsSpecialized();
   ExpectedSpecializedArray.selfConstructs();
-  auto SpecializedArr = Arr.specialize(diag, {Val, Const10});
+  auto SpecializedArr = Arr.specialize(diag, {Val, Const10}, bindings);
   ASSERT_TRUE(succeeded(SpecializedArr));
   ASSERT_EQ(*SpecializedArr, ExpectedSpecializedArray);
 }
@@ -123,17 +125,17 @@ TEST_F(SpecializationTest, constValSpecializationPropagatesProperlyForArraysOfAr
   auto genericCtorParam = bindings.Array(bindings.Array(Val, N), N);
 
   TypeBinding GenericFoo(
-      "Foo", unkLoc(), Val, zhl::ParamsMap({{{"N", 0}, N}}),
-      zhl::ParamsMap({{{"m", 0}, genericCtorParam}}), zhl::MembersMap(), Frame(), true
+      "Foo", unkLoc(), Val, zhl::ParamsMap().declare("N", N),
+      zhl::ParamsMap().declare("m", genericCtorParam), zhl::MembersMap(), Frame(), true
   );
 
   auto ctorParam = bindings.Array(bindings.Array(Val, 10), 10);
   TypeBinding ExpectedType(
-      "Foo", unkLoc(), Val, zhl::ParamsMap({{{"N", 0}, Const10}}),
-      zhl::ParamsMap({{{"m", 0}, ctorParam}}), zhl::MembersMap(), Frame(), true
+      "Foo", unkLoc(), Val, zhl::ParamsMap().declare("N", Const10),
+      zhl::ParamsMap().declare("m", ctorParam), zhl::MembersMap(), Frame(), true
   );
   ExpectedType.markAsSpecialized();
-  auto SpecializedFoo = GenericFoo.specialize(diag, {Const10});
+  auto SpecializedFoo = GenericFoo.specialize(diag, {Const10}, bindings);
   ASSERT_TRUE(succeeded(SpecializedFoo));
   ASSERT_EQ(*SpecializedFoo, ExpectedType);
 }
@@ -145,15 +147,15 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyToConstructor) {
   auto T = TypeBinding::MakeGenericParam(Type, "T");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap({{{"t", 0}, T}}),
+      "Foo", Component, zhl::ParamsMap().declare("T", T), zhl::ParamsMap().declare("t", T),
       zhl::MembersMap()
   );
   TypeBinding ExpectedSpecializedFoo(
-      "Foo", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}}),
-      zhl::ParamsMap({{{"t", 0}, Val}}), zhl::MembersMap()
+      "Foo", unkLoc(), Component, zhl::ParamsMap().declare("T", Val),
+      zhl::ParamsMap().declare("t", Val), zhl::MembersMap()
   );
   ExpectedSpecializedFoo.markAsSpecialized();
-  auto SpecializedFoo = Foo.specialize(diag, {Val});
+  auto SpecializedFoo = Foo.specialize(diag, {Val}, bindings);
   ASSERT_TRUE(succeeded(SpecializedFoo));
   ASSERT_EQ(*SpecializedFoo, ExpectedSpecializedFoo);
 }
@@ -166,21 +168,21 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyToSuperType) {
   auto F = TypeBinding::MakeGenericParam(Type, "F");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap(), zhl::MembersMap()
+      "Foo", Component, zhl::ParamsMap().declare("T", T), zhl::ParamsMap(), zhl::MembersMap()
   );
-  auto Foo_F = Foo.specialize(diag, {F}); // The specialized version of Foo within Bar.
+  auto Foo_F = Foo.specialize(diag, {F}, bindings); // The specialized version of Foo within Bar.
   ASSERT_TRUE(succeeded(Foo_F));
   auto &Bar = bindings.Create(
-      "Bar", *Foo_F, zhl::ParamsMap({{{"F", 0}, F}}), zhl::ParamsMap(), zhl::MembersMap()
+      "Bar", *Foo_F, zhl::ParamsMap().declare("F", F), zhl::ParamsMap(), zhl::MembersMap()
   );
   // The supertype should be like this after specializing Bar
   TypeBinding ExpectedSpecializedFoo(
-      "Foo", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}}), zhl::ParamsMap(),
+      "Foo", unkLoc(), Component, zhl::ParamsMap().declare("T", Val), zhl::ParamsMap(),
       zhl::MembersMap()
   );
   ExpectedSpecializedFoo.markAsSpecialized();
 
-  auto SpecializedBar = Bar.specialize(diag, {Val});
+  auto SpecializedBar = Bar.specialize(diag, {Val}, bindings);
   ASSERT_TRUE(succeeded(SpecializedBar));
   ASSERT_TRUE(SpecializedBar->hasSuperType());
   auto &super = SpecializedBar->getSuperType();
@@ -194,15 +196,15 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyToMembers) {
   auto T = TypeBinding::MakeGenericParam(Type, "T");
   auto &Val = bindings.Get("Val");
   auto &Foo = bindings.Create(
-      "Foo", Component, zhl::ParamsMap({{{"T", 0}, T}}), zhl::ParamsMap(),
+      "Foo", Component, zhl::ParamsMap().declare("T", T), zhl::ParamsMap(),
       zhl::MembersMap({{"t", T}})
   );
   TypeBinding ExpectedSpecializedFoo(
-      "Foo", unkLoc(), Component, zhl::ParamsMap({{{"T", 0}, Val}}), zhl::ParamsMap(),
+      "Foo", unkLoc(), Component, zhl::ParamsMap().declare("T", Val), zhl::ParamsMap(),
       zhl::MembersMap({{"t", Val}})
   );
   ExpectedSpecializedFoo.markAsSpecialized();
-  auto SpecializedFoo = Foo.specialize(diag, {Val});
+  auto SpecializedFoo = Foo.specialize(diag, {Val}, bindings);
   ASSERT_TRUE(succeeded(SpecializedFoo));
   ASSERT_EQ(*SpecializedFoo, ExpectedSpecializedFoo);
 }
