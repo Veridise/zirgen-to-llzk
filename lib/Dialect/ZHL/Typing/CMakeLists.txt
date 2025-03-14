@@ -10,7 +10,6 @@ target_sources(ZIRC PRIVATE
   Frame.cpp
   Expr.cpp
   TypeBinding.cpp
-  TypeBindingName.cpp
   Params.cpp
   Interpreter.cpp
 )

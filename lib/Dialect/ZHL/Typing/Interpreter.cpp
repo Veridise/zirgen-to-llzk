@@ -1,7 +1,9 @@
+#include <zklang/Dialect/ZHL/Typing/Interpreter.h>
+
 #include <algorithm>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/TypeSwitch.h>
-#include <zklang/Dialect/ZHL/Typing/Interpreter.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 #define DEBUG_TYPE "zhl-interpreter"

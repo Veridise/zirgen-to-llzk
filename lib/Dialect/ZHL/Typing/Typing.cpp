@@ -9,6 +9,7 @@
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/OpBindings.h>
 #include <zklang/Dialect/ZHL/Typing/Rules.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZHL/Typing/Typing.h>
 
@@ -196,7 +197,7 @@ private:
     if (failed(result)) {
       return failure();
     }
-    auto finalBinding = result->ReplaceFrame(frame);
+    auto finalBinding = TypeBinding::ReplaceFrame(*result, frame);
     auto *parent = frame.getParentSlot();
     if (auto *compParent = mlir::dyn_cast_if_present<ComponentSlot>(parent)) {
       if (mlir::isa_and_present<ComponentSlot>(finalBinding.getSlot())) {

@@ -17,9 +17,9 @@ class Frame {
 public:
   Frame();
   Frame(const Frame &);
-  Frame(Frame &&) = delete;
+  Frame(Frame &&);
   Frame &operator=(const Frame &);
-  Frame &operator=(Frame &&) = delete;
+  Frame &operator=(Frame &&);
 
   template <typename Slot, typename... Args> Slot *allocateSlot(Args &&...args) {
     return static_cast<Slot *>(info->allocateSlot<Slot, Args...>(std::forward<Args>(args)...));

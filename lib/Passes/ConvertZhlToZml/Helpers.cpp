@@ -7,6 +7,7 @@
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Params.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Builder.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>

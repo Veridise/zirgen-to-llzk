@@ -14,6 +14,7 @@
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zirgen/dsl/lower.h>
 #include <zirgen/dsl/parser.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/Passes.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 #include <zklang/Dialect/ZML/IR/Dialect.h>

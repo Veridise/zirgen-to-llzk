@@ -11,6 +11,7 @@
 #include <zklang/Dialect/ZHL/Typing/Interpreter.h>
 #include <zklang/Dialect/ZHL/Typing/Params.h>
 #include <zklang/Dialect/ZHL/Typing/Rules.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 
@@ -76,7 +77,9 @@ mlir::FailureOr<TypeBinding> ParameterTypingRule::
     return op->emitError() << "cannot use a constant expression as parameter type";
   }
   auto interpretatedArg = interpretateOp(
-      op, (op.getVariadic() ? TypeBinding::WrapVariadic(arg) : arg).WithUpdatedLocation(op.getLoc())
+      op, TypeBinding::WithUpdatedLocation(
+              op.getVariadic() ? TypeBinding::WrapVariadic(arg) : arg, op.getLoc()
+          )
   );
   liftCtorExpressions(interpretatedArg, scope);
   scope.declareConstructorParam(op.getName(), op.getIndex(), interpretatedArg);

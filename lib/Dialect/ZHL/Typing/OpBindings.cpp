@@ -1,5 +1,7 @@
 #include <zklang/Dialect/ZHL/Typing/OpBindings.h>
 
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
+
 using namespace mlir;
 using namespace llvm;
 
