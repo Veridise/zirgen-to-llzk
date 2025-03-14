@@ -102,14 +102,14 @@ inline ConstExpr UnaryOp(StringRef name, ArrayRef<TypeBinding> args) {
 
 namespace interpreter {
 
-template <> TypeBinding interpretateOp(zirgen::Zhl::TypeParamOp op, const TypeBinding &binding) {
+template <> TypeBinding interpretOp(zirgen::Zhl::TypeParamOp op, const TypeBinding &binding) {
   if (binding.getSuperType().isVal()) {
     return TypeBinding::WithExpr(binding, ConstExpr::Symbol(op.getName(), op.getIndex()));
   }
   return TypeBinding::NoExpr(binding);
 }
 
-template <> TypeBinding interpretateOp(zirgen::Zhl::LiteralOp op, const TypeBinding &binding) {
+template <> TypeBinding interpretOp(zirgen::Zhl::LiteralOp op, const TypeBinding &binding) {
   // The LiteralOp typing rule must have already created a const. Here we just check that that is
   // indeed the case.
   assert(binding.isKnownConst() && binding.getConst() == op.getValue());
@@ -121,9 +121,8 @@ template <> TypeBinding interpretateOp(zirgen::Zhl::LiteralOp op, const TypeBind
 /// not have a ConstExpr then gives up an returns the binding without a ConstExpr. A binding that
 /// does not have a ConstExpr means that it does not encode a semi-affine expression.
 template <>
-TypeBinding interpretateOp(
-    zirgen::Zhl::ConstructOp op, const TypeBinding &binding, ArrayRef<TypeBinding> &&args
-) {
+TypeBinding
+interpretOp(zirgen::Zhl::ConstructOp op, const TypeBinding &binding, ArrayRef<TypeBinding> &&args) {
   LLVM_DEBUG(
       llvm::dbgs() << "interpretating " << op << " at " << op.getLoc() << " with type " << binding
                    << "\n"

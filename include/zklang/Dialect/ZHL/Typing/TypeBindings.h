@@ -11,7 +11,6 @@
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
-#include <string_view>
 #include <zklang/Dialect/ZHL/Typing/Expr.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
@@ -92,6 +91,9 @@ private:
 
   mlir::Location unk;
   llvm::StringMap<TypeBinding> bindings;
+  /// This deque is used as an allocator to hold pointers to type bindings that other type bindings
+  /// can safely use as reference. Is used my the Manage member function but since that function is
+  /// const this member variable has to be mutable to be able to write in it.
   mutable std::deque<TypeBinding> managedBindings;
   TypeBinding bottom;
 };
