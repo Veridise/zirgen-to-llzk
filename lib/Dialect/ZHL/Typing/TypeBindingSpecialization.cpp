@@ -475,7 +475,16 @@ static LogicalResult propagateConstants(
       LLVM_DEBUG(spaces(indent + 1); llvm::dbgs()
                                      << "Binding " << paramBinding
                                      << " replaced its constexpr with " << *folded << "\n");
-      paramBinding.setConstExpr(*folded);
+      auto origWasCtor = mlir::isa<CtorExpr>(paramBinding.getConstExpr());
+      auto newIsVal = mlir::isa<ValExpr>(*folded);
+      if (origWasCtor && newIsVal) {
+        // If the expression folded to a constant then extract the value and replace the binding
+        // with a Const one.
+        paramBinding =
+            bindings.Const(mlir::cast<ValExpr>(*folded).getValue(), paramBinding.getLocation());
+      } else {
+        paramBinding.setConstExpr(*folded);
+      }
     }
   }
 

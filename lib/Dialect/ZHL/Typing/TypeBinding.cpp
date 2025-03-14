@@ -206,41 +206,87 @@ TypeBinding &TypeBinding::operator=(TypeBinding &&other) {
   return *this;
 }
 
+#ifndef NDEBUG
+namespace {
+struct deferDecr {
+  ~deferDecr() { value--; }
+
+  unsigned &value;
+};
+} // namespace
+#endif
+
 TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
+// Wrapped this way instead of LLVM_DEBUG because the macro may create its own scope.
+#ifndef NDEBUG
+  static unsigned indentLevel = 0;
+  indentLevel++;
+  deferDecr defer{.value = indentLevel};
+  auto logLine = [&](unsigned offset = 0) -> llvm::raw_ostream & {
+    return llvm::dbgs().indent(indentLevel + offset);
+  };
+  auto nl = []() { llvm::dbgs() << "\n"; };
+#endif
+  LLVM_DEBUG(print(logLine() << " this  = ", true); nl();
+             other.print(logLine() << " other = ", true); nl(););
   if (*this == other) {
+    LLVM_DEBUG(logLine(1) << "They are equal\n");
     return *this;
   }
-  // Special case for arrays that if they are the same size the common super type is another array
-  // whose element is the least common type of the two element types
-  if (name == "Array" && other.name == "Array") {
-    auto &arrElt = getGenericParamsMapping().getParam(0);
-    auto &otherArrElt = other.getGenericParamsMapping().getParam(0);
-    auto &arrSize = getGenericParamsMapping().getParam(1);
-    auto &otherArrSize = other.getGenericParamsMapping().getParam(1);
-    if (arrSize == otherArrSize) {
-      auto commonInner = arrElt.commonSupertypeWith(otherArrElt);
-      auto copy = *this;
-      copy.getGenericParamsMapping().getParam(0) = commonInner;
-      return copy;
+  // Special cases for arrays:
+  if (name == "Array") {
+    // If they are the same size the common super type is another array
+    // whose element is the least common type of the two element types
+    if (other.name == "Array") {
+      auto &arrElt = getGenericParamsMapping().getParam(0);
+      LLVM_DEBUG(arrElt.print(logLine(1) << "This array element:  ", true); nl());
+      auto &otherArrElt = other.getGenericParamsMapping().getParam(0);
+      LLVM_DEBUG(otherArrElt.print(logLine(1) << "Other array element: ", true); nl());
+      auto &arrSize = getGenericParamsMapping().getParam(1);
+      LLVM_DEBUG(arrSize.print(logLine(1) << "This array size:     ", true); nl());
+      auto &otherArrSize = other.getGenericParamsMapping().getParam(1);
+      LLVM_DEBUG(otherArrSize.print(logLine(1) << "Other array size:    ", true); nl());
+      if (arrSize == otherArrSize) {
+        auto commonInner = arrElt.commonSupertypeWith(otherArrElt);
+        auto copy = *this;
+        copy.getGenericParamsMapping().getParam(0) = commonInner;
+        copy.selfConstructs();
+        LLVM_DEBUG(copy.print(logLine(1) << "Resolved a new array: ", true); nl());
+        return copy;
+      }
+      LLVM_DEBUG(logLine(1) << "Defaulting to Component\n");
+      return TypeBinding(loc);
     }
-    return TypeBinding(loc);
+    // If this is an Array and the other has an Array supertype get the Array super type and go from
+    // there.
+    auto otherArray = other.getConcreteArrayType();
+    if (succeeded(otherArray)) {
+      LLVM_DEBUG(otherArray->print(logLine(1) << "Jumped to Array super type: ", true); nl());
+      return commonSupertypeWith(*otherArray);
+    }
   }
   if (mlir::succeeded(subtypeOf(other))) {
+    LLVM_DEBUG(logLine(1) << "this is a subtype of other\n");
     return other;
   }
   if (mlir::succeeded(other.subtypeOf(*this))) {
+    LLVM_DEBUG(logLine(1) << "other is a subtype of this\n");
     return *this;
   }
 
   if (superType) {
     // Climb alternatively
+    LLVM_DEBUG(superType->print(logLine(1) << "Delegating to super type: ", true); nl());
     return other.commonSupertypeWith(*superType);
   }
+  LLVM_DEBUG(logLine(1) << "Defaulting to Component\n");
   return TypeBinding(loc);
 }
 
 mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
   if (!isArray()) {
+    print(llvm::dbgs() << "[TypeBinding::getArrayElement] this = ", true);
+    llvm::dbgs() << "\n";
     return emitError() << "non array type '" << name << "' cannot be subscripted";
   }
   // A component with an array super type can behave like an array but it doesn't have all the
@@ -377,17 +423,7 @@ void TypeBinding::setName(StringRef newName) {
 }
 
 void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
-  if (isConst()) {
-    if (hasConstValue(constExpr)) {
-      os << getConstValue(constExpr);
-    } else {
-      os << "?";
-    }
-  } else if (hasConstExpr()) {
-    getConstExpr()->print(os);
-  } else if (isGenericParam()) {
-    os << *genericParamName;
-  } else {
+  auto printType = [&]() {
     os << name.ref();
     if (specialized) {
       getGenericParamsMapping().printParams(os, false);
@@ -400,6 +436,31 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     if (variadic) {
       os << "...";
     }
+  };
+  if (isConst()) {
+    if (hasConstValue(constExpr)) {
+      os << getConstValue(constExpr);
+    } else {
+      os << "?";
+    }
+    if (fullPrintout) {
+      os << " : ";
+      printType();
+    }
+  } else if (hasConstExpr()) {
+    getConstExpr()->print(os);
+    if (fullPrintout) {
+      os << " : ";
+      printType();
+    }
+  } else if (isGenericParam()) {
+    os << *genericParamName;
+    if (fullPrintout) {
+      os << " : ";
+      printType();
+    }
+  } else {
+    printType();
   }
   if (fullPrintout) {
     os << " { ";

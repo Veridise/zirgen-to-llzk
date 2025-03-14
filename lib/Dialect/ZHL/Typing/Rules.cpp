@@ -1,3 +1,4 @@
+#include <llvm/ADT/bit.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/Support/LogicalResult.h>
 #include <numeric>
@@ -539,7 +540,7 @@ mlir::FailureOr<TypeBinding> SubscriptTypeRule::
     return mlir::failure();
   }
 
-  return interpretateOp(op, operands[0].getArrayElement([&]() { return op->emitOpError(); }));
+  return interpretateOp(op, operands[0].getArrayElement([&]() { return op->emitError(); }));
 }
 
 mlir::FailureOr<TypeBinding> ArrayTypeRule::
@@ -626,9 +627,6 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
     return failure();
   }
   if (failed(innerType->subtypeOf(ctorParams.getParam(1)))) {
-    ctorParams.getParam(1).print(llvm::dbgs() << "Argument type: ", true);
-    innerType->print(llvm::dbgs() << "\nInput type: ", true);
-    llvm::dbgs() << "\n";
     return op->emitError() << "argument #1 '" << ctorParams.getName(1) << "' of type '"
                            << ctorParams.getParam(1) << "' is not a valid super type for '"
                            << *innerType << "'";
@@ -642,10 +640,6 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
                            << output << "'";
   }
 
-  // If the init value is a constant then return its super type (Val)
-  // if (operands[1].isConst()) {
-  //   return interpretateOp(op, operands[1].getSuperType());
-  // }
   return interpretateOp(op, output);
 }
 
