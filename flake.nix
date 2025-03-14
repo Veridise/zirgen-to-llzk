@@ -9,7 +9,7 @@
     };
 
     llzk = {
-      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=dani/literal-string-op";
+      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -188,6 +188,8 @@
               # Add binary dir to PATH for convenience
               export PATH="$PWD"/build/bin:"$PATH"
 
+              # For using mlir-tblgen inside the dev environment
+              export LD_LIBRARY_PATH=${pkgs.z3.lib}/lib:$LD_LIBRARY_PATH
             '';
           });
 

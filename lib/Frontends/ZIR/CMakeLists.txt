@@ -9,6 +9,7 @@ target_link_libraries(ZirFrontend PUBLIC
   MLIRIR 
   MLIRTransforms 
   MLIRFuncDialect 
+  MLIRIndexDialect
   LLZK::LLZKDialect 
   ZIRParser 
   ZIRC
