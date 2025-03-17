@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s
+// RUN: zklang -o - %s | FileCheck %s
 
 // COM: This test case has a useless parameter in the middle to make sure 
 // COM: the formals and the symbols in the affine map match properly when
@@ -8,6 +8,9 @@ component Unpack<N: Val, U: Val, P: Val>(in: Array<Val, N/P>) {
   in[0]
 }
 
+// CHECK-LABEL: func @compute() -> !llzk.struct<@User1<[]>> {
 component User1() {
+// CHECK: %{{[0-9a-zA-Z_\.]+}} = call @Unpack::@compute(%{{[0-9a-zA-Z_\.]+}}) : (!llzk.array<4 x !llzk.felt>) -> !llzk.struct<@Unpack<[8, 0, 2, 4]>> 
   Unpack<8,0,2>([0,0,0,0])
+// CHECK-LABEL: func @constrain(%{{[0-9a-zA-Z_\.]+}}: !llzk.struct<@User1<[]>>) {
 }

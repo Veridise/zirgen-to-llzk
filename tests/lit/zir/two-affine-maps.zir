@@ -1,9 +1,18 @@
-// RUN: zklang -o - %s
+// RUN: zklang -o - %s | FileCheck %s
 
-component Unpack<N: Val, P: Val, M: Val, Q: Val>(in1: Array<Val, N/P>, in2: Array<Val,M/P>) {
+// COM: Check that we lifted two new parameters
+// CHECK-LABEL: llzk.struct @Unpack<[@N, @P, @M, @Q, 
+// CHECK-SAME:     @Aff$0, @Aff$1]> {
+component Unpack<N: Val, P: Val, M: Val, Q: Val>(in1: Array<Val, N/P>, in2: Array<Val,M/Q>) {
+// COM: Check that each array has a different parameter.
+// CHECK: func @compute(%arg0: !llzk.array<@Aff$0 x !llzk.felt>, %arg1: !llzk.array<@Aff$1 x !llzk.felt>) -> !llzk.struct<@Unpack<[@N, @P, @M, @Q, @Aff$0, @Aff$1]>> {
+
   in1[0] + in2[0]
 }
 
+// CHECK-LABEL: llzk.struct @User1<[]> {
 component User1() {
+  // COM: Check that the parameters propagated and folded
+  // CHECK: %{{[0-9a-zA-Z_\.]+}} = call @Unpack::@compute(%{{[0-9a-zA-Z_\.]+}}, %{{[0-9a-zA-Z_\.]+}}) : (!llzk.array<4 x !llzk.felt>, !llzk.array<4 x !llzk.felt>) -> !llzk.struct<@Unpack<[8, 2, 4, 1, 4, 4]>> 
   Unpack<8,2, 4,1>([0,0,0,0], [0,0,0,0])
 }

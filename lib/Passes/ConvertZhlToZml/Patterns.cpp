@@ -752,15 +752,15 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
   auto start = rewriter.create<ValToIndexOp>(op.getStart().getLoc(), startVal);
   auto end = rewriter.create<ValToIndexOp>(op.getEnd().getLoc(), endVal);
-  rewriter.create<mlir::scf::ForOp>(
-      op.getLoc(), start, end, one, mlir::ValueRange(),
+  auto loop = rewriter.create<mlir::scf::ForOp>(
+      op.getLoc(), start, end, one, /*mlir::ValueRange()*/ ValueRange({arrAlloc}),
       [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
     auto conv = builder.create<IndexToValOp>(loc, innerType, iv);
-    builder.create<WriteArrayOp>(loc, arrAlloc, iv, conv);
-    builder.create<scf::YieldOp>(loc);
+    builder.create<WriteArrayOp>(loc, args[0], iv, conv);
+    builder.create<scf::YieldOp>(loc, args[0]);
   }
   );
-  rewriter.replaceOp(op, arrAlloc);
+  rewriter.replaceOp(op, /*arrAlloc*/ loop);
 
   return mlir::success();
 }
