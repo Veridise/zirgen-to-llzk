@@ -1,4 +1,5 @@
 #include <functional>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <zklang/Dialect/ZML/IR/Builder.h>
 
 using namespace mlir;
@@ -60,11 +61,8 @@ ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   }
 
   if (isGeneric()) {
-    SmallVector<StringRef> typeParamsRefs;
-    std::transform(
-        typeParams.begin(), typeParams.end(), std::back_inserter(typeParamsRefs),
-        [](auto &s) { return s.str(); }
-    );
+    SmallVector<StringRef> typeParamsRefs =
+        llvm::map_to_vector(typeParams, [](auto &s) { return s.str(); });
     return builder.create<ComponentOp>(*loc, compName, typeParamsRefs, attrs);
   } else {
     return builder.create<ComponentOp>(*loc, compName, attrs);

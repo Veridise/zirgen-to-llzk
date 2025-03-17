@@ -1,3 +1,5 @@
+#include <llvm/ADT/SmallVectorExtras.h>
+#include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/Expr.h>
 
 #include <algorithm>
@@ -19,205 +21,87 @@
 #define DEBUG_TYPE "zhl-const-exprs"
 
 using namespace mlir;
-
-namespace zhl::expr {
+using namespace zhl::expr;
+using namespace zhl::expr::detail;
 
 //==-----------------------------------------------------------------------==//
 // ExprBase
 //==-----------------------------------------------------------------------==//
 
-ExprBase::ExprBase(ExprKind Kind) : kind(Kind) {}
-
-ExprBase::ExprKind ExprBase::getKind() const { return kind; }
+ExprBase::operator SimpleExprView() const { return SimpleExprView(*this); }
 
 //==-----------------------------------------------------------------------==//
-// ConstExpr
+// ExprView
 //==-----------------------------------------------------------------------==//
 
-ConstExpr::ConstExpr() : expr(nullptr) {}
-
-ConstExpr::ConstExpr(ExprBase *exprPtr) : expr(exprPtr) {}
-
-ConstExpr::ConstExpr(const ExprBase &Expr) : expr(Expr.clone()) {}
-
-ConstExpr::operator bool() const { return expr != nullptr; }
-
-bool ConstExpr::operator==(const ConstExpr &other) const {
-  if (expr == nullptr && other.expr == nullptr) {
-    return true;
+ConstExpr ExprView::clone() const {
+  if (auto *expr = get()) {
+    return ConstExpr(*expr);
   }
-  if (expr == nullptr || other.expr == nullptr) {
-    return false;
-  }
-  return *expr == *other.expr;
+  return ConstExpr(nullptr);
 }
 
-ExprBase *ConstExpr::get() { return expr.get(); }
-
-const ExprBase *ConstExpr::get() const { return expr.get(); }
-
-ExprBase *ConstExpr::operator->() { return expr.get(); }
-
-const ExprBase *ConstExpr::operator->() const { return expr.get(); }
-
-ExprBase &ConstExpr::operator*() { return *expr; }
-
-const ExprBase &ConstExpr::operator*() const { return *expr; }
-
-ConstExpr ConstExpr::Val(uint64_t value) { return ConstExpr(new detail::Val(value)); }
-
-ConstExpr ConstExpr::Symbol(StringRef name, size_t pos) {
-  return ConstExpr(new detail::Symbol(name, pos));
-}
-
-namespace {
-template <typename T> inline bool asBool(const T &t) { return t; }
-} // namespace
-
-ConstExpr ConstExpr::Ctor(StringRef name, ArrayRef<ConstExpr> args) {
-  if (std::all_of(args.begin(), args.end(), asBool<ConstExpr>)) {
-    auto *expr = new detail::Ctor(name);
-    std::transform(args.begin(), args.end(), std::back_inserter(expr->arguments()), [](auto CE) {
-      return CE->clone();
-    });
-    return ConstExpr(expr);
+bool ExprView::operator==(const detail::ExprBase &other) const {
+  if (auto *expr = operator->()) {
+    return expr->operator==(other);
   }
-  return ConstExpr();
+  return false;
 }
 
-Attribute ConstExpr::convertIntoAttribute(Builder &builder) const {
-  if (expr) {
+bool ExprView::operator==(const ExprView &other) const {
+  auto *expr = get();
+  if (expr && other) {
+    return expr->operator==(other.ref());
+  }
+  return !expr && !other;
+}
+
+/// Converts the expression into a MLIR Attribute
+Attribute ExprView::convertIntoAttribute(mlir::Builder &builder) const {
+  if (auto *expr = get()) {
     return expr->convertIntoAttribute(builder);
   }
   return nullptr;
 }
 
-//==-----------------------------------------------------------------------==//
-// ValExpr
-//==-----------------------------------------------------------------------==//
-
-ValExpr::ValExpr() = default;
-
-ValExpr::ValExpr(std::nullptr_t) {
-  LLVM_DEBUG(llvm::dbgs() << "[ValExpr(std::nullptr_t)] Created " << this << "\n");
+/// Attempts to converte the expresion into an affine expression. Returns failure if it failed to
+/// do so.
+FailureOr<AffineExpr> ExprView::convertIntoAffineExpr(mlir::Builder &builder) const {
+  if (auto *expr = get()) {
+    return expr->convertIntoAffineExpr(builder);
+  }
+  return mlir::failure();
 }
 
-ValExpr::ValExpr(const ConstExpr &Expr) : ValExpr() {
-  if (mlir::isa<detail::Val>(Expr.get())) {
-    expr = Expr;
+/// Collects the free symbol names in the expression.
+void ExprView::collectFreeSymbols(llvm::StringSet<> &FS) const {
+  if (auto *expr = get()) {
+    expr->collectFreeSymbols(FS);
   }
 }
 
-ValExpr::ValExpr(const ValExpr &other) : expr{} {
-  LLVM_DEBUG(
-      llvm::dbgs() << "[ValExpr(const ValExpr &other)] constructed with ValExpr at " << &other
-                   << "\n"
-  );
-  expr = other.expr;
-}
-
-ValExpr &ValExpr::operator=(const ValExpr &other) {
-  expr = other.expr;
-  return *this;
-}
-
-bool ValExpr::classof(const ConstExpr *expr) {
-  LLVM_DEBUG(llvm::dbgs() << "Checking if ValExpr\n");
-  if (!expr) {
-    return false;
-  }
-  return mlir::isa_and_present<detail::Val>(expr->get());
-}
-
-uint64_t ValExpr::getValue() const { return mlir::cast<detail::Val>(expr.get())->getValue(); }
-
-ValExpr::operator bool() const { return expr; }
-
-detail::Val &ValExpr::operator*() { return *mlir::cast<detail::Val>(expr.get()); }
-
-const detail::Val &ValExpr::operator*() const { return *mlir::cast<detail::Val>(expr.get()); }
-
 //==-----------------------------------------------------------------------==//
-// SymExpr
+// ConstExpr
 //==-----------------------------------------------------------------------==//
 
-SymExpr::SymExpr() = default;
+ConstExpr ConstExpr::Val(uint64_t value) { return ConstExpr(new class Val(value)); }
 
-SymExpr::SymExpr(std::nullptr_t) : expr{} {}
+ConstExpr ConstExpr::Symbol(StringRef name, size_t pos) {
+  return ConstExpr(new class Symbol(name, pos));
+}
 
-SymExpr::SymExpr(const ConstExpr &Expr) : SymExpr() {
-  if (mlir::isa<detail::Symbol>(Expr.get())) {
-    expr = Expr;
+template <typename T> static bool asBool(const T &t) { return t; }
+
+ConstExpr ConstExpr::Ctor(StringRef name, ArrayRef<ConstExpr> args) {
+  if (llvm::all_of(args, asBool<ConstExpr>)) {
+    return ConstExpr(new class Ctor(name, args));
   }
+  return ConstExpr();
 }
-
-bool SymExpr::classof(const ConstExpr *expr) {
-  LLVM_DEBUG(llvm::dbgs() << "Checking if SymExpr\n");
-  if (!expr) {
-    return false;
-  }
-  return mlir::isa_and_present<detail::Symbol>(expr->get());
-}
-
-StringRef SymExpr::getName() const { return mlir::cast<detail::Symbol>(expr.get())->getName(); }
-
-SymExpr::operator bool() const { return expr; }
-
-detail::Symbol &SymExpr::operator*() { return *mlir::cast<detail::Symbol>(expr.get()); }
-
-const detail::Symbol &SymExpr::operator*() const { return *mlir::cast<detail::Symbol>(expr.get()); }
-
-//==-----------------------------------------------------------------------==//
-// CtorExpr
-//==-----------------------------------------------------------------------==//
-
-CtorExpr::CtorExpr() = default;
-
-CtorExpr::CtorExpr(std::nullptr_t) : expr{} {}
-
-CtorExpr::CtorExpr(const ConstExpr &Expr) : CtorExpr() {
-  if (mlir::isa<detail::Ctor>(Expr.get())) {
-    expr = Expr;
-  }
-}
-
-bool CtorExpr::classof(const ConstExpr *expr) {
-  LLVM_DEBUG(llvm::dbgs() << "Checking if CtorExpr\n");
-  if (!expr) {
-    return false;
-  }
-  return mlir::isa_and_present<detail::Ctor>(expr->get());
-}
-
-CtorExpr::Arguments &CtorExpr::arguments() {
-  return mlir::dyn_cast<detail::Ctor>(expr.get())->arguments();
-}
-
-const CtorExpr::Arguments &CtorExpr::arguments() const {
-  return mlir::dyn_cast<detail::Ctor>(expr.get())->arguments();
-}
-
-StringRef CtorExpr::getTypeName() const {
-  return mlir::cast<detail::Ctor>(expr.get())->getTypeName();
-}
-
-CtorExpr::operator bool() const { return expr; }
-
-detail::Ctor &CtorExpr::operator*() { return *mlir::cast<detail::Ctor>(expr.get()); }
-
-const detail::Ctor &CtorExpr::operator*() const { return *mlir::cast<detail::Ctor>(expr.get()); }
-
-namespace detail {
 
 //==-----------------------------------------------------------------------==//
 // Val
 //==-----------------------------------------------------------------------==//
-
-Val::Val(uint64_t Value) : ExprBase(Ex_Val), value(Value) {}
-
-bool Val::classof(const ExprBase *expr) { return expr->getKind() == Ex_Val; }
-
-ExprBase *Val::clone() const { return new Val(value); }
 
 bool Val::operator==(const ExprBase &other) const {
   if (auto *otherVal = mlir::dyn_cast<Val>(&other)) {
@@ -228,23 +112,13 @@ bool Val::operator==(const ExprBase &other) const {
 
 void Val::print(llvm::raw_ostream &os) const { os << value; }
 
-uint64_t Val::getValue() const { return value; }
-
 Attribute Val::convertIntoAttribute(Builder &builder) const {
   return builder.getIntegerAttr(builder.getI64Type(), value);
 }
 
-void Val::collectFreeSymbols(llvm::StringSet<> &symbols) const {}
-
 //==-----------------------------------------------------------------------==//
 // Symbol
 //==-----------------------------------------------------------------------==//
-
-Symbol::Symbol(StringRef Name, size_t Pos) : ExprBase(Ex_Symbol), name(Name), pos(Pos) {}
-
-bool Symbol::classof(const ExprBase *expr) { return expr->getKind() == Ex_Symbol; }
-
-ExprBase *Symbol::clone() const { return new Symbol(name, pos); }
 
 bool Symbol::operator==(const ExprBase &other) const {
   if (auto *otherSym = mlir::dyn_cast<Symbol>(&other)) {
@@ -255,27 +129,18 @@ bool Symbol::operator==(const ExprBase &other) const {
 
 void Symbol::print(llvm::raw_ostream &os) const { os << name; }
 
-StringRef Symbol::getName() const { return name; }
-
-size_t Symbol::getPos() const { return pos; }
-
 Attribute Symbol::convertIntoAttribute(Builder &builder) const {
   return SymbolRefAttr::get(builder.getStringAttr(name));
 }
-
-void Symbol::collectFreeSymbols(llvm::StringSet<> &symbols) const { symbols.insert(name); }
 
 //==-----------------------------------------------------------------------==//
 // Ctor
 //==-----------------------------------------------------------------------==//
 
-Ctor::Ctor(StringRef Name) : ExprBase(Ex_Ctor), typeName(Name) {}
-
-Ctor::Ctor(StringRef Name, const Arguments &Args) : ExprBase(Ex_Ctor), args(Args), typeName(Name) {}
-
-bool Ctor::classof(const ExprBase *expr) { return expr->getKind() == Ex_Ctor; }
-
-ExprBase *Ctor::clone() const { return new Ctor(typeName, args); }
+Ctor::Ctor(StringRef Name, ArrayRef<ConstExpr> Args)
+    : ExprBase(Ex_Ctor),
+      args(llvm::map_to_vector(Args, [](auto &expr) -> ExprBase * { return expr->clone(); })),
+      typeName(Name) {}
 
 bool Ctor::operator==(const ExprBase &other) const {
   if (auto *otherCtor = mlir::dyn_cast<Ctor>(&other)) {
@@ -284,9 +149,7 @@ bool Ctor::operator==(const ExprBase &other) const {
   return false;
 }
 
-namespace {
-
-inline bool isInfixExprByName(StringRef name) {
+static bool isInfixExprByName(StringRef name) {
   return llvm::StringSwitch<bool>(name)
       .Case("Add", true)
       .Case("Sub", true)
@@ -295,7 +158,7 @@ inline bool isInfixExprByName(StringRef name) {
       .Default(false);
 }
 
-inline StringRef getInfixSymbol(StringRef name) {
+static StringRef getInfixSymbol(StringRef name) {
   return llvm::StringSwitch<StringRef>(name)
       .Case("Add", "+")
       .Case("Sub", "-")
@@ -304,14 +167,12 @@ inline StringRef getInfixSymbol(StringRef name) {
       .Default(name);
 }
 
-inline bool isInfixExpr(const ExprBase &expr) {
+static bool isInfixExpr(const ExprBase &expr) {
   if (auto ctor = mlir::dyn_cast<Ctor>(&expr)) {
     return ctor->arguments().size() == 2 && isInfixExprByName(ctor->getTypeName());
   }
   return false;
 }
-
-} // namespace
 
 static void printSide(llvm::raw_ostream &os, const ExprBase &expr) {
   bool needsParen = isInfixExpr(expr);
@@ -338,12 +199,6 @@ void Ctor::print(llvm::raw_ostream &os) const {
     os << ")";
   }
 }
-
-Ctor::Arguments &Ctor::arguments() { return args; }
-
-const Ctor::Arguments &Ctor::arguments() const { return args; }
-
-StringRef Ctor::getTypeName() const { return typeName; }
 
 void Ctor::collectFreeSymbols(llvm::StringSet<> &symbols) const {
   for (auto &arg : args) {
@@ -396,35 +251,32 @@ Attribute Ctor::convertIntoAttribute(Builder &builder) const {
 // Ctor::Arguments
 //==-----------------------------------------------------------------------==//
 
-Ctor::Arguments::Arguments() = default;
+static ExprBase &cloneHelper(const ExprBase &expr) { return *expr.clone(); }
 
-Ctor::Arguments::Arguments(const Arguments &other) { copyArgsList(other); }
+template <typename In, typename Out, typename Fn>
+static void copyArgsList(const In &in, Out &out, Fn f) {
+  for (auto &arg : in) {
+    out.push_back(f(arg));
+  }
+}
+
+template <typename List> static void cleanArgsList(List &lst) {
+  lst.clearAndDispose(std::default_delete<typename List::value_type>());
+}
+
+Ctor::Arguments::Arguments(SmallVectorImpl<value_type> &&Args) {
+  copyArgsList(Args, lst, [](value_type expr) -> reference { return cloneHelper(*expr); });
+}
+
+Ctor::Arguments::Arguments(const Arguments &other) { copyArgsList(other.lst, lst, cloneHelper); }
 
 Ctor::Arguments &Ctor::Arguments::operator=(const Arguments &other) {
-  cleanArgsList();
-  copyArgsList(other);
+  cleanArgsList(lst);
+  copyArgsList(other.lst, lst, cloneHelper);
   return *this;
 }
 
-Ctor::Arguments::~Arguments() { cleanArgsList(); }
-
-Ctor::Arguments::iterator Ctor::Arguments::begin() { return lst.begin(); }
-
-Ctor::Arguments::const_iterator Ctor::Arguments::begin() const { return lst.begin(); }
-
-Ctor::Arguments::iterator Ctor::Arguments::end() { return lst.end(); }
-
-Ctor::Arguments::const_iterator Ctor::Arguments::end() const { return lst.end(); }
-
-void Ctor::Arguments::push_back(ExprBase *expr) { lst.insert(lst.end(), *expr); }
-
-void Ctor::Arguments::cleanArgsList() { lst.clearAndDispose(std::default_delete<ExprBase>()); }
-
-void Ctor::Arguments::copyArgsList(const Arguments &other) {
-  std::transform(other.begin(), other.end(), std::back_inserter(*this), [](auto &arg) {
-    return arg.clone();
-  });
-}
+Ctor::Arguments::~Arguments() { cleanArgsList(lst); }
 
 bool Ctor::Arguments::operator==(const Arguments &other) const {
   if (lst.size() != other.lst.size()) {
@@ -449,36 +301,44 @@ const ExprBase &Ctor::Arguments::operator[](size_t offset) const {
   return *std::next(lst.begin(), offset);
 }
 
-size_t Ctor::Arguments::size() const { return lst.size(); }
-
-} // namespace detail
-
-} // namespace zhl::expr
-
 //==-----------------------------------------------------------------------==//
 // Stream overloads
 //==-----------------------------------------------------------------------==//
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::ConstExpr &expr) {
+// template <typename T>
+// static void printNullable(llvm::raw_ostream &os, const T &t, StringRef nullMsg = "<<NULL>>") {
+//   if (t) {
+//     t->print(os);
+//   } else {
+//     os << nullMsg;
+//   }
+// }
+//
+// llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ConstExpr &expr) {
+//   printNullable(os, expr);
+//   return os;
+// }
+//
+// llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ValExpr &expr) {
+//   printNullable(os, expr);
+//   return os;
+// }
+//
+// llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SymExpr &expr) {
+//   printNullable(os, expr);
+//   return os;
+// }
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ExprView &expr) {
   if (expr) {
     expr->print(os);
   } else {
-    os << "ConstExpr(<<NULL>>)";
+    os << "<<NULL>>";
   }
   return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::detail::Val &expr) {
-  expr.print(os);
-  return os;
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::detail::Symbol &expr) {
-  expr.print(os);
-  return os;
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::expr::detail::Ctor &expr) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ExprBase &expr) {
   expr.print(os);
   return os;
 }

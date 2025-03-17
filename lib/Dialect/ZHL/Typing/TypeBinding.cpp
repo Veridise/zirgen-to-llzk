@@ -29,7 +29,7 @@ static bool hasConstValue(const expr::ConstExpr &constExpr) {
 
 static uint64_t getConstValue(const expr::ConstExpr &constExpr) {
   assert(hasConstValue(constExpr));
-  return mlir::cast<expr::ValExpr>(constExpr).getValue();
+  return mlir::cast<expr::ValExpr>(constExpr)->getValue();
 }
 
 static bool isPrivate(StringRef name) { return name.starts_with("_"); }

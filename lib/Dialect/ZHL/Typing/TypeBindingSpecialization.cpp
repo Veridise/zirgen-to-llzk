@@ -250,13 +250,13 @@ static void printFVs(const llvm::StringSet<> &FV, llvm::raw_ostream &os) {
 #endif
 
 static FailureOr<ConstExpr>
-constantFoldSymExpr(const expr::detail::Symbol &expr, ParamsScopeStack &scopes, size_t indent) {
+constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t indent) {
+  auto name = expr->getName();
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in Sym expr " << expr << "\n");
-  auto *replacement = scopes[expr.getName()];
+  auto *replacement = scopes[name];
   if (replacement == nullptr) {
-    LLVM_DEBUG(spaces(indent + 1);
-               llvm::dbgs() << "Symbol '" << expr.getName() << "' is not in scope\n");
-    return ConstExpr(expr);
+    LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Symbol '" << name << "' is not in scope\n");
+    return expr;
   }
   if (replacement->isKnownConst()) {
     LLVM_DEBUG(spaces(indent + 1);
@@ -265,27 +265,17 @@ constantFoldSymExpr(const expr::detail::Symbol &expr, ParamsScopeStack &scopes, 
   }
 
   LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Sym expr " << expr << " was not modified\n");
-  return ConstExpr(expr);
+  return expr;
 }
 
 static FailureOr<ConstExpr>
-constantFoldSymExpr(const SymExpr &expr, ParamsScopeStack &scopes, size_t indent) {
-  return constantFoldSymExpr(*expr, scopes, indent);
-}
-
-static FailureOr<ConstExpr>
-constantFoldValExpr(const expr::detail::Val &expr, ParamsScopeStack &scopes, size_t indent) {
+constantFoldValExpr(const ValView &expr, ParamsScopeStack &scopes, size_t indent) {
   LLVM_DEBUG(spaces(indent);
              llvm::dbgs() << "Propagating constants in Val expr " << expr << " is trivial\n");
-  return ConstExpr(expr);
+  return expr;
 }
 
-static FailureOr<ConstExpr>
-constantFoldValExpr(const ValExpr &expr, ParamsScopeStack &scopes, size_t indent) {
-  return constantFoldValExpr(*expr, scopes, indent);
-}
-
-static FailureOr<ConstExpr> constantFoldExpr(const ExprBase &, ParamsScopeStack &, size_t);
+static FailureOr<ConstExpr> constantFoldExpr(const ExprView &, ParamsScopeStack &, size_t);
 
 static llvm::StringSet<> FoldableComponents({"Add", "Sub", "Mul", "Div", "Mod", "Neg"});
 
@@ -310,43 +300,48 @@ static FailureOr<uint64_t> foldBinaryOp(StringRef name, uint64_t lhs, uint64_t r
 }
 
 static FailureOr<ConstExpr>
-constantFoldCtorExpr(const expr::detail::Ctor &expr, ParamsScopeStack &scopes, size_t indent) {
+constantFoldCtorExpr(const CtorView &expr, ParamsScopeStack &scopes, size_t indent) {
+  auto typeName = expr->getTypeName();
+
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in Ctor expr" << expr << "\n");
-  if (!FoldableComponents.contains(expr.getTypeName())) {
+  if (!FoldableComponents.contains(typeName)) {
     LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Expr " << expr << " is not foldable\n");
-    return ConstExpr(expr);
+    return expr;
   }
 
-  if (expr.getTypeName() == "Neg") {
+  if (typeName == "Neg") {
     LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Folding Neg constructor\n");
-    assert(expr.arguments().size() == 1);
-    auto foldedArg = constantFoldExpr(expr.arguments()[0], scopes, indent + 2);
+    assert(expr->arguments().size() == 1);
+
+    auto foldedArg = constantFoldExpr(expr->arguments()[0], scopes, indent + 2);
     if (failed(foldedArg)) {
       LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Failed to fold\n");
       return failure();
     }
+
     LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Folded into " << *foldedArg << "\n");
     if (auto val = mlir::dyn_cast_if_present<ValExpr>(*foldedArg)) {
       LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Argument is a constant value\n");
-      auto newValue = foldNeg(val.getValue());
+      auto newValue = foldNeg(val->getValue());
       LLVM_DEBUG(spaces(indent + 1);
                  llvm::dbgs() << "Neg constructor folded into " << newValue << "\n");
       return ConstExpr::Val(newValue);
     }
+
     LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Argument is not a constant value\n");
-    return ConstExpr::Ctor(expr.getTypeName(), {*foldedArg});
+    return ConstExpr::Ctor(typeName, {*foldedArg});
   } else {
-    LLVM_DEBUG(spaces(indent + 1);
-               llvm::dbgs() << "Folding " << expr.getTypeName() << " constructor\n");
-    assert(expr.arguments().size() == 2);
-    auto foldedLhs = constantFoldExpr(expr.arguments()[0], scopes, indent + 2);
+    LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Folding " << typeName << " constructor\n");
+    assert(expr->arguments().size() == 2);
+
+    auto foldedLhs = constantFoldExpr(expr->arguments()[0], scopes, indent + 2);
     if (failed(foldedLhs)) {
       LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Failed to fold left hand side\n");
       return failure();
     }
     LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Folded lhs into " << *foldedLhs << "\n");
 
-    auto foldedRhs = constantFoldExpr(expr.arguments()[1], scopes, indent + 2);
+    auto foldedRhs = constantFoldExpr(expr->arguments()[1], scopes, indent + 2);
     if (failed(foldedRhs)) {
       LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Failed to fold right hand side\n");
       return failure();
@@ -357,58 +352,41 @@ constantFoldCtorExpr(const expr::detail::Ctor &expr, ParamsScopeStack &scopes, s
     auto rhsVal = mlir::dyn_cast_if_present<ValExpr>(*foldedRhs);
     if (lhsVal && rhsVal) {
       LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Arguments are both constant values\n");
-      auto newValue = foldBinaryOp(expr.getTypeName(), lhsVal.getValue(), rhsVal.getValue());
+      auto newValue = foldBinaryOp(typeName, lhsVal->getValue(), rhsVal->getValue());
       if (failed(newValue)) {
         LLVM_DEBUG(spaces(indent + 2);
                    llvm::dbgs()
                    << "Failed to fold constructor because the folder returned an invalid value\n");
         return failure();
       }
-      LLVM_DEBUG(spaces(indent + 1); llvm::dbgs()
-                                     << expr.getTypeName() << " constructor folded into "
-                                     << *newValue << "\n");
+      LLVM_DEBUG(spaces(indent + 1);
+                 llvm::dbgs() << typeName << " constructor folded into " << *newValue << "\n");
       return ConstExpr::Val(*newValue);
     }
+
     LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Arguments are not both constant values\n");
-    return ConstExpr::Ctor(expr.getTypeName(), {*foldedLhs, *foldedRhs});
+    return ConstExpr::Ctor(typeName, {*foldedLhs, *foldedRhs});
   }
+
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Unreachable case\n");
   return failure();
 }
 
 static FailureOr<ConstExpr>
-constantFoldCtorExpr(const CtorExpr &expr, ParamsScopeStack &scopes, size_t indent) {
-  return constantFoldCtorExpr(*expr, scopes, indent);
-}
-
-static FailureOr<ConstExpr>
-constantFoldExpr(const ExprBase &expr, ParamsScopeStack &scopes, size_t indent) {
-  LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Folding expression (ExprBase &) " << expr << "\n");
-  return llvm::TypeSwitch<const ExprBase *, FailureOr<ConstExpr>>(&expr)
-      .Case([&](const expr::detail::Val *val) { return constantFoldValExpr(*val, scopes, indent); })
-      .Case([&](const expr::detail::Symbol *sym) {
-    return constantFoldSymExpr(*sym, scopes, indent);
-  })
-      .Case([&](const expr::detail::Ctor *ctor) {
-    return constantFoldCtorExpr(*ctor, scopes, indent);
-  }).Default([](auto &) { return failure(); });
-}
-
-static FailureOr<ConstExpr>
-constantFoldExpr(ConstExpr expr, ParamsScopeStack &scopes, size_t indent) {
+constantFoldExpr(const ExprView &expr, ParamsScopeStack &scopes, size_t indent) {
   assert(bool(expr) && "Attempted to fold empty ConstExpr");
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Folding expression (ConstExpr) " << expr << "\n");
-  if (auto val = mlir::dyn_cast<ValExpr>(expr)) {
+  if (auto val = mlir::dyn_cast<ValView>(expr)) {
     LLVM_DEBUG(spaces(indent); llvm::dbgs() << " Folding ValExpr\n");
     return constantFoldValExpr(val, scopes, indent);
   }
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << " Is not a ValExpr\n");
-  if (auto sym = mlir::dyn_cast<SymExpr>(expr)) {
+  if (auto sym = mlir::dyn_cast<SymbolView>(expr)) {
     LLVM_DEBUG(spaces(indent); llvm::dbgs() << " Folding SymExpr\n");
     return constantFoldSymExpr(sym, scopes, indent);
   }
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << " Is not a SymExpr\n");
-  if (auto ctor = mlir::dyn_cast<CtorExpr>(expr)) {
+  if (auto ctor = mlir::dyn_cast<CtorView>(expr)) {
     LLVM_DEBUG(spaces(indent); llvm::dbgs() << " Folding CtorExpr\n");
     return constantFoldCtorExpr(ctor, scopes, indent);
   }
@@ -468,7 +446,7 @@ static LogicalResult propagateConstants(
         // If the expression folded to a constant then extract the value and replace the binding
         // with a Const one.
         paramBinding =
-            bindings.Const(mlir::cast<ValExpr>(*folded).getValue(), paramBinding.getLocation());
+            bindings.Const(mlir::cast<ValExpr>(*folded)->getValue(), paramBinding.getLocation());
       } else {
         paramBinding.setConstExpr(*folded);
       }

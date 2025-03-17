@@ -55,7 +55,7 @@ inline bool isSemiAffine(const TypeBinding &binding) { return binding.hasConstEx
 inline bool isSymbolOrConst(const TypeBinding &binding) {
   return isSemiAffine(binding) &&
          (mlir::isa<expr::ValExpr, expr::SymExpr>(binding.getConstExpr()) ||
-          mlir::cast<expr::CtorExpr>(binding.getConstExpr()).getTypeName() == "Neg");
+          mlir::cast<expr::CtorExpr>(binding.getConstExpr())->getTypeName() == "Neg");
 }
 
 inline bool isIntLit(const TypeBinding &binding) {
