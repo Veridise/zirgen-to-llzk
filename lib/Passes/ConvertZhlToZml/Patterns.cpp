@@ -961,7 +961,12 @@ template <typename T> static T &slot(const FailureOr<TypeBinding> &b) {
 
 namespace {
 
+/// Holds the results of type checking a ReduceOp operation.
 struct Bindings {
+  // - op: The ReduceOp operation
+  // - input: The array expression that gets reduced
+  // - inputInner: The inner type of `input`
+  // - acc: The accumulator component's type
   FailureOr<TypeBinding> op, input, inputInner, acc;
 };
 

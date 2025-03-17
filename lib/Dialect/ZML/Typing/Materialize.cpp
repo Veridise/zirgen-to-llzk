@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <iterator>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <llvm/Support/Debug.h>
+#include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <unordered_set>
@@ -54,21 +56,17 @@ private:
     return base;
   }
 
-  SmallVector<Attribute, 2> materializeGenericParamNames(const TypeBinding &binding) {
-    SmallVector<Attribute, 2> params;
+  SmallVector<Attribute> materializeGenericParamNames(const TypeBinding &binding) {
     auto names = binding.getGenericParamNames();
-    params.reserve(names.size());
-    std::transform(names.begin(), names.end(), std::back_inserter(params), [&](const auto &name) {
+    return llvm::map_to_vector(names, [&](const auto &name) -> Attribute {
       return SymbolRefAttr::get(StringAttr::get(context, name));
     });
-    return params;
   }
 
   Attribute materializeAttribute(const TypeBinding &binding) {
     // Special case for constants that do not have a known value
     if (binding.isConst() && !binding.isKnownConst()) {
-      auto intAttr =
-          mlir::IntegerAttr::get(mlir::IntegerType::get(context, 64), mlir::ShapedType::kDynamic);
+      auto intAttr = IntegerAttr::get(IntegerType::get(context, 64), ShapedType::kDynamic);
       LLVM_DEBUG(
           llvm::dbgs() << "<== Materializing " << binding << " to IntegerAttr: " << intAttr << "\n"
       );
@@ -91,7 +89,7 @@ private:
       return symAttr;
     }
     if (binding.hasConstExpr()) {
-      mlir::Builder builder(context);
+      Builder builder(context);
       auto attrResult = binding.getConstExpr().convertIntoAttribute(builder);
       LLVM_DEBUG(
           llvm::dbgs() << "<== Materializing " << binding << " to Attribute: " << attrResult << "\n"
@@ -99,7 +97,7 @@ private:
       return attrResult;
     }
 
-    auto typeAttr = mlir::TypeAttr::get(materializeImpl(binding));
+    auto typeAttr = TypeAttr::get(materializeImpl(binding));
     LLVM_DEBUG(
         llvm::dbgs() << "<== Materializing " << binding << " to TypeAttr: " << typeAttr << "\n"
     );
@@ -134,14 +132,11 @@ private:
             context, SymbolRefAttr::get(StringAttr::get(context, binding.getGenericParamName()))
         );
       }
-      if (binding.getSuperType().isVal()) {
+      if (binding.getSuperType().isVal() || binding.getSuperType().isTransitivelyVal()) {
         LLVM_DEBUG(llvm::dbgs() << "<== Materializing " << binding << " to Val\n");
         return ComponentType::Val(context);
       }
-      if (binding.getSuperType().isTransitivelyVal()) {
-        LLVM_DEBUG(llvm::dbgs() << "<== Materializing " << binding << " to Val\n");
-        return ComponentType::Val(context);
-      }
+
       assert(false && "Generic param that is neither Val or Type");
     }
     auto superType = materializeImpl(binding.getSuperType());
@@ -191,11 +186,9 @@ static Type specializeAndMaterializeTypeBinding(
 
   // Make a copy to assign the params to
   auto copy = binding;
-  LogicalResult result = failure();
   ParamsScopeStack scopeStack(scope);
-  result = zhl::specializeTypeBinding(&copy, scopeStack, bindings);
 
-  if (failed(result)) {
+  if (failed(zhl::specializeTypeBinding(&copy, scopeStack, bindings))) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to specialize binding " << binding << "\n");
     return nullptr;
   }

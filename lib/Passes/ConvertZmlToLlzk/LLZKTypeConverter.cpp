@@ -22,7 +22,7 @@
 using namespace llzk;
 using namespace mlir;
 
-std::optional<mlir::Value> unrealizedCastMaterialization(
+static std::optional<mlir::Value> unrealizedCastMaterialization(
     mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs, mlir::Location loc
 ) {
 
@@ -30,7 +30,7 @@ std::optional<mlir::Value> unrealizedCastMaterialization(
   return builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs).getResult(0);
 }
 
-mlir::Type deduceArrayType(mlir::Attribute attr) {
+static mlir::Type deduceArrayType(mlir::Attribute attr) {
   LLVM_DEBUG(llvm::dbgs() << "deduceArrayType(" << attr << ")\n");
   if (auto typeAttr = mlir::dyn_cast<mlir::TypeAttr>(attr)) {
     return typeAttr.getValue();
@@ -39,14 +39,7 @@ mlir::Type deduceArrayType(mlir::Attribute attr) {
   return nullptr;
 }
 
-bool arrayLenIsKnown(mlir::Attribute attr) { return mlir::isa<mlir::IntegerAttr>(attr); }
-
-int64_t getSize(mlir::Attribute attr) {
-  auto intAttr = mlir::cast<mlir::IntegerAttr>(attr);
-  return intAttr.getValue().getZExtValue();
-}
-
-template <typename Attr> Attribute convert(Attr);
+template <typename Attr> static Attribute convert(Attr);
 
 template <> Attribute convert(zml::ConstExprAttr attr) {
   return mlir::AffineMapAttr::get(attr.getMap());
@@ -54,9 +47,9 @@ template <> Attribute convert(zml::ConstExprAttr attr) {
 
 template <> Attribute convert(zml::LiftedExprAttr attr) { return attr.getSymbol(); }
 
-template <typename Attr> Attribute pass(Attr a) { return a; }
+template <typename Attr> static Attribute pass(Attr a) { return a; }
 
-SmallVector<Attribute>
+static SmallVector<Attribute>
 convertParamAttrs(ArrayRef<mlir::Attribute> in, LLZKTypeConverter &converter) {
   return llvm::map_to_vector(in, [&](mlir::Attribute attr) -> mlir::Attribute {
     return llvm::TypeSwitch<Attribute, Attribute>(attr)
@@ -69,7 +62,7 @@ convertParamAttrs(ArrayRef<mlir::Attribute> in, LLZKTypeConverter &converter) {
   });
 }
 
-mlir::Attribute getSizeAttr(mlir::Attribute attr) {
+static mlir::Attribute getSizeAttr(mlir::Attribute attr) {
   LLVM_DEBUG(llvm::dbgs() << "getSizeSym(" << attr << ")\n");
   return llvm::TypeSwitch<Attribute, Attribute>(attr)
       .Case(pass<SymbolRefAttr>)
@@ -80,12 +73,6 @@ mlir::Attribute getSizeAttr(mlir::Attribute attr) {
     llvm_unreachable("was expecting a symbol, number, or an affine expression");
     return nullptr;
   });
-}
-
-bool arrayLenIsAffineMap(Attribute attr) { return mlir::isa<zml::ConstExprAttr>(attr); }
-
-AffineMapAttr getSizeMap(Attribute attr) {
-  return AffineMapAttr::get(mlir::cast<zml::ConstExprAttr>(attr).getMap());
 }
 
 llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)

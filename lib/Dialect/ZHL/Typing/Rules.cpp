@@ -432,7 +432,7 @@ inline LogicalResult checkSpecializationArg(
   auto &paramSuperType = paramType.getSuperType();
   bool paramIsVal = paramSuperType.isVal();
   bool paramIsType = paramSuperType.isTypeMarker();
-  if (!(paramIsVal || paramIsType)) {
+  if (!paramIsVal && !paramIsType) {
     return emitError() << "generic param that is neither 'Val' nor 'Type': '" << paramType
                        << "' (super type: '" << paramSuperType << "')";
   }
