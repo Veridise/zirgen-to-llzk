@@ -1,0 +1,10 @@
+// RUN: zklang -o - %s --emit=zml | FileCheck %s --check-prefix=ZML
+
+// ZML-LABEL: zml.component @Top
+component Top() {
+  x := Reg(2);
+// COM: If the value assigned to the variable has memory then it must read the variable by its given name
+// ZML: %{{[0-9a-zA-Z_\.]+}} = zml.read_back %{{[0-9a-zA-Z_\.]+}}[@x] at %{{[0-9a-zA-Z_\.]+}} 
+// ZML-SAME: <@Top false : !zml.comp<@Component true>>, <@Val true : !zml.comp<@Component true>>, !zml.comp<@Reg false : !zml.comp<@NondetReg true : !zml.comp<@Val true : !zml.comp<@Component true>>>>
+  x@1 = 2;
+}

@@ -220,6 +220,18 @@ def GetGlobalOp
   }];
 }
 
+def ReadBackOp : ZMLOp<"read_back"> {
+  let summary = "reads a back variable";
+
+  let arguments = (ins Component:$comp, Component:$distance,
+      SymbolNameAttr:$field);
+  let results = (outs TypeVarOr<Component>:$result);
+
+  let assemblyFormat =
+      "$comp `[` $field `]` `at` $distance `:` type($comp) `,` "
+      "type($distance) `,` type($result) attr-dict";
+}
+
 def ConstrainCallOp : ZMLOp<"constrain_call"> {
   let summary = "calls the constrain function";
 

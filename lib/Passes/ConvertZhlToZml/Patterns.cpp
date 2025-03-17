@@ -1113,3 +1113,56 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
 
   return success();
 }
+
+LogicalResult ZhlBackLowering::matchAndRewrite(
+    Zhl::BackOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  auto binding = getType(op);
+  if (failed(binding)) {
+    return op->emitError() << "failed to type check";
+  }
+
+  auto trgBinding = getType(op.getTarget());
+  if (failed(trgBinding)) {
+    return op->emitError() << "failed to type check target";
+  }
+
+  auto distBinding = getType(op.getDistance());
+  if (failed(distBinding)) {
+    return op->emitError() << "failed to type check distance expression";
+  }
+
+  auto target = getCastedValue(adaptor.getTarget(), *trgBinding, rewriter);
+  auto self = op->getParentOfType<SelfOp>();
+  assert(self);
+  FlatSymbolRefAttr fieldName;
+  Type slotType;
+  if (auto *trgSlot = mlir::dyn_cast_if_present<ComponentSlot>(trgBinding->getSlot())) {
+    // If the target has memory then load the field data that represents the slot
+    slotType = materializeTypeBinding(getContext(), trgSlot->getBinding());
+    fieldName = FlatSymbolRefAttr::get(rewriter.getStringAttr(trgSlot->getSlotName()));
+
+  } else {
+    // If the target does not have memory then the binding of this op must have memory. Use it to
+    // allocated a field and write into it.
+    auto *slot = mlir::dyn_cast_if_present<ComponentSlot>(binding->getSlot());
+    assert(slot);
+    auto comp = op->getParentOfType<ComponentInterface>();
+    assert(comp);
+    slotType = materializeTypeBinding(getContext(), slot->getBinding());
+    fieldName = createSlot(slot, rewriter, comp, op.getLoc());
+    storeSlot(
+        *slot, target, fieldName, slotType, op.getLoc(), comp.getType(), rewriter,
+        self.getSelfValue()
+    );
+  }
+  auto dist = getCastedValue(
+      adaptor.getDistance(), *distBinding, rewriter, ComponentType::Val(getContext())
+  );
+
+  rewriter.replaceOpWithNewOp<ReadBackOp>(
+      op, slotType, self.getSelfValue(), dist, fieldName.getValue()
+  );
+
+  return success();
+}

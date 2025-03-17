@@ -1,3 +1,4 @@
+#include <llvm/Support/Debug.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
@@ -38,7 +39,7 @@ bool calleeIsBuiltin(mlir::Operation *op) {
   return false;
 }
 
-#define DEBUG_TYPE "zml-create-slot"
+#define DEBUG_TYPE "zml-slot-helpers"
 
 FlatSymbolRefAttr createSlot(
     zhl::ComponentSlot *slot, OpBuilder &builder, ComponentInterface component, Location loc
@@ -63,8 +64,6 @@ FlatSymbolRefAttr createSlot(
   slot->rename(name.getValue());
   return mlir::FlatSymbolRefAttr::get(component.getContext(), name);
 }
-
-#undef DEBUG_TYPE
 
 TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
   if (count == 0) {
@@ -111,6 +110,10 @@ void storeSlot(
   auto compSlotIVs = slot.collectIVs();
 
   if (compSlotIVs.empty()) {
+    LLVM_DEBUG(
+        llvm::dbgs() << "slotType == " << slotType << " | value.getType() == " << value.getType()
+                     << "\n"
+    );
     assert(slotType == value.getType() && "result of construction and slot type must be the same");
     // Write the construction in a temporary
     builder.create<WriteFieldOp>(loc, self, slotName, value);
@@ -151,6 +154,8 @@ Value storeAndLoadArraySlot(
   // Read the value we wrote into the array back to a SSA value
   return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, ivs);
 }
+
+#undef DEBUG_TYPE
 
 void materializeFieldTypes(
     zhl::TypeBinding &binding, MLIRContext *ctx, SmallVectorImpl<Type> &types,

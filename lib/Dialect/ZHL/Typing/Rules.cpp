@@ -436,8 +436,21 @@ mlir::FailureOr<TypeBinding> BackTypeRule::
   if (operands.size() < 2) {
     return mlir::failure();
   }
-  // TODO: Check that distance is a subtype of Val
-  return operands[1];
+  if (failed(operands[0].subtypeOf(getBindings().Get("Val")))) {
+    return op->emitError() << "back-variable expression expects a distance of type 'Val', but got '"
+                           << operands[0] << "'";
+  }
+
+  auto copy = operands[1];
+  if (operands[1].getSlot()) {
+    // If the operand already has memory remove it from the copy to avoid duplicating.
+    copy.markSlot(nullptr);
+  } else {
+    // If the operand does not have memory allocate a slot so we can store the results for later
+    // retrival.
+    scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), copy);
+  }
+  return copy;
 }
 
 mlir::FailureOr<TypeBinding> RangeTypeRule::

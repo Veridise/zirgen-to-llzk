@@ -408,4 +408,12 @@ public:
       const override;
 };
 
+class ZhlBackLowering : public ZhlOpLoweringPattern<zirgen::Zhl::BackOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::BackOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::BackOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 } // namespace zml

@@ -73,9 +73,8 @@ void ConvertZhlToZmlPass::runOnOperation() {
       ZhlConstrainLowering, ZhlLookupLowering, ZhlArrayLowering, ZhlSubscriptLowering,
       ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
       ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
-      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval>(
-      typeAnalysis, typeConverter, ctx
-  );
+      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval,
+      ZhlBackLowering>(typeAnalysis, typeConverter, ctx);
   patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
     builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
   }, typeAnalysis, typeConverter, ctx);

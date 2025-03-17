@@ -1,0 +1,9 @@
+// RUN: zklang -o - %s --emit=zml | FileCheck %s --check-prefix=ZML
+
+// ZML-LABEL: zml.component @Top
+component Top() {
+  x := 2;
+// COM: If the value assigned to the variable does not have memory then it creates a temporary
+// ZML: %{{[0-9a-zA-Z_\.]+}} = zml.read_back %{{[0-9a-zA-Z_\.]+}}[@"${{temp[0-9_]*}}"] at %{{[0-9a-zA-Z_\.]+}} : <@Top false : !zml.comp<@Component true>>, <@Val true : !zml.comp<@Component true>>, !zml.comp<@Val true : !zml.comp<@Component true>>
+  x@1 = 2;
+}
