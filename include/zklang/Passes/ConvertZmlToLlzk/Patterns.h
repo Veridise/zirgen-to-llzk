@@ -29,6 +29,14 @@ public:
   matchAndRewrite(LitValOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LitStrOpLowering : public mlir::OpConversionPattern<LitStrOp> {
+public:
+  using OpConversionPattern<LitStrOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(LitStrOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 class ComponentLowering : public mlir::OpConversionPattern<SplitComponentOp> {
 public:
   using OpConversionPattern<SplitComponentOp>::OpConversionPattern;

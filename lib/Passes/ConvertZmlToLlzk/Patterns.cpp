@@ -39,6 +39,13 @@ mlir::LogicalResult LitValOpLowering::matchAndRewrite(
   return mlir::success();
 }
 
+LogicalResult LitStrOpLowering::matchAndRewrite(
+    LitStrOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  rewriter.replaceOpWithNewOp<llzk::LitStringOp>(op, adaptor.getValue());
+  return success();
+}
+
 mlir::LogicalResult ComponentLowering::matchAndRewrite(
     SplitComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
