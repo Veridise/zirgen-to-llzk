@@ -70,12 +70,7 @@ public:
   /// reference to the same name. This is done for propagating type renames to all bindings that
   /// reference the same type.
   class Name {
-    struct Impl {
-      Impl(mlir::StringRef nameRef) : name(nameRef) {}
-
-      llvm::SmallString<10> name;
-    };
-
+    using Impl = llvm::SmallString<10>;
     std::shared_ptr<Impl> impl;
 
   public:
@@ -88,17 +83,17 @@ public:
     ~Name() = default;
 
     Name &operator=(mlir::StringRef newName) {
-      impl->name = newName;
+      impl = std::make_shared<Impl>(newName);
       return *this;
     }
 
-    operator mlir::StringRef() const { return impl->name; }
+    operator mlir::StringRef() const { return *impl; }
 
     bool operator==(const Name &other) const { return ref() == other.ref(); }
 
     bool operator==(mlir::StringRef other) const { return ref() == other; }
 
-    mlir::StringRef ref() const { return impl->name; }
+    mlir::StringRef ref() const { return *impl; }
 
     friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const Name &);
   };

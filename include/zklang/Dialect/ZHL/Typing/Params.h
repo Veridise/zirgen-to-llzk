@@ -24,6 +24,14 @@ using ParamName = std::string;
 using ParamsList = mlir::SmallVector<TypeBinding, 0>;
 using ParamNames = mlir::SmallVector<ParamName>;
 
+/// Configuration for the print methods.
+struct ParamsPrintCfg {
+  bool fullPrintout = false;
+  char printIfEmpty = false;
+  char header = '<';
+  char footer = '>';
+};
+
 class Params {
 public:
   using iterator = mlir::ArrayRef<TypeBinding>::const_iterator;
@@ -58,15 +66,15 @@ public:
   const TypeBinding *operator[](mlir::StringRef name) const;
 
   /// Prints the parameters as a map from the names to the type bindings into the output stream.
-  void printMapping(llvm::raw_ostream &os, bool fullPrintout = false) const;
+  /// Uses PrintCfg::fullPrintout and ignores the rest of the passed configuration.
+  void printMapping(llvm::raw_ostream &os, ParamsPrintCfg cfg = {}) const;
 
   /// Prints the names of the parameters into the output stream.
-  void printNames(llvm::raw_ostream &os, char header = '<', char footer = '>') const;
+  /// Ignores PrintCfg::fullPrintout.
+  void printNames(llvm::raw_ostream &os, ParamsPrintCfg cfg = {}) const;
 
   /// Prints the type bindings of the parameters into the output stream.
-  void printParams(
-      llvm::raw_ostream &os, bool fullPrintout = false, char header = '<', char footer = '>'
-  ) const;
+  void printParams(llvm::raw_ostream &os, ParamsPrintCfg cfg = {}) const;
 
   iterator begin() const;
   iterator end() const;

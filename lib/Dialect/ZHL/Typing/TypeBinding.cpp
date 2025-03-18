@@ -305,12 +305,14 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   auto printType = [&]() {
     os << name.ref();
     if (specialized) {
-      getGenericParamsMapping().printParams(os, false);
+      getGenericParamsMapping().printParams(os, {.fullPrintout = false});
     } else {
       getGenericParamsMapping().printNames(os);
     }
     if (fullPrintout) {
-      getConstructorParams().printParams(os, false, '(', ')');
+      getConstructorParams().printParams(
+          os, {.fullPrintout = false, .printIfEmpty = true, .header = '(', .footer = ')'}
+      );
     }
     if (variadic) {
       os << "...";

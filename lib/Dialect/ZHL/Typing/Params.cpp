@@ -110,27 +110,25 @@ static void printHelper(It it, llvm::raw_ostream &os, UnaryFn fn, Side header, S
   os << footer;
 }
 
-void Params::printMapping(llvm::raw_ostream &os, bool fullPrintout) const {
-  if (!empty()) {
-    printHelper(llvm::zip_equal(data()->names, data()->params), os, [&](auto tup) {
-      auto [name, param] = tup;
-      os << name << ": ";
-      param.print(os, fullPrintout);
-    }, "{ ", " }");
+void Params::printMapping(llvm::raw_ostream &os, ParamsPrintCfg cfg) const {
+  printHelper(llvm::zip_equal(data()->names, data()->params), os, [&](auto tup) {
+    auto [name, param] = tup;
+    os << name << ": ";
+    param.print(os, cfg.fullPrintout);
+  }, "{ ", " }");
+}
+
+void Params::printNames(llvm::raw_ostream &os, ParamsPrintCfg cfg) const {
+  if (!empty() || cfg.printIfEmpty) {
+    printHelper(data()->names, os, [&](const auto &e) { os << e; }, cfg.header, cfg.footer);
   }
 }
 
-void Params::printNames(llvm::raw_ostream &os, char header, char footer) const {
-  if (!empty()) {
-    printHelper(data()->names, os, [&](const auto &e) { os << e; }, header, footer);
-  }
-}
-
-void Params::printParams(llvm::raw_ostream &os, bool fullPrintout, char header, char footer) const {
-  if (!empty()) {
+void Params::printParams(llvm::raw_ostream &os, ParamsPrintCfg cfg) const {
+  if (!empty() || cfg.printIfEmpty) {
     printHelper(data()->params, os, [&](const auto &e) {
-      e.print(os, fullPrintout);
-    }, header, footer);
+      e.print(os, cfg.fullPrintout);
+    }, cfg.header, cfg.footer);
   }
 }
 
