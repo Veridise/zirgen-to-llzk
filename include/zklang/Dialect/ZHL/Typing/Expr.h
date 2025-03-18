@@ -82,7 +82,7 @@ public:
   const detail::ExprBase *operator->() const { return get(); }
 
   /// Returns true if the view points to a valid object.
-  operator bool() const { return operator->() != nullptr; }
+  operator bool() const { return get() != nullptr; }
 
   /// Clones the underlying expression and returns it wrapped in an adaptor of the same type.
   ConstExpr clone() const;
