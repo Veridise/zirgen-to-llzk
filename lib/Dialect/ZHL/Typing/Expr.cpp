@@ -305,29 +305,6 @@ const ExprBase &Ctor::Arguments::operator[](size_t offset) const {
 // Stream overloads
 //==-----------------------------------------------------------------------==//
 
-// template <typename T>
-// static void printNullable(llvm::raw_ostream &os, const T &t, StringRef nullMsg = "<<NULL>>") {
-//   if (t) {
-//     t->print(os);
-//   } else {
-//     os << nullMsg;
-//   }
-// }
-//
-// llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ConstExpr &expr) {
-//   printNullable(os, expr);
-//   return os;
-// }
-//
-// llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ValExpr &expr) {
-//   printNullable(os, expr);
-//   return os;
-// }
-//
-// llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SymExpr &expr) {
-//   printNullable(os, expr);
-//   return os;
-// }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ExprView &expr) {
   if (expr) {
