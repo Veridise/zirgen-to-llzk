@@ -106,7 +106,7 @@ public:
   /// Returns the name of the type.
   mlir::StringRef getName() const { return name.ref(); }
 
-  /// Sets the name of the type and of any type it shares it's name with.
+  /// Sets the name of the type and of any type it shares its name with.
   void setName(mlir::StringRef);
 
   //==---------------------------------------------------------------------==//
