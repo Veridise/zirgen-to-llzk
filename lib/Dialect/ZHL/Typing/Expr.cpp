@@ -42,8 +42,8 @@ ConstExpr ExprView::clone() const {
 }
 
 bool ExprView::operator==(const detail::ExprBase &other) const {
-  if (auto *expr = operator->()) {
-    return expr->operator==(other);
+  if (auto *expr = get()) {
+    return *expr == other;
   }
   return false;
 }
