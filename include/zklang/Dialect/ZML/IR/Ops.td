@@ -109,15 +109,35 @@ def ConstructorRefOp : ZMLOp<"constructor", [Pure]> {
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$component, UnitAttr:$builtin);
+  let arguments = (ins FlatSymbolRefAttr:$component, IndexAttr:$numLiftedParams,
+      UnitAttr:$builtin);
   let results = (outs FunctionType);
   let assemblyFormat = "attr-dict $component `:` type(results)";
 
-  let builders = [OpBuilder<(ins "ComponentInterface":$comp,
-                      "mlir::FunctionType":$fn)>,
-                  OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
-                      "mlir::FunctionType":$fn, "bool":$isBuiltin)>];
+  let builders =
+      [OpBuilder<(ins "ComponentInterface":$comp, "uint64_t":$liftedParams,
+           "mlir::FunctionType":$fn)>,
+       OpBuilder<(ins "ComponentInterface":$comp, "mlir::FunctionType":$fn)>,
+       OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
+           "uint64_t":$liftedParams, "mlir::FunctionType":$fn,
+           "bool":$isBuiltin)>,
+       OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
+           "mlir::FunctionType":$fn, "bool":$isBuiltin)>,
 
+       OpBuilder<(ins "mlir::StringRef":$compSym, "uint64_t":$liftedParams,
+                     "mlir::FunctionType":$fn, "bool":$isBuiltin),
+                 [{
+        build($_builder, $_state, mlir::SymbolRefAttr::get($_builder.getStringAttr(compSym)), liftedParams, fn, isBuiltin);
+       }]>,
+       OpBuilder<(ins "mlir::StringRef":$compSym, "mlir::FunctionType":$fn,
+                     "bool":$isBuiltin),
+                 [{
+        build($_builder, $_state, compSym, 0, fn, isBuiltin);
+       }]>,
+
+  ];
+
+  let skipDefaultBuilders = 1;
   let extraClassDeclaration = [{
     /// Returns true if can be built with the given value
     /// and result type.
@@ -185,6 +205,8 @@ def SuperCoerceOp : ZMLOp<"super_coerce"> {
 
   let assemblyFormat =
       "$component attr-dict `:` type($component) `->` type($val)";
+
+  let hasVerifier = 1;
 }
 
 def NopOp : ZMLOp<"nop", [Pure]> {

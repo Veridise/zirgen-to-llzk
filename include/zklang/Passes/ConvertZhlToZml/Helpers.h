@@ -58,10 +58,8 @@ mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentType> v, ml
 /// The super type's value is provided with a lazy callback that will get called iff the function
 /// knowns it will succeed. This makes safe to create operations and other conversion modifications
 /// for obtaining the value of the super type.
-mlir::FailureOr<mlir::Value> constructPODComponent(
-    mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self,
-    llvm::function_ref<mlir::Value()> superTypeValueCb
-);
+mlir::FailureOr<mlir::Value>
+constructPODComponent(mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self, llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &);
 
 /// Creates a component used to represent a closure. This component will have a constructor that
 /// takes as input the values for all fields including the super type's value.
@@ -74,12 +72,12 @@ class CtorCallBuilder {
 public:
   static mlir::FailureOr<CtorCallBuilder> Make(
       mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
-      mlir::OpBuilder &builder, mlir::Value self
+      mlir::OpBuilder &builder, mlir::Value self, const zhl::TypeBindings &bindings
   );
 
   static mlir::FailureOr<CtorCallBuilder> Make(
       mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
-      mlir::Value self
+      mlir::Value self, const zhl::TypeBindings &bindings
   );
 
   /// Generates the ops that represent the construction of a component. Fetches a reference to

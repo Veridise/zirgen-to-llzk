@@ -91,7 +91,7 @@ public:
 /// type.
 mlir::FunctionType injectBVFunctionParams(
     const BVDialectHelper &, mlir::FunctionType, unsigned offset = 0,
-    std::vector<mlir::Location> *locs = nullptr
+    llvm::SmallVectorImpl<mlir::Location> *locs = nullptr
 );
 
 /// Returns the values of the back-variables given to a function.

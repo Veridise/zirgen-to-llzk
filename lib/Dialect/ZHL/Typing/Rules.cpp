@@ -1,3 +1,5 @@
+#include <llvm/ADT/bit.h>
+#include <llvm/Support/Debug.h>
 #include <mlir/Support/LogicalResult.h>
 #include <numeric>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
@@ -6,7 +8,10 @@
 #include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
+#include <zklang/Dialect/ZHL/Typing/Interpreter.h>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
 #include <zklang/Dialect/ZHL/Typing/Rules.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 
@@ -16,17 +21,20 @@ namespace zhl {
 
 using namespace zirgen::Zhl;
 using namespace mlir;
+using namespace expr::interpreter;
 
 mlir::FailureOr<TypeBinding> LiteralTypingRule::
     typeCheck(zirgen::Zhl::LiteralOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  return getBindings().Const(op.getValue());
+  return interpretOp(op, getBindings().Const(op.getValue()));
 }
+
 mlir::FailureOr<TypeBinding> StringTypingRule::
     typeCheck(zirgen::Zhl::StringOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  return getBindings().Get("String");
+  return interpretOp(op, getBindings().Get("String"));
 }
+
 mlir::FailureOr<TypeBinding> GlobalTypingRule::
     typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -34,19 +42,50 @@ mlir::FailureOr<TypeBinding> GlobalTypingRule::
   if (mlir::failed(binding)) {
     return op->emitError() << "type '" << op.getName() << "' was not found";
   }
-  return binding;
+  return interpretOp(op, *binding);
 }
+
+// If the type we are going to declare as constructor parameter has a parameter that would
+// generate an AffineMap (i.e. a CtorExpr) then we declare a new generic parameter that has the
+// type of the binding that would generate the AffineMap and replace it in the type with a
+// variable that points to the binding.
+
+static void liftCtorExpressions(TypeBinding &binding, Scope &scope) {
+  if (mlir::isa<expr::CtorExpr>(binding.getConstExpr())) {
+    binding = scope.declareLiftedAffineToGenericParam(binding);
+    return;
+  }
+
+  assert(binding.isSpecialized());
+  for (auto &param : binding.getGenericParams()) {
+    liftCtorExpressions(param, scope);
+  }
+}
+
 mlir::FailureOr<TypeBinding> ParameterTypingRule::
     typeCheck(zirgen::Zhl::ConstructorParamOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
     return mlir::failure();
   }
-  auto arg = (op.getVariadic() ? TypeBinding::WrapVariadic(operands[0]) : operands[0])
-                 .WithUpdatedLocation(op.getLoc());
-  scope.declareConstructorParam(op.getName(), op.getIndex(), arg);
-  return arg;
+  auto &arg = operands[0];
+  if (!arg.isSpecialized()) {
+    return op->emitError() << "cannot use on non-concrete type '" << arg
+                           << "' as component argument #" << op.getIndex();
+  }
+  if (arg.hasConstExpr()) {
+    return op->emitError() << "cannot use a constant expression as parameter type";
+  }
+  auto interpretdArg = interpretOp(
+      op, TypeBinding::WithUpdatedLocation(
+              op.getVariadic() ? TypeBinding::WrapVariadic(arg) : arg, op.getLoc()
+          )
+  );
+  liftCtorExpressions(interpretdArg, scope);
+  scope.declareConstructorParam(op.getName(), op.getIndex(), interpretdArg);
+  return interpretdArg;
 }
+
 mlir::FailureOr<TypeBinding> ExternTypingRule::
     typeCheck(zirgen::Zhl::ExternOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -54,8 +93,9 @@ mlir::FailureOr<TypeBinding> ExternTypingRule::
     return mlir::failure();
   }
   scope.isExtern();
-  return operands[0];
+  return interpretOp(op, operands[0]);
 }
+
 mlir::FailureOr<TypeBinding> ConstructTypingRule::
     typeCheck(zirgen::Zhl::ConstructOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -68,12 +108,13 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
   if (operands[0].isBuiltin() && zml::isBuiltinDontNeedAlloc(operands[0].getName())) {
-    return operands[0];
+    return interpretOp(op, operands[0], operands.drop_front());
   }
-  auto component = operands[0];
+  auto component = interpretOp(op, operands[0], operands.drop_front());
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
   return component;
 }
+
 mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
     typeCheck(zirgen::Zhl::GetGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -81,8 +122,9 @@ mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
   if (operands.empty()) {
     return mlir::failure();
   }
-  return operands[0];
+  return interpretOp(op, operands[0]);
 }
+
 mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
     typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
@@ -90,7 +132,7 @@ mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
   if (operands.empty()) {
     return mlir::failure();
   }
-  return operands[0];
+  return interpretOp(op, operands[0]);
 }
 
 mlir::FailureOr<TypeBinding> SuperTypingRule::
@@ -99,7 +141,8 @@ mlir::FailureOr<TypeBinding> SuperTypingRule::
   if (operands.empty()) {
     return mlir::failure();
   }
-  scope.declareSuperType(operands[0]);
+  auto super = interpretOp(op, operands[0]);
+  scope.declareSuperType(super);
   // If this super is the terminator of a block we create a type that represents it.
   if (mlir::isa<BlockOp>(op->getParentOp()) && scope.memberCount() > 0) {
     auto blockBinding = scope.createBinding("block$", op->getParentOp()->getLoc());
@@ -108,7 +151,7 @@ mlir::FailureOr<TypeBinding> SuperTypingRule::
     return blockBinding;
   }
 
-  return operands[0];
+  return super;
 }
 
 mlir::FailureOr<TypeBinding> DeclareTypingRule::
@@ -116,9 +159,9 @@ mlir::FailureOr<TypeBinding> DeclareTypingRule::
         const {
   if (operands.empty()) {
     scope.declareMember(op.getMember());
-    return getBindings().Bottom();
+    return interpretOp(op, getBindings().Bottom());
   }
-  auto binding = operands[0]; // Make a copy for marking the slot
+  auto binding = interpretOp(op, operands[0]); // Make a copy for marking the slot
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(
       getBindings(), binding, op.getMember()
   ); // Allocate a named slot with the declared type
@@ -257,6 +300,9 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
                            << operands[1] << "'";
   }
 
+  auto interpretdOperand0 = interpretOp(op, operands[0]);
+  auto interpretdOperand1 = interpretOp(op, operands[1]);
+
   LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Validation passed\n");
   auto *declSlot = operands[0].getSlot();
   auto *exprSlot = operands[1].getSlot();
@@ -299,34 +345,34 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     // this rule does not link to a slot since the expression op already does.
     if (declBinding == exprBinding) {
       LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 2\n");
-      scope.declareMember(decl->getMember(), operands[1]);
-      return maybeUpdateExprSlot(operands[1]);
+      scope.declareMember(decl->getMember(), interpretdOperand1);
+      return maybeUpdateExprSlot(interpretdOperand1);
     }
 
     // Case 1: In this case the result of this rule is a copy of the type binding of the declaration
     // op. The slot allocated by the expression needs to be maintained to avoid losing the type
     // information.
     LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 1\n");
-    return copyWithoutSlot(operands[0]);
+    return copyWithoutSlot(interpretdOperand0);
   }
 
   // Case 3: The result is a copy of the type binding of the declaration op.
   if (declSlot) {
     LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 3\n");
-    return copyWithoutSlot(operands[0]);
+    return copyWithoutSlot(interpretdOperand0);
   }
 
   // Case 4: Rename the slot with the name of the member.
   if (exprSlot) {
     LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 4\n");
-    scope.declareMember(decl->getMember(), operands[1]);
-    return maybeUpdateExprSlot(operands[1]);
+    scope.declareMember(decl->getMember(), interpretdOperand1);
+    return maybeUpdateExprSlot(interpretdOperand1);
   }
 
   // Case 5: Allocate a slot of the type binding of the expression and the name of the member.
   // Return a type binding that links to the allocated slot.
   LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Case 5\n");
-  auto binding = operands[1];
+  auto binding = interpretdOperand1;
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), binding, decl->getMember());
   scope.declareMember(decl->getMember(), binding);
   return binding;
@@ -349,14 +395,14 @@ mlir::FailureOr<TypeBinding> ConstrainTypeRule::
       return op.emitError()
              << "constraint operands have Array supertype but it could not be deduced";
     }
-    return leastCommonArray;
+    return interpretOp(op, *leastCommonArray);
   }
   auto &Val = getBindings().Get("Val");
   if (succeeded(leastCommon.subtypeOf(Val))) {
-    return Val;
+    return interpretOp(op, Val);
   }
 
-  return getBindings().Component();
+  return interpretOp(op, getBindings().Component());
 }
 
 mlir::FailureOr<TypeBinding> GenericParamTypeRule::
@@ -366,10 +412,94 @@ mlir::FailureOr<TypeBinding> GenericParamTypeRule::
     return mlir::failure();
   }
 
-  auto param = TypeBinding::MakeGenericParam(getBindings().Manage(operands[0]), op.getName());
+  auto param = interpretOp(
+      op, TypeBinding::MakeGenericParam(getBindings().Manage(operands[0]), op.getName())
+  );
   scope.declareGenericParam(op.getName(), op.getIndex(), param);
   return param;
 }
+
+namespace {
+
+/// Checks that the source value and type binding are valid for the parameter they are going to
+/// specialize.
+inline LogicalResult checkSpecializationArg(
+    Value value, const TypeBinding &type, const TypeBinding &paramType,
+    llvm::function_ref<InFlightDiagnostic()> emitError
+) {
+  if (!paramType.isGenericParam()) {
+    return emitError() << "non generic param type";
+  }
+  auto &paramSuperType = paramType.getSuperType();
+  bool paramIsVal = paramSuperType.isVal();
+  bool paramIsType = paramSuperType.isTypeMarker();
+  if (!paramIsVal && !paramIsType) {
+    return emitError() << "generic param that is neither 'Val' nor 'Type': '" << paramType
+                       << "' (super type: '" << paramSuperType << "')";
+  }
+  // The Value must come from a closed set of operations
+  auto op = value.getDefiningOp();
+  if (!mlir::isa_and_present<TypeParamOp, LiteralOp, SpecializeOp, GlobalOp, ConstructOp>(op)) {
+    return emitError() << "was expecting a type, literal value, constant expression or generic "
+                          "parameter, but got a value";
+  }
+  // If it comes from a TypeParamOp depends on the type of the generic param.
+  //  If it's Type then TypeParamOp's binding must not have a ConstExpr
+  //  If it's Val then TypeParamOp's binding must have a ConstExpr
+  if (mlir::isa<TypeParamOp>(op)) {
+    auto hasCE = type.hasConstExpr();
+    if (paramIsVal && hasCE) {
+      return success();
+    }
+    if (paramIsVal && !hasCE) {
+      return emitError() << "parameter '" << paramType
+                         << "' of type 'Val' expects a parameter of the same type, but got '"
+                         << type.getSuperType() << "'";
+    }
+    if (paramIsType && !hasCE) {
+      return success();
+    }
+    if (paramIsType && hasCE) {
+      return emitError() << "parameter '" << paramType
+                         << "' of type 'Type' expects a parameter of the same type, but got '"
+                         << type.getSuperType() << "'";
+    }
+  }
+  // If it comes from a LiteralOp then the type of the generic param must be Val
+  if (mlir::isa<LiteralOp>(op)) {
+    if (!paramIsVal) {
+      return emitError() << "parameter '" << paramType
+                         << "' was expecting a constant 'Val' but got '" << type << "'";
+    }
+    return success();
+  }
+
+  // If it comes from a SpecializeOp or a GlobalOp the type of the generic param must be Type
+  if (mlir::isa<SpecializeOp, GlobalOp>(op)) {
+    if (!paramIsType) {
+      return emitError() << "parameter '" << paramType << "' was expecting a type but got '" << type
+                         << "'";
+    }
+    return success();
+  }
+
+  // If it comes from a ConstructOp the type of the generic param must be Val and the type of the op
+  // must have a ConstExpr
+  if (mlir::isa<ConstructOp>(op)) {
+    if (!paramIsVal) {
+      return emitError() << "parameter '" << paramType
+                         << "' was expecting a type but got an expression";
+    }
+    if (!type.hasConstExpr()) {
+      return op->emitError() << "expression is not constant";
+    }
+    return success();
+  }
+  llvm_unreachable("Exhausted all possible options for valid type arguments");
+  return failure();
+}
+
+} // namespace
 
 mlir::FailureOr<TypeBinding> SpecializeTypeRule::
     typeCheck(zirgen::Zhl::SpecializeOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
@@ -378,24 +508,33 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
     return mlir::failure();
   }
 
-  auto I = op.getArgs().begin();
-  auto E = op.getArgs().end();
+  if (operands[0].isSpecialized()) {
+    return op->emitError() << "type '" << operands[0] << "' cannot be specialized";
+  }
+
+  assert(op.getArgs().size() == operands.size() - 1);
+
+  auto genericParams = operands[0].getDeclaredGenericParams();
+  if (op.getArgs().size() != genericParams.size()) {
+    return op->emitError() << "type '" << operands[0] << "' expects " << genericParams.size()
+                           << " generic parameters but got " << op.getArgs().size();
+  }
+
   bool failed = false;
-  for (; I != E; ++I) {
-    auto argOp = (*I).getDefiningOp();
-    assert(argOp && "cannot have values that do not come from operations in ZHL");
-    if (!mlir::isa<TypeParamOp, LiteralOp, SpecializeOp, GlobalOp>(argOp)) {
-      op->emitError() << "was expecting a type, a literal value or a generic parameter, but got "
-                      << argOp->getName().stripDialect();
-      failed = true;
-    }
+  for (auto [argValue, argBinding, param] :
+       llvm::zip_equal(op.getArgs(), operands.drop_front(), genericParams)) {
+    failed = failed || mlir::failed(checkSpecializationArg(argValue, argBinding, param, [&]() {
+      return op->emitError();
+    }));
   }
   if (failed) {
     return failure();
   }
 
   auto typeToSpecialize = operands[0];
-  return typeToSpecialize.specialize([&]() { return op->emitOpError(); }, operands.drop_front());
+  return interpretOp(op, typeToSpecialize.specialize([&]() {
+    return op->emitOpError();
+  }, operands.drop_front(), getBindings()));
 }
 
 mlir::FailureOr<TypeBinding> SubscriptTypeRule::
@@ -405,7 +544,7 @@ mlir::FailureOr<TypeBinding> SubscriptTypeRule::
     return mlir::failure();
   }
 
-  return operands[0].getArrayElement([&]() { return op->emitOpError(); });
+  return interpretOp(op, operands[0].getArrayElement([&]() { return op->emitError(); }));
 }
 
 mlir::FailureOr<TypeBinding> ArrayTypeRule::
@@ -415,20 +554,13 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
     return op->emitOpError() << "could not infer the type of the array";
   }
 
-  auto get = [](const TypeBinding &t) -> const TypeBinding & {
-    if (t.isKnownConst()) {
-      return t.getSuperType();
-    }
-    return t;
-  };
-
-  auto &fst = get(operands.front());
+  auto &fst = operands.front();
   auto commonType =
       std::reduce(operands.drop_front().begin(), operands.end(), fst, [&](auto &lhs, auto &rhs) {
-    return get(lhs).commonSupertypeWith(get(rhs));
+    return lhs.commonSupertypeWith(rhs);
   });
 
-  return getBindings().Array(commonType, operands.size());
+  return interpretOp(op, getBindings().Array(commonType, operands.size()));
 }
 
 mlir::FailureOr<TypeBinding> BackTypeRule::
@@ -442,7 +574,7 @@ mlir::FailureOr<TypeBinding> BackTypeRule::
                            << operands[0] << "'";
   }
 
-  auto copy = operands[1];
+  auto copy = interpretOp(op, operands[1]);
   if (operands[1].getSlot()) {
     // If the operand already has memory remove it from the copy to avoid duplicating.
     copy.markSlot(nullptr);
@@ -477,27 +609,55 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
     if (operands[1].getConst() < operands[0].getConst()) {
       return op->emitError() << "right side of range must be greater or equal than the left side";
     }
-    return getBindings().Array(common, operands[1].getConst() - operands[0].getConst());
+    return interpretOp(
+        op, getBindings().Array(common, operands[1].getConst() - operands[0].getConst())
+    );
   }
-  return getBindings().UnkArray(common);
+  if (operands[0].hasConstExpr() && operands[1].hasConstExpr()) {
+    auto size = TypeBinding::WithExpr(
+        getBindings().Get("Val"),
+        expr::ConstExpr::Ctor("Sub", {operands[1].getConstExpr(), operands[0].getConstExpr()})
+    );
+    return interpretOp(op, getBindings().Array(common, size));
+  }
+  return interpretOp(op, getBindings().UnkArray(common));
 }
 
 mlir::FailureOr<TypeBinding> ReduceTypeRule::
     typeCheck(zirgen::Zhl::ReduceOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 3) {
-    return mlir::failure();
+    return failure();
   }
-  // TODO: Validation that operands[0] is an array
-  // TODO: Validation that the inner type of the array is a subtype of the first argument of
-  // operands[2]
-  // TODO: Validation that the init type is a subtype of the second arguments of operands[2]
 
-  // If the init value is a constant then return its super type (Val)
-  if (operands[1].isConst()) {
-    return operands[1].getSuperType();
+  if (!operands[0].isArray()) {
+    return op->emitError() << "reduce expression expects an array, but got '" << operands[0] << "'";
   }
-  return operands[1];
+  auto ctorParams = operands[2].getConstructorParams();
+  if (ctorParams.size() != 2) {
+    return op->emitError() << "accumulator must be accept 2 constructor arguments, but '"
+                           << operands[2] << "' expects " << ctorParams.size();
+  }
+
+  auto innerType = operands[0].getArrayElement([&] { return op->emitError(); });
+  if (failed(innerType)) {
+    return failure();
+  }
+  if (failed(innerType->subtypeOf(ctorParams.getParam(1)))) {
+    return op->emitError() << "argument #1 '" << ctorParams.getName(1) << "' of type '"
+                           << ctorParams.getParam(1) << "' is not a valid super type for '"
+                           << *innerType << "'";
+  }
+
+  auto output = operands[1].commonSupertypeWith(operands[2]);
+  if (failed(output.subtypeOf(ctorParams.getParam(0)))) {
+    return op->emitError() << "argument #0 '" << ctorParams.getName(0) << "' of type '"
+                           << ctorParams.getParam(0)
+                           << "' is not a valid super type for reduce expression result type '"
+                           << output << "'";
+  }
+
+  return interpretOp(op, output);
 }
 
 mlir::FailureOr<Frame> ReduceTypeRule::allocate(Frame frame) const {
@@ -511,7 +671,7 @@ mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
     return mlir::failure();
   }
 
-  return operands[1];
+  return interpretOp(op, operands[1]);
 }
 
 FailureOr<TypeBinding> BlockTypeRule::typeCheck(
@@ -525,6 +685,7 @@ FailureOr<TypeBinding> BlockTypeRule::typeCheck(
   if (failed(super)) {
     return op->emitOpError() << "could not deduce type of block because couldn't get super type";
   }
+  super = interpretOp(op, super);
   auto binding = TypeBinding::WithoutClosure(*super);
   binding.markSlot(nullptr);
   return binding;
@@ -541,14 +702,17 @@ FailureOr<TypeBinding> SwitchTypeRule::typeCheck(
     return failure();
   }
   // TODO: Allocate a frame for the switch arms
-  return std::transform_reduce(
-      regionScopes.begin(), regionScopes.end(), FailureOr<TypeBinding>(getBindings().Bottom()),
-      [](FailureOr<TypeBinding> a, FailureOr<TypeBinding> b) -> FailureOr<TypeBinding> {
+  return interpretOp(
+      op,
+      std::transform_reduce(
+          regionScopes.begin(), regionScopes.end(), FailureOr<TypeBinding>(getBindings().Bottom()),
+          [](FailureOr<TypeBinding> a, FailureOr<TypeBinding> b) -> FailureOr<TypeBinding> {
     if (failed(a) || failed(b)) {
       return failure();
     }
     return a->commonSupertypeWith(*b);
   }, [](const Scope *armScope) { return armScope->getSuperType(); }
+      )
   );
 }
 
@@ -572,7 +736,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return failure();
   }
 
-  assert(arrayLen->isConst());
+  assert(arrayLen->isConst() || arrayLen->hasConstExpr());
 
   assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
@@ -580,7 +744,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return op->emitOpError() << "failed to deduce the super type";
   }
 
-  auto binding = getBindings().Array(*super, *arrayLen, op.getLoc());
+  auto binding = interpretOp(op, getBindings().Array(*super, *arrayLen, op.getLoc()));
   if (auto slot = scope.getCurrentFrame().getParentSlot()) {
     if (auto compSlot = dyn_cast<ComponentSlot>(slot)) {
       LLVM_DEBUG(
@@ -635,13 +799,12 @@ FailureOr<TypeBinding> LookupTypeRule::
   }
   auto &comp = operands[0];
 
-  return comp.getMember(op.getMember(), [&]() { return op->emitError(); });
+  return interpretOp(op, comp.getMember(op.getMember(), [&]() { return op->emitError(); }));
 }
 
-FailureOr<TypeBinding>
-DirectiveTypeRule::typeCheck(DirectiveOp, ArrayRef<TypeBinding>, Scope &, ArrayRef<const Scope *>)
-    const {
-  return getBindings().Component();
+FailureOr<TypeBinding> DirectiveTypeRule::
+    typeCheck(DirectiveOp op, ArrayRef<TypeBinding>, Scope &, ArrayRef<const Scope *>) const {
+  return interpretOp(op, getBindings().Component());
 }
 
 } // namespace zhl

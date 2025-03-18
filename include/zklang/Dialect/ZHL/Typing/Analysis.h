@@ -30,6 +30,8 @@ public:
 
   operator mlir::LogicalResult() const;
 
+  void emitRemarks() const;
+
   class Impl;
 
 private:

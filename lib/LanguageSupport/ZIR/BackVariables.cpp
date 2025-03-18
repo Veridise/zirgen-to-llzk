@@ -1,4 +1,5 @@
 #include <cassert>
+#include <llvm/ADT/SmallVector.h>
 #include <memory>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
@@ -29,7 +30,7 @@ template <typename Col> Col::iterator computeIterator(Col &col, unsigned offset)
 
 mlir::FunctionType lang::zir::injectBVFunctionParams(
     const BVDialectHelper &provider, mlir::FunctionType fn, unsigned offset,
-    std::vector<mlir::Location> *locs
+    llvm::SmallVectorImpl<mlir::Location> *locs
 ) {
   assert(fn.getNumResults() == 1);
   assert(offset <= fn.getNumInputs());

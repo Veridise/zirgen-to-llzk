@@ -14,10 +14,12 @@
 
 namespace zml {
 
+using Identifier = mlir::SmallString<10>;
+
 class ComponentBuilder {
 private:
   struct Field {
-    std::string_view name;
+    Identifier name;
     mlir::Type type;
     std::optional<mlir::Location> loc;
   };
@@ -31,12 +33,12 @@ private:
 
   struct Ctx {
     std::optional<mlir::Location> loc;
-    std::string_view compName;
-    std::vector<Field> fields;
-    mlir::ArrayRef<mlir::NamedAttribute> compAttrs;
-    std::vector<mlir::StringRef> typeParams;
+    Identifier compName;
+    mlir::SmallVector<Field> fields;
+    mlir::SmallVector<mlir::NamedAttribute> compAttrs;
+    mlir::SmallVector<Identifier> typeParams;
     mlir::FunctionType constructorType = nullptr;
-    std::vector<mlir::Location> argLocs;
+    mlir::SmallVector<mlir::Location> argLocs;
     std::unique_ptr<BodySrc> body;
     std::function<void(ComponentOp)> deferCb = nullptr;
     bool isBuiltin = false;
@@ -55,9 +57,9 @@ private:
 
     void addBody(ComponentOp op, mlir::OpBuilder &builder);
 
-    std::vector<mlir::NamedAttribute> funcBodyAttrs(mlir::OpBuilder &builder);
+    mlir::SmallVector<mlir::NamedAttribute> funcBodyAttrs(mlir::OpBuilder &builder);
 
-    std::vector<mlir::NamedAttribute> builtinAttrs(mlir::OpBuilder &builder);
+    mlir::SmallVector<mlir::NamedAttribute> builtinAttrs(mlir::OpBuilder &builder);
   };
 
   class TakeRegion : public BodySrc {
@@ -103,15 +105,15 @@ public:
   );
 
   ComponentBuilder &
-  constructor(mlir::FunctionType constructorType, std::vector<mlir::Location> argLocs);
+  constructor(mlir::FunctionType constructorType, mlir::ArrayRef<mlir::Location> argLocs);
 
   ComponentBuilder &location(mlir::Location loc);
 
-  ComponentBuilder &name(std::string_view name);
+  ComponentBuilder &name(mlir::StringRef name);
 
-  ComponentBuilder &field(std::string_view name, mlir::Type type, mlir::Location loc);
+  ComponentBuilder &field(mlir::StringRef name, mlir::Type type, mlir::Location loc);
 
-  ComponentBuilder &field(std::string_view name, mlir::Type type);
+  ComponentBuilder &field(mlir::StringRef name, mlir::Type type);
 
   ComponentBuilder &attrs(mlir::ArrayRef<mlir::NamedAttribute> attrs);
 

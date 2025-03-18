@@ -8,5 +8,9 @@ target_sources(ZIRC PRIVATE
   TypeBindingSpecialization.cpp 
   Typing.cpp 
   Frame.cpp
+  Expr.cpp
+  TypeBinding.cpp
+  Params.cpp
+  Interpreter.cpp
 )
 
