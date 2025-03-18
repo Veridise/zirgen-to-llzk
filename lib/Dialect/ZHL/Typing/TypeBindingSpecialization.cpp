@@ -577,7 +577,7 @@ mlir::LogicalResult zhl::specializeTypeBinding(
 mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
     EmitErrorFn emitError, mlir::ArrayRef<TypeBinding> params, TypeBindings &bindings
 ) const {
-  if (specialized) {
+  if (flags.isSpecialized()) {
     return emitError() << "can't respecialize type '" << getName() << "'";
   }
   auto declaredParamsSize = getGenericParamsMapping().sizeOfDeclared();

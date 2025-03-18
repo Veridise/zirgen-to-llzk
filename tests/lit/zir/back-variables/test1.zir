@@ -1,9 +1,40 @@
-// RUN: zklang -o - %s --emit=zml | FileCheck %s --check-prefix=ZML
+// RUN: zklang -o - %s  | FileCheck %s --enable-var-scope
 
-// ZML-LABEL: zml.component @Top
 component Top() {
   x := 2;
-// COM: If the value assigned to the variable does not have memory then it creates a temporary
-// ZML: %{{[0-9a-zA-Z_\.]+}} = zml.read_back %{{[0-9a-zA-Z_\.]+}}[@"${{temp[0-9_]*}}"] at %{{[0-9a-zA-Z_\.]+}} : <@Top false : !zml.comp<@Component true>>, <@Val true : !zml.comp<@Component true>>, !zml.comp<@Val true : !zml.comp<@Component true>>
   x@1 = 2;
 }
+
+// CHECK-LABEL: llzk.struct @Top<[]> {
+//       CHECK:    field @"$super" : !llzk.struct<@Component<[]>>
+//       CHECK:    field @"$temp_0" : !llzk.struct<@Component<[]>>
+//       CHECK:    field @"$temp" : !llzk.felt
+//       CHECK:    field @x : !llzk.felt
+// CHECK-LABEL:    func @compute
+//  CHECK-SAME:                 (%[[A0:[0-9a-zA-Z_.]+]]: !llzk.array<128 x !llzk.struct<@Top<[]>>>, %[[A1:[0-9a-zA-Z_.]+]]: index) -> !llzk.struct<@Top<[]>> {
+//       CHECK:      %[[T0:[0-9a-zA-Z_.]+]] = new_struct : <@Top<[]>>
+//       CHECK:      %[[T2:[0-9a-zA-Z_.]+]] = constfelt  2
+//       CHECK:      writef %[[T0]][@x] = %[[T2]] : <@Top<[]>>, !llzk.felt
+//       CHECK:      writef %[[T0]][@"$temp"] = %[[T2]] : <@Top<[]>>, !llzk.felt
+//       CHECK:      %[[T1:[0-9a-zA-Z_.]+]] = constfelt  2
+//       CHECK:      %[[T12:[0-9a-zA-Z_.]+]] = call @Component::@compute() : () -> !llzk.struct<@Component<[]>> 
+//       CHECK:      writef %[[T0]][@"$temp_0"] = %[[T12]] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      %[[T13:[0-9a-zA-Z_.]+]] = readf %[[T0]][@"$temp_0"] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      writef %[[T0]][@"$super"] = %[[T13]] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      return %[[T0]] : !llzk.struct<@Top<[]>>
+//       CHECK:    }
+// CHECK-LABEL:    func @constrain
+//  CHECK-SAME:                   (%[[A0:[0-9a-zA-Z_.]+]]: !llzk.struct<@Top<[]>>, %[[A1:[0-9a-zA-Z_.]+]]: !llzk.array<128 x !llzk.struct<@Top<[]>>>, %[[A2:[0-9a-zA-Z_.]+]]: index) {
+//       CHECK:      %[[T26:[0-9a-zA-Z_.]+]] = constfelt  1
+//       CHECK:      %[[T23:[0-9a-zA-Z_.]+]] = tofelt %[[A2]] : index
+//       CHECK:      %[[T24:[0-9a-zA-Z_.]+]] = sub %[[T23]], %[[T26]] : !llzk.felt, !llzk.felt
+//       CHECK:      %[[T25:[0-9a-zA-Z_.]+]] = toindex %[[T24]]
+//       CHECK:      %[[T4:[0-9a-zA-Z_.]+]] = readarr %[[A1]][%[[T25]]] : <128 x !llzk.struct<@Top<[]>>>, !llzk.struct<@Top<[]>>
+//       CHECK:      %[[T5:[0-9a-zA-Z_.]+]] = readf %[[T4]][@"$temp"] : <@Top<[]>>, !llzk.felt
+//       CHECK:      %[[T1:[0-9a-zA-Z_.]+]] = constfelt  2
+//       CHECK:      emit_eq %[[T5]], %[[T1]] : !llzk.felt, !llzk.felt
+//       CHECK:      %[[T12:[0-9a-zA-Z_.]+]] = readf %[[A0]][@"$temp_0"] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      call @Component::@constrain(%[[T12]]) : (!llzk.struct<@Component<[]>>) -> () 
+//       CHECK:      return
+//       CHECK:    }
+//       CHECK:  }

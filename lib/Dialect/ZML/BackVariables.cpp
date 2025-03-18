@@ -42,3 +42,22 @@ Type ZML_BVDialectHelper::deduceComponentType(FunctionOpInterface func) const {
   assert(func.getNumResults() == 1);
   return func.getResultTypes().front();
 }
+
+Value ZML_BVDialectHelper::subtractValues(Value lhs, Value rhs, OpBuilder &builder, Location loc)
+    const {
+  auto Index = IndexType::get(lhs.getContext());
+  auto Val = ComponentType::Val(lhs.getContext());
+
+  auto castToVal = [&](Value v) -> Value {
+    if (v.getType() == Val) {
+      return v;
+    }
+    if (v.getType() == Index) {
+      return builder.create<IndexToValOp>(loc, Val, v);
+    }
+    return builder.create<SuperCoerceOp>(loc, Val, v);
+  };
+
+  Value result = builder.create<SubOp>(loc, Val, castToVal(lhs), castToVal(rhs));
+  return builder.create<ValToIndexOp>(loc, result);
+}

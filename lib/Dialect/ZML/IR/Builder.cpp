@@ -48,7 +48,10 @@ void ComponentBuilder::Ctx::checkBareRequirements() {
   assert(loc.has_value());
   assert(!compName.empty());
   assert((isBuiltin || isClosure) == compAttrs.empty());
-  assert(isBuiltin != usesBackVariables);
+  // If the component is a builtin it cannot use back-variables.
+  if (isBuiltin) {
+    assert(!usesBackVariables);
+  }
 }
 
 ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {

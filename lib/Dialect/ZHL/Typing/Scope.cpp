@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSet.h>
 #include <mlir/Support/LLVM.h>
@@ -72,8 +73,11 @@ TypeBinding ComponentScope::createBinding(StringRef name, Location loc) const {
         paramName, paramData.Type, paramData.Pos + nGenericParams, paramData.Injected
     );
   }
+  TypeBinding::Flags flags;
+  flags.setExtern(extern_);
   return bindings->Create(
-      name, loc, bindings->Manage(*superType), genericParamsCopy, constructorParams, members, frame
+      name, loc, bindings->Manage(*superType), genericParamsCopy, constructorParams, members, flags,
+      frame
   );
 }
 

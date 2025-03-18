@@ -1,5 +1,7 @@
 #include <cassert>
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/Support/Debug.h>
 #include <memory>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
@@ -54,6 +56,10 @@ mlir::FunctionType lang::zir::injectBVFunctionParams(
   return builder.getFunctionType(inputs, fn.getResults());
 }
 
+ArrayRef<Type> lang::zir::hideInjectedBVTypes(ArrayRef<Type> types) {
+  return types.drop_front(BVConstants::ADDED_ARGS);
+}
+
 BVValues lang::zir::loadBVValues(
     const BVDialectHelper &helper, mlir::FunctionOpInterface func, unsigned offset
 ) {
@@ -68,8 +74,6 @@ BVValues lang::zir::loadMemoryForField(
     BVValues &parentValues, mlir::FlatSymbolRefAttr fieldName, Type fieldType,
     const BVDialectHelper &provider, mlir::OpBuilder &builder, Location loc
 ) {
-  // auto fieldType = provider.getFieldType(fieldName, field);
-  // assert(fieldType);
   auto memType = provider.getMemType(fieldType);
   assert(memType);
 
@@ -100,5 +104,15 @@ BVValues lang::zir::loadMemoryForField(
 void lang::zir::injectBVArgs(
     BVValues &BV, mlir::SmallVectorImpl<mlir::Value> &args, unsigned offset
 ) {
-  args.insert(std::next(args.begin(), offset + 1), {BV.impl->Memory, BV.impl->CycleCount});
+  args.insert(computeIterator(args, offset), {BV.impl->Memory, BV.impl->CycleCount});
+}
+
+Value lang::zir::readBackVariable(
+    BVValues &BV, FlatSymbolRefAttr fieldName, Type fieldType, Value distance,
+    const BVDialectHelper &helper, OpBuilder &builder, Location loc
+) {
+
+  auto offset = helper.subtractValues(BV.impl->CycleCount, distance, builder, loc);
+  auto arrValue = helper.readArray(BV.impl->Component, BV.impl->Memory, offset, builder, loc);
+  return helper.readField(fieldType, fieldName, arrValue, builder, loc);
 }

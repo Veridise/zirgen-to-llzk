@@ -312,9 +312,7 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   bool usesBackVariables = calleeUsesBackVariablesHelper(calleeComp);
   if (usesBackVariables) {
     ZML_BVDialectHelper TP;
-    llvm::dbgs() << *calleeComp << " uses back variables\n";
     constructorType = lang::zir::injectBVFunctionParams(TP, constructorType);
-    llvm::dbgs() << "Its constructor type is therefore: " << constructorType << "\n";
   }
 
   return CtorCallBuilder(
@@ -325,11 +323,6 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
 
 mlir::Value
 CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args) {
-  auto buildPrologue = [&](mlir::Value v) {
-    builder.create<ConstrainCallOp>(loc, v, args);
-    return v;
-  };
-
   SmallVector<Value> argValues(args);
   auto genericParams = compBinding.getGenericParamsMapping();
   auto ref = builder.create<ConstructorRefOp>(
@@ -346,8 +339,6 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
     auto parentBV = lang::zir::loadBVValues(TP, func);
     FlatSymbolRefAttr fieldName =
         FlatSymbolRefAttr::get(builder.getStringAttr(slot->getSlotName()));
-    llvm::dbgs() << "fieldName = " << fieldName << "\n";
-    llvm::dbgs() << "\n\n\n\n" << callerComponentOp << "\n";
     auto BV = lang::zir::loadMemoryForField(
         parentBV, fieldName, materializeTypeBinding(builder.getContext(), compBinding), TP, builder,
         loc
@@ -358,6 +349,10 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, argValues);
   Value compValue = call.getResult(0);
 
+  auto buildPrologue = [&](mlir::Value v) {
+    builder.create<ConstrainCallOp>(loc, v, argValues);
+    return v;
+  };
   if (!compBinding.getSlot()) {
     return buildPrologue(compValue);
   }

@@ -193,10 +193,9 @@ public:
       const override;
 
 private:
-  void prepareArguments(
-      mlir::ValueRange, mlir::ArrayRef<mlir::Type>, mlir::Location,
-      mlir::ConversionPatternRewriter &, std::vector<mlir::Value> &, unsigned
-  ) const;
+  void
+  prepareArguments(mlir::ValueRange, mlir::ArrayRef<mlir::Type>, mlir::Location, mlir::ConversionPatternRewriter &, std::vector<mlir::Value> &)
+      const;
 
   mlir::Value
   prepareArgument(mlir::Value, mlir::Type, mlir::Location, mlir::ConversionPatternRewriter &) const;

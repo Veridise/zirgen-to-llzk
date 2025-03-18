@@ -106,11 +106,9 @@ inline bool validArgCount(bool isVariadic, size_t argCount, size_t formalsCount)
   return argCount == formalsCount;
 }
 
-inline bool isVariadic(mlir::ArrayRef<mlir::Type> ctorFormals) {
+static inline bool isVariadic(mlir::ArrayRef<mlir::Type> ctorFormals) {
   return !ctorFormals.empty() && mlir::isa<VarArgsType>(ctorFormals.back());
 }
-
-inline bool isVariadic(mlir::FunctionType fnType) { return isVariadic(fnType.getInputs()); }
 
 mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
     Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
@@ -121,16 +119,17 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   }
   auto &binding = ctor->getBinding();
   auto constructorType = ctor->getCtorType();
-  auto ctorFormalsCount = constructorType.getInputs().size();
+  auto ctorFormals = constructorType.getInputs();
   if (ctor->calleeUsesBackVariables()) {
-    ctorFormalsCount -= lang::zir::BVConstants::ADDDED_ARGS;
+    ctorFormals = lang::zir::hideInjectedBVTypes(ctorFormals);
   }
 
-  if (!validArgCount(isVariadic(constructorType), adaptor.getArgs().size(), ctorFormalsCount)) {
+  auto ctorFormalsCount = ctorFormals.size();
+  if (!validArgCount(isVariadic(ctorFormals), adaptor.getArgs().size(), ctorFormalsCount)) {
     // Depending if it's variadic or not the message changes a bit.
     StringRef expectingNArgsMsg =
-        isVariadic(constructorType) ? ", was expecting at least " : ", was expecting ";
-    auto minArgCount = isVariadic(constructorType) ? ctorFormalsCount - 1 : ctorFormalsCount;
+        isVariadic(ctorFormals) ? ", was expecting at least " : ", was expecting ";
+    auto minArgCount = isVariadic(ctorFormals) ? ctorFormalsCount - 1 : ctorFormalsCount;
     return op->emitOpError().append(
         "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
         minArgCount, " arguments but got ", adaptor.getArgs().size()
@@ -138,10 +137,7 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   }
 
   std::vector<mlir::Value> preparedArguments;
-  prepareArguments(
-      adaptor.getArgs(), constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments,
-      ctor->calleeUsesBackVariables() ? lang::zir::BVConstants::ADDDED_ARGS : 0
-  );
+  prepareArguments(adaptor.getArgs(), ctorFormals, op->getLoc(), rewriter, preparedArguments);
 
   auto result = ctor->build(rewriter, op.getLoc(), preparedArguments);
   rewriter.replaceOp(op, result);
@@ -170,8 +166,7 @@ computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> construc
 
 void ZhlConstructLowering::prepareArguments(
     mlir::ValueRange args, mlir::ArrayRef<mlir::Type> constructorTypes, mlir::Location loc,
-    mlir::ConversionPatternRewriter &rewriter, std::vector<mlir::Value> &preparedArgs,
-    unsigned backVariablesCorrection
+    mlir::ConversionPatternRewriter &rewriter, std::vector<mlir::Value> &preparedArgs
 ) const {
 
   preparedArgs.clear();
@@ -202,10 +197,7 @@ void ZhlConstructLowering::prepareArguments(
     preparedArgs.push_back(va);
   }
 
-  assert(
-      preparedArgs.size() == (constructorTypes.size() - backVariablesCorrection) &&
-      "incorrect number of arguments"
-  );
+  assert(preparedArgs.size() == constructorTypes.size() && "incorrect number of arguments");
 }
 
 mlir::Value ZhlConstructLowering::prepareArgument(
@@ -680,9 +672,15 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
   auto paramLocations = name->getConstructorParamLocations();
   auto ctorType = materializeTypeBindingConstructor(rewriter, *name, getTypeBindings());
 
-  if (true) {
+  if (!name->isExtern()) {
+    name->print(llvm::dbgs() << "Type binding ", true);
+    llvm::dbgs() << " is not extern!\n";
     ctorType = lang::zir::injectBVFunctionParams(TP, ctorType, 0, &paramLocations);
     builder.usesBackVariables();
+  } else {
+
+    name->print(llvm::dbgs() << "Type binding ", true);
+    llvm::dbgs() << " is  extern!\n";
   }
 
   builder.name(name->getName())
@@ -1253,9 +1251,11 @@ LogicalResult ZhlBackLowering::matchAndRewrite(
       adaptor.getDistance(), *distBinding, rewriter, ComponentType::Val(getContext())
   );
 
-  rewriter.replaceOpWithNewOp<ReadBackOp>(
-      op, slotType, self.getSelfValue(), dist, fieldName.getValue()
-  );
+  ZML_BVDialectHelper DH;
+  auto BV = lang::zir::loadBVValues(DH, op->getParentOfType<func::FuncOp>());
+  Value backVariable =
+      lang::zir::readBackVariable(BV, fieldName, slotType, dist, DH, rewriter, op.getLoc());
+  rewriter.replaceOp(op, backVariable);
 
   return success();
 }

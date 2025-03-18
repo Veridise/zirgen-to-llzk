@@ -273,13 +273,18 @@ FailureOr<TypeBinding> TypeBinding::getConcreteArrayType() const {
 }
 
 TypeBinding::TypeBinding(mlir::Location loc)
-    : builtin(true), name("Component"), loc(loc), superType(nullptr) {}
+    : flags(Flags::MkBuiltin(true)), name("Component"), loc(loc), superType(nullptr) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, Frame t_frame,
+    llvm::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, Frame Frame,
     bool isBuiltin
 )
-    : TypeBinding(name, loc, superType, {}, {}, {}, t_frame, isBuiltin) {}
+    : TypeBinding(Name, Loc, SuperType, Flags::MkBuiltin(isBuiltin), Frame) {}
+
+TypeBinding::TypeBinding(
+    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, Flags Flags, Frame Frame
+)
+    : TypeBinding(Name, Loc, SuperType, {}, {}, {}, Flags, Frame) {}
 
 TypeBinding::TypeBinding(
     llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
@@ -288,23 +293,42 @@ TypeBinding::TypeBinding(
     : TypeBinding(name, loc, superType, t_genericParams, {}, {}, t_frame, isBuiltin) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-    ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members, Frame t_frame,
-    bool isBuiltin
+    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
+    Flags Flags, Frame Frame
 )
-    : builtin(isBuiltin), name(name), loc(loc), superType(&superType), members(members),
-      genericParams(t_genericParams), constructorParams(t_constructorParams), frame(t_frame) {}
+    : TypeBinding(Name, Loc, SuperType, GenericParams, {}, {}, Flags, Frame) {}
 
 TypeBinding::TypeBinding(
-    uint64_t value, mlir::Location loc, const TypeBindings &bindings, bool isBuiltin
+    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
+    ParamsMap ConstructorParams, MembersMap Members, Frame Frame, bool IsBuiltin
 )
-    : builtin(isBuiltin), name(CONST), loc(loc), constExpr(expr::ConstExpr::Val(value)),
-      superType(&bindings.Get("Val")) {}
+    : TypeBinding(
+          Name, Loc, SuperType, GenericParams, ConstructorParams, Members,
+          Flags::MkBuiltin(IsBuiltin), Frame
+      ) {}
+
+TypeBinding::TypeBinding(
+    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
+    ParamsMap ConstructorParams, MembersMap Members, Flags Flags, Frame Frame
+)
+    : flags(Flags), name(Name), loc(Loc), superType(&SuperType), members(Members),
+      genericParams(GenericParams), constructorParams(ConstructorParams), frame(Frame) {}
+
+TypeBinding::TypeBinding(
+    uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, bool IsBuiltin
+)
+    : TypeBinding(Value, Loc, Bindings, Flags::MkBuiltin(IsBuiltin)) {}
+
+TypeBinding::TypeBinding(
+    uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, Flags Flags
+)
+    : flags(Flags), name(CONST), loc(Loc), constExpr(expr::ConstExpr::Val(Value)),
+      superType(&Bindings.Get("Val")) {}
 
 void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   auto printType = [&]() {
     os << name.ref();
-    if (specialized) {
+    if (flags.isSpecialized()) {
       getGenericParamsMapping().printParams(os, {.fullPrintout = false});
     } else {
       getGenericParamsMapping().printNames(os);
@@ -314,7 +338,7 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
           os, {.fullPrintout = false, .printIfEmpty = true, .header = '(', .footer = ')'}
       );
     }
-    if (variadic) {
+    if (flags.isVariadic()) {
       os << "...";
     }
   };
@@ -345,20 +369,23 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   }
   if (fullPrintout) {
     os << " { ";
-    if (variadic) {
+    if (flags.isVariadic()) {
       os << "variadic ";
     }
-    if (specialized) {
+    if (flags.isSpecialized()) {
       os << "specialized ";
     }
-    if (selfConstructor) {
+    if (flags.isSelfConstructor()) {
       os << "selfConstructor ";
     }
-    if (builtin) {
+    if (flags.isBuiltin()) {
       os << "builtin ";
     }
-    if (closure) {
+    if (flags.isClosure()) {
       os << "closure ";
+    }
+    if (flags.isExtern()) {
+      os << "extern ";
     }
     if (hasConstValue(constExpr)) {
       os << "const(" << getConstValue(constExpr) << ") ";
@@ -395,10 +422,10 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
 }
 
 void TypeBinding::selfConstructs() {
-  if (selfConstructor) {
+  if (flags.isSelfConstructor()) {
     return;
   }
-  selfConstructor = true;
+  flags.setSelfConstructor(true);
   constructorParams = ParamsMap().declare("x", *this);
 }
 
@@ -412,11 +439,9 @@ bool TypeBinding::operator==(const TypeBinding &other) const {
     superTypeIsEqual = *superType == *other.superType;
   }
 
-  return superTypeIsEqual && variadic == other.variadic && specialized == other.specialized &&
-         selfConstructor == other.selfConstructor && builtin == other.builtin &&
-         name == other.name && constExpr == other.constExpr &&
-         genericParamName == other.genericParamName && members == other.members &&
-         getGenericParamsMapping() == other.getGenericParamsMapping() &&
+  return superTypeIsEqual && flags == other.flags && name == other.name &&
+         constExpr == other.constExpr && genericParamName == other.genericParamName &&
+         members == other.members && getGenericParamsMapping() == other.getGenericParamsMapping() &&
          getConstructorParams() == other.getConstructorParams();
 }
 

@@ -11,6 +11,7 @@
 #include <mlir/IR/Types.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Interfaces/FunctionInterfaces.h>
+#include <mlir/Support/LLVM.h>
 
 namespace lang::zir {
 
@@ -32,7 +33,7 @@ struct BVConstants {
   static constexpr uint8_t CYCLE_ARG_NO = 1;
 
   /// Number of added arguments to support back-variables in a function.
-  static constexpr uint8_t ADDDED_ARGS = 2;
+  static constexpr uint8_t ADDED_ARGS = 2;
 };
 
 /// Pure virtual class that defines an interface for generating types of a concrete dialect.
@@ -70,6 +71,10 @@ public:
 
   /// Given a function returns the type that represents the component
   virtual mlir::Type deduceComponentType(mlir::FunctionOpInterface) const = 0;
+
+  /// Creates ops to subtract two values.
+  virtual mlir::Value
+  subtractValues(mlir::Value lhs, mlir::Value rhs, mlir::OpBuilder &, mlir::Location) const = 0;
 };
 
 /// Opaque struct that holds the values required to support back-variables.
@@ -94,6 +99,9 @@ mlir::FunctionType injectBVFunctionParams(
     llvm::SmallVectorImpl<mlir::Location> *locs = nullptr
 );
 
+/// Returns a new ArrayRef that hides the injected back-variable types.
+mlir::ArrayRef<mlir::Type> hideInjectedBVTypes(mlir::ArrayRef<mlir::Type>);
+
 /// Returns the values of the back-variables given to a function.
 BVValues loadBVValues(const BVDialectHelper &, mlir::FunctionOpInterface, unsigned offset = 0);
 
@@ -106,5 +114,11 @@ BVValues loadMemoryForField(
 
 /// Inserts the memory and cycle values into a list of arguments
 void injectBVArgs(BVValues &, mlir::SmallVectorImpl<mlir::Value> &args, unsigned offset = 0);
+
+/// Creates instructions to read a back-variable.
+mlir::Value readBackVariable(
+    BVValues &, mlir::FlatSymbolRefAttr fieldName, mlir::Type fieldType, mlir::Value distance,
+    const BVDialectHelper &, mlir::OpBuilder &, mlir::Location
+);
 
 } // namespace lang::zir

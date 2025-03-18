@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <llvm/ADT/Bitset.h>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
@@ -105,6 +106,105 @@ public:
   void setName(mlir::StringRef);
 
   //==---------------------------------------------------------------------==//
+  // Type binding flags
+  //==---------------------------------------------------------------------==//
+
+  class Flags {
+    enum : unsigned {
+      /// A variadic type binding represents a constructor argument that can accept any number of
+      /// arguments.
+      Variadic,
+      /// A type binding is considered specialized if it has types or values assigned to its generic
+      /// parameters. This flag marks the type binding as having done that transformation.
+      Specialized,
+      /// Marks the type binding as having been declared to self construct.
+      SelfConstructor,
+      /// Marks the type binding as a language builtin type.
+      Builtin,
+      /// Marks the type binding as a closure that needs to have a component created during
+      /// lowering.
+      Closure,
+      /// Marks the type binding as an external component.
+      Extern,
+
+      Flags_End
+    };
+
+    using bitset = llvm::Bitset<Flags_End>;
+
+    bitset flags;
+
+    constexpr void set(unsigned idx, bool value) {
+      if (value) {
+        flags.set(idx);
+      } else {
+        flags.reset(idx);
+      }
+    }
+
+  public:
+    constexpr Flags() {}
+    constexpr Flags(std::initializer_list<unsigned> Init) : flags(Init) {}
+
+    static constexpr Flags MkBuiltin(bool builtin) {
+      Flags f;
+      f.setBuiltin(builtin);
+      return f;
+    }
+
+    constexpr bool operator==(const Flags &other) const { return flags == other.flags; }
+
+    /// Returns true if the type binding has been marked as variadic.
+    constexpr bool isVariadic() const { return flags[Variadic]; }
+    /// Sets the Variadic flag.
+    constexpr Flags &setVariadic(bool B = true) {
+      set(Variadic, B);
+      return *this;
+    }
+
+    /// Returns true if the type has an specialization of its generic parameters.
+    constexpr bool isSpecialized() const { return flags[Specialized]; }
+    /// Sets the Specialized flag.
+    constexpr Flags &setSpecialized(bool B = true) {
+      set(Specialized, B);
+      return *this;
+    }
+
+    /// Returns true if the type binding has been marked as self constructing.
+    constexpr bool isSelfConstructor() const { return flags[SelfConstructor]; }
+    /// Sets the SelfConstructor flag.
+    constexpr Flags &setSelfConstructor(bool B = true) {
+      set(SelfConstructor, B);
+      return *this;
+    }
+
+    /// Returns true if this type binding has a type that is a language builtin.
+    constexpr bool isBuiltin() const { return flags[Builtin]; }
+    /// Sets the Builtin flag.
+    constexpr Flags &setBuiltin(bool B = true) {
+      set(Builtin, B);
+      return *this;
+    }
+
+    /// Returns true if the type binding has been marked as a closure that needs to have a component
+    /// definition op generated.
+    constexpr bool isClosure() const { return flags[Closure]; }
+    /// Sets the Closure flag.
+    constexpr Flags &setClosure(bool B = true) {
+      set(Closure, B);
+      return *this;
+    }
+
+    /// Return true if the type binding is of a external component.
+    constexpr bool isExtern() const { return flags[Extern]; }
+    /// Sets the Extern flag.
+    constexpr Flags &setExtern(bool B = true) {
+      set(Extern, B);
+      return *this;
+    }
+  };
+
+  //==---------------------------------------------------------------------==//
   // Type binding properties
   //==---------------------------------------------------------------------==//
 
@@ -144,16 +244,19 @@ public:
   bool isGenericParam() const;
 
   /// Returns true if this type binding has a type that is a language builtin.
-  bool isBuiltin() const { return builtin; }
+  bool isBuiltin() const { return flags.isBuiltin(); }
 
   /// Returns true if the type is not generic or has an specialization of its generic parameters.
-  bool isSpecialized() const { return !isGeneric() || specialized; }
+  bool isSpecialized() const { return !isGeneric() || flags.isSpecialized(); }
 
   /// Returns true if the type binding has been marked as variadic.
-  bool isVariadic() const { return variadic; }
+  bool isVariadic() const { return flags.isVariadic(); }
 
   /// Returns true if the type binding has a super type.
   bool hasSuperType() const { return superType != nullptr; }
+
+  /// Return true if the type binding is of a external component.
+  bool isExtern() const { return flags.isExtern(); }
 
   /// Returns a reference to the super type of this type binding. Aborts if the
   /// type binding does not have a super type.
@@ -188,7 +291,7 @@ public:
 
   /// Returns true if the type binding has been marked as a closure that needs to have a component
   /// definition op generated.
-  bool hasClosure() const { return closure; }
+  bool hasClosure() const { return flags.isClosure(); }
 
   /// Returns the associated location of this type binding.
   mlir::Location getLocation() const { return loc; }
@@ -297,23 +400,32 @@ public:
   TypeBinding(mlir::Location);
 
   TypeBinding(
-      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType, Frame frame = Frame(),
-      bool isBuiltin = false
+      mlir::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, Frame = Frame(),
+      bool IsBuiltin = false
+  );
+  TypeBinding(mlir::StringRef, mlir::Location, const TypeBinding &, Flags, Frame = Frame());
+  TypeBinding(
+      mlir::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType,
+      ParamsMap GenericParams, Frame = Frame(), bool IsBuiltin = false
   );
   TypeBinding(
-      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-      ParamsMap t_genericParams, Frame frame = Frame(), bool isBuiltin = false
+      mlir::StringRef, mlir::Location, const TypeBinding &SuperType, ParamsMap GenericParams, Flags,
+      Frame = Frame()
   );
   TypeBinding(
-      llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-      ParamsMap t_genericParams, ParamsMap t_constructorParams, MembersMap members,
-      Frame frame = Frame(), bool isBuiltin = false
+      mlir::StringRef, mlir::Location, const TypeBinding &SuperType, ParamsMap GenericParams,
+      ParamsMap ConstructorParams, MembersMap Members, Frame = Frame(), bool IsBuiltin = false
+  );
+  TypeBinding(
+      mlir::StringRef, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
+      ParamsMap ConstructorParams, MembersMap Members, Flags, Frame = Frame()
   );
 
   /// Constructs a type binding with a constant Val associated.
   TypeBinding(
-      uint64_t value, mlir::Location loc, const TypeBindings &bindings, bool isBuiltin = false
+      uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, bool IsBuiltin = false
   );
+  TypeBinding(uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, Flags);
 
   ~TypeBinding() = default;
 
@@ -338,7 +450,7 @@ public:
   /// Returns a copy of the type binding that has the variadic property set to true.
   static TypeBinding WrapVariadic(const TypeBinding &t) {
     TypeBinding copy = t;
-    copy.variadic = true;
+    copy.flags.setVariadic(true);
     return copy;
   }
 
@@ -376,14 +488,14 @@ public:
   /// Returns a copy of the type binding with the closure property set to true.
   static TypeBinding WithClosure(const TypeBinding &binding) {
     auto copy = binding;
-    copy.closure = true;
+    copy.flags.setClosure(true);
     return copy;
   }
 
   /// Returns a copy of the type binding with the closure property set to false.
   static TypeBinding WithoutClosure(const TypeBinding &binding) {
     auto copy = binding;
-    copy.closure = false;
+    copy.flags.setClosure(false);
     return copy;
   }
 
@@ -402,7 +514,7 @@ public:
   /// Marks the type binding as having been specialized.
   void markAsSpecialized() {
     assert(isGeneric());
-    specialized = true;
+    flags.setSpecialized(true);
   }
 
   /// Attempts to create an specialized version of the type using the provided parameters. Returns
@@ -421,19 +533,22 @@ private:
   /// found but it couldn't get typechecked returns success wrapping a nullopt.
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
 
-  /// A variadic type binding represents a constructor argument that can accept any number of
-  /// arguments.
-  bool variadic = false;
-  /// A type binding is considered specialized if it has types or values assigned to its generic
-  /// parameters. This flag marks the type binding as having done that transformation.
-  bool specialized = false;
-  /// Marks the type binding as having been declared to self construct.
-  bool selfConstructor = false;
-  /// Marks the type binding as a language builtin type.
-  bool builtin = false;
-  /// Marks the type binding as a closure that needs to have a component created during lowering.
-  bool closure = false;
+  // /// A variadic type binding represents a constructor argument that can accept any number of
+  // /// arguments.
+  // bool variadic = false;
+  // /// A type binding is considered specialized if it has types or values assigned to its generic
+  // /// parameters. This flag marks the type binding as having done that transformation.
+  // bool specialized = false;
+  // /// Marks the type binding as having been declared to self construct.
+  // bool selfConstructor = false;
+  // /// Marks the type binding as a language builtin type.
+  // bool builtin = false;
+  // /// Marks the type binding as a closure that needs to have a component created during lowering.
+  // bool closure = false;
+  // /// Marks the type binding as an external component.
+  // bool external = false;
 
+  Flags flags;
   Name name;
   mlir::Location loc;
   expr::ConstExpr constExpr;

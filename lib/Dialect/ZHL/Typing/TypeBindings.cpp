@@ -54,8 +54,9 @@ TypeBinding TypeBindings::Array(TypeBinding type, TypeBinding size, Location loc
   auto cleanedType = TypeBinding::StripConst(type);
   arrayGenericParams.declare("T", cleanedType);
   arrayGenericParams.declare("N", size);
-  TypeBinding array("Array", loc, Component(), arrayGenericParams, Frame(), true);
-  array.specialized = true;
+  TypeBinding::Flags flags;
+  flags.setSpecialized().setBuiltin();
+  TypeBinding array("Array", loc, Component(), arrayGenericParams, flags, Frame());
   array.selfConstructs();
   return array;
 }

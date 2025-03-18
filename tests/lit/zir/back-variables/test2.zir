@@ -1,10 +1,61 @@
-// RUN: zklang -o - %s --emit=zml | FileCheck %s --check-prefix=ZML
+// RUN: zklang -o - %s  | FileCheck %s --enable-var-scope
 
-// ZML-LABEL: zml.component @Top
 component Top() {
   x := Reg(2);
-// COM: If the value assigned to the variable has memory then it must read the variable by its given name
-// ZML: %{{[0-9a-zA-Z_\.]+}} = zml.read_back %{{[0-9a-zA-Z_\.]+}}[@x] at %{{[0-9a-zA-Z_\.]+}} 
-// ZML-SAME: <@Top false : !zml.comp<@Component true>>, <@Val true : !zml.comp<@Component true>>, !zml.comp<@Reg false : !zml.comp<@NondetReg true : !zml.comp<@Val true : !zml.comp<@Component true>>>>
   x@1 = 2;
 }
+
+// CHECK-LABEL: llzk.struct @Top<[]> {
+//       CHECK:    field @"$super" : !llzk.struct<@Component<[]>>
+//       CHECK:    field @"$temp" : !llzk.struct<@Component<[]>>
+//       CHECK:    field @x : !llzk.struct<@Reg<[]>>
+// CHECK-LABEL:    func @compute
+//  CHECK-SAME:                 (%[[A0:[0-9a-zA-Z_.]+]]]: !llzk.array<128 x !llzk.struct<@Top<[]>>>, %[[A1:[0-9a-zA-Z_.]+]]]: index) -> !llzk.struct<@Top<[]>> {
+//       CHECK:      %[[T0:[0-9a-zA-Z_.]+]] =  new_struct : <@Top<[]>>
+//       CHECK:      %[[T2:[0-9a-zA-Z_.]+]] =  constfelt  2
+//       CHECK:      %[[T3:[0-9a-zA-Z_.]+]] =  arith.constant 0 : index
+//       CHECK:      %[[T4:[0-9a-zA-Z_.]+]] =  arith.constant 1 : index
+//       CHECK:      %[[T5:[0-9a-zA-Z_.]+]] =  new_array  : <128 x !llzk.struct<@Reg<[]>>> 
+//       CHECK:      %[[T8:[0-9a-zA-Z_.]+]] =  scf.for %[[A2:[0-9a-zA-Z_.]+]]] = %[[T3]] to %[[A1]] step %[[T4]] iter_args(%[[A3:[0-9a-zA-Z_.]+]]] = %[[T5]]) -> (!llzk.array<128 x !llzk.struct<@Reg<[]>>>) {
+//       CHECK:        %[[T6:[0-9a-zA-Z_.]+]] =  llzk.readarr %[[A0]][%[[A2]]] : <128 x !llzk.struct<@Top<[]>>>, !llzk.struct<@Top<[]>>
+//       CHECK:        %[[T7:[0-9a-zA-Z_.]+]] =  llzk.readf %[[T6]][@x] : <@Top<[]>>, !llzk.struct<@Reg<[]>>
+//       CHECK:        llzk.writearr %[[A3]][%[[A2]] = %[[T7]] : <128 x !llzk.struct<@Reg<[]>>>, !llzk.struct<@Reg<[]>>
+//       CHECK:        scf.yield %[[A3]] : !llzk.array<128 x !llzk.struct<@Reg<[]>>>
+//       CHECK:      }
+//       CHECK:      %[[T9:[0-9a-zA-Z_.]+]] =  call @Reg::@compute(%[[T8]], %[[A1]], %[[T2]]) : (!llzk.array<128 x !llzk.struct<@Reg<[]>>>, index, !llzk.felt) -> !llzk.struct<@Reg<[]>> 
+//       CHECK:      writef %[[T0]][@x] = %[[T9]] : <@Top<[]>>, !llzk.struct<@Reg<[]>>
+//       CHECK:      %[[T31:[0-9a-zA-Z_.]+]] =  call @Component::@compute() : () -> !llzk.struct<@Component<[]>> 
+//       CHECK:      writef %[[T0]][@"$temp"] = %[[T31]] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      %[[T32:[0-9a-zA-Z_.]+]] =  readf %[[T0]][@"$temp"] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      writef %[[T0]][@"$super"] = %[[T32]] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      return %[[T0]] : !llzk.struct<@Top<[]>>
+//       CHECK:    }
+// CHECK-LABEL:    func @constrain
+//  CHECK-SAME:                   (%[[A0:[0-9a-zA-Z_.]+]]]: !llzk.struct<@Top<[]>>, %[[A1:[0-9a-zA-Z_.]+]]]: !llzk.array<128 x !llzk.struct<@Top<[]>>>, %[[A2:[0-9a-zA-Z_.]+]]]: index) {
+//       CHECK:      %[[T1:[0-9a-zA-Z_.]+]] =  constfelt  2
+//       CHECK:      %[[T25:[0-9a-zA-Z_.]+]] =  arith.constant 0 : index
+//       CHECK:      %[[T26:[0-9a-zA-Z_.]+]] =  arith.constant 1 : index
+//       CHECK:      %[[T27:[0-9a-zA-Z_.]+]] =  new_array  : <128 x !llzk.struct<@Reg<[]>>> 
+//       CHECK:      %[[T28:[0-9a-zA-Z_.]+]] =  scf.for %[[A3:[0-9a-zA-Z_.]+]]] = %[[T25]] to %[[A2]] step %[[T26]] iter_args(%[[A4:[0-9a-zA-Z_.]+]]] = %[[T27]]) -> (!llzk.array<128 x !llzk.struct<@Reg<[]>>>) {
+//       CHECK:        %[[T22:[0-9a-zA-Z_.]+]] =  llzk.readarr %[[A1]][%[[A3]]] : <128 x !llzk.struct<@Top<[]>>>, !llzk.struct<@Top<[]>>
+//       CHECK:        %[[T23:[0-9a-zA-Z_.]+]] =  llzk.readf %[[T22]][@x] : <@Top<[]>>, !llzk.struct<@Reg<[]>>
+//       CHECK:        llzk.writearr %[[A4]][%[[A3]] = %[[T23]] : <128 x !llzk.struct<@Reg<[]>>>, !llzk.struct<@Reg<[]>>
+//       CHECK:        scf.yield %[[A4]] : !llzk.array<128 x !llzk.struct<@Reg<[]>>>
+//       CHECK:      }
+//       CHECK:      %[[T29:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@x] : <@Top<[]>>, !llzk.struct<@Reg<[]>>
+//       CHECK:      call @Reg::@constrain(%[[T29]], %[[T28]], %[[A2]], %[[T1]]) : (!llzk.struct<@Reg<[]>>, !llzk.array<128 x !llzk.struct<@Reg<[]>>>, index, !llzk.felt) -> () 
+//       CHECK:      %[[T32:[0-9a-zA-Z_.]+]] =  constfelt  1
+//       CHECK:      %[[T4:[0-9a-zA-Z_.]+]] =  tofelt %[[A2]] : index
+//       CHECK:      %[[T5:[0-9a-zA-Z_.]+]] =  sub %[[T4]], %[[T32]] : !llzk.felt, !llzk.felt
+//       CHECK:      %[[T6:[0-9a-zA-Z_.]+]] =  toindex %[[T5]]
+//       CHECK:      %[[T7:[0-9a-zA-Z_.]+]] =  readarr %[[A1]][%[[T6]]] : <128 x !llzk.struct<@Top<[]>>>, !llzk.struct<@Top<[]>>
+//       CHECK:      %[[T8:[0-9a-zA-Z_.]+]] =  readf %[[T7]][@x] : <@Top<[]>>, !llzk.struct<@Reg<[]>>
+//       CHECK:      %[[T0:[0-9a-zA-Z_.]+]] =  constfelt  2
+//       CHECK:      %[[T15:[0-9a-zA-Z_.]+]] =  readf %[[T8]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+//       CHECK:      %[[T16:[0-9a-zA-Z_.]+]] =  readf %[[T15]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
+//       CHECK:      emit_eq %[[T16]], %[[T0]] : !llzk.felt, !llzk.felt
+//       CHECK:      %[[T18:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@"$temp"] : <@Top<[]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      call @Component::@constrain(%[[T18]]) : (!llzk.struct<@Component<[]>>) -> () 
+//       CHECK:      return
+//       CHECK:    }
+//       CHECK:  }

@@ -33,6 +33,9 @@ public:
   ) const override;
 
   mlir::Type deduceComponentType(mlir::FunctionOpInterface) const override;
+
+  mlir::Value subtractValues(mlir::Value lhs, mlir::Value rhs, mlir::OpBuilder &, mlir::Location)
+      const override;
 };
 
 } // namespace zml
