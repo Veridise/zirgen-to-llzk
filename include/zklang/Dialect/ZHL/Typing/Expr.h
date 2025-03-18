@@ -425,7 +425,7 @@ protected:
 /// Convenience adaptor for ConstExpr that holds a detail::Val
 using ValExpr = TypedExprAdaptor<detail::Val>;
 
-/// Convenience adaptor for ConstExpr that holds a detail::Sym
+/// Convenience adaptor for ConstExpr that holds a detail::Symbol
 using SymExpr = TypedExprAdaptor<detail::Symbol>;
 
 /// Convenience adaptor for ConstExpr that holds a detail::Ctor
