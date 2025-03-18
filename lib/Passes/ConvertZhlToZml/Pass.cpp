@@ -16,6 +16,7 @@
 #include <mlir/Transforms/DialectConversion.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zklang/Dialect/ZHL/Typing/Analysis.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>

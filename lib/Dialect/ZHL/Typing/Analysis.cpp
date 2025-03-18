@@ -24,6 +24,7 @@ public:
   virtual void print(llvm::raw_ostream &) const = 0;
   virtual operator mlir::LogicalResult() const = 0;
   virtual mlir::ArrayRef<TypeBinding *> getClosures() = 0;
+  virtual void emitRemarks() const = 0;
 };
 
 namespace {
@@ -55,6 +56,8 @@ public:
   operator mlir::LogicalResult() const final { return *delegate; }
 
   mlir::ArrayRef<TypeBinding *> getClosures() final { return delegate->getClosures(); }
+
+  void emitRemarks() const final { delegate->emitRemarks(); }
 
 private:
   ZIRTypeAnalysis *const delegate;
@@ -127,6 +130,8 @@ public:
     return *cachedClosures;
   }
 
+  void emitRemarks() const final { opBindings->emitRemarks(); }
+
 private:
   TypeBindings typeBindings;
   bool typeCheckingFailed = false;
@@ -180,5 +185,7 @@ ZIRTypeAnalysis::operator mlir::LogicalResult() const {
   return *impl;
 }
 mlir::ArrayRef<TypeBinding *> ZIRTypeAnalysis::getClosures() { return impl->getClosures(); }
+
+void ZIRTypeAnalysis::emitRemarks() const { impl->emitRemarks(); }
 
 } // namespace zhl

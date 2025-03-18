@@ -3,6 +3,7 @@
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
@@ -21,6 +22,9 @@ public:
 
   // TODO: Global declarations
   virtual void declareGenericParam(mlir::StringRef, uint64_t, TypeBinding) = 0;
+  /// Declares a generic param as a lifted parameter that will materialize to an affine map.
+  /// Returns a type binding pointing to the generic parameter name of the newly created parameter.
+  virtual TypeBinding declareLiftedAffineToGenericParam(const TypeBinding &) = 0;
   virtual void declareConstructorParam(mlir::StringRef, uint64_t, TypeBinding) = 0;
   virtual void declareMember(mlir::StringRef) = 0;
   virtual void declareMember(mlir::StringRef, TypeBinding) = 0;
@@ -57,6 +61,8 @@ public:
 
   void declareGenericParam(mlir::StringRef name, uint64_t index, TypeBinding type) override;
 
+  TypeBinding declareLiftedAffineToGenericParam(const TypeBinding &) override;
+
   void declareConstructorParam(mlir::StringRef name, uint64_t index, TypeBinding type) override;
 
   void declareMember(mlir::StringRef name) override;
@@ -85,7 +91,7 @@ private:
   TypeBindings *bindings;
   zirgen::Zhl::ComponentOp component;
   ParamsMap constructorParams;
-  ParamsMap genericParams;
+  ParamsMap genericParams, liftedParams;
   Frame frame;
   mlir::FailureOr<TypeBinding> superType;
 };
@@ -95,6 +101,7 @@ class ChildScope : public Scope {
 public:
   explicit ChildScope(Scope &);
   void declareGenericParam(mlir::StringRef, uint64_t, TypeBinding) override;
+  TypeBinding declareLiftedAffineToGenericParam(const TypeBinding &) override;
   void declareConstructorParam(mlir::StringRef, uint64_t, TypeBinding) override;
   void declareMember(mlir::StringRef) override;
   void declareMember(mlir::StringRef, TypeBinding) override;
