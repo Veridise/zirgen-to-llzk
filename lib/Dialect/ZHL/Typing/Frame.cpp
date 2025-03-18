@@ -1,12 +1,14 @@
+#include <zklang/Dialect/ZHL/Typing/Frame.h>
+
 #include <memory>
 #include <mlir/IR/Value.h>
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
-#include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameInfo.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 #define DEBUG_TYPE "zhl-frame"
@@ -17,8 +19,17 @@ Frame::Frame() : info(std::make_shared<detail::FrameInfo>()) {}
 
 Frame::Frame(const Frame &other) : info(other.info) {}
 
+Frame::Frame(Frame &&other) : info(std::move(other.info)) {}
+
 Frame &Frame::operator=(const Frame &other) {
   info = other.info;
+  return *this;
+}
+
+Frame &Frame::operator=(Frame &&other) {
+  if (this != &other) {
+    info = std::move(other.info);
+  }
   return *this;
 }
 

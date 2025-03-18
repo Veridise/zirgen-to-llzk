@@ -51,6 +51,7 @@ def Component : ZMLType<"Component", "comp"> {
 
     mlir::FailureOr<mlir::Attribute> getArraySize() const;
     ComponentType getSuperTypeAsComp() const;
+    bool subtypeOf(Type) const;
 
     static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
     static ComponentType Component(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }

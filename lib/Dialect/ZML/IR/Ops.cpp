@@ -18,6 +18,8 @@
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 
+using namespace llzk;
+
 // TableGen'd implementation files
 #define GET_OP_CLASSES
 #include <zklang/Dialect/ZML/IR/OpInterfaces.cpp.inc>
@@ -210,18 +212,39 @@ void ConstructorRefOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op,
     mlir::FunctionType fnType
 ) {
-  build(builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), fnType, op.getBuiltin());
+  build(builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), 0, fnType, op.getBuiltin());
+}
+
+void ConstructorRefOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, ComponentInterface op,
+    uint64_t liftedParams, mlir::FunctionType fnType
+) {
+  build(
+      builder, state, mlir::SymbolRefAttr::get(op.getNameAttr()), liftedParams, fnType,
+      op.getBuiltin()
+  );
+}
+
+void ConstructorRefOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &state, mlir::FlatSymbolRefAttr sym,
+    uint64_t liftedParams, mlir::FunctionType fnType, bool isBuiltin
+) {
+  Properties &properties = state.getOrAddProperties<Properties>();
+
+  properties.numLiftedParams = builder.getIntegerAttr(builder.getIndexType(), liftedParams);
+  properties.component = sym;
+  if (isBuiltin) {
+    properties.builtin = mlir::UnitAttr::get(builder.getContext());
+  }
+
+  state.addTypes({fnType});
 }
 
 void ConstructorRefOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, mlir::FlatSymbolRefAttr sym,
     mlir::FunctionType fnType, bool isBuiltin
 ) {
-  state.getOrAddProperties<Properties>().component = sym;
-  if (isBuiltin) {
-    state.getOrAddProperties<Properties>().builtin = mlir::UnitAttr::get(builder.getContext());
-  }
-  state.addTypes({fnType});
+  build(builder, state, sym, 0, fnType, isBuiltin);
 }
 
 mlir::LogicalResult checkConstructorTypeIsValid(
@@ -336,6 +359,22 @@ LogicalResult NopOp::canonicalize(NopOp op, PatternRewriter &rewriter) {
     return success();
   }
   return failure();
+}
+
+static bool isTypeVar(Type t) { return mlir::isa<TypeVarType>(t); }
+
+LogicalResult SuperCoerceOp::verify() {
+  ComponentType inputType = getComponent().getType();
+  Type outputType = getVal().getType();
+
+  if (isTypeVar(outputType)) {
+    return success();
+  }
+  if (!inputType.subtypeOf(outputType)) {
+    return emitError() << "type " << outputType << " is not a valid super type of type "
+                       << inputType;
+  }
+  return success();
 }
 
 } // namespace zml

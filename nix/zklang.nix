@@ -32,10 +32,15 @@ stdenv.mkDerivation {
         src = src0;
       };
 
-  nativeBuildInputs = [ clang cmake ninja ];
+  nativeBuildInputs = [ clang cmake ninja z3.lib z3 ];
   buildInputs =  [
-    mlir  llzk 
+    mlir llzk z3.lib
   ];
+
+  # Needed for mlir-tblgen to run properly.
+  preBuild = ''
+    export LD_LIBRARY_PATH=${z3.lib}/lib:$LD_LIBRARY_PATH
+  '';
 
   # cmakeFlags = [
   #   "-DLLZK_BUILD_DEVTOOLS=ON"

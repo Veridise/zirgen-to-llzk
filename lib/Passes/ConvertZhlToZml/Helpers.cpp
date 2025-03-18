@@ -1,3 +1,4 @@
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
@@ -5,6 +6,9 @@
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Builder.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
@@ -191,9 +195,9 @@ void constructFieldReads(
 
 FailureOr<Value> constructPODComponent(
     Operation *op, zhl::TypeBinding &binding, OpBuilder &builder, Value self,
-    llvm::function_ref<mlir::Value()> superTypeValueCb
+    llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &bindings
 ) {
-  auto ctor = CtorCallBuilder::Make(op, binding, builder, self);
+  auto ctor = CtorCallBuilder::Make(op, binding, builder, self, bindings);
   if (failed(ctor)) {
     return failure();
   }
@@ -268,25 +272,26 @@ void createPODComponent(
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     mlir::Operation *op, mlir::Value value, const zhl::ZIRTypeAnalysis &typeAnalysis,
-    mlir::OpBuilder &builder, mlir::Value self
+    mlir::OpBuilder &builder, mlir::Value self, const zhl::TypeBindings &bindings
 ) {
   auto binding = typeAnalysis.getType(value);
   if (failed(binding)) {
     return op->emitError() << "failed to type check";
   }
 
-  return Make(op, *binding, builder, self);
+  return Make(op, *binding, builder, self, bindings);
 }
 
 mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
-    mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self
+    mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+    mlir::Value self, const zhl::TypeBindings &bindings
 ) {
   auto rootModule = op->getParentOfType<mlir::ModuleOp>();
   auto *calleeComp = findCallee(binding.getName(), rootModule);
   if (!calleeComp) {
     return op->emitError() << "could not find component with name " << binding.getName();
   }
-  auto constructorType = materializeTypeBindingConstructor(builder, binding);
+  auto constructorType = materializeTypeBindingConstructor(builder, binding, bindings);
 
   return CtorCallBuilder(
       constructorType, binding, op->getParentOfType<ComponentInterface>(), self,
@@ -301,7 +306,11 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
     return v;
   };
 
-  auto ref = builder.create<ConstructorRefOp>(loc, ctorType, compBinding.getName(), isBuiltin);
+  auto genericParams = compBinding.getGenericParamsMapping();
+  auto ref = builder.create<ConstructorRefOp>(
+      loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
+      isBuiltin
+  );
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
 
