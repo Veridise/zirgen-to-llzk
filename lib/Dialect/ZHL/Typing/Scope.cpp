@@ -90,6 +90,8 @@ mlir::FailureOr<TypeBinding> ChildScope::getSuperType() const { return parent->g
 Frame &ChildScope::getCurrentFrame() { return parent->getCurrentFrame(); }
 const Frame &ChildScope::getCurrentFrame() const { return parent->getCurrentFrame(); }
 
+void ChildScope::isExtern() { parent->isExtern(); }
+
 FrameScope::FrameScope(Scope &parent, Frame frame) : ChildScope(Sco_Frame, parent), frame(frame) {}
 
 Frame &FrameScope::getCurrentFrame() { return frame; }

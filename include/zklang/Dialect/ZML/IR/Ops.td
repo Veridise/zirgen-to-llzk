@@ -23,12 +23,13 @@ class ComponentOpBase<string prefix, string bodyFuncName,
                                  ComponentInterface]> {
   let summary = prefix#"component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
-      UnitAttr:$generic, UnitAttr:$builtin,
+      UnitAttr:$generic, UnitAttr:$builtin, UnitAttr:$usesBackVariables,
       OptionalAttr<FlatSymbolRefArrayAttr>:$params);
   let regions = (region SizedRegion<1>:$body);
 
   let builders = [OpBuilder<(ins "::mlir::StringRef":$name,
-                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>,
+                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs,
+                      CArg<"bool", "false">:$usesBackVariables)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
                       "::zml::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
@@ -36,7 +37,8 @@ class ComponentOpBase<string prefix, string bodyFuncName,
                       "::zml::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
                       "::mlir::ArrayRef<mlir::StringRef>":$params,
-                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>];
+                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs,
+                      CArg<"bool", "false">:$usesBackVariables)>];
 
   let extraClassDeclaration = [{
     /// Returns the type of the component.

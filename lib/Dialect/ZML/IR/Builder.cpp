@@ -42,6 +42,7 @@ void ComponentBuilder::Ctx::checkBareRequirements() {
   assert(loc.has_value());
   assert(!compName.empty());
   assert((isBuiltin || isClosure) == compAttrs.empty());
+  assert(isBuiltin != usesBackVariables);
 }
 
 ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
@@ -55,9 +56,9 @@ ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   }
 
   if (isGeneric()) {
-    return builder.create<ComponentOp>(*loc, compName, typeParams, attrs);
+    return builder.create<ComponentOp>(*loc, compName, typeParams, attrs, usesBackVariables);
   } else {
-    return builder.create<ComponentOp>(*loc, compName, attrs);
+    return builder.create<ComponentOp>(*loc, compName, attrs, usesBackVariables);
   }
 }
 
@@ -136,6 +137,12 @@ ComponentBuilder &ComponentBuilder::takeRegion(mlir::Region *region) {
 }
 ComponentBuilder &ComponentBuilder::isBuiltin() {
   ctx.isBuiltin = true;
+  ctx.usesBackVariables = false; // Force set it to false
+  return *this;
+}
+
+ComponentBuilder &ComponentBuilder::usesBackVariables() {
+  ctx.usesBackVariables = true;
   return *this;
 }
 

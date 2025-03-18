@@ -1,7 +1,9 @@
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/OpDefinition.h>
 #include <mlir/IR/Operation.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
@@ -10,6 +12,8 @@
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
+#include <zklang/Dialect/ZML/Utils/BackVariables.h>
+#include <zklang/LanguageSupport/ZIR/BackVariables.h>
 #include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 
 using namespace mlir;
@@ -32,11 +36,19 @@ mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root) {
   return nullptr;
 }
 
-bool calleeIsBuiltin(mlir::Operation *op) {
+template <typename T, typename Fn> T queryComp(mlir::Operation *op, Fn query, T Default = T()) {
   if (auto zmlOp = mlir::dyn_cast<ComponentInterface>(op)) {
-    return zmlOp.getBuiltin();
+    return query(zmlOp);
   }
-  return false;
+  return Default;
+}
+
+bool calleeIsBuiltin(mlir::Operation *op) {
+  return queryComp<bool>(op, [](auto zmlOp) { return zmlOp.getBuiltin(); });
+}
+
+static bool calleeUsesBackVariablesHelper(mlir::Operation *op) {
+  return queryComp<bool>(op, [](auto zmlOp) { return zmlOp.getUsesBackVariables(); }, true);
 }
 
 #define DEBUG_TYPE "zml-slot-helpers"
@@ -292,10 +304,17 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     return op->emitError() << "could not find component with name " << binding.getName();
   }
   auto constructorType = materializeTypeBindingConstructor(builder, binding);
+  bool usesBackVariables = calleeUsesBackVariablesHelper(calleeComp);
+  if (usesBackVariables) {
+    ZML_BVDialectHelper TP;
+    llvm::dbgs() << *calleeComp << " uses back variables\n";
+    constructorType = lang::zir::injectBVFunctionParams(TP, constructorType);
+    llvm::dbgs() << "Its constructor type is therefore: " << constructorType << "\n";
+  }
 
   return CtorCallBuilder(
       constructorType, binding, op->getParentOfType<ComponentInterface>(), self,
-      calleeIsBuiltin(calleeComp)
+      calleeIsBuiltin(calleeComp), usesBackVariables
   );
 }
 
@@ -306,8 +325,28 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
     return v;
   };
 
+  SmallVector<Value> argValues(args);
   auto ref = builder.create<ConstructorRefOp>(loc, ctorType, compBinding.getName(), isBuiltin);
-  auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
+
+  if (usesBackVariables) {
+    auto slot = mlir::dyn_cast_if_present<ComponentSlot>(compBinding.getSlot());
+    assert(slot);
+    auto func = ref->getParentOfType<func::FuncOp>();
+    assert(func && "calling a constructor outside a FuncOp");
+    ZML_BVDialectHelper TP;
+    auto parentBV = lang::zir::loadBVValues(TP, func);
+    FlatSymbolRefAttr fieldName =
+        FlatSymbolRefAttr::get(builder.getStringAttr(slot->getSlotName()));
+    llvm::dbgs() << "fieldName = " << fieldName << "\n";
+    llvm::dbgs() << "\n\n\n\n" << callerComponentOp << "\n";
+    auto BV = lang::zir::loadMemoryForField(
+        parentBV, fieldName, materializeTypeBinding(builder.getContext(), compBinding), TP, builder,
+        loc
+    );
+    lang::zir::injectBVArgs(BV, argValues);
+  }
+
+  auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, argValues);
   Value compValue = call.getResult(0);
 
   if (!compBinding.getSlot()) {
@@ -334,12 +373,16 @@ const zhl::TypeBinding &CtorCallBuilder::getBinding() const { return compBinding
 
 CtorCallBuilder::CtorCallBuilder(
     mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
-    mlir::Value selfValue, bool builtin
+    mlir::Value selfValue, bool builtin, bool usesBVs
 )
-    : ctorType(type), compBinding(binding), isBuiltin(builtin), callerComponentOp(caller),
-      self(selfValue) {
+    : ctorType(type), compBinding(binding), isBuiltin(builtin), usesBackVariables(usesBVs),
+      callerComponentOp(caller), self(selfValue) {
   assert(callerComponentOp);
   assert(self);
+  assert(
+      (!usesBackVariables || compBinding.getSlot()) &&
+      "If the component uses back-variables it needs to have a slot!"
+  );
 }
 
 mlir::FailureOr<Value> coerceToArray(TypedValue<ComponentType> v, OpBuilder &builder) {

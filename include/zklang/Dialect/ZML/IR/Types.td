@@ -95,7 +95,7 @@ def VarArgs : ZMLType<"VarArgs", "vargs"> {
   let assemblyFormat = "`<` $inner `>`";
 }
 
-def AnyZMLType : AnyTypeOf<[TypeVar, Component, VarArgs],
+def AnyZMLType : AnyTypeOf<[TypeVar, Component, VarArgs, Index],
                            "type that can participate in ZML components">;
 
 class TypeVarOr<Type type> : AnyTypeOf<[type, TypeVar]>;

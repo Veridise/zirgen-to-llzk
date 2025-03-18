@@ -42,6 +42,7 @@ private:
     bool isBuiltin = false;
     bool isClosure = false;
     bool forceSetGeneric = false;
+    bool usesBackVariables = false;
 
     bool isGeneric();
     // Builds a bare component op
@@ -91,6 +92,8 @@ public:
   ComponentBuilder &isBuiltin();
 
   ComponentBuilder &isClosure();
+
+  ComponentBuilder &usesBackVariables();
 
   ComponentBuilder &takeRegion(mlir::Region *region);
 

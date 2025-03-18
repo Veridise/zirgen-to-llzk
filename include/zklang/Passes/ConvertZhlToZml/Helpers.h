@@ -92,16 +92,18 @@ public:
   mlir::FunctionType getCtorType() const;
   const zhl::TypeBinding &getBinding() const;
   ComponentInterface getCallerComp() const;
+  bool calleeUsesBackVariables() const { return usesBackVariables; }
 
 private:
   CtorCallBuilder(
       mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
-      mlir::Value self, bool builtin
+      mlir::Value self, bool builtin, bool usesBVs
   );
 
   mlir::FunctionType ctorType;
   const zhl::TypeBinding compBinding;
   bool isBuiltin;
+  bool usesBackVariables;
   ComponentInterface callerComponentOp;
   mlir::Value self;
 };

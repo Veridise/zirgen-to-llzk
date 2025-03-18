@@ -31,6 +31,8 @@
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
+#include <zklang/Dialect/ZML/Utils/BackVariables.h>
+#include <zklang/LanguageSupport/ZIR/BackVariables.h>
 #include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
@@ -117,6 +119,9 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   auto &binding = ctor->getBinding();
   auto constructorType = ctor->getCtorType();
   auto ctorFormalsCount = constructorType.getInputs().size();
+  if (ctor->calleeUsesBackVariables()) {
+    ctorFormalsCount -= lang::zir::BVConstants::ADDDED_ARGS;
+  }
 
   if (!validArgCount(isVariadic(constructorType), adaptor.getArgs().size(), ctorFormalsCount)) {
     // Depending if it's variadic or not the message changes a bit.
@@ -131,7 +136,8 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
 
   std::vector<mlir::Value> preparedArguments;
   prepareArguments(
-      adaptor.getArgs(), constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments
+      adaptor.getArgs(), constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments,
+      ctor->calleeUsesBackVariables() ? lang::zir::BVConstants::ADDDED_ARGS : 0
   );
 
   auto result = ctor->build(rewriter, op.getLoc(), preparedArguments);
@@ -161,7 +167,8 @@ computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> construc
 
 void ZhlConstructLowering::prepareArguments(
     mlir::ValueRange args, mlir::ArrayRef<mlir::Type> constructorTypes, mlir::Location loc,
-    mlir::ConversionPatternRewriter &rewriter, std::vector<mlir::Value> &preparedArgs
+    mlir::ConversionPatternRewriter &rewriter, std::vector<mlir::Value> &preparedArgs,
+    unsigned backVariablesCorrection
 ) const {
 
   preparedArgs.clear();
@@ -192,7 +199,10 @@ void ZhlConstructLowering::prepareArguments(
     preparedArgs.push_back(va);
   }
 
-  assert(preparedArgs.size() == constructorTypes.size() && "incorrect number of arguments");
+  assert(
+      preparedArgs.size() == (constructorTypes.size() - backVariablesCorrection) &&
+      "incorrect number of arguments"
+  );
 }
 
 mlir::Value ZhlConstructLowering::prepareArgument(
@@ -661,15 +671,22 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     return op->emitOpError() << "could not be lowered because its type could not be infered";
   }
 
+  ZML_BVDialectHelper TP;
   ComponentBuilder builder;
   auto genericNames = name->getGenericParamNames();
+  auto paramLocations = name->getConstructorParamLocations();
+  auto ctorType = materializeTypeBindingConstructor(rewriter, *name);
+
+  if (true) {
+    ctorType = lang::zir::injectBVFunctionParams(TP, ctorType, 0, &paramLocations);
+    builder.usesBackVariables();
+  }
+
   builder.name(name->getName())
       .location(op->getLoc())
       .attrs(op->getAttrs())
       .typeParams(genericNames)
-      .constructor(
-          materializeTypeBindingConstructor(rewriter, *name), name->getConstructorParamLocations()
-      )
+      .constructor(ctorType, paramLocations)
       .takeRegion(&op.getRegion());
   for (auto &[fieldName, binding] : name->getMembers()) {
     if (!binding.has_value()) {

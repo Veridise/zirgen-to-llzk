@@ -53,6 +53,7 @@ mlir::FailureOr<TypeBinding> ExternTypingRule::
   if (operands.empty()) {
     return mlir::failure();
   }
+  scope.isExtern();
   return operands[0];
 }
 mlir::FailureOr<TypeBinding> ConstructTypingRule::

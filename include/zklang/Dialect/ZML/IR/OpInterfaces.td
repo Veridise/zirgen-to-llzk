@@ -62,6 +62,9 @@ def ComponentInterface
                        (ins "::mlir::FlatSymbolRefAttr":$field)>,
        InterfaceMethod<"Returns wether the component is a builtin or not",
                        "bool", "getBuiltin", (ins)>,
+       InterfaceMethod<
+           "Returns wether the component uses back-variables or not", "bool",
+           "getUsesBackVariables", (ins)>,
        InterfaceMethod<"Returns wether the component is the root 'Component'",
                        "bool", "isRoot", (ins)>,
        InterfaceMethod<
