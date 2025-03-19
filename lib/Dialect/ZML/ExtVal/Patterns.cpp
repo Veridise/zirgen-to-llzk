@@ -1,6 +1,8 @@
 #include <zklang/Dialect/ZML/ExtVal/Conversion.h>
 #include <zklang/Dialect/ZML/ExtVal/Patterns.h>
 
+#include <numeric>
+
 using namespace zml;
 using namespace mlir;
 using namespace zml::extval;
