@@ -555,7 +555,7 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
 
   auto &fst = operands.front();
   auto commonType =
-      std::reduce(operands.drop_front().begin(), operands.end(), fst, [&](auto &lhs, auto &rhs) {
+      std::reduce(operands.drop_front().begin(), operands.end(), fst, [&](auto lhs, auto rhs) {
     return lhs.commonSupertypeWith(rhs);
   });
 
