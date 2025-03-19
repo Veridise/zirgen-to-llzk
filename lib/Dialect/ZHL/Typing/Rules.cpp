@@ -113,6 +113,11 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   }
   auto component = interpretOp(op, operands[0], operands.drop_front());
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
+  // If we are constructing a component that needs backvariables then we need it in the caller as
+  // well.
+  if (component.needsBackVariables()) {
+    scope.needsBackVariablesSupport();
+  }
   return component;
 }
 
@@ -584,6 +589,7 @@ mlir::FailureOr<TypeBinding> BackTypeRule::
     // retrival.
     scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), copy);
   }
+  scope.needsBackVariablesSupport();
   return copy;
 }
 
@@ -668,7 +674,9 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
   } else {
     LLVM_DEBUG(llvm::dbgs() << "ReduceOp did not record the size of the array into the frame\n");
   }
-
+  if (operands[2].needsBackVariables()) {
+    scope.needsBackVariablesSupport();
+  }
   return interpretOp(op, output);
 }
 

@@ -126,6 +126,8 @@ public:
       Closure,
       /// Marks the type binding as an external component.
       Extern,
+      /// Marks the type binding as needing back-variable support.
+      NeedsBackVariables,
 
       Flags_End
     };
@@ -202,6 +204,14 @@ public:
       set(Extern, B);
       return *this;
     }
+
+    /// Return true if the type binding needs back-variable support.
+    constexpr bool needsBackVariables() const { return flags[NeedsBackVariables]; }
+    /// Sets the Extern flag.
+    constexpr Flags &setBackVariablesNeed(bool B = true) {
+      set(NeedsBackVariables, B);
+      return *this;
+    }
   };
 
   //==---------------------------------------------------------------------==//
@@ -257,6 +267,9 @@ public:
 
   /// Return true if the type binding is of a external component.
   bool isExtern() const { return flags.isExtern(); }
+
+  /// Return true if the type binding needs back-variable support.
+  bool needsBackVariables() const { return flags.needsBackVariables(); }
 
   /// Returns a reference to the super type of this type binding. Aborts if the
   /// type binding does not have a super type.

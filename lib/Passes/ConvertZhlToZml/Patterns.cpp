@@ -672,15 +672,9 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
   auto paramLocations = name->getConstructorParamLocations();
   auto ctorType = materializeTypeBindingConstructor(rewriter, *name, getTypeBindings());
 
-  if (!name->isExtern()) {
-    name->print(llvm::dbgs() << "Type binding ", true);
-    llvm::dbgs() << " is not extern!\n";
+  if (name->needsBackVariables()) {
     ctorType = lang::zir::injectBVFunctionParams(TP, ctorType, 0, &paramLocations);
     builder.usesBackVariables();
-  } else {
-
-    name->print(llvm::dbgs() << "Type binding ", true);
-    llvm::dbgs() << " is  extern!\n";
   }
 
   builder.name(name->getName())

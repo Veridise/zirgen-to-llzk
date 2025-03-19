@@ -74,7 +74,7 @@ TypeBinding ComponentScope::createBinding(StringRef name, Location loc) const {
     );
   }
   TypeBinding::Flags flags;
-  flags.setExtern(extern_);
+  flags.setExtern(extern_).setBackVariablesNeed(needsBVs);
   return bindings->Create(
       name, loc, bindings->Manage(*superType), genericParamsCopy, constructorParams, members, flags,
       frame
@@ -124,6 +124,8 @@ Frame &ChildScope::getCurrentFrame() { return parent->getCurrentFrame(); }
 const Frame &ChildScope::getCurrentFrame() const { return parent->getCurrentFrame(); }
 
 void ChildScope::isExtern() { parent->isExtern(); }
+
+void ChildScope::needsBackVariablesSupport() { parent->needsBackVariablesSupport(); }
 
 FrameScope::FrameScope(Scope &parent, Frame frame) : ChildScope(Sco_Frame, parent), frame(frame) {}
 
