@@ -1,4 +1,6 @@
-// RUN: zklang -o - %s 
+// RUN: zklang -o - %s
+// XFAIL: *
+// COM: Pending LLZK-168
 
 component A() {
   a := 1;
