@@ -31,7 +31,6 @@ in
           # Ignore unnecessary files
           filter = path: type: !(lib.lists.any (x: x) [
             (path == toString (src0.origSrc + "/README.md"))
-            # (type == "directory" && path == toString (src0.origSrc + "/third-party"))
             (type == "directory" && path == toString (src0.origSrc + "/.github"))
             (type == "regular" && lib.strings.hasSuffix ".nix" (toString path))
             (type == "regular" && baseNameOf path == "flake.lock")
@@ -52,10 +51,6 @@ in
     preBuild = ''
       export LD_LIBRARY_PATH=${z3.lib}/lib:$LD_LIBRARY_PATH
     '';
-
-    # cmakeFlags = [
-    #   "-DLLZK_BUILD_DEVTOOLS=ON"
-    # ];
 
     # This is done specifically so that the configure phase can find /usr/bin/sw_vers,
     # which is MacOS specific.
