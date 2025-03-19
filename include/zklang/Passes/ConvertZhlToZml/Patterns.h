@@ -11,7 +11,7 @@
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 
 namespace zml {
 

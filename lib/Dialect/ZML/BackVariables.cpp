@@ -2,12 +2,21 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Support/LLVM.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
 #include <zklang/Dialect/ZML/Utils/BackVariables.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 
 using namespace zml;
 using namespace mlir;
+
+ZML_BVDialectHelper::ZML_BVDialectHelper(zhl::ComponentSlot &Slot, mlir::MLIRContext *ctx)
+    : slot(&Slot), slotType(nullptr) {
+  auto binding = Slot.getBinding();
+  slotType = materializeTypeBinding(ctx, binding);
+}
 
 Value ZML_BVDialectHelper::getCycleConstant(OpBuilder &builder, uint64_t value, mlir::Location loc)
     const {
@@ -35,7 +44,12 @@ void ZML_BVDialectHelper::writeArray(
 Value ZML_BVDialectHelper::readField(
     Type type, FlatSymbolRefAttr name, Value src, OpBuilder &builder, Location loc
 ) const {
-  return builder.create<ReadFieldOp>(loc, type, src, name);
+  if (slot == nullptr) {
+    return builder.create<ReadFieldOp>(loc, type, src, name);
+  }
+
+  assert(slotType);
+  return loadSlot(*slot, type, name, slotType, loc, builder, src);
 }
 
 Type ZML_BVDialectHelper::deduceComponentType(FunctionOpInterface func) const {

@@ -35,8 +35,8 @@
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
 #include <zklang/Dialect/ZML/Utils/BackVariables.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 #include <zklang/LanguageSupport/ZIR/BackVariables.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
 #define DEBUG_TYPE "lower-zhl-pass"

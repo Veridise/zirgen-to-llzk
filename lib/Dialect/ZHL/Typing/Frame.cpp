@@ -103,7 +103,8 @@ void InnerFrame::print(llvm::raw_ostream &os) const {
 }
 
 ArrayFrame::ArrayFrame(const TypeBindings &bindings)
-    : ComponentSlot(FS_Array, bindings, bindings.Component(), "$array"), iv(nullptr), innerFrame{} {
+    : ComponentSlot(FS_Array, bindings, bindings.Component(), "$array"), iv(nullptr), innerFrame{},
+      size(bindings.UnkConst()) {
   innerFrame.setParentSlot(this);
 }
 
@@ -184,7 +185,7 @@ void ComponentSlot::print(llvm::raw_ostream &os) const {
 template <typename T>
 T traverseNestedArrayFramesT(
     const FrameSlot *root, const FrameSlot *slot, const T &t,
-    std::function<T(const ArrayFrame *, const T &)> onArrayFrame
+    std::function<T(const ArrayFrame &, const T &)> onArrayFrame
 ) {
   if (!slot) {
     return t;
@@ -193,19 +194,19 @@ T traverseNestedArrayFramesT(
     if (auto arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
       /// Make a copy of the array just created to make sure it survives until the recursive
       /// function finishes
-      auto arrayT = onArrayFrame(arrayFrame, t);
+      auto arrayT = onArrayFrame(*arrayFrame, t);
       return traverseNestedArrayFramesT(root, slot->getParentSlot(), arrayT, onArrayFrame);
     }
   }
   return traverseNestedArrayFramesT(root, slot->getParentSlot(), t, onArrayFrame);
 }
 
-void traverseNestedArrayFrames(
+static void traverseNestedArrayFrames(
     const FrameSlot *root, const FrameSlot *slot,
-    std::function<void(const ArrayFrame *)> onArrayFrame
+    std::function<void(const ArrayFrame &)> onArrayFrame
 ) {
   size_t dummy = 0;
-  traverseNestedArrayFramesT<size_t>(root, slot, dummy, [&](const ArrayFrame *frame, auto &) {
+  traverseNestedArrayFramesT<size_t>(root, slot, dummy, [&](const ArrayFrame &frame, auto &) {
     onArrayFrame(frame);
     return 0;
   });
@@ -219,16 +220,16 @@ void ComponentSlot::setBinding(TypeBinding &newBinding) {
 TypeBinding ComponentSlot::getBinding() const {
   return traverseNestedArrayFramesT<TypeBinding>(
       this, this, binding,
-      [&](const ArrayFrame *, const TypeBinding &b) {
-    return bindingsCtx->UnkArray(b, b.getLocation());
+      [&](const ArrayFrame &frame, const TypeBinding &b) {
+    return bindingsCtx->Array(b, frame.getSize(), b.getLocation());
   }
   );
 }
 
 mlir::SmallVector<mlir::Value> ComponentSlot::collectIVs() const {
   mlir::SmallVector<mlir::Value> vec;
-  traverseNestedArrayFrames(this, this, [&](const ArrayFrame *frame) {
-    vec.insert(vec.begin(), frame->getInductionVar());
+  traverseNestedArrayFrames(this, this, [&](const ArrayFrame &frame) {
+    vec.insert(vec.begin(), frame.getInductionVar());
   });
   return vec;
 }

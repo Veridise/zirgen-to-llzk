@@ -17,8 +17,8 @@
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
 #include <zklang/Dialect/ZML/Utils/BackVariables.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 #include <zklang/LanguageSupport/ZIR/BackVariables.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
 
 using namespace mlir;
 using namespace zhl;
@@ -321,54 +321,55 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   );
 }
 
-mlir::Value
-CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args) {
-  SmallVector<Value> argValues(args);
+Value CtorCallBuilder::buildCallWithoutSlot(OpBuilder &builder, Location loc, ValueRange args) {
   auto genericParams = compBinding.getGenericParamsMapping();
   auto ref = builder.create<ConstructorRefOp>(
       loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
       isBuiltin
   );
 
-  if (usesBackVariables) {
-    auto slot = mlir::dyn_cast_if_present<ComponentSlot>(compBinding.getSlot());
-    assert(slot);
-    auto func = ref->getParentOfType<func::FuncOp>();
-    assert(func && "calling a constructor outside a FuncOp");
-    ZML_BVDialectHelper TP;
-    auto parentBV = lang::zir::loadBVValues(TP, func);
-    FlatSymbolRefAttr fieldName =
-        FlatSymbolRefAttr::get(builder.getStringAttr(slot->getSlotName()));
-    auto BV = lang::zir::loadMemoryForField(
-        parentBV, fieldName, materializeTypeBinding(builder.getContext(), compBinding), TP, builder,
-        loc
-    );
-    lang::zir::injectBVArgs(BV, argValues);
-  }
+  auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
+  builder.create<ConstrainCallOp>(loc, call.getResult(0), args);
+  return call.getResult(0);
+}
 
-  auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, argValues);
-  Value compValue = call.getResult(0);
-
-  auto buildPrologue = [&](mlir::Value v) {
-    builder.create<ConstrainCallOp>(loc, v, argValues);
-    return v;
-  };
+Value CtorCallBuilder::build(OpBuilder &builder, Location loc, ValueRange argsRange) {
   if (!compBinding.getSlot()) {
-    return buildPrologue(compValue);
+    return buildCallWithoutSlot(builder, loc, argsRange);
   }
+
+  SmallVector<Value> args(argsRange);
 
   auto compSlot = mlir::cast<zhl::ComponentSlot>(compBinding.getSlot());
+  // Generate the concrete type that is required based in the scope (i.e. inside an array frame this
+  // will generate an array type wrapping the inner type).
   auto compSlotBinding = compSlot->getBinding();
-
   // Create the field
   auto name = createSlot(compSlot, builder, callerComponentOp, loc);
   auto slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
 
+  if (usesBackVariables) {
+    ZML_BVDialectHelper TP(*compSlot, builder.getContext());
+    auto parentBV = lang::zir::loadBVValues(TP, callerComponentOp.getBodyFunc());
+    auto BV =
+        lang::zir::loadMemoryForField(parentBV, name, ctorType.getResult(0), TP, builder, loc);
+    lang::zir::injectBVArgs(BV, args);
+  }
+
+  auto genericParams = compBinding.getGenericParamsMapping();
+  auto ref = builder.create<ConstructorRefOp>(
+      loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
+      isBuiltin
+  );
+
+  auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
+  Value compValue = call.getResult(0);
+
   compValue = storeAndLoadSlot(
       *compSlot, compValue, name, slotType, loc, callerComponentOp.getType(), builder, self
   );
-
-  return buildPrologue(compValue);
+  builder.create<ConstrainCallOp>(loc, compValue, args);
+  return compValue;
 }
 
 mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }

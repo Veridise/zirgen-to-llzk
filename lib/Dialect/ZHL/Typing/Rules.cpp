@@ -1,5 +1,6 @@
 #include <llvm/ADT/bit.h>
 #include <llvm/Support/Debug.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <numeric>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
@@ -633,6 +634,10 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
   if (!operands[0].isArray()) {
     return op->emitError() << "reduce expression expects an array, but got '" << operands[0] << "'";
   }
+  auto arrayLen = operands[0].getArraySize([&] { return op->emitError(); });
+  if (failed(arrayLen)) {
+    return failure();
+  }
   auto ctorParams = operands[2].getConstructorParams();
   if (ctorParams.size() != 2) {
     return op->emitError() << "accumulator must be accept 2 constructor arguments, but '"
@@ -655,6 +660,13 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
                            << ctorParams.getParam(0)
                            << "' is not a valid super type for reduce expression result type '"
                            << output << "'";
+  }
+
+  if (auto *arrayFrame =
+          mlir::dyn_cast_if_present<ArrayFrame>(scope.getCurrentFrame().getParentSlot())) {
+    arrayFrame->setSize(*arrayLen);
+  } else {
+    LLVM_DEBUG(llvm::dbgs() << "ReduceOp did not record the size of the array into the frame\n");
   }
 
   return interpretOp(op, output);
@@ -759,6 +771,9 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
       );
       // Any other slot simply gets forwarded
       binding.markSlot(slot);
+    }
+    if (auto *arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
+      arrayFrame->setSize(*arrayLen);
     }
   } else {
     LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << "\n");

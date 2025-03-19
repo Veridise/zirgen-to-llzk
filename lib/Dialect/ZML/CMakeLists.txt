@@ -6,4 +6,5 @@ add_subdirectory(ExtVal)
 
 target_sources(ZIRC PRIVATE 
   BackVariables.cpp
+  Helpers.cpp
 )

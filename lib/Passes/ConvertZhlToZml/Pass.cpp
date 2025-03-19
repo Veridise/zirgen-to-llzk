@@ -20,7 +20,7 @@
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Pass.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
