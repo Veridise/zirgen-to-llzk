@@ -15,11 +15,18 @@ jobs:
         build_type: [ Debug ]
         generator: [ Ninja ]
         c_compiler: [ gcc, clang ]
+        sanitizers: [ yes, no ]
         include:
           - c_compiler: gcc 
             cpp_compiler: g++
           - c_compiler: clang 
             cpp_compiler: clang++
+          - sanitizers: yes 
+            extra_cmake_flags: |
+              -DZKLANG_ENABLE_SANITIZER_ADDRESS=YES 
+              -DZKLANG_ENABLE_SANITIZER_UNDEFINED=YES 
+          - sanitizers: no 
+            extra_cmake_flags:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,6 +67,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          ${{ matrix.extra_cmake_flags }}
           -G ${{ matrix.generator }}
           -S ${{ github.workspace }}
       - name: Build zklang
