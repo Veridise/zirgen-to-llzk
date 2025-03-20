@@ -67,9 +67,10 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          ${{ matrix.extra_cmake_flags }}
           -G ${{ matrix.generator }}
           -S ${{ github.workspace }}
+          ${{ matrix.extra_cmake_flags }}
+        # Keep the extra cmake flags at the end to avoid a line break!
       - name: Build zklang
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target zklang
       - name: Build zklang-opt
