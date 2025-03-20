@@ -23,7 +23,7 @@ jobs:
             cpp_compiler: clang++
           - sanitizers: yes 
             extra_cmake_flags: |
-              -DZKLANG_ENABLE_SANITIZER_ADDRESS=YES 
+              -DZKLANG_ENABLE_SANITIZER_ADDRESS=YES \
               -DZKLANG_ENABLE_SANITIZER_UNDEFINED=YES 
           - sanitizers: no 
             extra_cmake_flags:
