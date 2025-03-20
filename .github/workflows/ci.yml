@@ -60,7 +60,16 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -G ${{ matrix.generator }}
           -S ${{ github.workspace }}
+      - name: Build zklang
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target zklang
+      - name: Build zklang-opt
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target zklang-opt
+      - name: Run unit tests
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target check-unit
+      - name: Run lit tests
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target check-lit
 
       - name: Clear Git credentials
         if: "${{ always() }}"
