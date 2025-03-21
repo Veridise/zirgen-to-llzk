@@ -19,9 +19,9 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Enhance error reporting and compiler messages
-if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*")
   add_compile_options(-fcolor-diagnostics)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*GNU.*")
   add_compile_options(-fdiagnostics-color=auto)
 else()
   message(STATUS "No colored compiler diagnostic set for '${CMAKE_CXX_COMPILER_ID}' compiler.")

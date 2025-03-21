@@ -15,7 +15,7 @@ macro(zklang_setup_dependencies ZKLANG_EXPORT_TARGETS)
 
   # Dependency setup
 
-  message(STATUS "${CMAKE_MODULE_PATH}")
+  message(DEBUG "${CMAKE_MODULE_PATH}")
 
   find_package(LLVM 18.1 REQUIRED CONFIG)
   message(STATUS "Using LLVM in: ${LLVM_DIR}")
@@ -26,7 +26,7 @@ macro(zklang_setup_dependencies ZKLANG_EXPORT_TARGETS)
   find_package(LLZK REQUIRED CONFIG)
   message(STATUS "Using LLZK in: ${LLZK_DIR}")
 
-  # LLVM & MLIR do not propagate their include dirs correctly We define them as
+  # LLVM & MLIR do not propagate their include dirs correctly, so we define them as
   # INTERFACE libraries and link against them
   add_header_library(LLVMHeaders ${LLVM_INCLUDE_DIRS} ${ZKLANG_EXPORT_TARGETS})
   add_header_library(MLIRHeaders ${MLIR_INCLUDE_DIRS} ${ZKLANG_EXPORT_TARGETS})
