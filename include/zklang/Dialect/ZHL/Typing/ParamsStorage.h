@@ -77,8 +77,6 @@ struct ParamsStorage {
   /// and fills the positions that are not claimed by the parameters in the map with a default
   /// value.
   ParamsStorage(const ParamsMap &Map, size_t Size, const TypeBinding &Default);
-
-  bool operator==(const ParamsStorage &) const;
 };
 
 } // namespace zhl

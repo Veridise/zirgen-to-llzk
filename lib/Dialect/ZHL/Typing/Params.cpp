@@ -19,10 +19,12 @@ static void fillVectors(
     SmallVectorImpl<ParamName> &names, BitVector &injected
 ) {
   for (auto &entry : map) {
-    auto pos = entry.getValue().Pos;
-    tmp[pos] = &entry.getValue().Type;
+    const ParamData &val = entry.getValue();
+    uint64_t pos = val.Pos;
+    tmp[pos] = &val.Type;
     names[pos] = entry.getKey();
-    injected[pos] = entry.getValue().Injected;
+    assert(pos <= std::numeric_limits<unsigned int>::max());
+    injected[static_cast<unsigned int>(pos)] = val.Injected;
   }
 }
 
@@ -59,7 +61,9 @@ ParamsStorage::ParamsStorage(const ParamsMap &map, size_t size, const TypeBindin
 Params::operator ParamsMap() const {
   ParamsMap map;
   for (size_t i = 0; i < data()->params.size(); i++) {
-    map.declare(data()->names[i], data()->params[i], i, data()->injected[i]);
+    assert(i <= std::numeric_limits<unsigned int>::max());
+    bool injected = data()->injected[static_cast<unsigned int>(i)];
+    map.declare(data()->names[i], data()->params[i], i, injected);
   }
   return map;
 }
@@ -86,7 +90,8 @@ ParamsList Params::getDeclaredParams() const {
   ParamsList params;
 
   for (size_t i = 0; i < data()->params.size(); i++) {
-    if (!data()->injected[i]) {
+    assert(i <= std::numeric_limits<unsigned int>::max());
+    if (!data()->injected[static_cast<unsigned int>(i)]) {
       params.push_back(data()->params[i]);
     }
   }

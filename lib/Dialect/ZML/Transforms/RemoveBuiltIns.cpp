@@ -30,7 +30,7 @@ public:
   using OpConversionPattern<CompType>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      CompType op, typename OpConversionPattern<CompType>::OpAdaptor adaptor,
+      CompType op, [[maybe_unused]] typename OpConversionPattern<CompType>::OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter
   ) const override {
     auto name = op.getName();

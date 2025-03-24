@@ -80,7 +80,7 @@ static LogicalResult specializeTypeBindingImpl(
 
 static LogicalResult specializeTypeBinding_genericParamCase(
     TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
-    const TypeBindings &bindings, size_t indent
+    [[maybe_unused]] const TypeBindings &bindings, size_t indent
 ) {
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Specializing " << *dst << "\n");
   auto varName = dst->getGenericParamName();
@@ -269,7 +269,7 @@ constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t ind
 }
 
 static FailureOr<ConstExpr>
-constantFoldValExpr(const ValView &expr, ParamsScopeStack &scopes, size_t indent) {
+constantFoldValExpr(const ValView &expr, [[maybe_unused]] ParamsScopeStack &scopes, size_t indent) {
   LLVM_DEBUG(spaces(indent);
              llvm::dbgs() << "Propagating constants in Val expr " << expr << " is trivial\n");
   return expr;
@@ -488,7 +488,7 @@ static LogicalResult propagateConstants(
     auto &type = member.getValue();
     if (type.has_value()) {
       ParamsStorage memberSto;
-      auto memberScope = getConstantParams(*type, memberSto);
+      Params memberScope = getConstantParams(*type, memberSto);
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in member " << name
                                               << " of type " << *type << "\n");
       {
@@ -602,8 +602,8 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   }
   // Convert the lifted parameters to their expressions, contained in their super type
   auto genericParamsMapping = getGenericParamsMapping();
-  auto totalSize = genericParamsMapping.size();
-  for (unsigned i = params.size(); i < totalSize; i++) {
+  size_t totalSize = genericParamsMapping.size();
+  for (size_t i = params.size(); i < totalSize; i++) {
     assert(genericParamsMapping.getParam(i).hasSuperType());
     generics.declare(
         genericParamsMapping.getName(i), genericParamsMapping.getParam(i).getSuperType(), i

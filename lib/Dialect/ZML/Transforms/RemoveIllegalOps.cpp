@@ -67,7 +67,7 @@ public:
   using OpConversionPattern<Op>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
+      Op op, [[maybe_unused]] typename OpConversionPattern<Op>::OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter
   ) const override {
     rewriter.eraseOp(op);
@@ -80,7 +80,7 @@ public:
   using OpConversionPattern<Op>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
+      Op op, [[maybe_unused]] typename OpConversionPattern<Op>::OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter
   ) const override {
     auto body = op->template getParentOfType<mlir::func::FuncOp>();
@@ -97,9 +97,9 @@ public:
   using OpConversionPattern<func::CallIndirectOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      func::CallIndirectOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+      [[maybe_unused]] func::CallIndirectOp op, [[maybe_unused]] OpAdaptor adaptor,
+      [[maybe_unused]] ConversionPatternRewriter &rewriter
   ) const override {
-
     return mlir::failure();
   }
 };
@@ -149,9 +149,9 @@ public:
   using OpConversionPattern<WriteArrayOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      WriteArrayOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+      [[maybe_unused]] WriteArrayOp op, [[maybe_unused]] OpAdaptor adaptor,
+      [[maybe_unused]] ConversionPatternRewriter &rewriter
   ) const override {
-
     return success();
   }
 };

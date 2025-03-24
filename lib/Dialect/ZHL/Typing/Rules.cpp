@@ -24,19 +24,19 @@ using namespace mlir;
 using namespace expr::interpreter;
 
 mlir::FailureOr<TypeBinding> LiteralTypingRule::
-    typeCheck(zirgen::Zhl::LiteralOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::LiteralOp op, mlir::ArrayRef<TypeBinding>, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   return interpretOp(op, getBindings().Const(op.getValue()));
 }
 
 mlir::FailureOr<TypeBinding> StringTypingRule::
-    typeCheck(zirgen::Zhl::StringOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::StringOp op, mlir::ArrayRef<TypeBinding>, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   return interpretOp(op, getBindings().Get("String"));
 }
 
 mlir::FailureOr<TypeBinding> GlobalTypingRule::
-    typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   auto binding = getBindings().MaybeGet(op.getName());
   if (mlir::failed(binding)) {
@@ -87,7 +87,7 @@ mlir::FailureOr<TypeBinding> ParameterTypingRule::
 }
 
 mlir::FailureOr<TypeBinding> ExternTypingRule::
-    typeCheck(zirgen::Zhl::ExternOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ExternOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
     return mlir::failure();
@@ -115,7 +115,7 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
 }
 
 mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
-    typeCheck(zirgen::Zhl::GetGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::GetGlobalOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   // TODO: Add check that the global exists in the scope
   if (operands.empty()) {
@@ -125,7 +125,7 @@ mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
 }
 
 mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
-    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   // TODO: Add global declaration to the scope
   if (operands.empty()) {
@@ -378,7 +378,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> ConstrainTypeRule::
-    typeCheck(zirgen::Zhl::ConstraintOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ConstraintOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() != 2) {
     return op.emitError() << "constraint expression expects 2 operands, but got "
@@ -501,7 +501,7 @@ inline LogicalResult checkSpecializationArg(
 } // namespace
 
 mlir::FailureOr<TypeBinding> SpecializeTypeRule::
-    typeCheck(zirgen::Zhl::SpecializeOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::SpecializeOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
     return mlir::failure();
@@ -537,7 +537,7 @@ mlir::FailureOr<TypeBinding> SpecializeTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> SubscriptTypeRule::
-    typeCheck(zirgen::Zhl::SubscriptOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::SubscriptOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
     return mlir::failure();
@@ -547,7 +547,7 @@ mlir::FailureOr<TypeBinding> SubscriptTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> ArrayTypeRule::
-    typeCheck(zirgen::Zhl::ArrayOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ArrayOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
     return op->emitOpError() << "could not infer the type of the array";
@@ -563,7 +563,7 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> BackTypeRule::
-    typeCheck(zirgen::Zhl::BackOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::BackOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 2) {
     return mlir::failure();
@@ -573,7 +573,7 @@ mlir::FailureOr<TypeBinding> BackTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> RangeTypeRule::
-    typeCheck(zirgen::Zhl::RangeOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::RangeOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 2) {
     return mlir::failure();
@@ -610,7 +610,7 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> ReduceTypeRule::
-    typeCheck(zirgen::Zhl::ReduceOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ReduceOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 3) {
     return failure();
@@ -651,7 +651,7 @@ mlir::FailureOr<Frame> ReduceTypeRule::allocate(Frame frame) const {
 }
 
 mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
-    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 2) {
     return mlir::failure();
@@ -661,7 +661,7 @@ mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
 }
 
 FailureOr<TypeBinding> BlockTypeRule::typeCheck(
-    BlockOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *> regionScopes
+    BlockOp op, [[maybe_unused]] ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, ArrayRef<const Scope *> regionScopes
 ) const {
   if (regionScopes.size() != 1) {
     return failure();
@@ -682,7 +682,7 @@ FailureOr<Frame> BlockTypeRule::allocate(Frame frame) const {
 }
 
 FailureOr<TypeBinding> SwitchTypeRule::typeCheck(
-    SwitchOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *> regionScopes
+    SwitchOp op, [[maybe_unused]] ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, ArrayRef<const Scope *> regionScopes
 ) const {
   if (regionScopes.empty()) {
     return failure();
@@ -757,7 +757,7 @@ FailureOr<Frame> MapTypeRule::allocate(Frame frame) const {
 }
 
 FailureOr<std::vector<TypeBinding>> MapTypeRule::bindRegionArguments(
-    ValueRange args, MapOp op, ArrayRef<TypeBinding> operands, Scope &scope
+    ValueRange args, MapOp op, ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope
 ) const {
   if (args.size() != 1) {
     return op->emitError() << "malformed ir: map op must have only one region argument";
@@ -777,7 +777,7 @@ FailureOr<std::vector<TypeBinding>> MapTypeRule::bindRegionArguments(
 }
 
 FailureOr<TypeBinding> LookupTypeRule::
-    typeCheck(LookupOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *>)
+    typeCheck(LookupOp op, ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, ArrayRef<const Scope *>)
         const {
   // Get the type of the component argument
   if (operands.empty()) {

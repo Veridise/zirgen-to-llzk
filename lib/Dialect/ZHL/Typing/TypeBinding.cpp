@@ -437,7 +437,7 @@ FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef member
 
 ParamsStorage *TypeBinding::ParamsStorageFactory::init() { return new ParamsStorage(); }
 
-TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMap &map) {
+TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(const ParamsMap &map) {
   set(new ParamsStorage(map));
   return *this;
 }
@@ -446,7 +446,7 @@ TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMa
   return *this;
 }
 
-TypeBinding::ParamsStoragePtr::ParamsStoragePtr(ParamsMap &map)
+TypeBinding::ParamsStoragePtr::ParamsStoragePtr(const ParamsMap &map)
     : zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>(new ParamsStorage(map)) {}
 
 //==-----------------------------------------------------------------------==//

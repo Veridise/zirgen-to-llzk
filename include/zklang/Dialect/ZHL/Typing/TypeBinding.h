@@ -52,12 +52,12 @@ private:
   struct ParamsStoragePtr : public zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory> {
     using zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>::CopyablePointer;
 
-    ParamsStoragePtr(ParamsMap &);
+    ParamsStoragePtr(const ParamsMap &);
 
     operator Params() const { return Params(this->operator*()); }
     operator MutableParams() { return MutableParams(this->operator*()); }
 
-    ParamsStoragePtr &operator=(ParamsMap &);
+    ParamsStoragePtr &operator=(const ParamsMap &);
     ParamsStoragePtr &operator=(ParamsMap &&);
   };
 
