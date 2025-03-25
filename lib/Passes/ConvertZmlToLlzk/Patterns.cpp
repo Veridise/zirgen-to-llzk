@@ -8,6 +8,7 @@
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/IR/Types.h>
+#include <llzk/Dialect/LLZK/Util/AttributeHelper.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
@@ -239,7 +240,7 @@ static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) 
     return builder.create<llzk::FeltToIndexOp>(loc, param);
   }
   if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
-    return builder.create<arith::ConstantIndexOp>(loc, intAttr.getValue().getZExtValue());
+    return builder.create<arith::ConstantIndexOp>(loc, llzk::fromAPInt(intAttr.getValue()));
   }
   assert(false && "Cannot materialize something that is not a symbol or a literal integer");
 }
