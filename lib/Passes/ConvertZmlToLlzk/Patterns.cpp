@@ -508,7 +508,7 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
     return op.emitOpError() << "was expecting an array type";
   }
 
-  ArrayRef<Attribute> compParams = op->getParentOfType<llzk::StructDefOp>().getType().getParams();
+  ArrayAttr compParams = op->getParentOfType<llzk::StructDefOp>().getType().getParams();
   SmallVector<ConstExprAttr> affineArrayParams;
   for (Attribute attr : op.getResult().getType().getParams()) {
     if (auto param = mlir::dyn_cast<ConstExprAttr>(attr)) {
@@ -526,13 +526,13 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
   for (auto [idx, constExpr] : llvm::enumerate(affineArrayParams)) {
     auto &values = mapOperandsMem[idx];
     for (uint64_t formal : constExpr.getFormals()) {
-      assert(formal <= std::numeric_limits<size_t>::max());
+      assert(formal <= std::numeric_limits<unsigned int>::max());
       assert(
-          static_cast<size_t>(formal) < compParams.size() &&
+          static_cast<unsigned int>(formal) < compParams.size() &&
           "Can only use as map operands declared parameters"
       );
       values.push_back(
-          materializeParam(compParams[static_cast<size_t>(formal)], rewriter, op->getLoc())
+          materializeParam(compParams[static_cast<unsigned int>(formal)], rewriter, op->getLoc())
       );
     }
     mapOperands.push_back(values);
