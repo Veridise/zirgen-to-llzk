@@ -37,7 +37,7 @@ ParamsStorage::ParamsStorage(
       params.push_back(*type);
     } else {
       assert(defaultBinding.has_value() && "cannot have null type when there is no default");
-      params.push_back(std::move(defaultBinding.value()));
+      params.push_back(defaultBinding.value());
     }
   }
 }
