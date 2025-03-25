@@ -562,16 +562,20 @@ mlir::LogicalResult zhl::specializeTypeBinding(
     TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
     const TypeBindings &bindings
 ) {
+  assert(dst);
   WrapLog w(*dst);
+  if (dst->isSpecialized()) {
+    LLVM_DEBUG(llvm::dbgs() << "Type '" << *dst << "' is already specialized. Doing nothing");
+    return success();
+  }
   return specializeTypeBindingImpl(dst, scopes, FV, bindings, 0);
 }
 
 mlir::LogicalResult zhl::specializeTypeBinding(
     TypeBinding *dst, ParamsScopeStack &scopes, const TypeBindings &bindings
 ) {
-  WrapLog w(*dst);
   llvm::StringSet<> emptyFVs;
-  return specializeTypeBindingImpl(dst, scopes, emptyFVs, bindings, 0);
+  return specializeTypeBinding(dst, scopes, emptyFVs, bindings);
 }
 
 mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
