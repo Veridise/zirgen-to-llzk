@@ -749,7 +749,7 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), type);
 
   // Create a for loop op using the operands as bounds
-  auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
+  auto one = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
   auto start = rewriter.create<ValToIndexOp>(op.getStart().getLoc(), startVal);
   auto end = rewriter.create<ValToIndexOp>(op.getEnd().getLoc(), endVal);
   auto loop = rewriter.create<mlir::scf::ForOp>(
@@ -804,8 +804,8 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   assert(succeeded(concreteArrValue));
 
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), outputType);
-  auto one = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 1);
-  auto zero = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), 0);
+  auto one = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
+  auto zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
   auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *arrValue);
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
@@ -1060,8 +1060,8 @@ static LogicalResult prepareLoopValues(
   // type analysis.
   assert(succeeded(arrayResult));
   loopValues.array = *arrayResult;
-  loopValues.stride = builder.create<mlir::index::ConstantOp>(op.getLoc(), 1);
-  loopValues.from = builder.create<mlir::index::ConstantOp>(op.getLoc(), 0);
+  loopValues.stride = builder.create<arith::ConstantIndexOp>(op.getLoc(), 1);
+  loopValues.from = builder.create<arith::ConstantIndexOp>(op.getLoc(), 0);
   loopValues.to = builder.create<GetArrayLenOp>(op.getLoc(), *arrayResult);
 
   return success();

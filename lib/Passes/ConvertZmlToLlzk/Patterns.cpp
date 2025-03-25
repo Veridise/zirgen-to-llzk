@@ -239,10 +239,7 @@ static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) 
     return builder.create<llzk::FeltToIndexOp>(loc, param);
   }
   if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
-    return builder.create<arith::ConstantOp>(
-        loc, builder.getIndexType(),
-        builder.getIntegerAttr(builder.getIndexType(), intAttr.getValue())
-    );
+    return builder.create<arith::ConstantIndexOp>(loc, intAttr.getValue().getZExtValue());
   }
   assert(false && "Cannot materialize something that is not a symbol or a literal integer");
 }
@@ -423,7 +420,7 @@ mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
   if (!adaptor.getElements().empty() && isa<llzk::ArrayType>(adaptor.getElements()[0].getType())) {
     auto arr = rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange());
     for (size_t i = 0; i < adaptor.getElements().size(); i++) {
-      auto idx = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), i);
+      auto idx = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), i);
       rewriter.create<llzk::InsertArrayOp>(
           op.getLoc(), arr, ValueRange({idx}), adaptor.getElements()[i]
       );
