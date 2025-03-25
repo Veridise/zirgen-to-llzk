@@ -1,0 +1,10 @@
+component Foo(a: Array<Array<Val, 2>, 1>) {
+}
+
+component Baz(n: Val) {
+  [n, n+1]
+}
+
+component Bar() {
+  Foo([Baz(1)])
+}

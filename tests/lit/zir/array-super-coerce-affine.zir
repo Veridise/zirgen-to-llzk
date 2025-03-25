@@ -1,0 +1,6 @@
+component Foo<N: Val>(a: Array<Val, N>) {
+}
+
+component Bar<N: Val>() {
+  Foo<N>(for i: 0..N { NondetReg(i) })
+}

@@ -99,18 +99,28 @@ FailureOr<Type> ComponentType::getFirstMatchingSuperType(llvm::function_ref<bool
   return failure();
 }
 
-FailureOr<Attribute> ComponentType::getArraySize() const {
-  if (!isArray()) {
+static FailureOr<Attribute> getArrayProperty(ComponentType t, size_t idx) {
+  if (!t.isArray()) {
     return failure();
   }
-  if (getName().getValue() == "Array") {
-    assert(getParams().size() == 2 && "Arrays must have only two params by definition");
-    return getParams()[1];
+  if (t.isConcreteArray()) {
+    assert(t.getParams().size() == 2 && "Arrays must have only two params by definition");
+    return t.getParams()[idx];
   }
-  if (!getSuperTypeAsComp()) {
+  if (!t.getSuperTypeAsComp()) {
     return failure();
   }
-  return getSuperTypeAsComp().getArraySize();
+  return getArrayProperty(t.getSuperTypeAsComp(), idx);
+}
+
+FailureOr<Attribute> ComponentType::getArraySize() const { return getArrayProperty(*this, 1); }
+
+FailureOr<Type> ComponentType::getArrayInnerType() const {
+  if (auto typeAttr =
+          mlir::dyn_cast_if_present<TypeAttr>(getArrayProperty(*this, 0).value_or(nullptr))) {
+    return typeAttr.getValue();
+  }
+  return failure();
 }
 
 ComponentType ComponentType::getSuperTypeAsComp() const {

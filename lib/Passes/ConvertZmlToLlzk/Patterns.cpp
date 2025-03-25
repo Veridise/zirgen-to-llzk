@@ -170,33 +170,101 @@ static std::unordered_set<std::string_view> builtinsConvertibleToOps{
     "Mod", "InRange", "ExtVal", "ExtAdd", "ExtSub", "ExtInv", "ExtMul", "MakeExt"
 };
 
-bool wasConvertedToPrimitiveType(ComponentType t) {
+static bool wasConvertedToPrimitiveType(ComponentType t) {
   return t.getBuiltin() &&
          (builtinsConvertibleToOps.find(t.getName().getValue()) != builtinsConvertibleToOps.end());
+}
+
+static Value readArray(Value src, Value iv, OpBuilder &builder, Location loc) {
+  auto type = mlir::cast<llzk::ArrayType>(src.getType());
+  if (type.getDimensionSizes().size() == 1) {
+    return builder.create<llzk::ReadArrayOp>(loc, src, iv);
+  }
+  return builder.create<llzk::ExtractArrayOp>(loc, src, iv);
+}
+
+static void writeArray(Value dst, Value iv, Value val, OpBuilder &builder, Location loc) {
+  auto type = mlir::cast<llzk::ArrayType>(dst.getType());
+  if (type.getDimensionSizes().size() == 1) {
+    builder.create<llzk::WriteArrayOp>(loc, dst, iv, val);
+  } else {
+    builder.create<llzk::InsertArrayOp>(loc, dst, iv, val);
+  }
+}
+
+static Value readSuperFields(
+    ComponentType type, Value chain, Type target, const TypeConverter &tc, Location loc,
+    OpBuilder &builder
+);
+
+static Value copyArraySuperFields(
+    ComponentType innerType, Value chain, Type target, const TypeConverter &tc, Location loc,
+    OpBuilder &builder
+) {
+  auto targetInner = mlir::cast<ComponentType>(target).getArrayInnerType();
+  auto targetArrayType = mlir::cast_if_present<llzk::ArrayType>(tc.convertType(target));
+
+  auto array = builder.create<llzk::CreateArrayOp>(loc, targetArrayType);
+
+  auto lb = builder.create<arith::ConstantIndexOp>(loc, 0);
+  auto ub = builder.create<llzk::ArrayLengthOp>(
+      loc, TypeRange({IndexType::get(builder.getContext())}), chain, lb
+  );
+  auto stride = builder.create<arith::ConstantIndexOp>(loc, 1);
+
+  auto loop = builder.create<scf::ForOp>(
+      loc, lb, stride, ub, ValueRange({array}),
+      [&](OpBuilder &builder, Location loc, Value iv, ValueRange args) {
+    auto src = readArray(chain, iv, builder, loc);
+    auto super = readSuperFields(innerType, src, *targetInner, tc, loc, builder);
+    writeArray(args[0], iv, super, builder, loc);
+
+    builder.create<scf::YieldOp>(loc, args);
+  }
+  );
+  return loop.getResult(0);
+}
+
+static Value readSuperFields(
+    ComponentType type, Value chain, Type target, const TypeConverter &tc, Location loc,
+    OpBuilder &builder
+) {
+
+  auto superComp = mlir::dyn_cast_if_present<ComponentType>(type.getSuperType());
+  // Stop if we reached a builtin that transforms to a primitive llzk type, we are done, or we
+  // cannot continue extracting
+  if (type == target || wasConvertedToPrimitiveType(type) || !superComp ||
+      mlir::isa<TypeVarType>(type.getSuperType())) {
+    return chain;
+  }
+  if (type.isConcreteArray()) {
+    auto targetAsComp = mlir::dyn_cast_if_present<ComponentType>(target);
+    // If the target is an array component then read the super fields of the inner elements and
+    // returns a new array with those values.
+    if (targetAsComp && targetAsComp.isConcreteArray()) {
+      return copyArraySuperFields(
+          mlir::cast<ComponentType>(*type.getArrayInnerType()), chain, target, tc, loc, builder
+      );
+    }
+    return chain;
+  }
+
+  auto read = builder.create<llzk::FieldReadOp>(loc, tc.convertType(superComp), chain, "$super");
+  return readSuperFields(superComp, read, target, tc, loc, builder);
 }
 
 LogicalResult LowerSuperCoerceOp::matchAndRewrite(
     SuperCoerceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
   auto t = mlir::dyn_cast<ComponentType>(op.getOperand().getType());
-  auto opChain = adaptor.getComponent();
+  assert(t);
   auto tc = getTypeConverter();
-  while (t != op.getResult().getType()) {
-    if (wasConvertedToPrimitiveType(t) || t.getName().getValue() == "Array") {
-      break;
-    }
-    auto typ = t.getSuperType();
-    if (!typ || mlir::isa<TypeVarType>(typ)) {
-      break;
-    }
-    if (auto comp = mlir::dyn_cast<ComponentType>(typ)) {
-      t = comp;
-    }
-    opChain =
-        rewriter.create<llzk::FieldReadOp>(op.getLoc(), tc->convertType(t), opChain, "$super");
-    assert(t);
-  }
-  rewriter.replaceOp(op, opChain);
+  assert(tc);
+  rewriter.replaceOp(
+      op, readSuperFields(
+              t, adaptor.getComponent(), op.getResult().getType(), *tc, op.getLoc(), rewriter
+          )
+  );
   return success();
 }
 

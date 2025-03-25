@@ -1,0 +1,6 @@
+component Foo(a: Array<Val, 1>) {
+}
+
+component Bar() {
+  Foo([NondetReg(1)])
+}
