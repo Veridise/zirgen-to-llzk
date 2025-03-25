@@ -11,6 +11,6 @@
 /.clwb/
 
 /build
-/.direnv
+.direnv/
 /result
 .envrc
