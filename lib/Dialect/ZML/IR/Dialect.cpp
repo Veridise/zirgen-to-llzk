@@ -48,7 +48,7 @@ ZMLDialect::materializeConstant(OpBuilder &builder, Attribute attr, Type type, L
     }
 
     if (isa<IndexType>(type)) {
-      return builder.create<mlir::index::ConstantOp>(loc, intAttr.getInt());
+      return builder.create<arith::ConstantIndexOp>(loc, intAttr.getInt());
     }
   }
   if (auto arrayAttr = mlir::dyn_cast<DenseI64ArrayAttr>(attr)) {

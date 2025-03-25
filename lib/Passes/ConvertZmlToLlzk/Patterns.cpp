@@ -8,6 +8,7 @@
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/IR/Types.h>
+#include <llzk/Dialect/LLZK/Util/AttributeHelper.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
@@ -239,10 +240,7 @@ static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) 
     return builder.create<llzk::FeltToIndexOp>(loc, param);
   }
   if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
-    return builder.create<arith::ConstantOp>(
-        loc, builder.getIndexType(),
-        builder.getIntegerAttr(builder.getIndexType(), intAttr.getValue())
-    );
+    return builder.create<arith::ConstantIndexOp>(loc, llzk::fromAPInt(intAttr.getValue()));
   }
   assert(false && "Cannot materialize something that is not a symbol or a literal integer");
 }
@@ -423,7 +421,7 @@ mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
   if (!adaptor.getElements().empty() && isa<llzk::ArrayType>(adaptor.getElements()[0].getType())) {
     auto arr = rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange());
     for (size_t i = 0; i < adaptor.getElements().size(); i++) {
-      auto idx = rewriter.create<mlir::index::ConstantOp>(op.getLoc(), i);
+      auto idx = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), i);
       rewriter.create<llzk::InsertArrayOp>(
           op.getLoc(), arr, ValueRange({idx}), adaptor.getElements()[i]
       );
