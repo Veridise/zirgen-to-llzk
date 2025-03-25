@@ -83,9 +83,9 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp, WriteFieldOpLowering,
       LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
       ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, ExternCallOpLowering,
-      CallIndirectOpLoweringInCompute, WriteFieldOpLowering, RemoveConstructorRefOp,
-      RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering, AssertOpLowering,
-      LowerLitValArrayOp, LitStrOpLowering>(*typeConverter, ctx);
+      CallIndirectOpLoweringInCompute, RemoveConstructorRefOp, RemoveExternFnRefOp,
+      UpdateScfExecuteRegionOpTypes, ValToI1OpLowering, AssertOpLowering, LowerLitValArrayOp,
+      LitStrOpLowering>(*typeConverter, ctx);
   populateExtValToLlzkConversionPatterns(patterns, *typeConverter, ctx, *extValConverter);
 
   scf::populateSCFStructuralTypeConversions(*typeConverter, patterns);
