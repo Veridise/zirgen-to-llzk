@@ -48,7 +48,7 @@ LogicalResult configureField(
     llvm::function_ref<InFlightDiagnostic()> emitError
 ) {
   return llvm::StringSwitch<llvm::function_ref<LogicalResult()>>(name)
-      .Case("babybear", [&]() {
+      .Case("babybear", [&] {
     ff::babybear::Field BabyBear;
     typeConverter = std::make_unique<llzk::LLZKTypeConverter>(BabyBear);
     converter = std::make_unique<zml::extval::babybear::Converter>(*typeConverter);
@@ -60,13 +60,13 @@ LogicalResult configureField(
 namespace zml {
 
 void ConvertZmlToLlzkPass::runOnOperation() {
-  auto op = getOperation();
+  ModuleOp op = getOperation();
 
-  mlir::MLIRContext *ctx = op->getContext();
+  mlir::MLIRContext *ctx = &getContext();
   LLZKTypeConverterPtr typeConverter;
   ConverterPtr extValConverter;
   // Only BabyBear is supported for now. More to come (LLZK-180)
-  if (failed(configureField(selectedExtValField, typeConverter, extValConverter, [&]() {
+  if (failed(configureField(selectedExtValField, typeConverter, extValConverter, [&op] {
     return op->emitError();
   }))) {
     llvm::errs() << "Failed to configure field\n";
@@ -97,10 +97,6 @@ void ConvertZmlToLlzkPass::runOnOperation() {
 
   // Legality for scf ops added manually here because ExecuteRegionOp and its associated YieldOp are
   // not supported by the MLIR provided populate* function
-  target.addDynamicallyLegalOp<scf::ExecuteRegionOp>([&](scf::ExecuteRegionOp execOp) {
-    return typeConverter->isLegal(execOp.getResultTypes());
-  });
-
   target.addDynamicallyLegalOp<scf::YieldOp>([&](scf::YieldOp yieldOp) {
     if (!isa<scf::ExecuteRegionOp, scf::ForOp, scf::IfOp, scf::WhileOp>(yieldOp->getParentOp())) {
       return true;
@@ -108,11 +104,11 @@ void ConvertZmlToLlzkPass::runOnOperation() {
     return typeConverter->isLegal(yieldOp.getOperandTypes());
   });
 
-  target.addDynamicallyLegalOp<scf::ForOp, scf::IfOp>([&](Operation *scfOp) {
-    return typeConverter->isLegal(scfOp->getResultTypes());
-  });
+  target.addDynamicallyLegalOp<scf::ExecuteRegionOp, scf::ForOp, scf::IfOp>(
+      [&typeConverter](Operation *scfOp) { return typeConverter->isLegal(scfOp->getResultTypes()); }
+  );
 
-  target.addDynamicallyLegalOp<scf::WhileOp, scf::ConditionOp>([&](Operation *scfOp) {
+  target.addDynamicallyLegalOp<scf::WhileOp, scf::ConditionOp>([&typeConverter](Operation *scfOp) {
     return typeConverter->isLegal(scfOp);
   });
 
@@ -122,7 +118,7 @@ void ConvertZmlToLlzkPass::runOnOperation() {
 }
 
 void InjectLlzkModAttrsPass::runOnOperation() {
-  auto op = getOperation();
+  ModuleOp op = getOperation();
   op->setAttr(
       llzk::LANG_ATTR_NAME,
       mlir::StringAttr::get(&getContext(), llzk::LLZKDialect::getDialectNamespace())
