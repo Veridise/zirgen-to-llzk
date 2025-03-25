@@ -661,7 +661,8 @@ mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
 }
 
 FailureOr<TypeBinding> BlockTypeRule::typeCheck(
-    BlockOp op, [[maybe_unused]] ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, ArrayRef<const Scope *> regionScopes
+    BlockOp op, [[maybe_unused]] ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope,
+    ArrayRef<const Scope *> regionScopes
 ) const {
   if (regionScopes.size() != 1) {
     return failure();
@@ -682,7 +683,8 @@ FailureOr<Frame> BlockTypeRule::allocate(Frame frame) const {
 }
 
 FailureOr<TypeBinding> SwitchTypeRule::typeCheck(
-    SwitchOp op, [[maybe_unused]] ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope, ArrayRef<const Scope *> regionScopes
+    SwitchOp op, [[maybe_unused]] ArrayRef<TypeBinding> operands, [[maybe_unused]] Scope &scope,
+    ArrayRef<const Scope *> regionScopes
 ) const {
   if (regionScopes.empty()) {
     return failure();
