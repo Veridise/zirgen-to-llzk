@@ -37,9 +37,8 @@ using namespace mlir;
 mlir::LogicalResult LitValOpLowering::matchAndRewrite(
     LitValOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  llzk::FeltType felt = llzk::FeltType::get(getContext());
   rewriter.replaceOpWithNewOp<llzk::FeltConstantOp>(
-      op, felt, llzk::FeltConstAttr::get(getContext(), llvm::APInt(64, adaptor.getValue()))
+      op, llzk::FeltConstAttr::get(getContext(), llvm::APInt(64, adaptor.getValue()))
   );
   return mlir::success();
 }
@@ -114,10 +113,10 @@ mlir::LogicalResult FuncOpLowering::matchAndRewrite(
   auto newType =
       mlir::FunctionType::get(rewriter.getContext(), result.getConvertedTypes(), newResults);
 
-  auto newFuncOp = rewriter.replaceOpWithNewOp<llzk::FuncOp>(op, op.getNameAttr(), newType);
+  auto newFuncOp = rewriter.create<llzk::FuncOp>(op.getLoc(), op.getNameAttr(), newType);
   cloneAttrsIntoLlzkFunc(op, newFuncOp);
-
   rewriter.inlineRegionBefore(op.getRegion(), newFuncOp.getRegion(), newFuncOp.end());
+  rewriter.replaceOp(op, newFuncOp);
   return mlir::success();
 }
 
@@ -422,11 +421,12 @@ mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
 
   // If it's an array then we allocate an empty one and then insert each operand with InsertArrayOp
   if (!adaptor.getElements().empty() && isa<llzk::ArrayType>(adaptor.getElements()[0].getType())) {
+    Location cachedLoc = op.getLoc();
     auto arr = rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange());
     for (size_t i = 0; i < adaptor.getElements().size(); i++) {
-      auto idx = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), i);
+      auto idx = rewriter.create<arith::ConstantIndexOp>(cachedLoc, i);
       rewriter.create<llzk::InsertArrayOp>(
-          op.getLoc(), arr, ValueRange({idx}), adaptor.getElements()[i]
+          cachedLoc, arr, ValueRange({idx}), adaptor.getElements()[i]
       );
     }
   } else {
@@ -601,8 +601,9 @@ mlir::LogicalResult UpdateScfExecuteRegionOpTypes::matchAndRewrite(
   if (mlir::failed(getTypeConverter()->convertTypes(op.getResultTypes(), newTypes))) {
     return mlir::failure();
   }
-  auto exec = rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, newTypes);
+  auto exec = rewriter.create<mlir::scf::ExecuteRegionOp>(op.getLoc(), newTypes);
   rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
+  rewriter.replaceOp(op, exec);
 
   return mlir::success();
 }

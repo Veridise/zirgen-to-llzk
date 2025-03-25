@@ -859,8 +859,10 @@ mlir::LogicalResult ZhlBlockLowering::matchAndRewrite(
   }
 
   auto type = materializeTypeBinding(getContext(), *binding);
-  auto exec = rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, type);
+
+  auto exec = rewriter.create<mlir::scf::ExecuteRegionOp>(op.getLoc(), type);
   rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
+  rewriter.replaceOp(op, exec);
   return mlir::success();
 }
 
@@ -1186,13 +1188,14 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
   ValueRange condsRange(conds);
 
   auto retType = materializeTypeBinding(getContext(), *binding);
-  RegionRange regions = op.getRegions();
-  auto execRegion = rewriter.replaceOpWithNewOp<scf::ExecuteRegionOp>(op, retType);
 
-  auto &block = execRegion.getRegion().emplaceBlock();
+  auto execRegion = rewriter.create<scf::ExecuteRegionOp>(op.getLoc(), retType);
+  RegionRange regions = op.getRegions();
+  Block &block = execRegion.getRegion().emplaceBlock();
   buildIfThenElseChain(
       regions.begin(), regions.end(), condsRange.begin(), block, block.end(), rewriter, retType
   );
+  rewriter.replaceOp(op, execRegion);
 
   return success();
 }
