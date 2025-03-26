@@ -1,6 +1,5 @@
 include_directories(SYSTEM ${MLIR_INCLUDE_DIRS} ${LLZK_INCLUDE_DIR})
 
-
 set(LLVM_TARGET_DEFINITIONS "Dialect.td")
 mlir_tablegen(Dialect.h.inc -gen-dialect-decls -dialect=zml)
 mlir_tablegen(Dialect.cpp.inc -gen-dialect-defs -dialect=zml)
