@@ -18,7 +18,7 @@ using namespace zml;
 ComponentBuilder &builtinCommon(ComponentBuilder &builder) { return builder.isBuiltin(); }
 
 ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
-  return builder.fillBody({type}, {type}, [&type](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+  return builder.fillBody({type}, {type}, [type](mlir::ValueRange args, mlir::OpBuilder &bldr) {
     mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, type);
