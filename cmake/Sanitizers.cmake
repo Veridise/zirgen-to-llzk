@@ -19,9 +19,9 @@ function(
       list(APPEND SANITIZERS "leak")
     endif()
 
-    # if(${ENABLE_SANITIZER_UNDEFINED_BEHAVIOR})
-    #   list(APPEND SANITIZERS "undefined")
-    # endif()
+    if(${ENABLE_SANITIZER_UNDEFINED_BEHAVIOR})
+      list(APPEND SANITIZERS "undefined")
+    endif()
 
     if(${ENABLE_SANITIZER_THREAD})
       if("address" IN_LIST SANITIZERS OR "leak" IN_LIST SANITIZERS)
