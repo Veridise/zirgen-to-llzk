@@ -284,4 +284,12 @@ public:
   matchAndRewrite(LoadValParamOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerVarArgsOp : public mlir::OpConversionPattern<VarArgsOp> {
+public:
+  using OpConversionPattern<VarArgsOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(VarArgsOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 } // namespace zml

@@ -619,3 +619,19 @@ LogicalResult AssertOpLowering::matchAndRewrite(
   rewriter.replaceOpWithNewOp<llzk::AssertOp>(op, adaptor.getCond(), rewriter.getStringAttr(""));
   return success();
 }
+
+LogicalResult LowerVarArgsOp::matchAndRewrite(
+    VarArgsOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
+      op,
+      llzk::ArrayType::get(
+          getTypeConverter()->convertType(
+              mlir::cast<VarArgsType>(op.getResult().getType()).getInner()
+          ),
+          {static_cast<int64_t>(adaptor.getElements().size())}
+      ),
+      adaptor.getElements()
+  );
+  return success();
+}
