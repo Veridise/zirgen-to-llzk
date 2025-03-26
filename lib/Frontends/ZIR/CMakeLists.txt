@@ -17,6 +17,6 @@ target_link_libraries(ZirFrontend PUBLIC
 MLIRDebug
   MLIRPass)
 target_link_libraries(ZirFrontend PRIVATE zklang_options zklang_warnings)
-include_directories(${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
+include_directories(SYSTEM ${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 
 

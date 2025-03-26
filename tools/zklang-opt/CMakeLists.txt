@@ -15,7 +15,7 @@ target_link_libraries(zklang-opt PUBLIC   ZklangHeaders
   MLIRReconcileUnrealizedCasts 
   MLIRPass)
 target_link_libraries(zklang-opt PRIVATE zklang_options zklang_warnings)
-include_directories(${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
+include_directories(SYSTEM ${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 
 set_target_properties(zklang-opt PROPERTIES RUNTIME_OUTPUT_DIRECTORY
                                           ${CMAKE_BINARY_DIR}/bin)
