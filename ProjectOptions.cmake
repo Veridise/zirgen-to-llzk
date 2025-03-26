@@ -29,7 +29,7 @@ macro(zklang_setup_options)
 
   zklang_supports_sanitizers()
 
-  option(ZKLANG_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
+  option(ZKLANG_WARNINGS_AS_ERRORS "Treat Warnings As Errors" ON)
   option(ZKLANG_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${SUPPORTS_ASAN})
   option(ZKLANG_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
   option(ZKLANG_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${SUPPORTS_UBSAN})
