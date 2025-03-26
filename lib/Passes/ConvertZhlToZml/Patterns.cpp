@@ -375,7 +375,7 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
     mlir::Type slotType = materializeTypeBinding(getContext(), slot->getBinding());
     SmallVector<Operation *, 2> castOps;
     Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
-    storeSlot(*slot, result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
+    storeSlot(*slot, result, slotName, slotType, op.getLoc(), rewriter, self);
   }
 
   rewriter.eraseOp(op);
@@ -837,10 +837,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     assert(comp);
     auto name = createSlot(compSlot, rewriter, comp, op.getLoc());
     auto slotType = materializeTypeBinding(getContext(), compSlot->getBinding());
-    Type compType = comp.getType();
-    auto val = storeAndLoadSlot(
-        *compSlot, arrAlloc, name, slotType, op.getLoc(), compType, rewriter, self
-    );
+    auto val = storeAndLoadSlot(*compSlot, arrAlloc, name, slotType, op.getLoc(), rewriter, self);
     rewriter.replaceOp(op, val);
   } else {
     rewriter.replaceOp(op, arrAlloc);
