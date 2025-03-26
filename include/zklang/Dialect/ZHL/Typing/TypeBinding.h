@@ -94,8 +94,6 @@ public:
     bool operator==(mlir::StringRef other) const { return ref() == other; }
 
     mlir::StringRef ref() const { return *impl; }
-
-    friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const Name &);
   };
 
   /// Returns the name of the type.
@@ -413,7 +411,6 @@ public:
   bool operator==(const TypeBinding &) const;
 
   friend TypeBindings;
-  friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding &b);
 
 private:
   /// Locates the member in the inheritance chain. A component lower in the chain will shadow
@@ -446,6 +443,8 @@ private:
   FrameSlot *slot = nullptr;
 };
 
+mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding::Name &);
+mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding &b);
 } // namespace zhl
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding::Name &);

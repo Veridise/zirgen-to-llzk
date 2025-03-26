@@ -18,29 +18,25 @@ using namespace zml;
 ComponentBuilder &builtinCommon(ComponentBuilder &builder) { return builder.isBuiltin(); }
 
 ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
-  return builder.fillBody(
-      {type}, {type},
-      [type = type](mlir::ValueRange args, mlir::OpBuilder &builder) {
+  return builder.fillBody({type}, {type}, [&type](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
-    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), type);
+    auto self = bldr.create<SelfOp>(loc, type);
     // Construct Component superType
     mlir::FunctionType constructor =
-        builder.getFunctionType({}, ComponentType::Component(builder.getContext()));
-    auto ref = builder.create<ConstructorRefOp>(
-        builder.getUnknownLoc(), mlir::SymbolRefAttr::get(builder.getStringAttr("Component")),
-        constructor, /*isBuiltin=*/true
+        bldr.getFunctionType({}, ComponentType::Component(bldr.getContext()));
+    auto ref = bldr.create<ConstructorRefOp>(
+        loc, mlir::SymbolRefAttr::get(bldr.getStringAttr("Component")), constructor,
+        /*isBuiltin=*/true
     );
-    auto comp = builder.create<mlir::func::CallIndirectOp>(builder.getUnknownLoc(), ref);
+    auto comp = bldr.create<mlir::func::CallIndirectOp>(loc, ref);
     // Store the result
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", comp.getResult(0));
-    auto super = builder.create<ReadFieldOp>(
-        builder.getUnknownLoc(), comp.getResultTypes().front(), self, "$super"
-    );
-    builder.create<ConstrainCallOp>(builder.getUnknownLoc(), super, mlir::ValueRange());
+    bldr.create<WriteFieldOp>(loc, self, "$super", comp.getResult(0));
+    auto super = bldr.create<ReadFieldOp>(loc, comp.getResultTypes().front(), self, "$super");
+    bldr.create<ConstrainCallOp>(loc, super, mlir::ValueRange());
     // Return self
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({args[0]}));
-  }
-  );
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({args[0]}));
+  });
 }
 
 template <typename OpTy>
@@ -52,15 +48,16 @@ void addBinOpCommon(mlir::OpBuilder &builder, mlir::StringRef name, ComponentTyp
                     .field("$super", superType)
                     .fillBody(
                         {superType, superType}, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+                        [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
-    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
+    auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
-    auto op = builder.create<OpTy>(builder.getUnknownLoc(), superType, args[0], args[1]);
+    auto op = bldr.create<OpTy>(loc, superType, args[0], args[1]);
     // Store the result
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", op);
+    bldr.create<WriteFieldOp>(loc, self, "$super", op);
     // Return self
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
   }
                     )
   ).build(builder);
@@ -84,15 +81,16 @@ void addUnaryOpCommon(mlir::OpBuilder &builder, mlir::StringRef name, ComponentT
                     .field("$super", superType)
                     .fillBody(
                         {superType}, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+                        [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
-    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
+    auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
-    auto op = builder.create<OpTy>(builder.getUnknownLoc(), superType, args[0]);
+    auto op = bldr.create<OpTy>(loc, superType, args[0]);
     // Store the result
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", op);
+    bldr.create<WriteFieldOp>(loc, self, "$super", op);
     // Return self
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
   }
                     )
   ).build(builder);
@@ -117,16 +115,16 @@ void addInRange(mlir::OpBuilder &builder) {
                     .field("$super", superType)
                     .fillBody(
                         {superType, superType, superType}, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &builder) {
+                        [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
-    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
+    auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
-    auto op =
-        builder.create<InRangeOp>(builder.getUnknownLoc(), superType, args[0], args[1], args[2]);
+    auto op = bldr.create<InRangeOp>(loc, superType, args[0], args[1], args[2]);
     // Store the result
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", op);
+    bldr.create<WriteFieldOp>(loc, self, "$super", op);
     // Return self
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
   }
                     )
   ).build(builder);
@@ -136,15 +134,17 @@ void addComponent(mlir::OpBuilder &builder) {
   auto componentType = ComponentType::Component(builder.getContext());
   mlir::SmallVector<mlir::Type> args;
 
-  builtinCommon(ComponentBuilder()
-                    .name("Component")
-                    .fillBody(
-                        args, {componentType},
-                        [&]([[maybe_unused]] mlir::ValueRange args, mlir::OpBuilder &b) {
-    auto op = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
-    b.create<mlir::func::ReturnOp>(b.getUnknownLoc(), mlir::ValueRange({op}));
+  builtinCommon(
+      ComponentBuilder()
+          .name("Component")
+          .fillBody(
+              args, {componentType},
+              [&componentType]([[maybe_unused]] mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
+    auto op = bldr.create<SelfOp>(loc, componentType);
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({op}));
   }
-                    )
+          )
   ).build(builder);
 }
 
@@ -157,14 +157,15 @@ void addNondetRegCommon(mlir::OpBuilder &builder, mlir::StringRef name, Componen
                     .field("reg", superType)
                     .fillBody(
                         {superType}, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &b) {
+                        [&componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
-    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
-    b.create<WriteFieldOp>(b.getUnknownLoc(), self, "reg", args[0]);
+    auto self = bldr.create<SelfOp>(loc, componentType);
+    bldr.create<WriteFieldOp>(loc, self, "reg", args[0]);
     // Store the result
-    b.create<WriteFieldOp>(b.getUnknownLoc(), self, "$super", args[0]);
+    bldr.create<WriteFieldOp>(loc, self, "$super", args[0]);
     // Return self
-    b.create<mlir::func::ReturnOp>(b.getUnknownLoc(), mlir::ValueRange({self}));
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
   }
                     )
   ).build(builder);
@@ -190,14 +191,15 @@ void addMakeExt(mlir::OpBuilder &builder) {
                     .field("$super", superType)
                     .fillBody(
                         {valType}, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &) {
+                        [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
-    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
-    auto ext = builder.create<MakeExtOp>(builder.getUnknownLoc(), superType, args[0]);
+    auto self = bldr.create<SelfOp>(loc, componentType);
+    auto ext = bldr.create<MakeExtOp>(loc, superType, args[0]);
     // Store the result
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", ext);
+    bldr.create<WriteFieldOp>(loc, self, "$super", ext);
     // Return self
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
   }
                     )
   ).build(builder);
@@ -214,21 +216,19 @@ void addEqzExt(mlir::OpBuilder &builder) {
                     .field("$super", superType)
                     .fillBody(
                         {valType}, {componentType},
-                        [&](mlir::ValueRange args, mlir::OpBuilder &) {
+                        [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
+    mlir::Location loc = bldr.getUnknownLoc();
     // Reference to self
-    auto self = builder.create<SelfOp>(builder.getUnknownLoc(), componentType);
-    builder.create<EqzExtOp>(builder.getUnknownLoc(), args[0]);
-    auto compCtorRef = builder.create<ConstructorRefOp>(
-        builder.getUnknownLoc(), superType.getName(),
-        builder.getFunctionType(mlir::TypeRange(), superType), true
+    auto self = bldr.create<SelfOp>(loc, componentType);
+    bldr.create<EqzExtOp>(loc, args[0]);
+    auto compCtorRef = bldr.create<ConstructorRefOp>(
+        loc, superType.getName(), bldr.getFunctionType(mlir::TypeRange(), superType), true
     );
-    auto comp = builder.create<mlir::func::CallIndirectOp>(
-        builder.getUnknownLoc(), compCtorRef, mlir::ValueRange()
-    );
+    auto comp = bldr.create<mlir::func::CallIndirectOp>(loc, compCtorRef, mlir::ValueRange());
     // Store the result
-    builder.create<WriteFieldOp>(builder.getUnknownLoc(), self, "$super", comp.getResult(0));
+    bldr.create<WriteFieldOp>(loc, self, "$super", comp.getResult(0));
     // Return self
-    builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange({self}));
+    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
   }
                     )
   ).build(builder);
@@ -237,12 +237,8 @@ void addEqzExt(mlir::OpBuilder &builder) {
 void addTrivial(mlir::OpBuilder &builder, mlir::StringRef name) {
   auto superType = ComponentType::Component(builder.getContext());
   auto componentType = ComponentType::get(builder.getContext(), name, superType, true);
-
   selfConstructs(
-      builtinCommon(ComponentBuilder().name(name).field("$super", superType)
-
-      ),
-      componentType
+      builtinCommon(ComponentBuilder().name(name).field("$super", superType)), componentType
   )
       .build(builder);
 }

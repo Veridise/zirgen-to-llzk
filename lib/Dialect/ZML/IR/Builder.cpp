@@ -183,10 +183,10 @@ void ComponentBuilder::FillBody::set(ComponentOp op, Ctx &buildCtx, mlir::OpBuil
 }
 
 ComponentBuilder::FillBody::FillBody(
-    mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results,
-    std::function<void(mlir::ValueRange, mlir::OpBuilder &)> delegate
+    mlir::ArrayRef<mlir::Type> ArgTypes, mlir::ArrayRef<mlir::Type> Results,
+    std::function<void(mlir::ValueRange, mlir::OpBuilder &)> Delegate
 )
-    : argTypes(argTypes), results(results), delegate(delegate) {}
+    : argTypes(ArgTypes), results(Results), delegate(Delegate) {}
 
 void ComponentBuilder::TakeRegion::set(ComponentOp op, Ctx &buildCtx, mlir::OpBuilder &builder)
     const {
