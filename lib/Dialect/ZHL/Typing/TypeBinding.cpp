@@ -453,20 +453,20 @@ TypeBinding::ParamsStoragePtr::ParamsStoragePtr(const ParamsMap &map)
 // operator<< overloads
 //==-----------------------------------------------------------------------==//
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
   type.print(os);
   return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding::Name &name) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, const TypeBinding::Name &name) {
   os << name.ref();
   return os;
 }
 
-mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const TypeBinding &b) {
+mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const TypeBinding &type) {
   std::string s;
   llvm::raw_string_ostream ss(s);
-  b.print(ss);
+  type.print(ss);
   diag << s;
   return diag;
 }
