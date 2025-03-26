@@ -69,7 +69,7 @@ ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   }
 }
 
-ComponentBuilder::TakeRegion::TakeRegion(mlir::Region *body) : body(body) {}
+ComponentBuilder::TakeRegion::TakeRegion(mlir::Region *bodyRegion) : body(bodyRegion) {}
 
 ComponentOp ComponentBuilder::build(mlir::OpBuilder &builder) {
   if (!ctx.loc.has_value()) {

@@ -134,17 +134,16 @@ void addComponent(mlir::OpBuilder &builder) {
   auto componentType = ComponentType::Component(builder.getContext());
   mlir::SmallVector<mlir::Type> args;
 
-  builtinCommon(
-      ComponentBuilder()
-          .name("Component")
-          .fillBody(
-              args, {componentType},
-              [&componentType]([[maybe_unused]] mlir::ValueRange args, mlir::OpBuilder &bldr) {
+  builtinCommon(ComponentBuilder()
+                    .name("Component")
+                    .fillBody(
+                        args, {componentType},
+                        [&componentType]([[maybe_unused]] mlir::ValueRange, mlir::OpBuilder &bldr) {
     mlir::Location loc = bldr.getUnknownLoc();
     auto op = bldr.create<SelfOp>(loc, componentType);
     bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({op}));
   }
-          )
+                    )
   ).build(builder);
 }
 
