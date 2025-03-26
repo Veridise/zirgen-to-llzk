@@ -276,22 +276,23 @@ TypeBinding::TypeBinding(mlir::Location Loc)
     : builtin(true), name("Component"), loc(Loc), superType(nullptr) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, Frame Frame,
+    llvm::StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType, Frame Frame,
     bool isBuiltin
 )
-    : TypeBinding(Name, Loc, SuperType, {}, {}, {}, Frame, isBuiltin) {}
+    : TypeBinding(BindingName, Loc, SuperType, {}, {}, {}, Frame, isBuiltin) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
-    Frame Frame, bool isBuiltin
+    llvm::StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
+    ParamsMap GenericParams, Frame Frame, bool isBuiltin
 )
-    : TypeBinding(Name, Loc, SuperType, GenericParams, {}, {}, Frame, isBuiltin) {}
+    : TypeBinding(BindingName, Loc, SuperType, GenericParams, {}, {}, Frame, isBuiltin) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
-    ParamsMap ConstructorParams, MembersMap Members, Frame Frame, bool isBuiltin
+    llvm::StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
+    ParamsMap GenericParams, ParamsMap ConstructorParams, MembersMap Members, Frame Frame,
+    bool isBuiltin
 )
-    : builtin(isBuiltin), name(Name), loc(Loc), superType(&SuperType), members(Members),
+    : builtin(isBuiltin), name(BindingName), loc(Loc), superType(&SuperType), members(Members),
       genericParams(GenericParams), constructorParams(ConstructorParams), frame(Frame) {}
 
 TypeBinding::TypeBinding(
