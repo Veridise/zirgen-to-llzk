@@ -261,7 +261,7 @@ constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t ind
   if (replacement->isKnownConst()) {
     LLVM_DEBUG(spaces(indent + 1);
                llvm::dbgs() << "Sym expr " << expr << " replaced with " << *replacement << "\n");
-    return ConstExpr::Val(replacement->getConst());
+    return static_cast<FailureOr<ConstExpr>>(ConstExpr::Val(replacement->getConst()));
   }
 
   LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Sym expr " << expr << " was not modified\n");
@@ -325,11 +325,11 @@ constantFoldCtorExpr(const CtorView &expr, ParamsScopeStack &scopes, size_t inde
       auto newValue = foldNeg(val->getValue());
       LLVM_DEBUG(spaces(indent + 1);
                  llvm::dbgs() << "Neg constructor folded into " << newValue << "\n");
-      return ConstExpr::Val(newValue);
+      return static_cast<FailureOr<ConstExpr>>(ConstExpr::Val(newValue));
     }
 
     LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Argument is not a constant value\n");
-    return ConstExpr::Ctor(typeName, {*foldedArg});
+    return static_cast<FailureOr<ConstExpr>>(ConstExpr::Ctor(typeName, {*foldedArg}));
   } else {
     LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Folding " << typeName << " constructor\n");
     assert(expr->arguments().size() == 2);
@@ -361,11 +361,11 @@ constantFoldCtorExpr(const CtorView &expr, ParamsScopeStack &scopes, size_t inde
       }
       LLVM_DEBUG(spaces(indent + 1);
                  llvm::dbgs() << typeName << " constructor folded into " << *newValue << "\n");
-      return ConstExpr::Val(*newValue);
+      return static_cast<FailureOr<ConstExpr>>(ConstExpr::Val(*newValue));
     }
 
     LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Arguments are not both constant values\n");
-    return ConstExpr::Ctor(typeName, {*foldedLhs, *foldedRhs});
+    return static_cast<FailureOr<ConstExpr>>(ConstExpr::Ctor(typeName, {*foldedLhs, *foldedRhs}));
   }
 
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Unreachable case\n");
