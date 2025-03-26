@@ -1,4 +1,4 @@
-include_directories(${MLIR_INCLUDE_DIRS} ${LLZK_INCLUDE_DIR})
+include_directories(SYSTEM ${MLIR_INCLUDE_DIRS} ${LLZK_INCLUDE_DIR})
 
 
 set(LLVM_TARGET_DEFINITIONS "Dialect.td")
