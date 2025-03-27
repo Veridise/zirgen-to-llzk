@@ -67,8 +67,7 @@ public:
   using OpConversionPattern<Op>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter
+      Op op, typename OpConversionPattern<Op>::OpAdaptor, ConversionPatternRewriter &rewriter
   ) const override {
     rewriter.eraseOp(op);
     return mlir::success();
@@ -80,8 +79,7 @@ public:
   using OpConversionPattern<Op>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      Op op, typename OpConversionPattern<Op>::OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter
+      Op op, typename OpConversionPattern<Op>::OpAdaptor, ConversionPatternRewriter &rewriter
   ) const override {
     auto body = op->template getParentOfType<mlir::func::FuncOp>();
     mlir::BlockArgument arg = body.getArgument(ArgIdx);
@@ -96,10 +94,8 @@ class ReplaceConstructWithRead : public OpConversionPattern<func::CallIndirectOp
 public:
   using OpConversionPattern<func::CallIndirectOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      func::CallIndirectOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-  ) const override {
-
+  LogicalResult
+  matchAndRewrite(func::CallIndirectOp, OpAdaptor, ConversionPatternRewriter &) const override {
     return mlir::failure();
   }
 };
@@ -148,10 +144,8 @@ class ReplaceWriteArrayWithRead : public OpConversionPattern<WriteArrayOp> {
 public:
   using OpConversionPattern<WriteArrayOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      WriteArrayOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-  ) const override {
-
+  LogicalResult
+  matchAndRewrite(WriteArrayOp, OpAdaptor, ConversionPatternRewriter &) const override {
     return success();
   }
 };

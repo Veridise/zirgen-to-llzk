@@ -30,7 +30,7 @@ public:
   using OpConversionPattern<CompType>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      CompType op, typename OpConversionPattern<CompType>::OpAdaptor adaptor,
+      CompType op, typename OpConversionPattern<CompType>::OpAdaptor,
       ConversionPatternRewriter &rewriter
   ) const override {
     auto name = op.getName();
@@ -88,9 +88,9 @@ class RemoveBuiltInsPass : public RemoveBuiltInsBase<RemoveBuiltInsPass> {
         arith::ArithDialect>();
     target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
 
-    target.addDynamicallyLegalOp<ComponentOp>([&](ComponentOp op) {
-      auto found = BuiltInComponentNames.find(op.getName().str()) != BuiltInComponentNames.end();
-      auto markedBuiltIn = op.getBuiltin();
+    target.addDynamicallyLegalOp<ComponentOp>([&](ComponentOp comp) {
+      auto found = BuiltInComponentNames.find(comp.getName().str()) != BuiltInComponentNames.end();
+      auto markedBuiltIn = comp.getBuiltin();
       return !(found && markedBuiltIn);
     });
 

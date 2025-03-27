@@ -79,8 +79,8 @@ static LogicalResult specializeTypeBindingImpl(
 );
 
 static LogicalResult specializeTypeBinding_genericParamCase(
-    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
-    const TypeBindings &bindings, size_t indent
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, const TypeBindings &,
+    size_t indent
 ) {
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Specializing " << *dst << "\n");
   auto varName = dst->getGenericParamName();
@@ -261,7 +261,7 @@ constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t ind
   if (replacement->isKnownConst()) {
     LLVM_DEBUG(spaces(indent + 1);
                llvm::dbgs() << "Sym expr " << expr << " replaced with " << *replacement << "\n");
-    return ConstExpr::Val(replacement->getConst());
+    return static_cast<FailureOr<ConstExpr>>(ConstExpr::Val(replacement->getConst()));
   }
 
   LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Sym expr " << expr << " was not modified\n");
@@ -269,7 +269,7 @@ constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t ind
 }
 
 static FailureOr<ConstExpr>
-constantFoldValExpr(const ValView &expr, ParamsScopeStack &scopes, size_t indent) {
+constantFoldValExpr(const ValView &expr, ParamsScopeStack &, size_t indent) {
   LLVM_DEBUG(spaces(indent);
              llvm::dbgs() << "Propagating constants in Val expr " << expr << " is trivial\n");
   return expr;
@@ -325,11 +325,11 @@ constantFoldCtorExpr(const CtorView &expr, ParamsScopeStack &scopes, size_t inde
       auto newValue = foldNeg(val->getValue());
       LLVM_DEBUG(spaces(indent + 1);
                  llvm::dbgs() << "Neg constructor folded into " << newValue << "\n");
-      return ConstExpr::Val(newValue);
+      return static_cast<FailureOr<ConstExpr>>(ConstExpr::Val(newValue));
     }
 
     LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Argument is not a constant value\n");
-    return ConstExpr::Ctor(typeName, {*foldedArg});
+    return static_cast<FailureOr<ConstExpr>>(ConstExpr::Ctor(typeName, {*foldedArg}));
   } else {
     LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Folding " << typeName << " constructor\n");
     assert(expr->arguments().size() == 2);
@@ -361,11 +361,11 @@ constantFoldCtorExpr(const CtorView &expr, ParamsScopeStack &scopes, size_t inde
       }
       LLVM_DEBUG(spaces(indent + 1);
                  llvm::dbgs() << typeName << " constructor folded into " << *newValue << "\n");
-      return ConstExpr::Val(*newValue);
+      return static_cast<FailureOr<ConstExpr>>(ConstExpr::Val(*newValue));
     }
 
     LLVM_DEBUG(spaces(indent + 2); llvm::dbgs() << "Arguments are not both constant values\n");
-    return ConstExpr::Ctor(typeName, {*foldedLhs, *foldedRhs});
+    return static_cast<FailureOr<ConstExpr>>(ConstExpr::Ctor(typeName, {*foldedLhs, *foldedRhs}));
   }
 
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Unreachable case\n");
@@ -488,7 +488,7 @@ static LogicalResult propagateConstants(
     auto &type = member.getValue();
     if (type.has_value()) {
       ParamsStorage memberSto;
-      auto memberScope = getConstantParams(*type, memberSto);
+      Params memberScope = getConstantParams(*type, memberSto);
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in member " << name
                                               << " of type " << *type << "\n");
       {
@@ -602,8 +602,8 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
   }
   // Convert the lifted parameters to their expressions, contained in their super type
   auto genericParamsMapping = getGenericParamsMapping();
-  auto totalSize = genericParamsMapping.size();
-  for (unsigned i = params.size(); i < totalSize; i++) {
+  size_t totalSize = genericParamsMapping.size();
+  for (size_t i = params.size(); i < totalSize; i++) {
     assert(genericParamsMapping.getParam(i).hasSuperType());
     generics.declare(
         genericParamsMapping.getName(i), genericParamsMapping.getParam(i).getSuperType(), i
