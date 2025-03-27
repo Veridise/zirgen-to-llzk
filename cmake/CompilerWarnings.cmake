@@ -45,7 +45,9 @@ function(
   if(WARNINGS_AS_ERRORS)
     message(TRACE "Warnings are treated as errors")
     list(APPEND CLANG_WARNINGS -Werror)
-    list(APPEND GCC_WARNINGS -Werror)
+    # Even though all MLIR/LLVM includes are marked with SYSTEM, the GCC compiler still produces a
+    # few `null-dereference` warnings that originate in MLIR code so don't convert those to error.
+    list(APPEND GCC_WARNINGS -Werror -Wno-error=null-dereference)
   endif()
 
   if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")

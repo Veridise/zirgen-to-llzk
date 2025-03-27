@@ -1,7 +1,7 @@
-# Adds an INTERFACE library that only includes headers
+# Adds a SYSTEM INTERFACE library that only includes headers
 function(add_header_library _name _include_dirs _export_name)
   add_library(${_name} INTERFACE)
-  target_include_directories(${_name} INTERFACE ${_include_dirs})
+  target_include_directories(${_name} SYSTEM INTERFACE ${_include_dirs})
   install(TARGETS ${_name} EXPORT ${_export_name})
 endfunction()
 
@@ -27,7 +27,7 @@ macro(zklang_setup_dependencies ZKLANG_EXPORT_TARGETS)
   message(STATUS "Using LLZK in: ${LLZK_DIR}")
 
   # LLVM & MLIR do not propagate their include dirs correctly, so we define them as
-  # INTERFACE libraries and link against them
+  # SYSTEM INTERFACE libraries and link against them
   add_header_library(LLVMHeaders ${LLVM_INCLUDE_DIRS} ${ZKLANG_EXPORT_TARGETS})
   add_header_library(MLIRHeaders ${MLIR_INCLUDE_DIRS} ${ZKLANG_EXPORT_TARGETS})
 

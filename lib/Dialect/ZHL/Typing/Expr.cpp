@@ -113,7 +113,8 @@ bool Val::operator==(const ExprBase &other) const {
 void Val::print(llvm::raw_ostream &os) const { os << value; }
 
 Attribute Val::convertIntoAttribute(Builder &builder) const {
-  return builder.getIntegerAttr(builder.getI64Type(), value);
+  assert(value <= std::numeric_limits<int64_t>::max());
+  return builder.getI64IntegerAttr(static_cast<int64_t>(value));
 }
 
 //==-----------------------------------------------------------------------==//
@@ -221,7 +222,7 @@ Attribute Ctor::convertIntoAttribute(Builder &builder) const {
     auto symExpr = mlir::cast<AffineSymbolExpr>(e);
     largest = std::max(largest.value_or(0), symExpr.getPosition());
   });
-  auto symbolCount = 0;
+  unsigned int symbolCount = 0;
   if (largest.has_value()) {
     symbolCount = *largest + 1;
   }
@@ -230,8 +231,8 @@ Attribute Ctor::convertIntoAttribute(Builder &builder) const {
   // After constructing the map reduce the number of symbols and compute what formals they refer to
   SmallVector<uint64_t> formals;
   SmallVector<AffineExpr> formalsToSymbols;
-  uint64_t shift = 0;
-  for (size_t i = 0; i < map.getNumSymbols(); i++) {
+  unsigned int shift = 0;
+  for (unsigned int i = 0; i < map.getNumSymbols(); i++) {
     if (map.isFunctionOfSymbol(i)) {
       formals.push_back(i);
       // Map the i-th formal to the position the symbol will have in the affine map after
@@ -243,7 +244,8 @@ Attribute Ctor::convertIntoAttribute(Builder &builder) const {
     }
   }
   assert(formalsToSymbols.size() == map.getNumSymbols());
-  map = map.replaceDimsAndSymbols({}, formalsToSymbols, 0, formals.size());
+  assert(formals.size() <= std::numeric_limits<unsigned>::max());
+  map = map.replaceDimsAndSymbols({}, formalsToSymbols, 0, static_cast<unsigned>(formals.size()));
   return zml::ConstExprAttr::get(map, formals);
 }
 
@@ -293,18 +295,19 @@ bool Ctor::Arguments::operator==(const Arguments &other) const {
 
 ExprBase &Ctor::Arguments::operator[](size_t offset) {
   assert(offset < lst.size());
-  return *std::next(lst.begin(), offset);
+  assert(offset <= std::numeric_limits<ptrdiff_t>::max());
+  return *std::next(lst.begin(), static_cast<ptrdiff_t>(offset));
 }
 
 const ExprBase &Ctor::Arguments::operator[](size_t offset) const {
   assert(offset < lst.size());
-  return *std::next(lst.begin(), offset);
+  assert(offset <= std::numeric_limits<ptrdiff_t>::max());
+  return *std::next(lst.begin(), static_cast<ptrdiff_t>(offset));
 }
 
 //==-----------------------------------------------------------------------==//
 // Stream overloads
 //==-----------------------------------------------------------------------==//
-
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ExprView &expr) {
   if (expr) {
