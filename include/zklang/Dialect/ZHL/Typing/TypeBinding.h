@@ -83,7 +83,6 @@ public:
     ~Name() = default;
 
     Name &operator=(mlir::StringRef newName) {
-      // impl = std::make_shared<Impl>(newName);
       *impl = newName;
       return *this;
     }
