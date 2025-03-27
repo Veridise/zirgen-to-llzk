@@ -3,9 +3,13 @@
 #include "zklang/Dialect/ZML/IR/Types.h"
 #include "zklang/Dialect/ZML/Typing/Materialize.h"
 #include <gtest/gtest.h>
+#include <llvm/Support/raw_ostream.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LogicalResult.h>
+#include <string>
+#include <string_view>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 //=----------------------------------------------------------=//
@@ -207,4 +211,16 @@ TEST_F(SpecializationTest, specializationPropagatesProperlyToMembers) {
   auto SpecializedFoo = Foo.specialize(diag, {Val}, bindings);
   ASSERT_TRUE(succeeded(SpecializedFoo));
   ASSERT_EQ(*SpecializedFoo, ExpectedSpecializedFoo);
+}
+
+TEST(TypeBindingTest, NameChangesShouldPropagateToSharedCopies) {
+  TypeBinding::Name orig("Test");
+  TypeBinding::Name copy = orig;
+
+  ASSERT_EQ(orig.ref(), "Test");
+  ASSERT_EQ(copy.ref(), "Test");
+
+  orig = "Changed";
+  ASSERT_EQ(orig.ref(), "Changed");
+  ASSERT_EQ(copy.ref(), "Changed");
 }
