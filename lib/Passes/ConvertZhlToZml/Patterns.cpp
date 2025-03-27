@@ -543,17 +543,19 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << "\n");
   }
 
-  auto fieldType = compDef.lookupFieldType(nameSym);
-  assert(mlir::succeeded(fieldType));
+  auto field = originalComp->getMember(nameSym.getValue(), [&op] { return op->emitError(); });
+  assert(succeeded(field));
+  auto fieldType = materializeTypeBinding(getContext(), *field);
+  assert(fieldType);
 
   auto binding = getType(op);
   if (mlir::failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
   auto bindingType = materializeTypeBinding(getContext(), *binding);
-  if (*fieldType != bindingType) {
+  if (fieldType != bindingType) {
     return op->emitError() << "type mismatch, was expecting " << bindingType << " but field "
-                           << adaptor.getMember() << " is of type " << *fieldType;
+                           << adaptor.getMember() << " is of type " << fieldType;
   }
 
   // Coerce to the type in the chain that defines the accessed member

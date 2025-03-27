@@ -1,0 +1,16 @@
+// RUN: zklang -o - %s
+
+// COM: If a member of a component depends on generic parameters its type will 
+// COM: change for different specializations of the type.
+// COM: This test checks that the correct type is used when deducing the type 
+// COM: the member is supposed to have when dealing with specialization.
+// COM: The conversion pattern has validation so this test succesfully executing is assurance enough.
+
+component Foo<N: Val>() {
+  public zeroes := for i : 0..N { 0 };
+}
+
+component Bar() {
+  foo := Foo<3>();
+  foo.zeroes[2] = 0;
+}
