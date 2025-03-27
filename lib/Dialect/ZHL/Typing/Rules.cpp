@@ -128,10 +128,10 @@ mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
     typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
         const {
   // TODO: Add global declaration to the scope
-  if (operands.empty()) {
+  if (operands.size() < 2) {
     return mlir::failure();
   }
-  return interpretOp(op, operands[0]);
+  return interpretOp(op, operands[1]);
 }
 
 mlir::FailureOr<TypeBinding> SuperTypingRule::
@@ -648,16 +648,6 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
 
 mlir::FailureOr<Frame> ReduceTypeRule::allocate(Frame frame) const {
   return frame.allocateSlot<ArrayFrame>(getBindings())->getFrame();
-}
-
-mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
-    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
-        const {
-  if (operands.size() < 2) {
-    return mlir::failure();
-  }
-
-  return interpretOp(op, operands[1]);
 }
 
 FailureOr<TypeBinding> BlockTypeRule::typeCheck(
