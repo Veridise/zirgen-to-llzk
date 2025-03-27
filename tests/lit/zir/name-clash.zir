@@ -1,5 +1,4 @@
 // RUN: zklang -o - %s
-// XFAIL: *
 
 component Top() {
   {
