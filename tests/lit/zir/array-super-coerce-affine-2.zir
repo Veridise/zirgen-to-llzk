@@ -6,11 +6,8 @@ component Foo<M: Val>(a: Array<Val, M>) {
 component Bar<N: Val>() {
   Foo<N>(for i: 0..N { NondetReg(i) })
 // CHECK-LABEL:    func @compute() -> !llzk.struct<@Bar<[@N]>> {
-//       CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
 //       CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
-//         COM:    This closing bracket is the closing of the loop that creates the array for the range 0..N.
-//         COM:    We match him to make sure that the read_const op we are matching below it don't get confused with the same kind of ops above.
-//       CHECK:      }
+//       CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
 //       CHECK:      %[[T8:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
 //       CHECK:      %[[T9:[0-9a-zA-Z_\.]+]] = toindex %[[T8]]
 //       CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = new_array  : <@N x !llzk.felt> 
@@ -20,7 +17,6 @@ component Bar<N: Val>() {
 //       CHECK:        %[[T5:[0-9a-zA-Z_\.]+]] = llzk.readarr %[[T2]][%[[A0]]] : <#map x !llzk.struct<@NondetReg<[]>>>, !llzk.struct<@NondetReg<[]>>
 //       CHECK:        %[[T6:[0-9a-zA-Z_\.]+]] = llzk.readf %[[T5]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
 //       CHECK:        llzk.writearr %[[T3]][%[[A0]]] = %[[T6]] : <@N x !llzk.felt>, !llzk.felt
-//       CHECK:      }
 //       CHECK:      %[[T7:[0-9a-zA-Z_\.]+]] = call @Foo::@compute(%[[T3]]) : (!llzk.array<@N x !llzk.felt>) -> !llzk.struct<@Foo<[@N]>> 
 //       CHECK:      return %{{[0-9a-zA-Z_\.]+}} : !llzk.struct<@Bar<[@N]>>
 }
