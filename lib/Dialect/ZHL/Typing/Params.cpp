@@ -14,40 +14,30 @@ using namespace mlir;
 // ParamsStorage
 //==-----------------------------------------------------------------------==//
 
-static void fillVectors(
-    const ParamsMap &map, SmallVectorImpl<const TypeBinding *> &tmp,
-    SmallVectorImpl<ParamName> &names, BitVector &injected
-) {
-  for (auto &entry : map) {
-    auto pos = entry.getValue().Pos;
-    tmp[pos] = &entry.getValue().Type;
-    names[pos] = entry.getKey();
-    injected[pos] = entry.getValue().Injected;
-  }
-}
-
-ParamsStorage::ParamsStorage(const ParamsMap &map) : names(map.size()), injected(map.size()) {
-  // Hack to get the bindings ordered without having a default constructor
-  SmallVector<const TypeBinding *> tmp(map.size(), nullptr);
-  fillVectors(map, tmp, names, injected);
-  params.reserve(map.size());
-  for (auto *type : tmp) {
-    assert(type);
-    params.push_back(*type);
-  }
-}
-
-ParamsStorage::ParamsStorage(const ParamsMap &map, size_t size, const TypeBinding &defaultBinding)
-    : names(size), injected(size) {
+ParamsStorage::ParamsStorage(
+    const ParamsMap &map, size_t size, std::optional<TypeBinding> defaultBinding
+)
+    : names(size),
+      injected((
+          assert(size <= std::numeric_limits<unsigned int>::max()), static_cast<unsigned int>(size)
+      )) {
   // Hack to get the bindings ordered without having a default constructor
   SmallVector<const TypeBinding *> tmp(size, nullptr);
-  fillVectors(map, tmp, names, injected);
+  for (auto &entry : map) {
+    const ParamData &val = entry.getValue();
+    uint64_t pos = val.Pos;
+    tmp[pos] = &val.Type;
+    names[pos] = entry.getKey();
+    assert(pos <= std::numeric_limits<unsigned int>::max());
+    injected[static_cast<unsigned int>(pos)] = val.Injected;
+  }
   params.reserve(size);
-  for (auto *type : tmp) {
+  for (const TypeBinding *type : tmp) {
     if (type) {
       params.push_back(*type);
     } else {
-      params.push_back(defaultBinding);
+      assert(defaultBinding.has_value() && "cannot have null type when there is no default");
+      params.push_back(defaultBinding.value());
     }
   }
 }
@@ -59,7 +49,9 @@ ParamsStorage::ParamsStorage(const ParamsMap &map, size_t size, const TypeBindin
 Params::operator ParamsMap() const {
   ParamsMap map;
   for (size_t i = 0; i < data()->params.size(); i++) {
-    map.declare(data()->names[i], data()->params[i], i, data()->injected[i]);
+    assert(i <= std::numeric_limits<unsigned int>::max());
+    bool injected = data()->injected[static_cast<unsigned int>(i)];
+    map.declare(data()->names[i], data()->params[i], i, injected);
   }
   return map;
 }
@@ -86,7 +78,8 @@ ParamsList Params::getDeclaredParams() const {
   ParamsList params;
 
   for (size_t i = 0; i < data()->params.size(); i++) {
-    if (!data()->injected[i]) {
+    assert(i <= std::numeric_limits<unsigned int>::max());
+    if (!data()->injected[static_cast<unsigned int>(i)]) {
       params.push_back(data()->params[i]);
     }
   }

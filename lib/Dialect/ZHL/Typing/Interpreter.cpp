@@ -200,11 +200,13 @@ namespace detail {
 // Defined here to access the semi-affine support information
 
 FailureOr<AffineExpr> Val::convertIntoAffineExpr(Builder &builder) const {
-  return builder.getAffineConstantExpr(value);
+  assert(value <= std::numeric_limits<int64_t>::max());
+  return builder.getAffineConstantExpr(static_cast<int64_t>(value));
 }
 
 FailureOr<AffineExpr> Symbol::convertIntoAffineExpr(Builder &builder) const {
-  return builder.getAffineSymbolExpr(pos);
+  assert(pos <= std::numeric_limits<unsigned int>::max());
+  return builder.getAffineSymbolExpr(static_cast<unsigned int>(pos));
 }
 
 FailureOr<AffineExpr> Ctor::convertIntoAffineExpr(Builder &builder) const {
