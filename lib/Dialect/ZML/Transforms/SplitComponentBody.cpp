@@ -83,8 +83,8 @@ LogicalResult PendingSymbolRenames::applyPendingRenames() {
 class SplitComponentOpPattern : public mlir::OpConversionPattern<ComponentOp> {
 public:
   template <typename... Args>
-  SplitComponentOpPattern(PendingSymbolRenames &pending, Args &&...args)
-      : ::OpConversionPattern<ComponentOp>(std::forward<Args>(args)...), pending(pending) {}
+  SplitComponentOpPattern(PendingSymbolRenames &Pending, Args &&...args)
+      : ::OpConversionPattern<ComponentOp>(std::forward<Args>(args)...), pending(Pending) {}
 
   mlir::LogicalResult
   matchAndRewrite(ComponentOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
@@ -102,7 +102,7 @@ public:
 };
 
 LogicalResult SplitComponentOpPattern::matchAndRewrite(
-    ComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+    ComponentOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
 
   SplitComponentOp newOp = rewriter.create<SplitComponentOp>(
@@ -167,7 +167,7 @@ LogicalResult SplitComponentOpPattern::matchAndRewrite(
 }
 
 LogicalResult ReplaceReturnOpInConstrainFunc::matchAndRewrite(
-    func::ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+    func::ReturnOp op, OpAdaptor, ConversionPatternRewriter &rewriter
 ) const {
   auto func = op.getParentOp();
   auto comp = mlir::dyn_cast<ComponentInterface>(func->getParentOp());

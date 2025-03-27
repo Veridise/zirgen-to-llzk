@@ -52,12 +52,12 @@ private:
   struct ParamsStoragePtr : public zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory> {
     using zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>::CopyablePointer;
 
-    ParamsStoragePtr(ParamsMap &);
+    ParamsStoragePtr(const ParamsMap &);
 
     operator Params() const { return Params(this->operator*()); }
     operator MutableParams() { return MutableParams(this->operator*()); }
 
-    ParamsStoragePtr &operator=(ParamsMap &);
+    ParamsStoragePtr &operator=(const ParamsMap &);
     ParamsStoragePtr &operator=(ParamsMap &&);
   };
 
@@ -94,8 +94,6 @@ public:
     bool operator==(mlir::StringRef other) const { return ref() == other; }
 
     mlir::StringRef ref() const { return *impl; }
-
-    friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const Name &);
   };
 
   /// Returns the name of the type.
@@ -413,7 +411,6 @@ public:
   bool operator==(const TypeBinding &) const;
 
   friend TypeBindings;
-  friend mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding &b);
 
 private:
   /// Locates the member in the inheritance chain. A component lower in the chain will shadow
@@ -446,7 +443,14 @@ private:
   FrameSlot *slot = nullptr;
 };
 
+mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding &b);
+mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding::Name &name);
+
 } // namespace zhl
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding::Name &);
+namespace llvm {
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding &b);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding::Name &name);
+
+} // namespace llvm

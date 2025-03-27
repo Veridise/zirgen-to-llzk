@@ -92,9 +92,8 @@ class RemoveConstructorRef : public OpConversionPattern<ConstructorRefOp> {
 public:
   using OpConversionPattern<ConstructorRefOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      ConstructorRefOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-  ) const override {
+  LogicalResult matchAndRewrite(ConstructorRefOp op, OpAdaptor, ConversionPatternRewriter &rewriter)
+      const override {
     if (isLegalConstructRefOp(op)) {
       return mlir::failure();
     }

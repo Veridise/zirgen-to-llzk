@@ -14,3 +14,17 @@
 .direnv/
 /result
 .envrc
+*.profraw
+/third-party
+
+# Visual Studio Code
+.vscode
+
+# Vim
+*.swp
+
+# CLion
+.idea/
+
+#venv
+.venv/

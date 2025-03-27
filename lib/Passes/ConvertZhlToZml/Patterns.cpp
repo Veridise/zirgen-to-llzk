@@ -158,9 +158,10 @@ computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> construc
 
   // Compute how many arguments are var-args and substract that amount to the number of arguments to
   // get the offset from args.begin() where the var-args start.
-  auto C = constructorTypes.size();
-  auto offset = C - 1;
-  return args.begin() + offset;
+  size_t C = constructorTypes.size();
+  assert(C > 0);
+  assert(C <= std::numeric_limits<ptrdiff_t>::max());
+  return std::next(args.begin(), static_cast<ptrdiff_t>(C) - 1);
 }
 
 void ZhlConstructLowering::prepareArguments(
@@ -249,7 +250,7 @@ mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
 ///////////////////////////////////////////////////////////
 
 mlir::LogicalResult ZhlGlobalRemoval::matchAndRewrite(
-    zirgen::Zhl::GlobalOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+    zirgen::Zhl::GlobalOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto binding = getType(op);
   if (mlir::failed(binding)) {
@@ -262,7 +263,7 @@ mlir::LogicalResult ZhlGlobalRemoval::matchAndRewrite(
 }
 
 LogicalResult ZhlDirectiveRemoval::matchAndRewrite(
-    zirgen::Zhl::DirectiveOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+    zirgen::Zhl::DirectiveOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   rewriter.eraseOp(op);
   return success();
@@ -373,7 +374,7 @@ mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
     mlir::Type slotType = materializeTypeBinding(getContext(), slot->getBinding());
     SmallVector<Operation *, 2> castOps;
     Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
-    storeSlot(*slot, result, slotName, slotType, op.getLoc(), comp.getType(), rewriter, self);
+    storeSlot(*slot, result, slotName, slotType, op.getLoc(), rewriter, self);
   }
 
   rewriter.eraseOp(op);
@@ -658,7 +659,7 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
 ///////////////////////////////////////////////////////////
 
 mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
-    zirgen::Zhl::ComponentOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+    zirgen::Zhl::ComponentOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto name = getType(op.getName());
   if (mlir::failed(name)) {
@@ -727,13 +728,14 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
   // Create a literal array directly if we know the range is made of literal values
   if (startBinding->isKnownConst() && endBinding->isKnownConst()) {
     SmallVector<int64_t> values;
-    unsigned E = endBinding->getConst();
-    unsigned I = startBinding->getConst();
+    uint64_t E = endBinding->getConst();
+    uint64_t I = startBinding->getConst();
     values.reserve(E - I);
     for (; I < E; I++) {
-      values.push_back(I);
+      assert(I <= std::numeric_limits<int64_t>::max());
+      values.push_back(static_cast<int64_t>(I));
     }
-    auto litArr = DenseI64ArrayAttr::get(getContext(), values);
+    DenseI64ArrayAttr litArr = rewriter.getDenseI64ArrayAttr(values);
     rewriter.replaceOpWithNewOp<LitValArrayOp>(
         op, ComponentType::Array(getContext(), ComponentType::Val(getContext()), values.size()),
         litArr
@@ -811,7 +813,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
-      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange args) {
+      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange) {
     arrayFrame->setInductionVar(iv);
     auto itVal = builder.create<ReadArrayOp>(loc, itType, *concreteArrValue, mlir::ValueRange(iv));
     // Cast it to a zhl Expr type for the block inlining
@@ -832,10 +834,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     assert(comp);
     auto name = createSlot(compSlot, rewriter, comp, op.getLoc());
     auto slotType = materializeTypeBinding(getContext(), compSlot->getBinding());
-    Type compType = comp.getType();
-    auto val = storeAndLoadSlot(
-        *compSlot, arrAlloc, name, slotType, op.getLoc(), compType, rewriter, self
-    );
+    auto val = storeAndLoadSlot(*compSlot, arrAlloc, name, slotType, op.getLoc(), rewriter, self);
     rewriter.replaceOp(op, val);
   } else {
     rewriter.replaceOp(op, arrAlloc);
@@ -846,7 +845,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
 }
 
 mlir::LogicalResult ZhlBlockLowering::matchAndRewrite(
-    Zhl::BlockOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+    Zhl::BlockOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto binding = getType(op);
   if (mlir::failed(binding)) {
@@ -854,8 +853,10 @@ mlir::LogicalResult ZhlBlockLowering::matchAndRewrite(
   }
 
   auto type = materializeTypeBinding(getContext(), *binding);
-  auto exec = rewriter.replaceOpWithNewOp<mlir::scf::ExecuteRegionOp>(op, type);
+
+  auto exec = rewriter.create<mlir::scf::ExecuteRegionOp>(op.getLoc(), type);
   rewriter.inlineRegionBefore(op.getRegion(), exec.getRegion(), exec.getRegion().end());
+  rewriter.replaceOp(op, exec);
   return mlir::success();
 }
 
@@ -1181,13 +1182,14 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
   ValueRange condsRange(conds);
 
   auto retType = materializeTypeBinding(getContext(), *binding);
-  RegionRange regions = op.getRegions();
-  auto execRegion = rewriter.replaceOpWithNewOp<scf::ExecuteRegionOp>(op, retType);
 
-  auto &block = execRegion.getRegion().emplaceBlock();
+  auto execRegion = rewriter.create<scf::ExecuteRegionOp>(op.getLoc(), retType);
+  RegionRange regions = op.getRegions();
+  Block &block = execRegion.getRegion().emplaceBlock();
   buildIfThenElseChain(
       regions.begin(), regions.end(), condsRange.begin(), block, block.end(), rewriter, retType
   );
+  rewriter.replaceOp(op, execRegion);
 
   return success();
 }
