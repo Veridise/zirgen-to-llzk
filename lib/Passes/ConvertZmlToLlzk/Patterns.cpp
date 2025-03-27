@@ -202,7 +202,7 @@ static Value copyArraySuperFields(
     OpBuilder &builder
 ) {
   auto targetInner = mlir::cast<ComponentType>(target).getArrayInnerType();
-  auto targetArrayType = mlir::cast_if_present<llzk::ArrayType>(tc.convertType(target));
+  auto targetArrayType = mlir::cast<llzk::ArrayType>(tc.convertType(target));
 
   auto array = builder.create<llzk::CreateArrayOp>(loc, targetArrayType);
 
