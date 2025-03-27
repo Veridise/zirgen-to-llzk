@@ -629,6 +629,7 @@ LogicalResult AssertOpLowering::matchAndRewrite(
 LogicalResult LowerVarArgsOp::matchAndRewrite(
     VarArgsOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
+  assert(adaptor.getElements().size() <= std::numeric_limits<int64_t>::max());
   rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
       op,
       llzk::ArrayType::get(
