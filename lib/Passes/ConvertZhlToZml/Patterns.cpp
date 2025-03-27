@@ -119,6 +119,7 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   }
   auto &binding = ctor->getBinding();
   auto constructorType = ctor->getCtorType();
+  assert(constructorType && "Could not deduce the constructor type for component");
   auto ctorFormalsCount = constructorType.getInputs().size();
 
   if (!validArgCount(isVariadic(constructorType), adaptor.getArgs().size(), ctorFormalsCount)) {
