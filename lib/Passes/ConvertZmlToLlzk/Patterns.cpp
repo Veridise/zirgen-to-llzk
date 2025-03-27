@@ -510,7 +510,8 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
 
   ArrayAttr compParams = op->getParentOfType<llzk::StructDefOp>().getType().getParams();
   SmallVector<ConstExprAttr> affineArrayParams;
-  for (Attribute attr : op.getResult().getType().getParams()) {
+  ComponentType cType = op.getResult().getType();
+  for (Attribute attr : cType.getParams()) {
     if (auto param = mlir::dyn_cast<ConstExprAttr>(attr)) {
       affineArrayParams.push_back(param);
     }
