@@ -249,8 +249,7 @@ mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
 ///////////////////////////////////////////////////////////
 
 mlir::LogicalResult ZhlGlobalRemoval::matchAndRewrite(
-    zirgen::Zhl::GlobalOp op, [[maybe_unused]] OpAdaptor adaptor,
-    mlir::ConversionPatternRewriter &rewriter
+    zirgen::Zhl::GlobalOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto binding = getType(op);
   if (mlir::failed(binding)) {
@@ -263,8 +262,7 @@ mlir::LogicalResult ZhlGlobalRemoval::matchAndRewrite(
 }
 
 LogicalResult ZhlDirectiveRemoval::matchAndRewrite(
-    zirgen::Zhl::DirectiveOp op, [[maybe_unused]] OpAdaptor adaptor,
-    mlir::ConversionPatternRewriter &rewriter
+    zirgen::Zhl::DirectiveOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   rewriter.eraseOp(op);
   return success();
@@ -660,8 +658,7 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
 ///////////////////////////////////////////////////////////
 
 mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
-    zirgen::Zhl::ComponentOp op, [[maybe_unused]] OpAdaptor adaptor,
-    mlir::ConversionPatternRewriter &rewriter
+    zirgen::Zhl::ComponentOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto name = getType(op.getName());
   if (mlir::failed(name)) {
@@ -815,8 +812,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
-      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv,
-          [[maybe_unused]] mlir::ValueRange args) {
+      [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value iv, mlir::ValueRange) {
     arrayFrame->setInductionVar(iv);
     auto itVal = builder.create<ReadArrayOp>(loc, itType, *concreteArrValue, mlir::ValueRange(iv));
     // Cast it to a zhl Expr type for the block inlining
@@ -848,7 +844,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
 }
 
 mlir::LogicalResult ZhlBlockLowering::matchAndRewrite(
-    Zhl::BlockOp op, [[maybe_unused]] OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+    Zhl::BlockOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto binding = getType(op);
   if (mlir::failed(binding)) {

@@ -54,7 +54,7 @@ mlir::LogicalResult checkValidTypeParam(
 
 mlir::LogicalResult ComponentType::verify(
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError, ::mlir::FlatSymbolRefAttr compName,
-    mlir::Type superType, ::llvm::ArrayRef<::mlir::Attribute> params, [[maybe_unused]] bool builtin
+    mlir::Type superType, ::llvm::ArrayRef<::mlir::Attribute> params, bool
 ) {
   if (!superType && compName.getValue() != "Component") {
     return emitError() << "malformed IR: super type for " << compName << " cannot be null";

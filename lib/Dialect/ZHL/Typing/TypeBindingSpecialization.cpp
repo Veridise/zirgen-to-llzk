@@ -79,8 +79,8 @@ static LogicalResult specializeTypeBindingImpl(
 );
 
 static LogicalResult specializeTypeBinding_genericParamCase(
-    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV,
-    [[maybe_unused]] const TypeBindings &bindings, size_t indent
+    TypeBinding *dst, ParamsScopeStack &scopes, const llvm::StringSet<> &FV, const TypeBindings &,
+    size_t indent
 ) {
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Specializing " << *dst << "\n");
   auto varName = dst->getGenericParamName();
@@ -269,7 +269,7 @@ constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t ind
 }
 
 static FailureOr<ConstExpr>
-constantFoldValExpr(const ValView &expr, [[maybe_unused]] ParamsScopeStack &scopes, size_t indent) {
+constantFoldValExpr(const ValView &expr, ParamsScopeStack &, size_t indent) {
   LLVM_DEBUG(spaces(indent);
              llvm::dbgs() << "Propagating constants in Val expr " << expr << " is trivial\n");
   return expr;

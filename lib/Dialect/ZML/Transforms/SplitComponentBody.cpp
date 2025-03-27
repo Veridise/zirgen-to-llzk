@@ -102,7 +102,7 @@ public:
 };
 
 LogicalResult SplitComponentOpPattern::matchAndRewrite(
-    ComponentOp op, [[maybe_unused]] OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+    ComponentOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
 
   SplitComponentOp newOp = rewriter.create<SplitComponentOp>(
@@ -167,7 +167,7 @@ LogicalResult SplitComponentOpPattern::matchAndRewrite(
 }
 
 LogicalResult ReplaceReturnOpInConstrainFunc::matchAndRewrite(
-    func::ReturnOp op, [[maybe_unused]] OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+    func::ReturnOp op, OpAdaptor, ConversionPatternRewriter &rewriter
 ) const {
   auto func = op.getParentOp();
   auto comp = mlir::dyn_cast<ComponentInterface>(func->getParentOp());

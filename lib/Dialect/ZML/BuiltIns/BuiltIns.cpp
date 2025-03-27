@@ -138,7 +138,7 @@ void addComponent(mlir::OpBuilder &builder) {
                     .name("Component")
                     .fillBody(
                         args, {componentType},
-                        [&componentType]([[maybe_unused]] mlir::ValueRange, mlir::OpBuilder &bldr) {
+                        [&componentType](mlir::ValueRange, mlir::OpBuilder &bldr) {
     mlir::Location loc = bldr.getUnknownLoc();
     auto op = bldr.create<SelfOp>(loc, componentType);
     bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({op}));

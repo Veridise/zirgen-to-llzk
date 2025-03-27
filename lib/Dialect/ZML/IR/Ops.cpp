@@ -49,8 +49,7 @@ void SelfOp::build(
 }
 
 void SelfOp::build(
-    [[maybe_unused]] mlir::OpBuilder &builder, mlir::OperationState &state, mlir::Type compType,
-    mlir::Region &movedRegion
+    mlir::OpBuilder &, mlir::OperationState &state, mlir::Type compType, mlir::Region &movedRegion
 ) {
   state.addTypes(compType);
   auto *region = state.addRegion();
@@ -76,8 +75,7 @@ void SplitComponentOp::build(
 }
 
 mlir::ArrayAttr fillParams(
-    mlir::OpBuilder &builder, [[maybe_unused]] mlir::OperationState &state,
-    mlir::ArrayRef<mlir::StringRef> params
+    mlir::OpBuilder &builder, mlir::OperationState &, mlir::ArrayRef<mlir::StringRef> params
 ) {
   std::vector<mlir::Attribute> symbols;
   std::transform(params.begin(), params.end(), std::back_inserter(symbols), [&](mlir::StringRef s) {
@@ -297,22 +295,20 @@ bool ConstructorRefOp::isBuildableWith(mlir::Attribute value, mlir::Type type) {
   return llvm::isa<mlir::FlatSymbolRefAttr>(value) && llvm::isa<mlir::FunctionType>(type);
 }
 
-mlir::LogicalResult
-ReadFieldOp::verifySymbolUses([[maybe_unused]] ::mlir::SymbolTableCollection &symbolTable) {
+mlir::LogicalResult ReadFieldOp::verifySymbolUses(mlir::SymbolTableCollection &) {
   // TODO
   return mlir::success();
 }
 
-mlir::LogicalResult
-WriteFieldOp::verifySymbolUses([[maybe_unused]] ::mlir::SymbolTableCollection &symbolTable) {
+mlir::LogicalResult WriteFieldOp::verifySymbolUses(mlir::SymbolTableCollection &) {
   // TODO
   return mlir::success();
 }
 
 mlir::LogicalResult GetGlobalOp::inferReturnTypes(
-    mlir::MLIRContext *ctx, std::optional<mlir::Location>,
-    [[maybe_unused]] mlir::ValueRange operands, mlir::DictionaryAttr, mlir::OpaqueProperties,
-    mlir::RegionRange, llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
+    mlir::MLIRContext *ctx, std::optional<mlir::Location>, mlir::ValueRange, mlir::DictionaryAttr,
+    mlir::OpaqueProperties, mlir::RegionRange,
+    llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
 ) {
   // TODO
   inferredReturnTypes.push_back(ComponentType::Val(ctx));
@@ -327,7 +323,7 @@ mlir::OpFoldResult ValToIndexOp::fold(ValToIndexOp::FoldAdaptor adaptor) {
   return adaptor.getVal();
 }
 
-OpFoldResult GetArrayLenOp::fold([[maybe_unused]] GetArrayLenOp::FoldAdaptor adaptor) {
+OpFoldResult GetArrayLenOp::fold(GetArrayLenOp::FoldAdaptor) {
   if (auto compType = dyn_cast<ComponentType>(getArray().getType())) {
     auto arrSize = compType.getArraySize();
     if (failed(arrSize)) {
