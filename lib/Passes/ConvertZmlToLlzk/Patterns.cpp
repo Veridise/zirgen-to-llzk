@@ -213,12 +213,12 @@ static Value copyArraySuperFields(
 
   auto loop = builder.create<scf::ForOp>(
       loc, lb, stride, ub, ValueRange({array}),
-      [&](OpBuilder &builder, Location loc, Value iv, ValueRange args) {
-    auto src = readArray(chain, iv, builder, loc);
-    auto super = readSuperFields(innerType, src, *targetInner, tc, loc, builder);
-    writeArray(args[0], iv, super, builder, loc);
+      [&](OpBuilder &loopBuilder, Location loopLoc, Value iv, ValueRange args) {
+    auto src = readArray(chain, iv, loopBuilder, loopLoc);
+    auto super = readSuperFields(innerType, src, *targetInner, tc, loopLoc, loopBuilder);
+    writeArray(args[0], iv, super, loopBuilder, loopLoc);
 
-    builder.create<scf::YieldOp>(loc, args);
+    loopBuilder.create<scf::YieldOp>(loopLoc, args);
   }
   );
   return loop.getResult(0);
