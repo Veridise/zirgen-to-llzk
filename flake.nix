@@ -109,6 +109,11 @@
 
               # For using mlir-tblgen inside the dev environment
               export LD_LIBRARY_PATH=${pkgs.z3.lib}/lib:$LD_LIBRARY_PATH
+
+              # Disable container overflow checks because it can give false positives in
+              # ConvertZmlToLlzkPass::runOnOperation() since LLVM itself is not built with ASan.
+              # https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow#false-positives
+              export ASAN_OPTIONS=detect_container_overflow=0:detect_leaks=0
             '';
           });
 
