@@ -9,6 +9,7 @@
 #include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/IR/Attributes.h>
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
@@ -144,6 +145,20 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
 
   addSourceMaterialization(unrealizedCastMaterialization);
   addTargetMaterialization(unrealizedCastMaterialization);
+
+  addTargetMaterialization(
+      [&](OpBuilder &, Type type, ValueRange values, Location) -> std::optional<Value> {
+    if (!isValidType(type) || values.size() != 1) {
+      return std::nullopt;
+    }
+
+    auto llzkType = convertType(values[0].getType());
+    if (!isValidType(llzkType) || !typesUnify(llzkType, type)) {
+      return std::nullopt;
+    }
+    return values[0];
+  }
+  );
   addArgumentMaterialization(unrealizedCastMaterialization);
 }
 

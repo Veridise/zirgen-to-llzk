@@ -224,6 +224,32 @@ static Value copyArraySuperFields(
   return loop.getResult(0);
 }
 
+static Value handleArraySpecialCases(
+    ComponentType type, Value chain, Type target, const TypeConverter &tc, Location loc,
+    OpBuilder &builder
+) {
+  auto targetAsComp = mlir::dyn_cast_if_present<ComponentType>(target);
+  if (!targetAsComp || !targetAsComp.isConcreteArray()) {
+    return chain;
+  }
+
+  auto llzkType = mlir::cast<llzk::ArrayType>(tc.convertType(type));
+  auto targetLlzkType = mlir::cast<llzk::ArrayType>(tc.convertType(target));
+  // We don't need to create the copying code if the llzk versions of the types are going to unify.
+  if (llzk::typesUnify(llzkType, targetLlzkType)) {
+    assert(chain.getType() == llzkType);
+    // Set the output type to the equivalent target type to avoid an unrealizable conversion cast.
+    // chain.setType(targetLlzkType);
+    return chain;
+  }
+
+  // If the target is an array component then read the super fields of the inner elements and
+  // returns a new array with those values.
+  return copyArraySuperFields(
+      mlir::cast<ComponentType>(*type.getArrayInnerType()), chain, target, tc, loc, builder
+  );
+}
+
 static Value readSuperFields(
     ComponentType type, Value chain, Type target, const TypeConverter &tc, Location loc,
     OpBuilder &builder
@@ -237,15 +263,7 @@ static Value readSuperFields(
     return chain;
   }
   if (type.isConcreteArray()) {
-    auto targetAsComp = mlir::dyn_cast_if_present<ComponentType>(target);
-    // If the target is an array component then read the super fields of the inner elements and
-    // returns a new array with those values.
-    if (targetAsComp && targetAsComp.isConcreteArray()) {
-      return copyArraySuperFields(
-          mlir::cast<ComponentType>(*type.getArrayInnerType()), chain, target, tc, loc, builder
-      );
-    }
-    return chain;
+    return handleArraySpecialCases(type, chain, target, tc, loc, builder);
   }
 
   auto read = builder.create<llzk::FieldReadOp>(loc, tc.convertType(superComp), chain, "$super");
