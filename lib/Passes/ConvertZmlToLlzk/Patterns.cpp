@@ -15,6 +15,7 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
@@ -233,14 +234,11 @@ static Value handleArraySpecialCases(
     return chain;
   }
 
-  auto llzkType = mlir::cast<llzk::ArrayType>(tc.convertType(type));
   auto targetLlzkType = mlir::cast<llzk::ArrayType>(tc.convertType(target));
   // We don't need to create the copying code if the llzk versions of the types are going to unify.
-  if (llzk::typesUnify(llzkType, targetLlzkType)) {
-    assert(chain.getType() == llzkType);
-    // Set the output type to the equivalent target type to avoid an unrealizable conversion cast.
-    // chain.setType(targetLlzkType);
-    return chain;
+  if (llzk::typesUnify(chain.getType(), targetLlzkType)) {
+    // Cast the output type to the equivalent target type to avoid an unrealizable conversion cast.
+    return builder.create<llzk::UnifiableCastOp>(loc, targetLlzkType, chain);
   }
 
   // If the target is an array component then read the super fields of the inner elements and
