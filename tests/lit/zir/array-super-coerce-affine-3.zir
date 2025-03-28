@@ -1,0 +1,13 @@
+// RUN: zklang -o - %s
+
+// COM: Checks that a regression introduced by LLZK-209 doesn't happen
+// COM: An array with an expression for size given and passed as argument 
+// COM: should not follow the logic that LLZK-209 introduced for covariant array subtypes.
+// COM: If such arrays wrongly follow this logic the resulting IR will fail to validate.
+
+component Foo<N: Val, P: Val>(a: Array<Val, N/P>) {
+}
+
+component Bar<N: Val, P: Val>(a: Array<Val, N/P>) {
+  Foo<N, P>(a);
+}
