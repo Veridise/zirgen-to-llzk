@@ -34,9 +34,7 @@ public:
   void print(llvm::raw_ostream &) const override;
 
 protected:
-  ComponentSlot(
-      FrameSlotKind, const TypeBindings &bindings, const TypeBinding &binding, mlir::StringRef name
-  );
+  ComponentSlot(FrameSlotKind, const TypeBindings &bindings, const TypeBinding &binding);
 
 private:
   TypeBinding binding;

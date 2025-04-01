@@ -45,14 +45,20 @@ FrameSlot *Frame::getParentSlot() const { return info->getParentSlot(); }
 
 // FrameSlot
 
-FrameSlot::FrameSlot(FrameSlotKind slotKind) : FrameSlot(slotKind, "$temp") {}
+FrameSlot::FrameSlot(FrameSlotKind slotKind) : FrameSlot(slotKind, "") {}
 
 FrameSlot::FrameSlot(FrameSlotKind slotKind, mlir::StringRef slotName)
     : kind(slotKind), name(slotName) {}
 
 void FrameSlot::rename(mlir::StringRef newName) { name = newName; }
 
-mlir::StringRef FrameSlot::getSlotName() const { return name; }
+mlir::StringRef FrameSlot::getSlotName() const {
+  return isTemporary() ? defaultNameForTemporaries() : mlir::StringRef(name);
+}
+
+mlir::StringRef FrameSlot::defaultNameForTemporaries() const { return "$temp"; }
+
+bool FrameSlot::isTemporary() const { return name.empty(); }
 
 FrameSlot::FrameSlotKind FrameSlot::getKind() const { return kind; }
 
@@ -87,9 +93,11 @@ void FrameSlot::print(llvm::raw_ostream &os) const {
 }
 
 InnerFrame::InnerFrame(const TypeBindings &bindings)
-    : ComponentSlot(FS_Frame, bindings, bindings.Component(), "$inner"), innerFrame{} {
+    : ComponentSlot(FS_Frame, bindings, bindings.Component()), innerFrame{} {
   innerFrame.setParentSlot(this);
 }
+
+mlir::StringRef InnerFrame::defaultNameForTemporaries() const { return "$inner"; }
 
 Frame &InnerFrame::getFrame() { return innerFrame; }
 
@@ -103,12 +111,14 @@ void InnerFrame::print(llvm::raw_ostream &os) const {
 }
 
 ArrayFrame::ArrayFrame(const TypeBindings &bindings)
-    : ComponentSlot(FS_Array, bindings, bindings.Component(), "$array"), iv(nullptr), innerFrame{},
+    : ComponentSlot(FS_Array, bindings, bindings.Component()), iv(nullptr), innerFrame{},
       size(bindings.UnkConst()) {
   innerFrame.setParentSlot(this);
 }
 
 bool ArrayFrame::classof(const FrameSlot *S) { return S->getKind() == FS_Array; }
+
+mlir::StringRef ArrayFrame::defaultNameForTemporaries() const { return "$array"; }
 
 Frame &ArrayFrame::getFrame() { return innerFrame; }
 
@@ -167,9 +177,9 @@ ComponentSlot::ComponentSlot(const TypeBindings &bindings, TypeBinding &type, ml
 }
 
 ComponentSlot::ComponentSlot(
-    FrameSlotKind Kind, const TypeBindings &bindings, const TypeBinding &type, mlir::StringRef name
+    FrameSlotKind Kind, const TypeBindings &bindings, const TypeBinding &type
 )
-    : FrameSlot(Kind, name), binding(type), bindingsCtx(&bindings) {
+    : FrameSlot(Kind), binding(type), bindingsCtx(&bindings) {
   binding.markSlot(this);
 }
 

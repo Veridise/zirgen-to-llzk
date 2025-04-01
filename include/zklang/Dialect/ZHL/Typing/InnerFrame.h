@@ -16,6 +16,9 @@ public:
 
   void print(llvm::raw_ostream &) const override;
 
+protected:
+  mlir::StringRef defaultNameForTemporaries() const override;
+
 private:
   Frame innerFrame;
 };

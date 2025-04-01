@@ -579,16 +579,16 @@ mlir::FailureOr<TypeBinding> BackTypeRule::
     return op->emitError() << "back-variable expression expects a distance of type 'Val', but got '"
                            << operands[0] << "'";
   }
+  if (!operands[0].hasConstExpr()) {
+    return op->emitError() << "distance expression must be a compile time constant";
+  }
+
+  if (!operands[1].getSlot() || operands[1].getSlot()->isTemporary()) {
+    return op->emitError() << "back-variable expression expects a named member";
+  }
 
   auto copy = interpretOp(op, operands[1]);
-  if (operands[1].getSlot()) {
-    // If the operand already has memory remove it from the copy to avoid duplicating.
-    copy.markSlot(nullptr);
-  } else {
-    // If the operand does not have memory allocate a slot so we can store the results for later
-    // retrival.
-    scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), copy);
-  }
+  copy.markSlot(nullptr);
   scope.needsBackVariablesSupport();
   return copy;
 }
