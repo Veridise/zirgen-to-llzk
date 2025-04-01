@@ -14,3 +14,4 @@
 /.direnv
 /result
 .envrc
+/.cache
