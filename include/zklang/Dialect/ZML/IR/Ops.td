@@ -1,6 +1,7 @@
 // Copyright 2024 Veridise, Inc.
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/BuiltinAttributes.td"
 include "Dialect.td"
 include "Types.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -247,13 +248,13 @@ def GetGlobalOp
 def ReadBackOp : ZMLOp<"read_back"> {
   let summary = "reads a back variable";
 
-  let arguments = (ins Component:$comp, Component:$distance,
+  let arguments = (ins Component:$comp, AnyAttrOf<[SymbolRefAttr, Builtin_IntegerAttr, ConstExpr]>:$distance,
       SymbolNameAttr:$field);
   let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat =
-      "$comp `[` $field `]` `at` $distance `:` type($comp) `,` "
-      "type($distance) `,` type($result) attr-dict";
+      "$comp `[` $field `]` `:` type($comp) `,` "
+      "type($result) attr-dict";
 }
 
 def ConstrainCallOp : ZMLOp<"constrain_call"> {

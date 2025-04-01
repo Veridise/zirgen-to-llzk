@@ -121,9 +121,9 @@ mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
   auto constructorType = ctor->getCtorType();
   assert(constructorType && "Could not deduce the constructor type for component");
   auto ctorFormals = constructorType.getInputs();
-  if (ctor->calleeUsesBackVariables()) {
-    ctorFormals = lang::zir::hideInjectedBVTypes(ctorFormals);
-  }
+  // if (ctor->calleeUsesBackVariables()) {
+  //   ctorFormals = lang::zir::hideInjectedBVTypes(ctorFormals);
+  // }
 
   auto ctorFormalsCount = ctorFormals.size();
   if (!validArgCount(isVariadic(ctorFormals), adaptor.getArgs().size(), ctorFormalsCount)) {
@@ -670,16 +670,16 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     return op->emitOpError() << "could not be lowered because its type could not be infered";
   }
 
-  ZML_BVDialectHelper TP;
+  // ZML_BVDialectHelper TP;
   ComponentBuilder builder;
   auto genericNames = name->getGenericParamNames();
   auto paramLocations = name->getConstructorParamLocations();
   auto ctorType = materializeTypeBindingConstructor(rewriter, *name, getTypeBindings());
 
-  if (name->needsBackVariables()) {
-    ctorType = lang::zir::injectBVFunctionParams(TP, ctorType, 0, &paramLocations);
-    builder.usesBackVariables();
-  }
+  // if (name->needsBackVariables()) {
+  //   ctorType = lang::zir::injectBVFunctionParams(TP, ctorType, 0, &paramLocations);
+  //   builder.usesBackVariables();
+  // }
 
   builder.name(name->getName())
       .location(op->getLoc())
@@ -1205,7 +1205,7 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
 }
 
 LogicalResult ZhlBackLowering::matchAndRewrite(
-    Zhl::BackOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+    Zhl::BackOp op, OpAdaptor, ConversionPatternRewriter &rewriter
 ) const {
   auto binding = getType(op);
   if (failed(binding)) {
@@ -1216,42 +1216,22 @@ LogicalResult ZhlBackLowering::matchAndRewrite(
   if (failed(trgBinding)) {
     return op->emitError() << "failed to type check target";
   }
+  assert(trgBinding->getSlot());
 
   auto distBinding = getType(op.getDistance());
   if (failed(distBinding)) {
     return op->emitError() << "failed to type check distance expression";
   }
 
-  auto target = getCastedValue(adaptor.getTarget(), *trgBinding, rewriter);
   auto self = op->getParentOfType<SelfOp>();
   assert(self);
-  FlatSymbolRefAttr fieldName;
-  Type slotType;
-  if (auto *trgSlot = mlir::dyn_cast_if_present<ComponentSlot>(trgBinding->getSlot())) {
-    // If the target has memory then load the field data that represents the slot
-    slotType = materializeTypeBinding(getContext(), trgSlot->getBinding());
-    fieldName = FlatSymbolRefAttr::get(rewriter.getStringAttr(trgSlot->getSlotName()));
+  auto *trgSlot = mlir::cast<ComponentSlot>(trgBinding->getSlot());
+  auto slotType = materializeTypeBinding(getContext(), trgSlot->getBinding());
+  auto dist = distBinding->getConstExpr()->convertIntoAttribute(rewriter);
 
-  } else {
-    // If the target does not have memory then the binding of this op must have memory. Use it to
-    // allocated a field and write into it.
-    auto *slot = mlir::dyn_cast_if_present<ComponentSlot>(binding->getSlot());
-    assert(slot);
-    auto comp = op->getParentOfType<ComponentInterface>();
-    assert(comp);
-    slotType = materializeTypeBinding(getContext(), slot->getBinding());
-    fieldName = createSlot(slot, rewriter, comp, op.getLoc());
-    storeSlot(*slot, target, fieldName, slotType, op.getLoc(), rewriter, self.getSelfValue());
-  }
-  auto dist = getCastedValue(
-      adaptor.getDistance(), *distBinding, rewriter, ComponentType::Val(getContext())
+  rewriter.replaceOpWithNewOp<ReadBackOp>(
+      op, slotType, self.getSelfValue(), dist, trgSlot->getSlotName()
   );
-
-  ZML_BVDialectHelper DH;
-  auto BV = lang::zir::loadBVValues(DH, op->getParentOfType<func::FuncOp>());
-  Value backVariable =
-      lang::zir::readBackVariable(BV, fieldName, slotType, dist, DH, rewriter, op.getLoc());
-  rewriter.replaceOp(op, backVariable);
 
   return success();
 }
