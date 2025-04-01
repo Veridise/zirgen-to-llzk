@@ -72,13 +72,17 @@ struct ParamsStorage {
   ParamsStorage() = default;
   /// Constructs the list of parameters from the given map. Expects it to be densely filled, meaning
   /// that from 0 to the size of the map minus 1 there is a parameter assigned to that position.
-  ParamsStorage(const ParamsMap &Map);
+  ParamsStorage(const ParamsMap &Map) : ParamsStorage(Map, Map.size()) {}
   /// Constructs the list of parameters from the given map but sets the total size to the given size
   /// and fills the positions that are not claimed by the parameters in the map with a default
   /// value.
-  ParamsStorage(const ParamsMap &Map, size_t Size, const TypeBinding &Default);
+  ParamsStorage(const ParamsMap &Map, size_t Size, const TypeBinding &Default)
+      : ParamsStorage(Map, Size, std::make_optional(Default)) {}
 
-  bool operator==(const ParamsStorage &) const;
+private:
+  ParamsStorage(
+      const ParamsMap &Map, size_t Size, std::optional<TypeBinding> Default = std::nullopt
+  );
 };
 
 } // namespace zhl

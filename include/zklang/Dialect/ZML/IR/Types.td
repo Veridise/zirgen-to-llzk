@@ -49,9 +49,10 @@ def Component : ZMLType<"Component", "comp"> {
     /// Climbs the chain and returns the first super type (including self) that matches the predicate, or failure() otherwise.
     mlir::FailureOr<mlir::Type> getFirstMatchingSuperType(llvm::function_ref<bool(mlir::Type)>) const;
 
+    mlir::FailureOr<mlir::Type> getArrayInnerType() const;
     mlir::FailureOr<mlir::Attribute> getArraySize() const;
     ComponentType getSuperTypeAsComp() const;
-    bool subtypeOf(Type) const;
+    bool subtypeOf(mlir::Type) const;
 
     static ComponentType getRoot(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }
     static ComponentType Component(mlir::MLIRContext *ctx) { return ComponentType::get(ctx); }

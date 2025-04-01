@@ -349,9 +349,9 @@ FrozenTypingRuleSet zhlTypingRules(TypeBindings &bindings) {
   return rules;
 }
 
-TypingRule::TypingRule(TypeBindings &bindings) : bindings(&bindings) {}
+TypingRule::TypingRule(TypeBindings &Bindings) : bindings(&Bindings) {}
 TypeBindings &TypingRule::getBindings() const { return *bindings; }
-FrozenTypingRuleSet::FrozenTypingRuleSet(RuleSet &&rules) : rules(std::move(rules)) {}
+FrozenTypingRuleSet::FrozenTypingRuleSet(RuleSet &&Rules) : rules(std::move(Rules)) {}
 FrozenTypingRuleSet::RuleSet::const_iterator FrozenTypingRuleSet::begin() const {
   return rules.begin();
 }

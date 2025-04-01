@@ -272,46 +272,49 @@ FailureOr<TypeBinding> TypeBinding::getConcreteArrayType() const {
   return superType->getConcreteArrayType();
 }
 
-TypeBinding::TypeBinding(mlir::Location loc)
-    : flags(Flags::MkBuiltin(true)), name("Component"), loc(loc), superType(nullptr) {}
+TypeBinding::TypeBinding(mlir::Location Loc)
+    : flags(Flags::MkBuiltin(true)), name("Component"), loc(Loc), superType(nullptr) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, Frame Frame,
+    llvm::StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType, Frame Frame,
     bool isBuiltin
 )
-    : TypeBinding(Name, Loc, SuperType, Flags::MkBuiltin(isBuiltin), Frame) {}
+    : TypeBinding(BindingName, Loc, SuperType, {}, {}, {}, Flags::MkBuiltin(isBuiltin), Frame) {}
 
 TypeBinding::TypeBinding(
-    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, Flags Flags, Frame Frame
+    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType, Flags BindingFlags,
+    Frame Frame
 )
-    : TypeBinding(Name, Loc, SuperType, {}, {}, {}, Flags, Frame) {}
+    : TypeBinding(BindingName, Loc, SuperType, {}, {}, {}, BindingFlags, Frame) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef name, mlir::Location loc, const TypeBinding &superType,
-    ParamsMap t_genericParams, Frame t_frame, bool isBuiltin
+    llvm::StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
+    ParamsMap GenericParams, Frame Frame, bool isBuiltin
 )
-    : TypeBinding(name, loc, superType, t_genericParams, {}, {}, t_frame, isBuiltin) {}
+    : TypeBinding(BindingName, Loc, SuperType, GenericParams, {}, {}, Frame, isBuiltin) {}
 
 TypeBinding::TypeBinding(
-    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
-    Flags Flags, Frame Frame
+    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
+    ParamsMap GenericParams, Flags BindingFlags, Frame Frame
 )
-    : TypeBinding(Name, Loc, SuperType, GenericParams, {}, {}, Flags, Frame) {}
+    : TypeBinding(BindingName, Loc, SuperType, GenericParams, {}, {}, BindingFlags, Frame) {}
 
 TypeBinding::TypeBinding(
-    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
-    ParamsMap ConstructorParams, MembersMap Members, Frame Frame, bool IsBuiltin
+    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
+    ParamsMap GenericParams, ParamsMap ConstructorParams, MembersMap Members, Frame Frame,
+    bool IsBuiltin
 )
     : TypeBinding(
-          Name, Loc, SuperType, GenericParams, ConstructorParams, Members,
+          BindingName, Loc, SuperType, GenericParams, ConstructorParams, Members,
           Flags::MkBuiltin(IsBuiltin), Frame
       ) {}
 
 TypeBinding::TypeBinding(
-    StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
-    ParamsMap ConstructorParams, MembersMap Members, Flags Flags, Frame Frame
+    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
+    ParamsMap GenericParams, ParamsMap ConstructorParams, MembersMap Members, Flags BindingFlags,
+    Frame Frame
 )
-    : flags(Flags), name(Name), loc(Loc), superType(&SuperType), members(Members),
+    : flags(BindingFlags), name(BindingName), loc(Loc), superType(&SuperType), members(Members),
       genericParams(GenericParams), constructorParams(ConstructorParams), frame(Frame) {}
 
 TypeBinding::TypeBinding(
@@ -320,9 +323,9 @@ TypeBinding::TypeBinding(
     : TypeBinding(Value, Loc, Bindings, Flags::MkBuiltin(IsBuiltin)) {}
 
 TypeBinding::TypeBinding(
-    uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, Flags Flags
+    uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, Flags BindingFlags
 )
-    : flags(Flags), name(CONST), loc(Loc), constExpr(expr::ConstExpr::Val(Value)),
+    : flags(BindingFlags), name(CONST), loc(Loc), constExpr(expr::ConstExpr::Val(Value)),
       superType(&Bindings.Get("Val")) {}
 
 void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
@@ -462,7 +465,7 @@ FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef member
 
 ParamsStorage *TypeBinding::ParamsStorageFactory::init() { return new ParamsStorage(); }
 
-TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMap &map) {
+TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(const ParamsMap &map) {
   set(new ParamsStorage(map));
   return *this;
 }
@@ -471,27 +474,27 @@ TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMa
   return *this;
 }
 
-TypeBinding::ParamsStoragePtr::ParamsStoragePtr(ParamsMap &map)
+TypeBinding::ParamsStoragePtr::ParamsStoragePtr(const ParamsMap &map)
     : zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>(new ParamsStorage(map)) {}
 
 //==-----------------------------------------------------------------------==//
 // operator<< overloads
 //==-----------------------------------------------------------------------==//
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, const TypeBinding &type) {
   type.print(os);
   return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TypeBinding::Name &name) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, const TypeBinding::Name &name) {
   os << name.ref();
   return os;
 }
 
-mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const TypeBinding &b) {
+mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const TypeBinding &type) {
   std::string s;
   llvm::raw_string_ostream ss(s);
-  b.print(ss);
+  type.print(ss);
   diag << s;
   return diag;
 }

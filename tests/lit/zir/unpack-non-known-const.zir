@@ -20,13 +20,13 @@ component User1<N: Val, P: Val>() {
 // CHECK-DAG:     %[[T2:[0-9a-zA-Z_\.]+]] = read_const @P : !llzk.felt
 // CHECK-DAG:     %[[T3:[0-9a-zA-Z_\.]+]] = toindex %[[T2]]
 // CHECK-DAG:     %[[T4:[0-9a-zA-Z_\.]+]] = new_array{()[%[[T1]], %[[T3]]]} : <#[[MAP:[0-9a-zA-Z_\.]+]] x !llzk.felt>
-// CHECK-DAG:     %[[T10:[0-9a-zA-Z_\.]+]]  = scf.for %{{[0-9a-zA-Z_\.]+}} = %{{[0-9a-zA-Z_\.]+}} to %{{[0-9a-zA-Z_\.]+}} step %{{[0-9a-zA-Z_\.]+}} iter_args(%{{[0-9a-zA-Z_\.]+}} = %[[T4:[0-9a-zA-Z_\.]+]]) -> (!llzk.array<#[[MAP]] x !llzk.felt>) {
+// CHECK-DAG:     scf.for %{{[0-9a-zA-Z_\.]+}} = %{{[0-9a-zA-Z_\.]+}} to %{{[0-9a-zA-Z_\.]+}} step %{{[0-9a-zA-Z_\.]+}} {
 
 // CHECK-DAG:     %[[T5:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
 // CHECK-DAG:     %[[T6:[0-9a-zA-Z_\.]+]] = toindex %[[T5]]
 // CHECK-DAG:     %[[T7:[0-9a-zA-Z_\.]+]] = read_const @P : !llzk.felt
 // CHECK-DAG:     %[[T8:[0-9a-zA-Z_\.]+]] = toindex %[[T7]]
-// CHECK-DAG:     %[[T9:[0-9a-zA-Z_\.]+]] = call @Unpack::@compute(%[[T10]]) {()[%[[T6]], %[[T8]]]} : (!llzk.array<#[[MAP]] x !llzk.felt>) -> !llzk.struct<@Unpack<[@N, @P, #[[MAP]]]>>
+// CHECK-DAG:     %[[T9:[0-9a-zA-Z_\.]+]] = call @Unpack::@compute(%[[T4]]) {()[%[[T6]], %[[T8]]]} : (!llzk.array<#[[MAP]] x !llzk.felt>) -> !llzk.struct<@Unpack<[@N, @P, #[[MAP]]]>>
 
 // CHECK-LABEL: func @constrain(%{{[0-9a-zA-Z_\.]+}}: !llzk.struct<@User1<[@N, @P]>>) {
 }

@@ -11,8 +11,8 @@ component Bar() {
   f.bits[0]
 
 // CHECK-LABEL: func @compute() -> !llzk.struct<@Bar<[]>> {
-// CHECK:     %[[T0:[0-9a-zA-Z_\.]+]] = new_struct : <@Bar<[]>>
 // CHECK:     %[[T1:[0-9a-zA-Z_\.]+]] = constfelt  2
+// CHECK:     %[[T0:[0-9a-zA-Z_\.]+]] = new_struct : <@Bar<[]>>
 // CHECK:     %[[T2:[0-9a-zA-Z_\.]+]] = call @Foo::@compute(%[[T1]]) : (!llzk.felt) -> !llzk.struct<@Foo<[]>> 
 // CHECK:     writef %[[T0]][@f] = %[[T2]] : <@Bar<[]>>, !llzk.struct<@Foo<[]>>
 // CHECK:     %[[T3:[0-9a-zA-Z_\.]+]] = readf %[[T0]][@f] : <@Bar<[]>>, !llzk.struct<@Foo<[]>>

@@ -93,9 +93,9 @@ TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
 
 Value storeAndLoadSlot(
     ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
-    Type compType, OpBuilder &builder, Value self
+    OpBuilder &builder, Value self
 ) {
-  storeSlot(slot, value, slotName, slotType, loc, compType, builder, self);
+  storeSlot(slot, value, slotName, slotType, loc, builder, self);
   return loadSlot(slot, value.getType(), slotName, slotType, loc, builder, self);
 }
 
@@ -120,7 +120,7 @@ Value loadSlot(
 
 void storeSlot(
     ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
-    Type compType, OpBuilder &builder, Value self
+    OpBuilder &builder, Value self
 ) {
   auto compSlotBinding = slot.getBinding();
   auto compSlotIVs = slot.collectIVs();
@@ -150,25 +150,6 @@ void storeSlot(
     // Write the array back into the field
     builder.create<WriteFieldOp>(loc, self, slotName, arrayData);
   }
-}
-
-Value storeAndLoadArraySlot(
-    Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc, Type compType,
-    OpBuilder &builder, mlir::ValueRange ivs, Value self
-) {
-  // Read the array from the slot field
-  auto arrayData = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
-  // Write into the array the value
-  builder.create<WriteArrayOp>(loc, arrayData, ivs, value, true);
-
-  // Write the array back into the field
-  builder.create<WriteFieldOp>(loc, self, slotName, arrayData);
-
-  // Read the array back to a SSA value
-  auto arrayDataBis = builder.create<ReadFieldOp>(loc, slotType, self, slotName);
-
-  // Read the value we wrote into the array back to a SSA value
-  return builder.create<ReadArrayOp>(loc, value.getType(), arrayDataBis, ivs);
 }
 
 #undef DEBUG_TYPE
@@ -365,9 +346,7 @@ Value CtorCallBuilder::build(OpBuilder &builder, Location loc, ValueRange argsRa
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
 
-  compValue = storeAndLoadSlot(
-      *compSlot, compValue, name, slotType, loc, callerComponentOp.getType(), builder, self
-  );
+  compValue = storeAndLoadSlot(*compSlot, compValue, name, slotType, loc, builder, self);
   builder.create<ConstrainCallOp>(loc, compValue, args);
   return compValue;
 }

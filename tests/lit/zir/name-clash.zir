@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s 
+// RUN: zklang -o - %s
 
 component Top() {
   {

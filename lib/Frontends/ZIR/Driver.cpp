@@ -64,9 +64,8 @@ static cl::opt<std::string>
 // They are defined with external storage to avoid having to wrap
 // the code that uses them in preprocessor checks too
 bool DisableMultiThreadingFlag = false;
-// Disabled by default until LLZK-177 is resolved
-bool DisableCleanupPassesFlag = true;
-bool DisableCastReconciliationFlag = true;
+bool DisableCleanupPassesFlag = false;
+bool DisableCastReconciliationFlag = false;
 
 #ifndef NDEBUG
 static cl::opt<bool, true> DisableMultiThreading(

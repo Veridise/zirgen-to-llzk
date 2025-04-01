@@ -14,8 +14,7 @@ target_link_libraries(ZirFrontend PUBLIC
   ZIRParser 
   ZIRC
   MLIRReconcileUnrealizedCasts 
-MLIRDebug
+  MLIRDebug
   MLIRPass)
-include_directories(${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
-
-
+target_link_libraries(ZirFrontend PRIVATE zklang_options zklang_warnings)
+include_directories(SYSTEM ${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})

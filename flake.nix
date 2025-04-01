@@ -21,90 +21,18 @@
     {
       # First, we define the packages used in this repository/flake
       overlays.default = final: prev: {
-     
 
         # Default zklang build uses the default compiler for the system (usually gcc for Linux and clang for Macos)
         zklang = final.callPackage ./nix/zklang.nix { clang = final.clang_18; llzk = final.llzk; };
         # Build in release with symbols mode with a particular compiler. Mostly useful for development and CI
-        zklangClang = (final.zklang.override { stdenv = final.clangStdenv; }).overrideAttrs(attrs: { 
+        zklangClang = (final.zklang.override { stdenv = final.clangStdenv; }).overrideAttrs(attrs: {
           cmakeBuildType = "RelWithDebInfo";
         });
-        zklangGCC = (final.zklang.override { stdenv = final.gccStdenv; }).overrideAttrs(attrs: { 
+        zklangGCC = (final.zklang.override { stdenv = final.gccStdenv; }).overrideAttrs(attrs: {
           cmakeBuildType = "RelWithDebInfo";
         });
 
-        # llzkWithPython = final.llzk.override {
-        #   mlir = final.mlirWithPython;
-        # };
-        #
-        # llzkDebugClang = (final.llzk.override { stdenv = final.clangStdenv; }).overrideAttrs(attrs: {
-        #   cmakeBuildType = "DebWithSans";
-        #
-        #   postInstall = ''
-        #     if [ -f test/report.xml ]; then
-        #       mkdir -p $out/artifacts
-        #       echo "-- Copying xUnit report to $out/artifacts/clang-report.xml"
-        #       cp test/report.xml $out/artifacts/clang-report.xml
-        #     fi
-        #   '';
-        # });
-        # llzkDebugClangCov = final.llzkDebugClang.overrideAttrs(attrs: {
-        #   postCheck = ''
-        #     MANIFEST=profiles.manifest
-        #     PROFDATA=coverage.profdata
-        #     BINS=bins.lst
-        #     if [[ "$(uname)" == "Darwin" ]]; then
-        #       find bin lib -type f | xargs file | fgrep Mach-O | grep executable | cut -f1 -d: > $BINS
-        #     else
-        #       find bin lib -type f | xargs file | grep ELF | grep executable | cut -f1 -d: > $BINS
-        #     fi
-        #     echo -n "Found profraw files:"
-        #     find test -name "*.profraw" | tee $MANIFEST | wc -l
-        #     cat $MANIFEST
-        #     llvm-profdata merge -sparse -f $MANIFEST -o $PROFDATA
-        #     OBJS=$( (head -n 1 $BINS ; tail -n +2 $BINS | sed -e "s/^/-object /") | xargs)
-        #     # TODO HTML reports
-        #     llvm-cov report $OBJS -instr-profile $PROFDATA > cov-summary.txt
-        #     echo =========== COVERAGE SUMMARY =================
-        #     cat cov-summary.txt
-        #     echo ==============================================
-        #     llvm-cov export -format=lcov -instr-profile $PROFDATA $OBJS > report.lcov
-        #     rm -rf $MANIFEST $PROFDATA $BINS
-        #   '';
-        #
-        #   postInstall = ''
-        #     mkdir -p $out/artifacts/
-        #     echo "-- Copying coverage summary to $out/artifacts/cov-summary.txt"
-        #     cp cov-summary.txt $out/artifacts/
-        #     echo "-- Copying lcov report to $out/artifacts/report.lcov"
-        #     cp report.lcov $out/artifacts/
-        #     if [ -f test/report.xml ]; then
-        #       echo "-- Copying xUnit report to $out/artifacts/clang-report.xml"
-        #       cp test/report.xml $out/artifacts/clang-report.xml
-        #     fi
-        #   '';
-        # });
-        # llzkDebugGCC = (final.llzk.override { stdenv = final.gccStdenv; }).overrideAttrs(attrs: {
-        #   cmakeBuildType = "DebWithSans";
-        #
-        #   postInstall = ''
-        #     if [ -f test/report.xml ]; then
-        #       mkdir -p $out/artifacts
-        #       echo "-- Copying xUnit report to $out/artifacts/gcc-report.xml"
-        #       cp test/report.xml $out/artifacts/gcc-report.xml
-        #     fi
-        #   '';
-        # });
-        #
-        # ccacheStdenv = prev.ccacheStdenv.override {
-        #   extraConfig = ''
-        #     export CCACHE_DIR=/tmp/ccache
-        #     export CCACHE_UMASK=007
-        #     export CCACHE_COMPRESS=1
-        #   '';
-        # };
-        #
-          # The default shell is used for ZKLANG development.
+        # The default shell is used for ZKLANG development.
         # Because `nix develop` is used to set up a dev shell for a given
         # derivation, we just need to extend the  derivation with any
         # extra tools we need.
@@ -149,7 +77,7 @@
         # Now, we can define the actual outputs of the flake
         packages = flake-utils.lib.flattenTree {
           # Copy the packages from the overlay.
-          inherit (pkgs) zklang ;
+          inherit (pkgs) zklang;
 
           # For debug purposes, expose the MLIR/LLVM packages.
           inherit (pkgs) libllvm llvm mlir llzk clang gtest python3 lit z3 cvc5 ;
@@ -157,16 +85,7 @@
           default = pkgs.zklang;
           withClang = pkgs.zklangClang;
           withGCC = pkgs.zklangGCC;
-
-          
-          # debugClang = pkgs.llzkDebugClang;
-          # debugClangCov = pkgs.llzkDebugClangCov;
-          # debugGCC = pkgs.llzkDebugGCC;
         };
-
-        # checks = flake-utils.lib.flattenTree {
-        #   llzkInstallCheck = pkgs.callPackage ./nix/llzk-installcheck { };
-        # };
 
         devShells = flake-utils.lib.flattenTree {
           default =  pkgs.zklang.overrideAttrs (old: {
@@ -190,11 +109,13 @@
 
               # For using mlir-tblgen inside the dev environment
               export LD_LIBRARY_PATH=${pkgs.z3.lib}/lib:$LD_LIBRARY_PATH
+
+              # Disable container overflow checks because it can give false positives in
+              # ConvertZmlToLlzkPass::runOnOperation() since LLVM itself is not built with ASan.
+              # https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow#false-positives
+              export ASAN_OPTIONS=detect_container_overflow=0:detect_leaks=0
             '';
           });
-
-          # debugClang = _: (pkgs.devShellBase pkgs pkgs.llzkDebugClang).shell;
-          # debugGCC = _: (pkgs.devShellBase pkgs pkgs.llzkDebugGCC).shell;
 
           llvm = pkgs.mkShell {
             buildInputs = [ pkgs.libllvm.dev ];

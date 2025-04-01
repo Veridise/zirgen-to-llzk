@@ -11,7 +11,23 @@
 /.clwb/
 
 /build
-/.direnv
+.direnv/
 /result
 .envrc
 /.cache
+*.profraw
+/third-party
+
+# Visual Studio Code
+.vscode
+
+# Vim
+*.swp
+
+# CLion
+.idea/
+
+#venv
+.venv/
+
+.cache/

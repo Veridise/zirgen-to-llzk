@@ -167,7 +167,7 @@ Values LLZKTypeConverter::wrapArrayValues(mlir::Value v, mlir::OpBuilder &builde
   Values vals;
   vals.reserve(field.degree);
   for (uint64_t i = 0; i < field.degree; i++) {
-    auto idx = builder.create<index::ConstantOp>(v.getLoc(), i);
+    auto idx = builder.create<arith::ConstantIndexOp>(v.getLoc(), i);
     vals.push_back(
         ValueWrap(builder.create<ReadArrayOp>(v.getLoc(), v, ValueRange(idx)), builder, *this)
     );

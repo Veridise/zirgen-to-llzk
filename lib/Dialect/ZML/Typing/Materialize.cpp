@@ -20,12 +20,6 @@ using namespace mlir;
 using namespace zhl;
 using namespace zml;
 
-static void errMsg(const TypeBinding &binding, StringRef reason) {
-  LLVM_DEBUG(
-      llvm::dbgs() << "failed to materialize type for " << binding << ": " << reason << "\n"
-  );
-}
-
 static void assertValidSuperType(Type superType) {
   auto validSuperType = mlir::isa<ComponentType, TypeVarType>(superType);
   (void)validSuperType;

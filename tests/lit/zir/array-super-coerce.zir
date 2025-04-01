@@ -1,0 +1,21 @@
+// RUN: zklang -o - %s | FileCheck %s
+
+component Foo(a: Array<Val, 1>) {
+}
+
+component Bar() {
+  Foo([NondetReg(1)])
+// CHECK-LABEL:    func @compute() -> !llzk.struct<@Bar<[]>> {
+//       CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
+//       CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
+//       CHECK:      %[[T2:[0-9a-zA-Z_\.]+]] = new_array %{{[0-9a-zA-Z_\.]+}} : <1 x !llzk.struct<@NondetReg<[]>>> 
+//       CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = new_array  : <1 x !llzk.felt> 
+//       CHECK:      %[[T4:[0-9a-zA-Z_\.]+]] = array_len %[[T2]], %[[T1]] : <1 x !llzk.struct<@NondetReg<[]>>>
+//       CHECK:      scf.for %[[A0:[0-9a-zA-Z_\.]+]] = %[[T1]] to %[[T0]] step %[[T4]] {
+//       CHECK:        %[[T5:[0-9a-zA-Z_\.]+]] = llzk.readarr %[[T2]][%[[A0]]] : <1 x !llzk.struct<@NondetReg<[]>>>, !llzk.struct<@NondetReg<[]>>
+//       CHECK:        %[[T6:[0-9a-zA-Z_\.]+]] = llzk.readf %[[T5]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
+//       CHECK:        llzk.writearr %[[T3]][%[[A0]]] = %[[T6]] : <1 x !llzk.felt>, !llzk.felt
+//       CHECK:      }
+//       CHECK:      %[[T7:[0-9a-zA-Z_\.]+]] = call @Foo::@compute(%[[T3]]) : (!llzk.array<1 x !llzk.felt>) -> !llzk.struct<@Foo<[]>> 
+//       CHECK:      return %{{[0-9a-zA-Z_\.]+}} : !llzk.struct<@Bar<[]>>
+}

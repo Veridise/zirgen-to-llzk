@@ -49,8 +49,7 @@ void SelfOp::build(
 }
 
 void SelfOp::build(
-    mlir::OpBuilder &builder, mlir::OperationState &state, mlir::Type compType,
-    mlir::Region &movedRegion
+    mlir::OpBuilder &, mlir::OperationState &state, mlir::Type compType, mlir::Region &movedRegion
 ) {
   state.addTypes(compType);
   auto *region = state.addRegion();
@@ -76,7 +75,7 @@ void SplitComponentOp::build(
 }
 
 mlir::ArrayAttr fillParams(
-    mlir::OpBuilder &builder, mlir::OperationState &state, mlir::ArrayRef<mlir::StringRef> params
+    mlir::OpBuilder &builder, mlir::OperationState &, mlir::ArrayRef<mlir::StringRef> params
 ) {
   std::vector<mlir::Attribute> symbols;
   std::transform(params.begin(), params.end(), std::back_inserter(symbols), [&](mlir::StringRef s) {
@@ -245,7 +244,8 @@ void ConstructorRefOp::build(
 ) {
   Properties &properties = state.getOrAddProperties<Properties>();
 
-  properties.numLiftedParams = builder.getIntegerAttr(builder.getIndexType(), liftedParams);
+  assert(liftedParams <= std::numeric_limits<int64_t>::max());
+  properties.numLiftedParams = builder.getIndexAttr(static_cast<int64_t>(liftedParams));
   properties.component = sym;
   if (isBuiltin) {
     properties.builtin = mlir::UnitAttr::get(builder.getContext());
@@ -309,19 +309,19 @@ bool ConstructorRefOp::isBuildableWith(mlir::Attribute value, mlir::Type type) {
   return llvm::isa<mlir::FlatSymbolRefAttr>(value) && llvm::isa<mlir::FunctionType>(type);
 }
 
-mlir::LogicalResult ReadFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
+mlir::LogicalResult ReadFieldOp::verifySymbolUses(mlir::SymbolTableCollection &) {
   // TODO
   return mlir::success();
 }
 
-mlir::LogicalResult WriteFieldOp::verifySymbolUses(::mlir::SymbolTableCollection &symbolTable) {
+mlir::LogicalResult WriteFieldOp::verifySymbolUses(mlir::SymbolTableCollection &) {
   // TODO
   return mlir::success();
 }
 
 mlir::LogicalResult GetGlobalOp::inferReturnTypes(
-    mlir::MLIRContext *ctx, std::optional<mlir::Location>, mlir::ValueRange operands,
-    mlir::DictionaryAttr, mlir::OpaqueProperties, mlir::RegionRange,
+    mlir::MLIRContext *ctx, std::optional<mlir::Location>, mlir::ValueRange, mlir::DictionaryAttr,
+    mlir::OpaqueProperties, mlir::RegionRange,
     llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
 ) {
   // TODO
@@ -337,7 +337,7 @@ mlir::OpFoldResult ValToIndexOp::fold(ValToIndexOp::FoldAdaptor adaptor) {
   return adaptor.getVal();
 }
 
-OpFoldResult GetArrayLenOp::fold(GetArrayLenOp::FoldAdaptor adaptor) {
+OpFoldResult GetArrayLenOp::fold(GetArrayLenOp::FoldAdaptor) {
   if (auto compType = dyn_cast<ComponentType>(getArray().getType())) {
     auto arrSize = compType.getArraySize();
     if (failed(arrSize)) {

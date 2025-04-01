@@ -162,24 +162,24 @@ void FrameInfo::print(llvm::raw_ostream &os) const {
 
 } // namespace detail
 
-ComponentSlot::ComponentSlot(const TypeBindings &bindings, TypeBinding &type)
-    : FrameSlot(FS_Component), binding(type), bindingsCtx(&bindings) {
+ComponentSlot::ComponentSlot(const TypeBindings &Bindings, TypeBinding &Type)
+    : FrameSlot(FS_Component), binding(Type), bindingsCtx(&Bindings) {
   // Mark both the input argument and the member since we make a copy of the binding
   binding.markSlot(this);
-  type.markSlot(this);
+  Type.markSlot(this);
 }
 
-ComponentSlot::ComponentSlot(const TypeBindings &bindings, TypeBinding &type, mlir::StringRef name)
-    : FrameSlot(FS_Component, name), binding(type), bindingsCtx(&bindings) {
+ComponentSlot::ComponentSlot(const TypeBindings &Bindings, TypeBinding &Type, mlir::StringRef Name)
+    : FrameSlot(FS_Component, Name), binding(Type), bindingsCtx(&Bindings) {
   // Mark both the input argument and the member since we make a copy of the binding
   binding.markSlot(this);
-  type.markSlot(this);
+  Type.markSlot(this);
 }
 
 ComponentSlot::ComponentSlot(
-    FrameSlotKind Kind, const TypeBindings &bindings, const TypeBinding &type
+    FrameSlotKind Kind, const TypeBindings &Bindings, const TypeBinding &Type
 )
-    : FrameSlot(Kind), binding(type), bindingsCtx(&bindings) {
+    : FrameSlot(Kind), binding(Type), bindingsCtx(&Bindings) {
   binding.markSlot(this);
 }
 

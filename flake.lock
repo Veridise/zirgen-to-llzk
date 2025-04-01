@@ -118,11 +118,11 @@
         "veridise-pkgs": "veridise-pkgs"
       },
       "locked": {
-        "lastModified": 1742226567,
-        "narHash": "sha256-1XuEzA46SbZYnc0+pjTzQv+LArMsPff2tIQjzZxE4zo=",
+        "lastModified": 1743188345,
+        "narHash": "sha256-LYoo4by74rOzrQRisVlqEEAH6ZVzSMkBmaW3sNRkcDw=",
         "ref": "main",
-        "rev": "c9408d4148616e6f2926baf067a62f22d00fa177",
-        "revCount": 150,
+        "rev": "d4d34500c64d5195a4f28d2c13efe0bcb9690d10",
+        "revCount": 158,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },

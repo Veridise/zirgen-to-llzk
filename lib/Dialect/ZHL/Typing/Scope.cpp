@@ -12,8 +12,8 @@ using namespace mlir;
 
 namespace zhl {
 
-ComponentScope::ComponentScope(ComponentOp component, TypeBindings &bindings)
-    : Scope(Sco_Component), bindings(&bindings), component(component) {}
+ComponentScope::ComponentScope(ComponentOp Component, TypeBindings &Bindings)
+    : Scope(Sco_Component), bindings(&Bindings), component(Component) {}
 
 ComponentScope::~ComponentScope() { createBinding(component.getName(), component.getLoc()); }
 
@@ -127,13 +127,13 @@ void ChildScope::isExtern() { parent->isExtern(); }
 
 void ChildScope::needsBackVariablesSupport() { parent->needsBackVariablesSupport(); }
 
-FrameScope::FrameScope(Scope &parent, Frame frame) : ChildScope(Sco_Frame, parent), frame(frame) {}
+FrameScope::FrameScope(Scope &Parent, Frame Frame) : ChildScope(Sco_Frame, Parent), frame(Frame) {}
 
 Frame &FrameScope::getCurrentFrame() { return frame; }
 const Frame &FrameScope::getCurrentFrame() const { return frame; }
 
-BlockScope::BlockScope(Scope &parent, TypeBindings &Bindings)
-    : ChildScope(Sco_Block, parent), bindings(&Bindings) {}
+BlockScope::BlockScope(Scope &Parent, TypeBindings &Bindings)
+    : ChildScope(Sco_Block, Parent), bindings(&Bindings) {}
 
 void BlockScope::declareSuperType(TypeBinding type) { superType = type; }
 
