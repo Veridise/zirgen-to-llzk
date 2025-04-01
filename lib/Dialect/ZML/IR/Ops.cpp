@@ -305,13 +305,8 @@ mlir::LogicalResult WriteFieldOp::verifySymbolUses(mlir::SymbolTableCollection &
   return mlir::success();
 }
 
-mlir::LogicalResult GetGlobalOp::inferReturnTypes(
-    mlir::MLIRContext *ctx, std::optional<mlir::Location>, mlir::ValueRange, mlir::DictionaryAttr,
-    mlir::OpaqueProperties, mlir::RegionRange,
-    llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
-) {
+mlir::LogicalResult GetGlobalOp::verifySymbolUses(mlir::SymbolTableCollection &) {
   // TODO
-  inferredReturnTypes.push_back(ComponentType::Val(ctx));
   return mlir::success();
 }
 

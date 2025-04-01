@@ -292,4 +292,20 @@ public:
   matchAndRewrite(VarArgsOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerGlobalDefOp : public mlir::OpConversionPattern<GlobalDefOp> {
+public:
+  using OpConversionPattern<GlobalDefOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(GlobalDefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerGetGlobalOp : public mlir::OpConversionPattern<GetGlobalOp> {
+public:
+  using OpConversionPattern<GetGlobalOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(GetGlobalOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 } // namespace zml

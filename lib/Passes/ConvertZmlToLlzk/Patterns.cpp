@@ -726,3 +726,21 @@ LogicalResult LowerVarArgsOp::matchAndRewrite(
   );
   return success();
 }
+
+LogicalResult LowerGetGlobalOp::matchAndRewrite(
+    GetGlobalOp op, OpAdaptor, ConversionPatternRewriter &rewriter
+) const {
+  Type newType = getTypeConverter()->convertType(op.getResult().getType());
+  rewriter.replaceOpWithNewOp<llzk::GlobalReadOp>(op, newType, op.getNameRef());
+  return success();
+}
+
+LogicalResult LowerGlobalDefOp::matchAndRewrite(
+    GlobalDefOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  llvm::dbgs() << "[LowerGlobalDefOp] TODO: " << op << "\n";
+  rewriter.replaceOpWithNewOp<llzk::GlobalWriteOp>(
+      op, SymbolRefAttr::get(op.getSymNameAttr()), adaptor.getValue()
+  );
+  return failure();
+}

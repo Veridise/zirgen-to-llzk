@@ -134,21 +134,31 @@ public:
     return getCastedValue(value, binding, builder, generatedOps, super);
   }
 
-  mlir::FailureOr<CtorCallBuilder>
-  makeCtorCallBuilder(mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder) const {
-    auto selfOp = op->getParentOfType<SelfOp>();
-    if (!selfOp) {
-      return op->emitOpError() << "is not within a self region";
-    }
-    return CtorCallBuilder::Make(
-        op, value, *typeAnalysis, builder, selfOp.getSelfValue(), getTypeBindings()
-    );
-  }
-
   const zhl::TypeBindings &getTypeBindings() const { return typeAnalysis->getBindings(); }
 
-private:
+protected:
   zhl::ZIRTypeAnalysis *const typeAnalysis;
+};
+
+template <typename Op> class ConstructorLowering : public ZhlOpLoweringPattern<Op> {
+protected:
+  void
+  prepareArguments(mlir::ValueRange, mlir::ArrayRef<mlir::Type>, mlir::Location, mlir::ConversionPatternRewriter &, std::vector<mlir::Value> &)
+      const;
+
+  mlir::Value
+  prepareArgument(mlir::Value, mlir::Type, mlir::Location, mlir::ConversionPatternRewriter &) const;
+
+  mlir::FailureOr<CtorCallBuilder>
+  makeCtorCallBuilder(mlir::Operation *, mlir::Value, mlir::OpBuilder &) const;
+
+  mlir::FailureOr<mlir::Value> makeCtorCall(
+      Op, mlir::Value, mlir::ValueRange newArgs, mlir::ConversionPatternRewriter &,
+      bool doReplace = true
+  ) const;
+
+public:
+  using ZhlOpLoweringPattern<Op>::ZhlOpLoweringPattern;
 };
 
 /// Lowers literal Vals
@@ -184,21 +194,15 @@ public:
 
 /// Converts `zhl.construct` ops into calls to the body function of
 /// a component.
-class ZhlConstructLowering : public ZhlOpLoweringPattern<zirgen::Zhl::ConstructOp> {
+class ZhlConstructLowering : public ConstructorLowering<zirgen::Zhl::ConstructOp> {
 public:
-  using ZhlOpLoweringPattern<zirgen::Zhl::ConstructOp>::ZhlOpLoweringPattern;
+  using ConstructorLowering<zirgen::Zhl::ConstructOp>::ConstructorLowering;
 
-  mlir::LogicalResult
-  matchAndRewrite(zirgen::Zhl::ConstructOp, OpAdaptor, mlir::ConversionPatternRewriter &)
-      const override;
-
-private:
-  void
-  prepareArguments(mlir::ValueRange, mlir::ArrayRef<mlir::Type>, mlir::Location, mlir::ConversionPatternRewriter &, std::vector<mlir::Value> &)
-      const;
-
-  mlir::Value
-  prepareArgument(mlir::Value, mlir::Type, mlir::Location, mlir::ConversionPatternRewriter &) const;
+  mlir::LogicalResult matchAndRewrite(
+      zirgen::Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+  ) const override {
+    return makeCtorCall(op, op, adaptor.getArgs(), rewriter);
+  }
 };
 
 /// Converts `zhl.constrain` ops to `zmir.constrain` ones.
@@ -351,8 +355,6 @@ public:
 
 class ZhlCompToZmirCompPattern : public ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp> {
 public:
-  /*using ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp>::ZhlOpLoweringPattern;*/
-
   template <typename... Args>
   ZhlCompToZmirCompPattern(std::function<void(mlir::StringRef)> delegate, Args &&...args)
       : ZhlOpLoweringPattern<zirgen::Zhl::ComponentOp>(std::forward<Args>(args)...),
@@ -407,6 +409,24 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::SwitchOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
+class ZhlConstructGlobalLowering : public ConstructorLowering<zirgen::Zhl::ConstructGlobalOp> {
+public:
+  using ConstructorLowering<zirgen::Zhl::ConstructGlobalOp>::ConstructorLowering;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::ConstructGlobalOp, OpAdaptor, mlir::ConversionPatternRewriter &)
+      const override;
+};
+
+class ZhlGetGlobalLowering : public ZhlOpLoweringPattern<zirgen::Zhl::GetGlobalOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::GetGlobalOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::GetGlobalOp, OpAdaptor, mlir::ConversionPatternRewriter &)
       const override;
 };
 
