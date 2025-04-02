@@ -11,6 +11,7 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/Passes.h>
+#include <optional>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zirgen/dsl/lower.h>
 #include <zirgen/dsl/parser.h>
@@ -283,7 +284,7 @@ LogicalResult Driver::run() {
     return failure();
   }
 
-  mod->print(*dst);
+  mod->print(*dst, OpPrintingFlags(std::nullopt).enableDebugInfo());
 
   llvm::WithColor(llvm::errs(), llvm::raw_ostream::GREEN) << "Success!\n";
   return success();

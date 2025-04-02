@@ -4,7 +4,4 @@ add_subdirectory(Typing)
 add_subdirectory(Transforms)
 add_subdirectory(ExtVal)
 
-target_sources(ZIRC PRIVATE 
-  BackVariables.cpp
-  Helpers.cpp
-)
+target_sources(ZIRC PRIVATE Helpers.cpp)

@@ -16,9 +16,7 @@
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
-#include <zklang/Dialect/ZML/Utils/BackVariables.h>
 #include <zklang/Dialect/ZML/Utils/Helpers.h>
-#include <zklang/LanguageSupport/ZIR/BackVariables.h>
 
 using namespace mlir;
 using namespace zhl;
@@ -49,10 +47,6 @@ template <typename T, typename Fn> T queryComp(mlir::Operation *op, Fn query, T 
 
 bool calleeIsBuiltin(mlir::Operation *op) {
   return queryComp<bool>(op, [](auto zmlOp) { return zmlOp.getBuiltin(); });
-}
-
-static bool calleeUsesBackVariablesHelper(mlir::Operation *op) {
-  return queryComp<bool>(op, [](auto zmlOp) { return zmlOp.getUsesBackVariables(); }, true);
 }
 
 #define DEBUG_TYPE "zml-slot-helpers"
@@ -290,15 +284,10 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
     return op->emitError() << "could not find component with name " << binding.getName();
   }
   auto constructorType = materializeTypeBindingConstructor(builder, binding, bindings);
-  bool usesBackVariables = calleeUsesBackVariablesHelper(calleeComp);
-  if (usesBackVariables) {
-    ZML_BVDialectHelper TP;
-    constructorType = lang::zir::injectBVFunctionParams(TP, constructorType);
-  }
 
   return CtorCallBuilder(
       constructorType, binding, op->getParentOfType<ComponentInterface>(), self,
-      calleeIsBuiltin(calleeComp), usesBackVariables
+      calleeIsBuiltin(calleeComp)
   );
 }
 
@@ -329,14 +318,6 @@ Value CtorCallBuilder::build(OpBuilder &builder, Location loc, ValueRange argsRa
   auto name = createSlot(compSlot, builder, callerComponentOp, loc);
   auto slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
 
-  if (usesBackVariables) {
-    ZML_BVDialectHelper TP(*compSlot, builder.getContext());
-    auto parentBV = lang::zir::loadBVValues(TP, callerComponentOp.getBodyFunc());
-    auto BV =
-        lang::zir::loadMemoryForField(parentBV, name, ctorType.getResult(0), TP, builder, loc);
-    lang::zir::injectBVArgs(BV, args);
-  }
-
   auto genericParams = compBinding.getGenericParamsMapping();
   auto ref = builder.create<ConstructorRefOp>(
       loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
@@ -357,16 +338,12 @@ const zhl::TypeBinding &CtorCallBuilder::getBinding() const { return compBinding
 
 CtorCallBuilder::CtorCallBuilder(
     mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
-    mlir::Value selfValue, bool builtin, bool usesBVs
+    mlir::Value selfValue, bool builtin
 )
-    : ctorType(type), compBinding(binding), isBuiltin(builtin), usesBackVariables(usesBVs),
-      callerComponentOp(caller), self(selfValue) {
+    : ctorType(type), compBinding(binding), isBuiltin(builtin), callerComponentOp(caller),
+      self(selfValue) {
   assert(callerComponentOp);
   assert(self);
-  assert(
-      (!usesBackVariables || compBinding.getSlot()) &&
-      "If the component uses back-variables it needs to have a slot!"
-  );
 }
 
 mlir::FailureOr<Value> coerceToArray(TypedValue<ComponentType> v, OpBuilder &builder) {
