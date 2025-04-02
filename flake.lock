@@ -91,11 +91,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1743550662,
-        "narHash": "sha256-8bGHrgk3RdlAour8ch8LqsQG7vnA2LpoufljrMt6U4o=",
+        "lastModified": 1743619909,
+        "narHash": "sha256-jLuVyK9v+QMkJ7/ZG5o3miZYZ6GrhV+R4TeeYESkJFg=",
         "owner": "Veridise",
         "repo": "llzk-nix-pkgs",
-        "rev": "11410bbc0ff373f0a05aca4433afc374e35baf30",
+        "rev": "d40e7f02ac779f385a5eec74549d9149b7bf02f8",
         "type": "github"
       },
       "original": {
