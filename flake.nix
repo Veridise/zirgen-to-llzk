@@ -3,9 +3,12 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils/v1.0.0";
 
-    veridise-pkgs = {
-      url = "git+ssh://git@github.com/Veridise/veridise-nix-pkgs.git?ref=main";
-      inputs.nixpkgs.follows = "nixpkgs";
+    llzk-pkgs = {
+      url = "github:Veridise/llzk-nix-pkgs?ref=main";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
     };
 
     llzk = {
@@ -17,7 +20,7 @@
   # Custom colored bash prompt
   nixConfig.bash-prompt = ''\[\e[0;32m\][LLZK]\[\e[m\] \[\e[38;5;244m\]\w\[\e[m\] % '';
 
-  outputs = { self, nixpkgs, flake-utils, veridise-pkgs, llzk }:
+  outputs = { self, nixpkgs, flake-utils, llzk-pkgs, llzk }:
     {
       # First, we define the packages used in this repository/flake
       overlays.default = final: prev: {
@@ -68,7 +71,7 @@
 
           overlays = [
             self.overlays.default
-            veridise-pkgs.overlays.default
+            llzk-pkgs.overlays.default
             llzk.overlays.default
           ];
         };
