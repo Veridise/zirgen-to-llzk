@@ -1,14 +1,16 @@
 # Based on the LLZK flake
 {
   inputs = {
-    flake-utils.url = "github:numtide/flake-utils/v1.0.0";
+    llzk-pkgs.url = "github:Veridise/llzk-nix-pkgs?ref=main";
 
-    llzk-pkgs = {
-      url = "github:Veridise/llzk-nix-pkgs?ref=main";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
+    nixpkgs = {
+      url = "github:NixOS/nixpkgs";
+      follows = "llzk-pkgs/nixpkgs";
+    };
+
+    flake-utils = {
+      url = "github:numtide/flake-utils/v1.0.0";
+      follows = "llzk-pkgs/flake-utils";
     };
 
     llzk = {
@@ -83,7 +85,10 @@
           inherit (pkgs) zklang;
 
           # For debug purposes, expose the MLIR/LLVM packages.
-          inherit (pkgs) libllvm llvm mlir llzk clang gtest python3 lit z3 cvc5 ;
+          inherit (pkgs) mlir llzk clang gtest python3 lit z3 cvc5;
+          # Prevent use of libllvm and llvm from nixpkgs, which will have different
+          # versions than the mlir from llzk-pkgs.
+          inherit (pkgs.llzk_llvmPackages) libllvm llvm;
 
           default = pkgs.zklang;
           withClang = pkgs.zklangClang;
