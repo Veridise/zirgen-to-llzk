@@ -1,4 +1,4 @@
-//===- Interpreter.h - Compile time interpreter -----------------*- C++ -*-===//
+//===- Interpreter.h - Compile-time interpreter -----------------*- C++ -*-===//
 //
 // Part of the LLZK Project, under the Apache License v2.0.
 // See LICENSE.txt for license information.
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file includes a set of functions that interpret compile time constant
+// This file includes a set of functions that interpret compile-time constant
 // expressions in the ZHL dialect.
 //
 //===----------------------------------------------------------------------===//

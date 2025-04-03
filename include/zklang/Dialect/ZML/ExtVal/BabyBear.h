@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file includes an ExtVal converter that uses the BabyBear field for
-// lowering the type to its lower level representaiton.
+// lowering the type to its lower level representation.
 //
 //===----------------------------------------------------------------------===//
 

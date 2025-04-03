@@ -9,7 +9,7 @@
 //
 // This file includes the pass that converts ZML operations into LLZK
 // operations and the pass that adds the necessary attributes to the top-level
-// LLZK module
+// LLZK module.
 //
 //===----------------------------------------------------------------------===//
 

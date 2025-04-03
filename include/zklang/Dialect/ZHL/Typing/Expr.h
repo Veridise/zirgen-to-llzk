@@ -1,4 +1,4 @@
-//===- Expr.h - Compile time expressions ///---------------------*- C++ -*-===//
+//===- Expr.h - Compile time expressions ------------------------*- C++ -*-===//
 //
 // Part of the LLZK Project, under the Apache License v2.0.
 // See LICENSE.txt for license information.
