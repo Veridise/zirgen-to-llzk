@@ -1,4 +1,4 @@
-//===- Passes.h - Passes public API ---------------------*- C++ -*-===//
+//===- Passes.h - Passes public API -----------------------------*- C++ -*-===//
 //
 // Part of the LLZK Project, under the Apache License v2.0.
 // See LICENSE.txt for license information.
