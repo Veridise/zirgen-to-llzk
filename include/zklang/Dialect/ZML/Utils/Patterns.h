@@ -1,3 +1,17 @@
+//===- Patterns.h - Reusable patterns of ZML ops ----------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes common patterns or templates thereof used by several
+// passes grouped here together to avoid duplicating code.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -5,11 +19,6 @@
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
-
-/*
- * Common patterns or templates thereof used by several passes grouped here together
- * to avoid duplicating code.
- */
 
 namespace zml {
 

@@ -1,4 +1,16 @@
-// Copyright 2024 Veridise, Inc.
+//===- Passes.td - ZML transformation passes definitions ---*- tablegen -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes passes for transforming circuits defined with the 
+// ZML dialect.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef ZML_TRANSFORM_PASSES
 #define ZML_TRANSFORM_PASSES

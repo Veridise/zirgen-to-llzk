@@ -1,3 +1,16 @@
+//===- ArrayFrame.h - Frame array information  ------------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes a frame type for scopes of array iteration.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <mlir/IR/Value.h>
