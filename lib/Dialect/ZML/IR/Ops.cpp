@@ -310,6 +310,11 @@ mlir::LogicalResult GetGlobalOp::verifySymbolUses(mlir::SymbolTableCollection &)
   return mlir::success();
 }
 
+mlir::LogicalResult SetGlobalOp::verifySymbolUses(mlir::SymbolTableCollection &) {
+  // TODO
+  return mlir::success();
+}
+
 mlir::OpFoldResult LitValOp::fold(LitValOp::FoldAdaptor) { return getValueAttr(); }
 
 mlir::OpFoldResult LitValArrayOp::fold(LitValArrayOp::FoldAdaptor) { return getElementsAttr(); }

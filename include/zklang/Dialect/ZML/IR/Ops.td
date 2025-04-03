@@ -218,27 +218,36 @@ def NopOp : ZMLOp<"nop", [Pure]> {
   let hasCanonicalizeMethod = 1;
 }
 
-def GlobalDefOp : ZMLOp<"global"> {
-  let summary = "defines a global component";
-  let description = "Defines a global component and binds it to a symbol.";
+def GlobalDefOp : ZMLOp<"global", [HasParent<"::mlir::ModuleOp">]> {
+  let summary = "declares a global component";
 
-  let arguments = (ins SymbolNameAttr:$sym_name, AnyZMLType:$value,
-      TypeAttrOf<AnyZMLType>:$type);
+  let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyZMLType>:$type);
 
   let assemblyFormat = [{
-    $sym_name `=` $value `:` $type `,` type($value) attr-dict
+    $sym_name `:` $type attr-dict
   }];
 }
 
 def GetGlobalOp
     : ZMLOp<"get_global", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-  let summary = "loads a global variable";
+  let summary = "gets value of a global variable";
 
   let arguments = (ins SymbolRefAttr:$name_ref);
   let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat = [{
     $name_ref `:` type($result) attr-dict
+  }];
+}
+
+def SetGlobalOp
+    : ZMLOp<"set_global", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  let summary = "sets value of a global variable";
+
+  let arguments = (ins SymbolRefAttr:$name_ref, TypeVarOr<Component>:$val);
+
+  let assemblyFormat = [{
+    $name_ref `=` $val `:` type($val) attr-dict
   }];
 }
 

@@ -300,6 +300,14 @@ public:
   matchAndRewrite(GlobalDefOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerSetGlobalOp : public mlir::OpConversionPattern<SetGlobalOp> {
+public:
+  using OpConversionPattern<SetGlobalOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(SetGlobalOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 class LowerGetGlobalOp : public mlir::OpConversionPattern<GetGlobalOp> {
 public:
   using OpConversionPattern<GetGlobalOp>::OpConversionPattern;

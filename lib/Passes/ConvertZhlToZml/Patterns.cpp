@@ -1219,11 +1219,11 @@ LogicalResult ZhlConstructGlobalLowering::matchAndRewrite(
   auto constructedVal =
       this->makeCtorCall(op, op.getConstructType(), adaptor.getArgs(), rewriter, false);
   if (failed(constructedVal)) {
-    return op->emitOpError() << "failed TODO";
+    return op->emitOpError() << "failed to generate constructor call";
   }
-  rewriter.replaceOpWithNewOp<GlobalDefOp>(
-      op, op.getNameAttr(), *constructedVal, TypeAttr::get(constructedVal->getType())
-  );
+  StringAttr name = op.getNameAttr();
+  addGlobalDef(op.getLoc(), name, constructedVal->getType());
+  rewriter.replaceOpWithNewOp<SetGlobalOp>(op, buildGlobalName(name), *constructedVal);
   return success();
 }
 
@@ -1236,6 +1236,6 @@ LogicalResult ZhlGetGlobalLowering::matchAndRewrite(
   }
 
   Type retType = materializeTypeBinding(getContext(), *binding);
-  rewriter.replaceOpWithNewOp<GetGlobalOp>(op, retType, SymbolRefAttr::get(op.getNameAttr()));
+  rewriter.replaceOpWithNewOp<GetGlobalOp>(op, retType, buildGlobalName(op.getNameAttr()));
   return success();
 }

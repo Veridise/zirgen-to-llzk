@@ -63,6 +63,8 @@ void ConvertZhlToZmlPass::runOnOperation() {
 
   OpBuilder builder(module);
   SymbolTable st(module);
+  mlir::ModuleOp globalsModule = mlir::ModuleOp::create(builder.getUnknownLoc(), "globals");
+  st.insert(globalsModule, module.begin());
   createPODComponentsFromClosures(typeAnalysis, builder, st, &module.getRegion().front());
 
   ZMLTypeConverter typeConverter;
@@ -73,8 +75,12 @@ void ConvertZhlToZmlPass::runOnOperation() {
       ZhlConstrainLowering, ZhlLookupLowering, ZhlArrayLowering, ZhlSubscriptLowering,
       ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
       ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
-      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval,
-      ZhlGetGlobalLowering, ZhlConstructGlobalLowering>(typeAnalysis, typeConverter, ctx);
+      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval>(
+      typeAnalysis, typeConverter, ctx
+  );
+  patterns.add<ZhlConstructGlobalLowering, ZhlGetGlobalLowering>(
+      globalsModule, typeAnalysis, typeConverter, ctx
+  );
   patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
     builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
   }, typeAnalysis, typeConverter, ctx);
