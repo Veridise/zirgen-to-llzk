@@ -1,4 +1,16 @@
-// Copyright 2024 Veridise, Inc.
+//===- Passes.td - ZHL utility passes definitions ----------*- tablegen -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes a pass that prints all the deduced types during type 
+// analysis.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef ZMIR_TRANSFORM_PASSES
 #define ZMIR_TRANSFORM_PASSES

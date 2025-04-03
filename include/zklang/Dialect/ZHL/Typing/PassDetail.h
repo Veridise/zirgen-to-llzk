@@ -1,4 +1,16 @@
-// Copyright 2024 Veridise, Inc.
+//===- PassDetail.h - Pass details ------------------------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes the tablegen generated header file for the passes
+// defined in Passes.td in the same directory.
+//
+//===----------------------------------------------------------------------===//
 
 #pragma once
 

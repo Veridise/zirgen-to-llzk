@@ -1,11 +1,16 @@
 # Based on the LLZK flake
 {
   inputs = {
-    flake-utils.url = "github:numtide/flake-utils/v1.0.0";
+    llzk-pkgs.url = "github:Veridise/llzk-nix-pkgs?ref=main";
 
-    veridise-pkgs = {
-      url = "git+ssh://git@github.com/Veridise/veridise-nix-pkgs.git?ref=main";
-      inputs.nixpkgs.follows = "nixpkgs";
+    nixpkgs = {
+      url = "github:NixOS/nixpkgs";
+      follows = "llzk-pkgs/nixpkgs";
+    };
+
+    flake-utils = {
+      url = "github:numtide/flake-utils/v1.0.0";
+      follows = "llzk-pkgs/flake-utils";
     };
 
     llzk = {
@@ -17,7 +22,7 @@
   # Custom colored bash prompt
   nixConfig.bash-prompt = ''\[\e[0;32m\][LLZK]\[\e[m\] \[\e[38;5;244m\]\w\[\e[m\] % '';
 
-  outputs = { self, nixpkgs, flake-utils, veridise-pkgs, llzk }:
+  outputs = { self, nixpkgs, flake-utils, llzk-pkgs, llzk }:
     {
       # First, we define the packages used in this repository/flake
       overlays.default = final: prev: {
@@ -68,7 +73,7 @@
 
           overlays = [
             self.overlays.default
-            veridise-pkgs.overlays.default
+            llzk-pkgs.overlays.default
             llzk.overlays.default
           ];
         };
@@ -80,7 +85,10 @@
           inherit (pkgs) zklang;
 
           # For debug purposes, expose the MLIR/LLVM packages.
-          inherit (pkgs) libllvm llvm mlir llzk clang gtest python3 lit z3 cvc5 ;
+          inherit (pkgs) mlir llzk clang gtest python3 lit z3 cvc5;
+          # Prevent use of libllvm and llvm from nixpkgs, which will have different
+          # versions than the mlir from llzk-pkgs.
+          inherit (pkgs.llzk_llvmPackages) libllvm llvm;
 
           default = pkgs.zklang;
           withClang = pkgs.zklangClang;

@@ -1,4 +1,15 @@
-// Copyright 2024 Veridise, Inc.
+//===- Attrs.td - ZML attributes definitions ---------------*- tablegen -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes attributes to define compile time constant expressions.
+//
+//===----------------------------------------------------------------------===//
 
 include "mlir/IR/AttrTypeBase.td"
 include "Dialect.td"
@@ -8,7 +19,7 @@ class ZMLAttr<string name, string attrMnemonic, list<Trait> traits = []>
   let mnemonic = attrMnemonic;
 }
 
-def Variadic : ZMLAttr<"Variadic", "variadic"> {}
+def Variadic : ZMLAttr<"Variadic", "variadic"> {} // XXX: Remove me??
 
 def ConstExpr : ZMLAttr<"ConstExpr", "cexpr"> {
   let summary = "constant expression";

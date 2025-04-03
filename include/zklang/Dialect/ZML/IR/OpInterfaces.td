@@ -1,3 +1,17 @@
+//===- OpInterfaces.td - ZML op interface definitions ------*- tablegen -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes operation interfaces for treating an operation as 
+// defining a zirgen component.
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef ZML_OP_INTERFACES
 #define ZML_OP_INTERFACES
 

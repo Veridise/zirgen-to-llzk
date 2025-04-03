@@ -1,4 +1,15 @@
-// Copyright 2024 Veridise, Inc.
+//===- Ops.td - ZML operation definitions ------------------*- tablegen -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes the definitions of the operations in the ZML dialect.
+//
+//===----------------------------------------------------------------------===//
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/BuiltinAttributes.td"

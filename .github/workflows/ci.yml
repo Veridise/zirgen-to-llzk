@@ -8,7 +8,7 @@ jobs:
   build:
     name: "Build"
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       matrix:
         os: [ ubuntu-24.04 ]
@@ -35,7 +35,8 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - uses: cachix/install-nix-action@v27
+      # v37.1.0
+      - uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2
         with:
           install_url: https://releases.nixos.org/nix/nix-2.23.3/install
           github_access_token: "${{ secrets.CI_BUILD_TOKEN }}"
@@ -47,16 +48,16 @@ jobs:
           echo 'echo "$CI_BOT_PAT"' > ~/.git-askpass
           chmod 500 ~/.git-askpass
           git config --global core.askPass "$HOME"/.git-askpass
-      - uses: cachix/cachix-action@v15
+      # v16
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad
         with:
-          name: veridise-private
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          name: veridise-public
+          authToken: '${{ secrets.CACHIX_PUBLIC_TOKEN }}'
           pushFilter: '(-source$)'
       - name: Set nix environment
         uses: nicknovitski/nix-develop@v1
         env:
           CI_BOT_PAT: "${{ secrets.CI_BUILD_TOKEN }}"
-
       - name: Set reusable strings
         # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
         id: strings

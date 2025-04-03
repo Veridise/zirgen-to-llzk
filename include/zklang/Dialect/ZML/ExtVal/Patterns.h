@@ -1,3 +1,17 @@
+//===- Patterns.h - ExtVal lowering patterns --------------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes a function to populate a rewrite pattern set with
+// patterns to lower ExtVal operations.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <llzk/Dialect/LLZK/IR/Ops.h>

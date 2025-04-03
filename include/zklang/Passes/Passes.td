@@ -1,4 +1,16 @@
-// Copyright 2024 Veridise, Inc.
+//===- Passes.td - Conversion passes definitions -----------*- tablegen -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes definitions for passes that convert between dialects 
+// or are part of the broader lowering pipeline of the frontend.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef ZMIR_TRANSLATION_PASSES
 #define ZMIR_TRANSLATION_PASSES
