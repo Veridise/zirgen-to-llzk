@@ -41,11 +41,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1743605448,
-        "narHash": "sha256-/KVFz9bWR/dLXFJquY1KSGxmAvM/+iLTSJXFZSVr9fQ=",
+        "lastModified": 1743698820,
+        "narHash": "sha256-6v2erWDpqJGmrZLVzDuvkS9qYgnWTXnsRdUJ7NFOAy8=",
         "ref": "main",
-        "rev": "eb9725ba8cd2a15887a0b91de79855399118820a",
-        "revCount": 159,
+        "rev": "da73459df2c748133e8dc00806d8e17fb7668315",
+        "revCount": 160,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
@@ -103,11 +103,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1743629798,
-        "narHash": "sha256-xIgjAtCNeEgpRIOHAPEUnFrTmM+u2q+XhdHsMYxa20M=",
+        "lastModified": 1743613625,
+        "narHash": "sha256-N4hv3YDFs2yA/NBYNQK1o4AaNzLdBKqeePquk+t+QiA=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "edbcfb98bbe828d0b97c882882293b52c7d58df9",
+        "rev": "b19d7721ae9325afb9ba3729a09a18d203ccd6e6",
         "type": "github"
       },
       "original": {
