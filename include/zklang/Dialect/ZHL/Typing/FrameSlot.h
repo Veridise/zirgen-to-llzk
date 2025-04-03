@@ -1,3 +1,17 @@
+//===- FrameSlot.h - Base class for slots -----------------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes the base class for frame slots that allocate memory
+// inside a component's frame.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <llvm/ADT/SmallString.h>

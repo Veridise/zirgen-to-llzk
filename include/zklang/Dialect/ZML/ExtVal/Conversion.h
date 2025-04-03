@@ -1,3 +1,17 @@
+//===- Conversion.h - ExtVal conversion -------------------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes the base interface for implementing ExtVal type
+// conversions to lower level types and operations.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <mlir/IR/Builders.h>

@@ -1,3 +1,17 @@
+//===- Params.h - Views over a set of parameters ----------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes view classes that allows handling a collection of
+// parameters, supporting both generic parameters and constructor parameters.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <cassert>

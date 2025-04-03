@@ -1,5 +1,15 @@
-
-// Copyright 2024 Veridise, Inc.
+//===- SplitComponentBody.cpp - Witness & constraints splitting -*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes the implementation of the --split-component-body pass.
+//
+//===----------------------------------------------------------------------===//
 
 #include <cassert>
 #include <llvm/ADT/STLExtras.h>

@@ -1,3 +1,17 @@
+//===- Typing.h - Type checking ---------------------------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes classes and functions for performing type checking and
+// analysis over a zirgen circuit defined with the ZHL dialect.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <zklang/Dialect/ZHL/Typing/Frame.h>

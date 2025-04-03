@@ -1,3 +1,17 @@
+//===- BuiltIns.h - Builtins definitions ------------------------*- C++ -*-===//
+//
+// Part of the LLZK Project, under the Apache License v2.0.
+// See LICENSE.txt for license information.
+// Copyright 2025 Veridise Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+//
+// This file includes definitions for builtins types and components in the
+// zirgen DSL.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <mlir/IR/Builders.h>
