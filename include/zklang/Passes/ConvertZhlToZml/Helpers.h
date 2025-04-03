@@ -79,15 +79,14 @@ public:
   );
 
   /// Generates the ops that represent the construction of a component. Fetches a reference to
-  /// the constructor and calls it. If the binding is linked to a frame slot creates a field in the
-  /// component and writes the result into it. If a field is created returns the Value of reading
+  /// the constructor and calls it. If the binding is linked to a frame slot, creates a field in the
+  /// component and writes the result into it. If a field is created, returns the Value of reading
   /// the field, otherwise returns the value returned by the constructor call. The returned value is
   /// also used as argument to create a constrain call op that represents the call to `@constrain`
   /// in LLZK.
   mlir::Value build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args);
   mlir::FunctionType getCtorType() const;
   const zhl::TypeBinding &getBinding() const;
-  ComponentInterface getCallerComp() const;
 
 private:
   CtorCallBuilder(
