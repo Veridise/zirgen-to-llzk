@@ -23,7 +23,7 @@ namespace zml {
 
 namespace {
 
-template <typename Impl, typename Base> class RemoveIllegalOpsCommon : public Base {
+template <typename Base> class RemoveIllegalOpsCommon : public Base {
 
   void runOnOperation() override {
     // Skip if we are not in the interesting function
@@ -151,8 +151,7 @@ public:
 };
 
 class RemoveIllegalComputeOpsPass
-    : public RemoveIllegalOpsCommon<
-          RemoveIllegalComputeOpsPass, RemoveIllegalComputeOpsBase<RemoveIllegalComputeOpsPass>> {
+    : public RemoveIllegalOpsCommon<RemoveIllegalComputeOpsBase<RemoveIllegalComputeOpsPass>> {
 
   bool inTargetFunction() override {
     auto comp = getDeclaringComponent();
@@ -172,9 +171,7 @@ class RemoveIllegalComputeOpsPass
 };
 
 class RemoveIllegalConstrainOpsPass
-    : public RemoveIllegalOpsCommon<
-          RemoveIllegalConstrainOpsPass,
-          RemoveIllegalConstrainOpsBase<RemoveIllegalConstrainOpsPass>> {
+    : public RemoveIllegalOpsCommon<RemoveIllegalConstrainOpsBase<RemoveIllegalConstrainOpsPass>> {
 
   bool inTargetFunction() override {
     auto comp = getDeclaringComponent();
