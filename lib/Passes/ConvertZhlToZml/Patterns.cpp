@@ -155,8 +155,9 @@ ConstructorLowering<Op>::makeCtorCallBuilder(Operation *op, Value value, OpBuild
 }
 
 template <typename Op>
-FailureOr<Value> ConstructorLowering<Op>::makeCtorCall(
-    Op op, Value value, ValueRange newArgs, ConversionPatternRewriter &rewriter, bool doReplace
+LogicalResult ConstructorLowering<Op>::makeCtorCall(
+    Op op, Value value, ValueRange newArgs, ConversionPatternRewriter &rewriter,
+    GlobalBuilder::AndName globalBuilder
 ) const {
   FailureOr<CtorCallBuilder> ctor = makeCtorCallBuilder(op, value, rewriter);
   if (failed(ctor)) {
@@ -180,12 +181,15 @@ FailureOr<Value> ConstructorLowering<Op>::makeCtorCall(
 
   std::vector<Value> preparedArguments;
   prepareArguments(newArgs, constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments);
-
-  auto result = ctor->build(rewriter, op->getLoc(), preparedArguments);
-  if (doReplace) {
+  Value result = ctor->build(rewriter, op->getLoc(), preparedArguments, globalBuilder);
+  if (globalBuilder) {
+    // In this case, cannot replace the old op uses with 'result' because the old op has 0 results.
+    assert(op->getNumResults() == 0);
+    rewriter.eraseOp(op);
+  } else {
     rewriter.replaceOp(op, result);
   }
-  return result;
+  return success();
 }
 
 template class zml::ConstructorLowering<zirgen::Zhl::ConstructOp>;
@@ -1216,15 +1220,9 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
 LogicalResult ZhlConstructGlobalLowering::matchAndRewrite(
     zirgen::Zhl::ConstructGlobalOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  auto constructedVal =
-      this->makeCtorCall(op, op.getConstructType(), adaptor.getArgs(), rewriter, false);
-  if (failed(constructedVal)) {
-    return op->emitOpError() << "failed to generate constructor call";
-  }
-  StringAttr name = op.getNameAttr();
-  addGlobalDef(op.getLoc(), name, constructedVal->getType());
-  rewriter.replaceOpWithNewOp<SetGlobalOp>(op, buildGlobalName(name), *constructedVal);
-  return success();
+  return this->makeCtorCall(
+      op, op.getConstructType(), adaptor.getArgs(), rewriter, forName(op.getNameAttr())
+  );
 }
 
 LogicalResult ZhlGetGlobalLowering::matchAndRewrite(
@@ -1236,6 +1234,6 @@ LogicalResult ZhlGetGlobalLowering::matchAndRewrite(
   }
 
   Type retType = materializeTypeBinding(getContext(), *binding);
-  rewriter.replaceOpWithNewOp<GetGlobalOp>(op, retType, buildGlobalName(op.getNameAttr()));
+  rewriter.replaceOpWithNewOp<GetGlobalOp>(op, retType, buildName(op.getNameAttr()));
   return success();
 }

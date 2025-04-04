@@ -728,10 +728,11 @@ LogicalResult LowerVarArgsOp::matchAndRewrite(
 }
 
 LogicalResult LowerGlobalDefOp::matchAndRewrite(
-    GlobalDefOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+    GlobalDefOp op, OpAdaptor, ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::GlobalDefOp>(op, op.getSymName(), false, op.getType(), nullptr);
-  return failure();
+  Type newType = getTypeConverter()->convertType(op.getType());
+  rewriter.replaceOpWithNewOp<llzk::GlobalDefOp>(op, op.getSymName(), false, newType, nullptr);
+  return success();
 }
 
 LogicalResult LowerSetGlobalOp::matchAndRewrite(

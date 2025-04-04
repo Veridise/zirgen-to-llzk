@@ -63,6 +63,39 @@ constructPODComponent(mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBu
 /// takes as input the values for all fields including the super type's value.
 void createPODComponent(zhl::TypeBinding &, mlir::OpBuilder &, mlir::SymbolTable &);
 
+/// Helper for constructing global variables in a common global module.
+class GlobalBuilder {
+  mlir::ModuleOp &globalsModuleRef;
+
+public:
+  GlobalBuilder(mlir::ModuleOp &globalsModule) : globalsModuleRef(globalsModule) {}
+
+  mlir::SymbolRefAttr buildName(mlir::StringAttr flatName) const {
+    return mlir::SymbolRefAttr::get(
+        globalsModuleRef.getSymNameAttr(), {mlir::FlatSymbolRefAttr::get(flatName)}
+    );
+  }
+
+  void buildDef(mlir::Location loc, mlir::StringAttr flatName, mlir::Type type) const {
+    mlir::OpBuilder bldr(globalsModuleRef.getRegion());
+    bldr.create<GlobalDefOp>(loc, flatName, mlir::TypeAttr::get(type));
+  }
+
+  using AndName = std::optional<std::pair<const GlobalBuilder *, mlir::StringAttr>>;
+
+  inline AndName forName(mlir::StringAttr nameOfGlobal) const {
+    return std::make_pair(this, nameOfGlobal);
+  }
+
+  /// Build `GlobalDefOp` and return it's full, unambiguous name.
+  inline static mlir::SymbolRefAttr
+  buildDef(const AndName &builder, mlir::Location loc, mlir::Type type) {
+    mlir::StringAttr name = builder->second;
+    builder->first->buildDef(loc, name, type);
+    return builder->first->buildName(name);
+  }
+};
+
 /// Helper for creating the ops that represent the call to a component's constructor.
 /// If the associated binding is linked to a frame slot it also creates the field and writes the
 /// result into it.
@@ -79,12 +112,27 @@ public:
   );
 
   /// Generates the ops that represent the construction of a component. Fetches a reference to
-  /// the constructor and calls it. If the binding is linked to a frame slot, creates a field in the
-  /// component and writes the result into it. If a field is created, returns the Value of reading
-  /// the field, otherwise returns the value returned by the constructor call. The returned value is
-  /// also used as argument to create a constrain call op that represents the call to `@constrain`
-  /// in LLZK.
-  mlir::Value build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args);
+  /// the constructor and calls it. The constructed component is also used as argument to create
+  /// a constrain call op that represents the call to `@constrain` in LLZK. Returns the argument to
+  /// the constrain call op (which may be the direct result of the construction or the result of a
+  /// write-read round trip described below which is needed to break the def-use chain of the
+  /// returned value from the component construction so the latter can be removed in the LLZK
+  /// `@constrain` functions).
+  ///
+  /// If the binding is linked to a frame slot, it also generates a field in the component and
+  /// generates the following between the construction and the constrain call op:
+  ///   - a field write storing the constructed value to the new field
+  ///   - a field read retrieving the constructed value from the new field
+  ///
+  /// Otherwise, if a `GlobalBuilder::AndName` instance is provided (i.e. the call is handling a
+  /// `zhl.construct_global` op), generates a global declaration op in the "globals" module and
+  /// generates the following between the construction and the constrain call op:
+  ///   - a global write storing the constructed value to the new global
+  ///   - a global read retrieving the constructed value from the new global
+  mlir::Value build(
+      mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args,
+      GlobalBuilder::AndName globalBuilder = std::nullopt
+  );
   mlir::FunctionType getCtorType() const;
   const zhl::TypeBinding &getBinding() const;
 

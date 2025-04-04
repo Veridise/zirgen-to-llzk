@@ -218,7 +218,7 @@ def NopOp : ZMLOp<"nop", [Pure]> {
   let hasCanonicalizeMethod = 1;
 }
 
-def GlobalDefOp : ZMLOp<"global", [HasParent<"::mlir::ModuleOp">]> {
+def GlobalDefOp : ZMLOp<"global_decl", [HasParent<"::mlir::ModuleOp">]> {
   let summary = "declares a global component";
 
   let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyZMLType>:$type);

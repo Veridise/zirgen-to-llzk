@@ -152,9 +152,9 @@ protected:
   mlir::FailureOr<CtorCallBuilder>
   makeCtorCallBuilder(mlir::Operation *, mlir::Value, mlir::OpBuilder &) const;
 
-  mlir::FailureOr<mlir::Value> makeCtorCall(
+  mlir::LogicalResult makeCtorCall(
       Op, mlir::Value, mlir::ValueRange newArgs, mlir::ConversionPatternRewriter &,
-      bool doReplace = true
+      GlobalBuilder::AndName globalBuilder = std::nullopt
   ) const;
 
 public:
@@ -412,44 +412,25 @@ public:
       const override;
 };
 
-class GlobalRefHelper {
-  mlir::ModuleOp &globalsModuleRef;
-
-public:
-  GlobalRefHelper(mlir::ModuleOp &globalsModule) : globalsModuleRef(globalsModule) {}
-
-  mlir::SymbolRefAttr buildGlobalName(mlir::StringAttr flatName) const {
-    return mlir::SymbolRefAttr::get(
-        globalsModuleRef.getSymNameAttr(), {mlir::FlatSymbolRefAttr::get(flatName)}
-    );
-  }
-
-  void addGlobalDef(mlir::Location loc, mlir::StringAttr flatName, mlir::Type type) const {
-    mlir::OpBuilder bldr(globalsModuleRef.getRegion());
-    bldr.create<GlobalDefOp>(loc, flatName, mlir::TypeAttr::get(type));
-  }
-};
-
 class ZhlConstructGlobalLowering : public ConstructorLowering<zirgen::Zhl::ConstructGlobalOp>,
-                                   GlobalRefHelper {
+                                   GlobalBuilder {
 public:
   template <typename... Args>
   ZhlConstructGlobalLowering(mlir::ModuleOp &globalsModule, Args &&...args)
       : ConstructorLowering<zirgen::Zhl::ConstructGlobalOp>(std::forward<Args>(args)...),
-        GlobalRefHelper(globalsModule) {}
+        GlobalBuilder(globalsModule) {}
 
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::ConstructGlobalOp, OpAdaptor, mlir::ConversionPatternRewriter &)
       const override;
 };
 
-class ZhlGetGlobalLowering : public ZhlOpLoweringPattern<zirgen::Zhl::GetGlobalOp>,
-                             GlobalRefHelper {
+class ZhlGetGlobalLowering : public ZhlOpLoweringPattern<zirgen::Zhl::GetGlobalOp>, GlobalBuilder {
 public:
   template <typename... Args>
   ZhlGetGlobalLowering(mlir::ModuleOp &globalsModule, Args &&...args)
       : ZhlOpLoweringPattern<zirgen::Zhl::GetGlobalOp>(std::forward<Args>(args)...),
-        GlobalRefHelper(globalsModule) {}
+        GlobalBuilder(globalsModule) {}
 
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::GetGlobalOp, OpAdaptor, mlir::ConversionPatternRewriter &)
