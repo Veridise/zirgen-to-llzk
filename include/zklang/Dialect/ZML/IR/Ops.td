@@ -170,7 +170,7 @@ def FieldDefOp : ZMLOp<"field", [HasParent<"::zml::ComponentOp, "
                                  Symbol]> {
   let summary = "component field definition";
   let arguments = (ins SymbolNameAttr:$sym_name,
-      TypeAttrOf<TypeVarOr<Component>>:$type);
+      TypeAttrOf<TypeVarOr<Component>>:$type, UnitAttr:$column);
 
   let assemblyFormat = [{
     $sym_name `:` $type attr-dict

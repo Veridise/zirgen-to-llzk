@@ -13,7 +13,9 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <llzk/Dialect/LLZK/IR/Ops.h>
 #include <llzk/Dialect/LLZK/IR/Types.h>
@@ -22,6 +24,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -76,7 +79,7 @@ mlir::LogicalResult FieldDefOpLowering::matchAndRewrite(
     FieldDefOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   rewriter.replaceOpWithNewOp<llzk::FieldDefOp>(
-      op, op.getNameAttr(), getTypeConverter()->convertType(op.getType())
+      op, op.getNameAttr(), getTypeConverter()->convertType(op.getType()), op.getColumn()
   );
   return mlir::success();
 }
@@ -273,7 +276,9 @@ static Value readSuperFields(
     return handleArraySpecialCases(type, chain, target, tc, loc, builder);
   }
 
-  auto read = builder.create<llzk::FieldReadOp>(loc, tc.convertType(superComp), chain, "$super");
+  auto read = builder.create<llzk::FieldReadOp>(
+      loc, tc.convertType(superComp), chain, builder.getStringAttr("$super")
+  );
   return readSuperFields(superComp, read, target, tc, loc, builder);
 }
 
@@ -359,6 +364,16 @@ static void collectAffineParams(ArrayRef<Attribute> attrs, SmallVectorImpl<Const
   }
 }
 
+static ValueRange materializeValuesForParam(
+    ConstExprAttr param, ArrayRef<Attribute> sourceParams, SmallVectorImpl<Value> &out,
+    OpBuilder &builder, Location loc
+) {
+  out = llvm::map_to_vector(param.getFormals(), [&](auto formal) {
+    return materializeParam(sourceParams[formal], builder, loc);
+  });
+  return out;
+}
+
 static void materializeValuesForParams(
     ArrayRef<ConstExprAttr> affineParams, ArrayRef<Attribute> sourceParams,
     MutableArrayRef<SmallVector<Value>> mem, OpBuilder &builder, Location loc,
@@ -366,11 +381,7 @@ static void materializeValuesForParams(
 ) {
   auto res = llvm::map_to_vector(llvm::zip_equal(mem, affineParams), [&](auto in) -> ValueRange {
     auto [values, param] = in;
-    values = llvm::map_to_vector(param.getFormals(), [&](auto formal) {
-      return materializeParam(sourceParams[formal], builder, loc);
-    });
-
-    return values;
+    return materializeValuesForParam(param, sourceParams, values, builder, loc);
   });
   out.insert(out.end(), res.begin(), res.end());
 }
@@ -466,7 +477,7 @@ mlir::LogicalResult LowerReadFieldOp::matchAndRewrite(
 ) const {
   rewriter.replaceOpWithNewOp<llzk::FieldReadOp>(
       op, getTypeConverter()->convertType(op.getType()), adaptor.getComponent(),
-      adaptor.getFieldNameAttr()
+      adaptor.getFieldNameAttr().getAttr()
   );
   return mlir::success();
 }
@@ -733,5 +744,65 @@ LogicalResult LowerVarArgsOp::matchAndRewrite(
       ),
       adaptor.getElements()
   );
+  return success();
+}
+
+LogicalResult LowerReadBackOp::matchAndRewrite(
+    ReadBackOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  const auto *converter = getTypeConverter();
+  assert(converter);
+
+  auto replace = [&](auto... args) {
+    auto outType = converter->convertType(op.getResult().getType());
+    rewriter.replaceOpWithNewOp<llzk::FieldReadOp>(
+        op, outType, adaptor.getComp(), adaptor.getFieldAttr(),
+        std::forward<decltype(args)>(args)...
+    );
+  };
+  llvm::TypeSwitch<Attribute>(adaptor.getDistance())
+      .Case([&](SymbolRefAttr symAttr) {
+    // If the distance is a symbol create an affine expression that negates the symbol.
+    // Expects the symbol to be one of the parameters of the current struct. Will generate malformed
+    // IR otherwise.
+    auto value = materializeParam(symAttr, rewriter, op->getLoc());
+    ValueRange mapOperands({value});
+    replace(
+        AffineMapAttr::get(AffineMap::get(
+            /*dimCount=*/0, /*symbolCount=*/1,
+            rewriter.getAffineConstantExpr(0) - rewriter.getAffineSymbolExpr(0)
+        )),
+        mapOperands, 0
+    );
+  })
+      .Case([&](IntegerAttr intAttr) {
+    // If the distance is a literal integer just negate it to move backwards.
+    auto intValue = intAttr.getValue();
+    assert(intValue.isNonNegative());
+    if (!intValue.isZero()) {
+      intValue.negate();
+    }
+    replace(IntegerAttr::get(rewriter.getIndexType(), intValue));
+  })
+      .Case([&](ConstExprAttr cexpAttr) {
+    // If the distance is an expression, wrap it around a negation.
+    auto templMap = AffineMap::get(
+        /*dimCount=*/1, /*symbolCount=*/0,
+        rewriter.getAffineConstantExpr(0) - rewriter.getAffineDimExpr(0)
+    );
+    auto newMap = templMap.compose(cexpAttr.getMap());
+    auto newCexpr = ConstExprAttr::get(newMap, cexpAttr.getFormals());
+    auto params = op->getParentOfType<llzk::StructDefOp>()
+                      .getConstParams()
+                      .value_or(rewriter.getArrayAttr({}))
+                      .getValue();
+    SmallVector<SmallVector<Value>, 1> mapOperandsMem(1);
+    SmallVector<ValueRange, 1> mapOperands;
+    materializeValuesForParams(
+        {newCexpr}, params, MutableArrayRef(mapOperandsMem), rewriter, op.getLoc(), mapOperands
+    );
+    replace(Attribute(AffineMapAttr::get(newCexpr.getMap())), mapOperands[0], 0);
+  }).Default([&](Attribute) { llvm_unreachable("ReadBackOp with an unexpected attribute type"); });
+
   return success();
 }

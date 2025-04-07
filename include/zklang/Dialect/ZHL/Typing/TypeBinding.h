@@ -557,21 +557,6 @@ private:
   /// found but it couldn't get typechecked returns success wrapping a nullopt.
   mlir::FailureOr<std::optional<TypeBinding>> locateMember(mlir::StringRef) const;
 
-  // /// A variadic type binding represents a constructor argument that can accept any number of
-  // /// arguments.
-  // bool variadic = false;
-  // /// A type binding is considered specialized if it has types or values assigned to its generic
-  // /// parameters. This flag marks the type binding as having done that transformation.
-  // bool specialized = false;
-  // /// Marks the type binding as having been declared to self construct.
-  // bool selfConstructor = false;
-  // /// Marks the type binding as a language builtin type.
-  // bool builtin = false;
-  // /// Marks the type binding as a closure that needs to have a component created during lowering.
-  // bool closure = false;
-  // /// Marks the type binding as an external component.
-  // bool external = false;
-
   Flags flags;
   Name name;
   mlir::Location loc;

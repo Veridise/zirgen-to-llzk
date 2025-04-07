@@ -47,7 +47,7 @@ void ComponentBuilder::Ctx::addFields(mlir::OpBuilder &builder) {
   for (auto &field : fields) {
     builder.create<FieldDefOp>(
         field.loc.value_or(builder.getUnknownLoc()), builder.getStringAttr(field.name),
-        mlir::TypeAttr::get(field.type)
+        mlir::TypeAttr::get(field.type), field.column ? builder.getUnitAttr() : nullptr
     );
   }
 }
@@ -121,13 +121,14 @@ ComponentBuilder &ComponentBuilder::attrs(mlir::ArrayRef<mlir::NamedAttribute> a
   return *this;
 }
 
-ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type) {
-  ctx.fields.push_back({.name = name, .type = type, .loc = std::nullopt});
+ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type, bool isColumn) {
+  ctx.fields.push_back({.name = name, .type = type, .loc = std::nullopt, .column = isColumn});
   return *this;
 }
 
-ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type, mlir::Location loc) {
-  ctx.fields.push_back({.name = name, .type = type, .loc = loc});
+ComponentBuilder &
+ComponentBuilder::field(StringRef name, mlir::Type type, mlir::Location loc, bool isColumn) {
+  ctx.fields.push_back({.name = name, .type = type, .loc = loc, .column = isColumn});
   return *this;
 }
 

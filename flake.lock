@@ -34,18 +34,22 @@
     },
     "llzk": {
       "inputs": {
-        "flake-utils": "flake-utils",
+        "flake-utils": [
+          "llzk",
+          "llzk-pkgs",
+          "flake-utils"
+        ],
         "llzk-pkgs": "llzk-pkgs",
         "nixpkgs": [
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1743698820,
-        "narHash": "sha256-6v2erWDpqJGmrZLVzDuvkS9qYgnWTXnsRdUJ7NFOAy8=",
+        "lastModified": 1743803990,
+        "narHash": "sha256-wL2ZEHje+EgvNSD1LAGgcvsgqY1l9AyAuSJkRvH+KE4=",
         "ref": "main",
-        "rev": "da73459df2c748133e8dc00806d8e17fb7668315",
-        "revCount": 160,
+        "rev": "71e96b1399107c3f65515c1f1f8d5d567c2c1ada",
+        "revCount": 163,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
@@ -57,14 +61,8 @@
     },
     "llzk-pkgs": {
       "inputs": {
-        "flake-utils": [
-          "llzk",
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "llzk",
-          "nixpkgs"
-        ]
+        "flake-utils": "flake-utils",
+        "nixpkgs": "nixpkgs"
       },
       "locked": {
         "lastModified": 1743550662,
@@ -84,7 +82,7 @@
     "llzk-pkgs_2": {
       "inputs": {
         "flake-utils": "flake-utils_2",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1743619909,
@@ -102,6 +100,20 @@
       }
     },
     "nixpkgs": {
+      "locked": {
+        "lastModified": 1743689281,
+        "narHash": "sha256-y7Hg5lwWhEOgflEHRfzSH96BOt26LaYfrYWzZ+VoVdg=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2bfc080955153be0be56724be6fa5477b4eefabb",
+        "type": "github"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "type": "indirect"
+      }
+    },
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1743613625,
         "narHash": "sha256-N4hv3YDFs2yA/NBYNQK1o4AaNzLdBKqeePquk+t+QiA=",

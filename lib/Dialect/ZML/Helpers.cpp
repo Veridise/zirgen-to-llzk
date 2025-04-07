@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
@@ -73,7 +74,9 @@ FlatSymbolRefAttr createSlot(
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(&component.getRegion().front().front());
   auto type = materializeTypeBinding(builder.getContext(), slot->getBinding());
-  auto fieldDef = builder.create<FieldDefOp>(loc, desiredName, TypeAttr::get(type));
+  auto fieldDef = builder.create<FieldDefOp>(
+      loc, desiredName, TypeAttr::get(type), slot->isColumn() ? builder.getUnitAttr() : nullptr
+  );
 
   LLVM_DEBUG(llvm::dbgs() << "Field op: " << fieldDef << "\n");
   // Insert the FieldDefOp into the symbol table to make sure it has an unique name within the
@@ -159,22 +162,29 @@ void storeSlot(
 
 void materializeFieldTypes(
     zhl::TypeBinding &binding, MLIRContext *ctx, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<StringRef> &fields
+    SmallVectorImpl<StringRef> &fields, SmallVectorImpl<bool> *columns = nullptr
 ) {
-  llvm::StringMap<Type> map;
+  llvm::StringMap<std::pair<Type, bool>> map;
   SmallVector<StringRef> fieldsToSort;
   fieldsToSort.reserve(binding.getMembers().size());
 
   for (auto &[memberName, memberBinding] : binding.getMembers()) {
     assert(memberBinding.has_value());
     auto memberType = materializeTypeBinding(ctx, *memberBinding);
-    map[memberName] = memberType;
+    bool isColumn = false;
+    if (auto *cslot = mlir::dyn_cast_if_present<ComponentSlot>(memberBinding->getSlot())) {
+      isColumn = cslot->isColumn();
+    }
+    map[memberName] = {memberType, isColumn};
     fieldsToSort.push_back(memberName);
   }
 
   std::sort(fieldsToSort.begin(), fieldsToSort.end());
   for (auto field : fieldsToSort) {
-    types.push_back(map[field]);
+    types.push_back(map[field].first);
+    if (columns) {
+      columns->push_back(map[field].second);
+    }
   }
   fields.insert(fields.end(), fieldsToSort.begin(), fieldsToSort.end());
 }
@@ -228,6 +238,7 @@ void createPODComponent(
 ) {
   SmallVector<Type> argTypes;
   SmallVector<StringRef> fieldNames;
+  SmallVector<bool> columns;
 
   ComponentBuilder cb;
   auto loc = binding.getLocation();
@@ -236,12 +247,14 @@ void createPODComponent(
   auto superType = materializeTypeBinding(builder.getContext(), binding.getSuperType());
   argTypes = {superType};
   fieldNames = {"$super"};
+  columns = {false};
   argTypes.reserve(1 + binding.getMembers().size());
   fieldNames.reserve(1 + binding.getMembers().size());
+  columns.reserve(1 + binding.getMembers().size());
 
-  materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames);
-  for (auto [memberName, memberType] : llvm::zip_equal(fieldNames, argTypes)) {
-    cb.field(memberName, memberType);
+  materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames, &columns);
+  for (auto [memberName, memberType, isColumn] : llvm::zip_equal(fieldNames, argTypes, columns)) {
+    cb.field(memberName, memberType, isColumn);
   }
 
   if (!binding.getGenericParamNames().empty()) {
