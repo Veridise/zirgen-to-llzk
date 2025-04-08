@@ -36,12 +36,14 @@ mlir::FailureOr<TypeBinding> StringTypingRule::
 }
 
 mlir::FailureOr<TypeBinding> GlobalTypingRule::
-    typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   auto binding = getBindings().MaybeGet(op.getName());
   if (mlir::failed(binding)) {
     return op->emitError() << "type '" << op.getName() << "' was not found";
   }
+  // Ensure the global is declared
+  scope.declareGlobal(op.getName(), *binding);
   return interpretOp(op, *binding);
 }
 
@@ -115,22 +117,24 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
 }
 
 mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
-    typeCheck(zirgen::Zhl::GetGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::GetGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  // TODO: Add check that the global exists in the scope
   if (operands.empty()) {
     return mlir::failure();
   }
+  // Ensure the global is declared
+  scope.declareGlobal(op.getName(), operands[0]);
   return interpretOp(op, operands[0]);
 }
 
 mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
-    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
-  // TODO: Add global declaration to the scope
   if (operands.size() < 2) {
     return mlir::failure();
   }
+  // Ensure the global is declared
+  scope.declareGlobal(op.getName(), operands[0]);
   return interpretOp(op, operands[1]);
 }
 

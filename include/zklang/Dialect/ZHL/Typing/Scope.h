@@ -20,7 +20,7 @@ public:
   explicit Scope(ScopeKind Kind) : kind(Kind) {}
   virtual ~Scope() = default;
 
-  // TODO: Global declarations
+  void declareGlobal(mlir::StringRef, TypeBinding);
   virtual void declareGenericParam(mlir::StringRef, uint64_t, TypeBinding) = 0;
   /// Declares a generic param as a lifted parameter that will materialize to an affine map.
   /// Returns a type binding pointing to the generic parameter name of the newly created parameter.
@@ -41,6 +41,8 @@ public:
 
 private:
   ScopeKind kind;
+
+  static MembersMap globals;
 };
 
 /// Mixin that implements the logic for defining members
