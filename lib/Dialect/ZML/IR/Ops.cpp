@@ -305,14 +305,26 @@ mlir::LogicalResult WriteFieldOp::verifySymbolUses(mlir::SymbolTableCollection &
   return mlir::success();
 }
 
-mlir::LogicalResult GetGlobalOp::verifySymbolUses(mlir::SymbolTableCollection &) {
-  // TODO
-  return mlir::success();
+namespace {
+
+LogicalResult verifyGlobalName(SymbolTableCollection &tables, Operation *op, SymbolRefAttr name) {
+  ModuleOp mod = op->getParentOfType<ModuleOp>();
+  assert(mod);
+  GlobalDefOp def = tables.lookupSymbolIn<GlobalDefOp>(mod, name);
+  if (!def) {
+    return op->emitOpError() << "reference to undefined global '" << name << "'";
+  }
+  return success();
 }
 
-mlir::LogicalResult SetGlobalOp::verifySymbolUses(mlir::SymbolTableCollection &) {
-  // TODO
-  return mlir::success();
+} // namespace
+
+LogicalResult GetGlobalOp::verifySymbolUses(SymbolTableCollection &tables) {
+  return verifyGlobalName(tables, *this, getNameRef());
+}
+
+LogicalResult SetGlobalOp::verifySymbolUses(SymbolTableCollection &tables) {
+  return verifyGlobalName(tables, *this, getNameRef());
 }
 
 mlir::OpFoldResult LitValOp::fold(LitValOp::FoldAdaptor) { return getValueAttr(); }
