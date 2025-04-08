@@ -1234,6 +1234,8 @@ LogicalResult ZhlGetGlobalLowering::matchAndRewrite(
   }
 
   Type retType = materializeTypeBinding(getContext(), *binding);
-  rewriter.replaceOpWithNewOp<GetGlobalOp>(op, retType, buildName(op.getNameAttr()));
+  GlobalBuilder::AndName globalBuilder = forName(op.getNameAttr());
+  SymbolRefAttr globalName = buildDef(globalBuilder, op.getLoc(), retType);
+  rewriter.replaceOpWithNewOp<GetGlobalOp>(op, retType, globalName);
   return success();
 }

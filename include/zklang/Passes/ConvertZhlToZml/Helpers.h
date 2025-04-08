@@ -77,8 +77,13 @@ public:
   }
 
   void buildDef(mlir::Location loc, mlir::StringAttr flatName, mlir::Type type) const {
-    mlir::OpBuilder bldr(globalsModuleRef.getRegion());
-    bldr.create<GlobalDefOp>(loc, flatName, mlir::TypeAttr::get(type));
+    // This must be called for both Zhl::ConstructGlobalOp and Zhl::GetGlobalOp (because there's no
+    // requirement that a global is defined within the current compilation) so check if it already
+    // exists before creating the GlobalDefOp.
+    if (globalsModuleRef.lookupSymbol(flatName) == nullptr) {
+      mlir::OpBuilder bldr(globalsModuleRef.getRegion());
+      bldr.create<GlobalDefOp>(loc, flatName, mlir::TypeAttr::get(type));
+    }
   }
 
   using AndName = std::optional<std::pair<const GlobalBuilder *, mlir::StringAttr>>;
