@@ -35,15 +35,19 @@ mlir::FailureOr<TypeBinding> StringTypingRule::
   return interpretOp(op, getBindings().Get("String"));
 }
 
-mlir::FailureOr<TypeBinding> GlobalTypingRule::
-    typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &scope, mlir::ArrayRef<const Scope *>)
+FailureOr<TypeBinding> GlobalTypingRule::
+    typeCheck(zirgen::Zhl::GlobalOp op, ArrayRef<TypeBinding>, Scope &scope, ArrayRef<const Scope *>)
         const {
   auto binding = getBindings().MaybeGet(op.getName());
-  if (mlir::failed(binding)) {
+  if (failed(binding)) {
     return op->emitError() << "type '" << op.getName() << "' was not found";
   }
   // Ensure the global is declared
-  scope.declareGlobal(op.getName(), *binding);
+  if (failed(scope.declareGlobal(op.getName(), *binding, [&op]() { return op.emitError(); }))) {
+    {
+      return failure();
+    }
+  }
   return interpretOp(op, *binding);
 }
 
@@ -116,25 +120,29 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   return component;
 }
 
-mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
-    typeCheck(zirgen::Zhl::GetGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+FailureOr<TypeBinding> GetGlobalTypingRule::
+    typeCheck(zirgen::Zhl::GetGlobalOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
-    return mlir::failure();
+    return failure();
   }
   // Ensure the global is declared
-  scope.declareGlobal(op.getName(), operands[0]);
+  if (failed(scope.declareGlobal(op.getName(), operands[0], [&op]() { return op.emitError(); }))) {
+    return failure();
+  }
   return interpretOp(op, operands[0]);
 }
 
-mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
-    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
+FailureOr<TypeBinding> ConstructGlobalTypingRule::
+    typeCheck(zirgen::Zhl::ConstructGlobalOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *>)
         const {
   if (operands.size() < 2) {
-    return mlir::failure();
+    return failure();
   }
   // Ensure the global is declared
-  scope.declareGlobal(op.getName(), operands[0]);
+  if (failed(scope.declareGlobal(op.getName(), operands[0], [&op]() { return op.emitError(); }))) {
+    return failure();
+  }
   return interpretOp(op, operands[1]);
 }
 

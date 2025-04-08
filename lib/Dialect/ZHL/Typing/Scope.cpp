@@ -13,21 +13,21 @@ namespace zhl {
 
 MembersMap Scope::globals;
 
-void Scope::declareGlobal(StringRef name, TypeBinding type) {
+LogicalResult Scope::declareGlobal(StringRef name, TypeBinding type, EmitErrorFn emitErr) {
   MembersMap::iterator existing = globals.find(name);
   // If there's an existing TypeBinding, the new one must be the same.
   if (existing != globals.end()) {
     if (std::optional<TypeBinding> &ev = existing->getValue()) {
       if (ev.value() != type) {
-        llvm::errs() << "Attempt to change type of global \"" << name << "\"\n";
-        llvm::errs() << "  old type = " << ev.value() << "\n";
-        llvm::errs() << "  new type = " << type << "\n";
-        assert(false);
+        return emitErr() << "Attempt to change type of global \"" << name << "\"\n"
+                         << "  old type = " << ev.value() << "\n"
+                         << "  new type = " << type << "\n";
       }
-      return;
+      return success();
     }
   }
   globals[name] = type;
+  return success();
 }
 
 ComponentScope::ComponentScope(ComponentOp Component, TypeBindings &Bindings)
