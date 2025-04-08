@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s | FileCheck %s
+// RUN: zklang -o - %s | FileCheck %s --enable-var-scope
 
 extern LookupDelta(table: Val, index: Val, count: Val);
 
@@ -246,7 +246,6 @@ component ControlDone(cycle: Reg, input: InstInput) {
   global isTerminate: Reg;
   global shutdownCycle: Reg;
   if ((1 - input.mode) * (1 - isTerminate)) {
-    Log("Verifying end state");
     IsCycle(cycle - shutdownCycle);
   } else {
     // NOP
@@ -254,4 +253,85 @@ component ControlDone(cycle: Reg, input: InstInput) {
   InstOutput(ValU32(0, 0), StateControlDone(), 1)
 }
 
-//CHECK: TODO
+component Top() {
+  cycle := Reg(0);
+
+  major := 1;
+  minor := 1;
+  state := 1;
+  machine_mode := 1;
+  low_pc := 1;
+  high_pc := 1;
+  pc_u32 := ValU32(low_pc, high_pc);
+  inst_input := InstInput(major, minor, pc_u32, state, machine_mode);
+
+  ControlLoadRoot(cycle, inst_input);
+}
+
+test run {
+  Top();
+}
+
+// CHECK-LABEL: module @globals {
+// CHECK-NEXT:    llzk.global @shutdownCycle : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    llzk.global @stateOut : !llzk.struct<@DigestReg<[]>>
+// CHECK-NEXT:    llzk.global @termA1high : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    llzk.global @termA1low : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    llzk.global @termA0high : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    llzk.global @termA0low : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    llzk.global @output : !llzk.struct<@DigestReg<[]>>
+// CHECK-NEXT:    llzk.global @isTerminate : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    llzk.global @input : !llzk.struct<@DigestReg<[]>>
+// CHECK-NEXT:    llzk.global @stateIn : !llzk.struct<@DigestReg<[]>>
+// CHECK-NEXT:  }
+//
+// CHECK-LABEL: llzk.struct @ControlSuspend<[]> {
+// CHECK-LABEL:   func @compute(%{{.*}}: !llzk.struct<@Reg<[]>>, %{{.*}}: !llzk.struct<@InstInput<[]>>) -> !llzk.struct<@ControlSuspend<[]>> {
+// CHECK:           %[[VAL_14:.*]] = new_struct : <@ControlSuspend<[]>>
+// CHECK:           %[[VAL_39:.*]] = llzk.readg @globals::@isTerminate : !llzk.struct<@Reg<[]>>
+//
+// CHECK:           %[[VAL_55:.*]] = llzk.new_array  : <8 x !llzk.struct<@ValU32<[]>>>
+// CHECK:           %[[VAL_61:.*]] = llzk.call @DigestReg::@compute(%[[VAL_55]]) : (!llzk.array<8 x !llzk.struct<@ValU32<[]>>>) -> !llzk.struct<@DigestReg<[]>>
+// CHECK:           llzk.writeg @globals::@output = %[[VAL_61]] : !llzk.struct<@DigestReg<[]>>
+//
+// CHECK:           %[[VAL_72:.*]] = llzk.call @Reg::@compute(%{{.*}}) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.writeg @globals::@termA0low = %[[VAL_72]] : !llzk.struct<@Reg<[]>>
+//
+// CHECK:           %[[VAL_75:.*]] = llzk.call @Reg::@compute(%{{.*}}) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.writeg @globals::@termA0high = %[[VAL_75]] : !llzk.struct<@Reg<[]>>
+//
+// CHECK:           %[[VAL_78:.*]] = llzk.call @Reg::@compute(%{{.*}}) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.writeg @globals::@termA1low = %[[VAL_78]] : !llzk.struct<@Reg<[]>>
+//
+// CHECK:           %[[VAL_81:.*]] = llzk.call @Reg::@compute(%{{.*}}) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.writeg @globals::@termA1high = %[[VAL_81]] : !llzk.struct<@Reg<[]>>
+//
+// CHECK:           %[[VAL_94:.*]] = llzk.call @Reg::@compute(%{{.*}}) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
+//
+// CHECK:           %[[VAL_120:.*]] = llzk.readf %[[VAL_14]][@"$temp_11"] : <@ControlSuspend<[]>>, !llzk.struct<@Div<[]>>
+// CHECK:           %[[VAL_121:.*]] = llzk.readf %[[VAL_120]][@"$super"] : <@Div<[]>>, !llzk.felt
+// CHECK:           %[[VAL_122:.*]] = llzk.call @Reg::@compute(%[[VAL_121]]) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.writeg @globals::@isTerminate = %[[VAL_122]] : !llzk.struct<@Reg<[]>>
+//
+// CHECK-LABEL:   func @constrain
+// CHECK-SAME:    (%[[VAL_151:.*]]: !llzk.struct<@ControlSuspend<[]>>, %[[VAL_152:.*]]: !llzk.struct<@Reg<[]>>, %[[VAL_153:.*]]: !llzk.struct<@InstInput<[]>>) {
+//
+// CHECK:           %[[VAL_187:.*]] = llzk.readg @globals::@isTerminate : !llzk.struct<@Reg<[]>>
+// CHECK:           %[[VAL_207:.*]] = llzk.readg @globals::@output : !llzk.struct<@DigestReg<[]>>
+// CHECK:           llzk.call @DigestReg::@constrain(%[[VAL_207]], %{{.*}}) : (!llzk.struct<@DigestReg<[]>>, !llzk.array<8 x !llzk.struct<@ValU32<[]>>>) -> ()
+// CHECK:           %[[VAL_209:.*]] = llzk.readf %[[VAL_187]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK:           %[[VAL_210:.*]] = llzk.readf %[[VAL_209]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
+//
+// CHECK:           %[[VAL_217:.*]] = llzk.readg @globals::@termA0low : !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.call @Reg::@constrain(%[[VAL_217]], %{{.*}}) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> ()
+// CHECK:           %[[VAL_219:.*]] = llzk.readg @globals::@termA0high : !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.call @Reg::@constrain(%[[VAL_219]], %{{.*}}) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> ()
+// CHECK:           %[[VAL_221:.*]] = llzk.readg @globals::@termA1low : !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.call @Reg::@constrain(%[[VAL_221]], %{{.*}}) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> ()
+// CHECK:           %[[VAL_223:.*]] = llzk.readg @globals::@termA1high : !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.call @Reg::@constrain(%[[VAL_223]], %{{.*}}) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> ()
+//
+// CHECK:           %[[VAL_253:.*]] = llzk.readf %[[VAL_151]][@"$temp_11"] : <@ControlSuspend<[]>>, !llzk.struct<@Div<[]>>
+// CHECK:           %[[VAL_254:.*]] = llzk.readf %[[VAL_253]][@"$super"] : <@Div<[]>>, !llzk.felt
+// CHECK:           %[[VAL_255:.*]] = llzk.readg @globals::@isTerminate : !llzk.struct<@Reg<[]>>
+// CHECK:           llzk.call @Reg::@constrain(%[[VAL_255]], %[[VAL_254]]) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> ()
