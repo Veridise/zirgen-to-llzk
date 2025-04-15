@@ -44,7 +44,7 @@ FailureOr<TypeBinding> GlobalTypingRule::
   }
   // Ensure the global is declared
   if (failed(scope.declareGlobal(op.getName(), *binding, [&op]() { return op.emitError(); }))) {
-    return op->emitError() << "global '" << op.getName() << "' was not declared"; 
+    return failure(); // declareGlobal() already emits error message
   }
   return interpretOp(op, *binding);
 }
