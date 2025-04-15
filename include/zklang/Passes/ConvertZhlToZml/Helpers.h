@@ -92,7 +92,7 @@ public:
     return std::make_pair(this, nameOfGlobal);
   }
 
-  /// Build `GlobalDefOp` and return it's full, unambiguous name.
+  /// Build `GlobalDefOp` and return its full, unambiguous name.
   inline static mlir::SymbolRefAttr
   buildDef(const AndName &builder, mlir::Location loc, mlir::Type type) {
     mlir::StringAttr name = builder->second;
