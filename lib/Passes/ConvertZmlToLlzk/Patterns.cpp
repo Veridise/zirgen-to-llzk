@@ -803,6 +803,27 @@ LogicalResult LowerReadBackOp::matchAndRewrite(
     );
     replace(Attribute(AffineMapAttr::get(newCexpr.getMap())), mapOperands[0], 0);
   }).Default([&](Attribute) { llvm_unreachable("ReadBackOp with an unexpected attribute type"); });
+  return success();
+}
+LogicalResult LowerGlobalDefOp::matchAndRewrite(
+    GlobalDefOp op, OpAdaptor, ConversionPatternRewriter &rewriter
+) const {
+  Type newType = getTypeConverter()->convertType(op.getType());
+  rewriter.replaceOpWithNewOp<llzk::GlobalDefOp>(op, op.getSymName(), false, newType, nullptr);
+  return success();
+}
 
+LogicalResult LowerSetGlobalOp::matchAndRewrite(
+    SetGlobalOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  rewriter.replaceOpWithNewOp<llzk::GlobalWriteOp>(op, op.getNameRefAttr(), adaptor.getVal());
+  return success();
+}
+
+LogicalResult LowerGetGlobalOp::matchAndRewrite(
+    GetGlobalOp op, OpAdaptor, ConversionPatternRewriter &rewriter
+) const {
+  Type newType = getTypeConverter()->convertType(op.getResult().getType());
+  rewriter.replaceOpWithNewOp<llzk::GlobalReadOp>(op, newType, op.getNameRef());
   return success();
 }

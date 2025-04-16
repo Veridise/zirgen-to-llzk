@@ -313,33 +313,10 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   );
 }
 
-Value CtorCallBuilder::buildCallWithoutSlot(OpBuilder &builder, Location loc, ValueRange args) {
-  auto genericParams = compBinding.getGenericParamsMapping();
-  auto ref = builder.create<ConstructorRefOp>(
-      loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
-      isBuiltin
-  );
-
-  auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
-  builder.create<ConstrainCallOp>(loc, call.getResult(0), args);
-  return call.getResult(0);
-}
-
-Value CtorCallBuilder::build(OpBuilder &builder, Location loc, ValueRange argsRange) {
-  if (!compBinding.getSlot()) {
-    return buildCallWithoutSlot(builder, loc, argsRange);
-  }
-
-  SmallVector<Value> args(argsRange);
-
-  auto compSlot = mlir::cast<zhl::ComponentSlot>(compBinding.getSlot());
-  // Generate the concrete type that is required based in the scope (i.e. inside an array frame this
-  // will generate an array type wrapping the inner type).
-  auto compSlotBinding = compSlot->getBinding();
-  // Create the field
-  auto name = createSlot(compSlot, builder, callerComponentOp, loc);
-  auto slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
-
+mlir::Value CtorCallBuilder::build(
+    mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args,
+    GlobalBuilder::AndName globalBuilder
+) {
   auto genericParams = compBinding.getGenericParamsMapping();
   auto ref = builder.create<ConstructorRefOp>(
       loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
@@ -349,7 +326,22 @@ Value CtorCallBuilder::build(OpBuilder &builder, Location loc, ValueRange argsRa
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
 
-  compValue = storeAndLoadSlot(*compSlot, compValue, name, slotType, loc, builder, self);
+  if (FrameSlot *slot = compBinding.getSlot()) {
+    assert(!globalBuilder && "cannot be both field and global");
+    zhl::ComponentSlot *compSlot = mlir::cast<zhl::ComponentSlot>(slot);
+    TypeBinding compSlotBinding = compSlot->getBinding();
+
+    // Create the field
+    FlatSymbolRefAttr name = createSlot(compSlot, builder, callerComponentOp, loc);
+    Type slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
+
+    compValue = storeAndLoadSlot(*compSlot, compValue, name, slotType, loc, builder, self);
+  } else if (globalBuilder) {
+    SymbolRefAttr name = GlobalBuilder::buildDef(*globalBuilder, loc, compValue.getType());
+    builder.create<SetGlobalOp>(loc, name, compValue);
+    compValue = builder.create<GetGlobalOp>(loc, compValue.getType(), name);
+  }
+
   builder.create<ConstrainCallOp>(loc, compValue, args);
   return compValue;
 }

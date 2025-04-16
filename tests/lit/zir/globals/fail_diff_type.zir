@@ -1,0 +1,25 @@
+// RUN: zklang -o - %s | FileCheck %s
+// XFAIL: *
+
+component ValU32(low: Val, high: Val) {
+  public low := low;
+  public high := high;
+}
+
+component DigestReg(values: Array<ValU32, 8>) {
+  public values := for v : values {
+    public low := Reg(v.low);
+    public high := Reg(v.high);
+  };
+}
+
+component A() {
+  global a := Reg(1);
+  a = 1;
+}
+
+component Top() {
+  // error: Attempt to change type of global "a"
+  global a : DigestReg;
+  A();
+}

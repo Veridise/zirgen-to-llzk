@@ -34,7 +34,7 @@ namespace zml {
 
 namespace {
 
-template <typename Impl, typename Base> class RemoveIllegalOpsCommon : public Base {
+template <typename Base> class RemoveIllegalOpsCommon : public Base {
 
   void runOnOperation() override {
     // Skip if we are not in the interesting function
@@ -85,85 +85,8 @@ public:
   }
 };
 
-template <typename Op, int ArgIdx> class ReplaceUsesWithArg : public OpConversionPattern<Op> {
-public:
-  using OpConversionPattern<Op>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      Op op, typename OpConversionPattern<Op>::OpAdaptor, ConversionPatternRewriter &rewriter
-  ) const override {
-    auto body = op->template getParentOfType<mlir::func::FuncOp>();
-    mlir::BlockArgument arg = body.getArgument(ArgIdx);
-
-    rewriter.replaceAllUsesWith(op, arg);
-    rewriter.eraseOp(op);
-    return mlir::success();
-  }
-};
-
-class ReplaceConstructWithRead : public OpConversionPattern<func::CallIndirectOp> {
-public:
-  using OpConversionPattern<func::CallIndirectOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(func::CallIndirectOp, OpAdaptor, ConversionPatternRewriter &) const override {
-    return mlir::failure();
-  }
-};
-
-class ReplaceWriteFieldWithRead : public OpConversionPattern<WriteFieldOp> {
-public:
-  using OpConversionPattern<WriteFieldOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      WriteFieldOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-  ) const override {
-    insertReadToReplaceUses(op, adaptor, rewriter);
-    rewriter.eraseOp(op);
-    return mlir::success();
-  }
-
-  void insertReadToReplaceUses(
-      WriteFieldOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
-  ) const {
-
-    OpBuilder::InsertionGuard guard(rewriter);
-    /// Only insert the read op if the value is primitive
-    if (mlir::isa<ComponentType>(op.getVal().getType())) {
-      return;
-    }
-
-    if (auto valOp = adaptor.getVal().getDefiningOp()) {
-      rewriter.setInsertionPoint(valOp);
-    } else {
-      rewriter.setInsertionPointToStart(&(op->getParentOfType<mlir::func::FuncOp>().getBody().front(
-      )));
-    }
-    auto read = rewriter.create<ReadFieldOp>(
-        op.getLoc(), op.getVal().getType(), adaptor.getComponent(), adaptor.getFieldNameAttr()
-    );
-    rewriter.replaceUsesWithIf(adaptor.getVal(), read, [](auto &operand) {
-      // Replace anything but write ops since we want to get rid of them
-      // and changing these ops causes recursion problems with the pattern
-      // matcher.
-      return !mlir::isa<WriteFieldOp>(operand.getOwner());
-    });
-  }
-};
-
-class ReplaceWriteArrayWithRead : public OpConversionPattern<WriteArrayOp> {
-public:
-  using OpConversionPattern<WriteArrayOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(WriteArrayOp, OpAdaptor, ConversionPatternRewriter &) const override {
-    return success();
-  }
-};
-
 class RemoveIllegalComputeOpsPass
-    : public RemoveIllegalOpsCommon<
-          RemoveIllegalComputeOpsPass, RemoveIllegalComputeOpsBase<RemoveIllegalComputeOpsPass>> {
+    : public RemoveIllegalOpsCommon<RemoveIllegalComputeOpsBase<RemoveIllegalComputeOpsPass>> {
 
   bool inTargetFunction() override {
     auto comp = getDeclaringComponent();
@@ -183,9 +106,7 @@ class RemoveIllegalComputeOpsPass
 };
 
 class RemoveIllegalConstrainOpsPass
-    : public RemoveIllegalOpsCommon<
-          RemoveIllegalConstrainOpsPass,
-          RemoveIllegalConstrainOpsBase<RemoveIllegalConstrainOpsPass>> {
+    : public RemoveIllegalOpsCommon<RemoveIllegalConstrainOpsBase<RemoveIllegalConstrainOpsPass>> {
 
   bool inTargetFunction() override {
     auto comp = getDeclaringComponent();
@@ -197,7 +118,7 @@ class RemoveIllegalConstrainOpsPass
 
   void setLegality(ConversionTarget &target) override {
     target.addIllegalOp<
-        WriteFieldOp, ConstructorRefOp,
+        WriteFieldOp, SetGlobalOp, ConstructorRefOp,
         SelfOp, // Gets transformed into llzk.new_struct
         BitAndOp, InvOp, ExtInvOp, EqzExtOp>();
     target.addDynamicallyLegalOp<func::CallIndirectOp>([](func::CallIndirectOp callOp) {
@@ -214,8 +135,8 @@ class RemoveIllegalConstrainOpsPass
 
   void addPatterns(RewritePatternSet &patterns) override {
     patterns.add<
-        RemoveOp<WriteFieldOp>, RemoveOp<BitAndOp>, RemoveOp<InvOp>, RemoveOp<ExtInvOp>,
-        RemoveOp<EqzExtOp>, ReplaceSelfWith<Arg<0>>, RemoveOp<WriteArrayOp>,
+        RemoveOp<WriteFieldOp>, RemoveOp<SetGlobalOp>, RemoveOp<BitAndOp>, RemoveOp<InvOp>,
+        RemoveOp<ExtInvOp>, RemoveOp<EqzExtOp>, ReplaceSelfWith<Arg<0>>, RemoveOp<WriteArrayOp>,
         RemoveOp<func::CallIndirectOp>, RemoveOp<ConstructorRefOp>>(&getContext());
   }
 };

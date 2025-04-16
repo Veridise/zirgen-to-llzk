@@ -222,7 +222,6 @@ def SuperCoerceOp : ZMLOp<"super_coerce"> {
 }
 
 def NopOp : ZMLOp<"nop", [Pure]> {
-
   let arguments = (ins Variadic<AnyZMLType>:$ins);
   let results = (outs Variadic<AnyZMLType>:$outs);
 
@@ -233,26 +232,36 @@ def NopOp : ZMLOp<"nop", [Pure]> {
   let hasCanonicalizeMethod = 1;
 }
 
-def GlobalDefOp : ZMLOp<"global", [HasParent<"::mlir::ModuleOp">]> {
-  let summary = "defines a global component";
-  let description = "Defines a global component and binds it to a symbol.";
+def GlobalDefOp : ZMLOp<"global_decl", [HasParent<"::mlir::ModuleOp">]> {
+  let summary = "declares a global component";
 
-  let arguments = (ins SymbolNameAttr:$sym_name, AnyZMLType:$value,
-      TypeAttrOf<AnyZMLType>:$type);
+  let arguments = (ins SymbolNameAttr:$sym_name, TypeAttrOf<AnyZMLType>:$type);
 
   let assemblyFormat = [{
-    $sym_name `=` $value `:` $type `,` type($value) attr-dict
+    $sym_name `:` $type attr-dict
   }];
 }
 
 def GetGlobalOp
-    : ZMLOp<"get_global", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-  let summary = "loads a global variable";
+    : ZMLOp<"get_global", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  let summary = "gets value of a global variable";
 
-  let arguments = (ins SymbolNameAttr:$sym_name);
+  let arguments = (ins SymbolRefAttr:$name_ref);
+  let results = (outs TypeVarOr<Component>:$result);
 
   let assemblyFormat = [{
-    $sym_name `:` attr-dict
+    $name_ref `:` type($result) attr-dict
+  }];
+}
+
+def SetGlobalOp
+    : ZMLOp<"set_global", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  let summary = "sets value of a global variable";
+
+  let arguments = (ins SymbolRefAttr:$name_ref, TypeVarOr<Component>:$val);
+
+  let assemblyFormat = [{
+    $name_ref `=` $val `:` type($val) attr-dict
   }];
 }
 

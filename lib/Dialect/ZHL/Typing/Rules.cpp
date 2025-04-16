@@ -45,12 +45,16 @@ mlir::FailureOr<TypeBinding> StringTypingRule::
   return interpretOp(op, getBindings().Get("String"));
 }
 
-mlir::FailureOr<TypeBinding> GlobalTypingRule::
-    typeCheck(zirgen::Zhl::GlobalOp op, mlir::ArrayRef<TypeBinding>, Scope &, mlir::ArrayRef<const Scope *>)
+FailureOr<TypeBinding> GlobalTypingRule::
+    typeCheck(zirgen::Zhl::GlobalOp op, ArrayRef<TypeBinding>, Scope &scope, ArrayRef<const Scope *>)
         const {
   auto binding = getBindings().MaybeGet(op.getName());
-  if (mlir::failed(binding)) {
+  if (failed(binding)) {
     return op->emitError() << "type '" << op.getName() << "' was not found";
+  }
+  // Ensure the global is declared
+  if (failed(scope.declareGlobal(op.getName(), *binding, [&op]() { return op.emitError(); }))) {
+    return failure(); // declareGlobal() already emits error message
   }
   return interpretOp(op, *binding);
 }
@@ -130,24 +134,30 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   return component;
 }
 
-mlir::FailureOr<TypeBinding> GetGlobalTypingRule::
-    typeCheck(zirgen::Zhl::GetGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
+FailureOr<TypeBinding> GetGlobalTypingRule::
+    typeCheck(zirgen::Zhl::GetGlobalOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *>)
         const {
-  // TODO: Add check that the global exists in the scope
   if (operands.empty()) {
-    return mlir::failure();
+    return failure();
+  }
+  // Ensure the global is declared
+  if (failed(scope.declareGlobal(op.getName(), operands[0], [&op]() { return op.emitError(); }))) {
+    return failure();
   }
   return interpretOp(op, operands[0]);
 }
 
-mlir::FailureOr<TypeBinding> ConstructGlobalTypingRule::
-    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
+FailureOr<TypeBinding> ConstructGlobalTypingRule::
+    typeCheck(zirgen::Zhl::ConstructGlobalOp op, ArrayRef<TypeBinding> operands, Scope &scope, ArrayRef<const Scope *>)
         const {
-  // TODO: Add global declaration to the scope
-  if (operands.empty()) {
-    return mlir::failure();
+  if (operands.size() < 2) {
+    return failure();
   }
-  return interpretOp(op, operands[0]);
+  // Ensure the global is declared
+  if (failed(scope.declareGlobal(op.getName(), operands[0], [&op]() { return op.emitError(); }))) {
+    return failure();
+  }
+  return interpretOp(op, operands[1]);
 }
 
 mlir::FailureOr<TypeBinding> SuperTypingRule::
@@ -691,16 +701,6 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
 
 mlir::FailureOr<Frame> ReduceTypeRule::allocate(Frame frame) const {
   return frame.allocateSlot<ArrayFrame>(getBindings())->getFrame();
-}
-
-mlir::FailureOr<TypeBinding> ConstructGlobalTypeRule::
-    typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
-        const {
-  if (operands.size() < 2) {
-    return mlir::failure();
-  }
-
-  return interpretOp(op, operands[1]);
 }
 
 FailureOr<TypeBinding> BlockTypeRule::typeCheck(

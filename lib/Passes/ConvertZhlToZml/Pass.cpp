@@ -48,7 +48,6 @@ namespace {
 void createPODComponentsFromClosures(
     zhl::ZIRTypeAnalysis &typeAnalysis, OpBuilder &builder, SymbolTable &st, Block *insertionPoint
 ) {
-
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToEnd(insertionPoint);
   for (auto *clo : typeAnalysis.getClosures()) {
@@ -71,6 +70,8 @@ void ConvertZhlToZmlPass::runOnOperation() {
 
   OpBuilder builder(module);
   SymbolTable st(module);
+  mlir::ModuleOp globalsModule = mlir::ModuleOp::create(builder.getUnknownLoc(), "globals");
+  st.insert(globalsModule, module.begin());
   createPODComponentsFromClosures(typeAnalysis, builder, st, &module.getRegion().front());
 
   ZMLTypeConverter typeConverter;
@@ -82,7 +83,12 @@ void ConvertZhlToZmlPass::runOnOperation() {
       ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
       ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
       ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval,
-      ZhlBackLowering>(typeAnalysis, typeConverter, ctx);
+      ZhlBackLowering>(
+      typeAnalysis, typeConverter, ctx
+  );
+  patterns.add<ZhlConstructGlobalLowering, ZhlGetGlobalLowering>(
+      globalsModule, typeAnalysis, typeConverter, ctx
+  );
   patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
     builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
   }, typeAnalysis, typeConverter, ctx);
