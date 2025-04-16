@@ -193,15 +193,6 @@ public:
   mlir::FailureOr<Frame> allocate(Frame) const override;
 };
 
-class ConstructGlobalTypeRule : public OpTypingRule<zirgen::Zhl::ConstructGlobalOp> {
-public:
-  using OpTypingRule<zirgen::Zhl::ConstructGlobalOp>::OpTypingRule;
-
-  mlir::FailureOr<TypeBinding>
-  typeCheck(zirgen::Zhl::ConstructGlobalOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
-      const override;
-};
-
 class BlockTypeRule : public OpTypingRule<zirgen::Zhl::BlockOp> {
 public:
   using OpTypingRule<zirgen::Zhl::BlockOp>::OpTypingRule;

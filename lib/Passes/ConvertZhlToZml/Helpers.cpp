@@ -289,13 +289,10 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   );
 }
 
-mlir::Value
-CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args) {
-  auto buildPrologue = [&](mlir::Value v) {
-    builder.create<ConstrainCallOp>(loc, v, args);
-    return v;
-  };
-
+mlir::Value CtorCallBuilder::build(
+    mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args,
+    GlobalBuilder::AndName globalBuilder
+) {
   auto genericParams = compBinding.getGenericParamsMapping();
   auto ref = builder.create<ConstructorRefOp>(
       loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
@@ -304,20 +301,24 @@ CtorCallBuilder::build(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
 
-  if (!compBinding.getSlot()) {
-    return buildPrologue(compValue);
+  if (FrameSlot *slot = compBinding.getSlot()) {
+    assert(!globalBuilder && "cannot be both field and global");
+    zhl::ComponentSlot *compSlot = mlir::cast<zhl::ComponentSlot>(slot);
+    TypeBinding compSlotBinding = compSlot->getBinding();
+
+    // Create the field
+    FlatSymbolRefAttr name = createSlot(compSlot, builder, callerComponentOp, loc);
+    Type slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
+
+    compValue = storeAndLoadSlot(*compSlot, compValue, name, slotType, loc, builder, self);
+  } else if (globalBuilder) {
+    SymbolRefAttr name = GlobalBuilder::buildDef(*globalBuilder, loc, compValue.getType());
+    builder.create<SetGlobalOp>(loc, name, compValue);
+    compValue = builder.create<GetGlobalOp>(loc, compValue.getType(), name);
   }
 
-  auto compSlot = mlir::cast<zhl::ComponentSlot>(compBinding.getSlot());
-  auto compSlotBinding = compSlot->getBinding();
-
-  // Create the field
-  auto name = createSlot(compSlot, builder, callerComponentOp, loc);
-  auto slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
-
-  compValue = storeAndLoadSlot(*compSlot, compValue, name, slotType, loc, builder, self);
-
-  return buildPrologue(compValue);
+  builder.create<ConstrainCallOp>(loc, compValue, args);
+  return compValue;
 }
 
 mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }

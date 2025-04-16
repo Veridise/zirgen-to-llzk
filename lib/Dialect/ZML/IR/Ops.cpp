@@ -314,14 +314,26 @@ mlir::LogicalResult WriteFieldOp::verifySymbolUses(mlir::SymbolTableCollection &
   return mlir::success();
 }
 
-mlir::LogicalResult GetGlobalOp::inferReturnTypes(
-    mlir::MLIRContext *ctx, std::optional<mlir::Location>, mlir::ValueRange, mlir::DictionaryAttr,
-    mlir::OpaqueProperties, mlir::RegionRange,
-    llvm::SmallVectorImpl<mlir::Type> &inferredReturnTypes
-) {
-  // TODO
-  inferredReturnTypes.push_back(ComponentType::Val(ctx));
-  return mlir::success();
+namespace {
+
+LogicalResult verifyGlobalName(SymbolTableCollection &tables, Operation *op, SymbolRefAttr name) {
+  ModuleOp mod = op->getParentOfType<ModuleOp>();
+  assert(mod);
+  GlobalDefOp def = tables.lookupSymbolIn<GlobalDefOp>(mod, name);
+  if (!def) {
+    return op->emitOpError() << "reference to undefined global '" << name << "'";
+  }
+  return success();
+}
+
+} // namespace
+
+LogicalResult GetGlobalOp::verifySymbolUses(SymbolTableCollection &tables) {
+  return verifyGlobalName(tables, *this, getNameRef());
+}
+
+LogicalResult SetGlobalOp::verifySymbolUses(SymbolTableCollection &tables) {
+  return verifyGlobalName(tables, *this, getNameRef());
 }
 
 mlir::OpFoldResult LitValOp::fold(LitValOp::FoldAdaptor) { return getValueAttr(); }
