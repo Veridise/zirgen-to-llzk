@@ -264,45 +264,6 @@ inline bool validArgCount(bool isVariadic, size_t argCount, size_t formalsCount)
   return argCount == formalsCount;
 }
 
-static inline bool isVariadic(mlir::ArrayRef<mlir::Type> ctorFormals) {
-  return !ctorFormals.empty() && mlir::isa<VarArgsType>(ctorFormals.back());
-}
-
-mlir::LogicalResult ZhlConstructLowering::matchAndRewrite(
-    Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto ctor = makeCtorCallBuilder(op, op, rewriter);
-  if (failed(ctor)) {
-    return failure(); // makeCtorCallBuilder emits an error message already
-  }
-  auto &binding = ctor->getBinding();
-  auto constructorType = ctor->getCtorType();
-  assert(constructorType && "Could not deduce the constructor type for component");
-  auto ctorFormals = constructorType.getInputs();
-  // if (ctor->calleeUsesBackVariables()) {
-  //   ctorFormals = lang::zir::hideInjectedBVTypes(ctorFormals);
-  // }
-
-  auto ctorFormalsCount = ctorFormals.size();
-  if (!validArgCount(isVariadic(ctorFormals), adaptor.getArgs().size(), ctorFormalsCount)) {
-    // Depending if it's variadic or not the message changes a bit.
-    StringRef expectingNArgsMsg =
-        isVariadic(ctorFormals) ? ", was expecting at least " : ", was expecting ";
-    auto minArgCount = isVariadic(ctorFormals) ? ctorFormalsCount - 1 : ctorFormalsCount;
-    return op->emitOpError().append(
-        "incorrect number of arguments for component ", binding.getName(), expectingNArgsMsg,
-        minArgCount, " arguments but got ", adaptor.getArgs().size()
-    );
-  }
-
-  std::vector<mlir::Value> preparedArguments;
-  prepareArguments(adaptor.getArgs(), ctorFormals, op->getLoc(), rewriter, preparedArguments);
-
-  auto result = ctor->build(rewriter, op.getLoc(), preparedArguments);
-  rewriter.replaceOp(op, result);
-  return mlir::success();
-}
-
 mlir::ValueRange::iterator
 computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> constructorTypes) {
   if (!isVariadic(constructorTypes)) {
@@ -322,62 +283,6 @@ computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> construc
   assert(C > 0);
   assert(C <= std::numeric_limits<ptrdiff_t>::max());
   return std::next(args.begin(), static_cast<ptrdiff_t>(C) - 1);
-}
-
-void ZhlConstructLowering::prepareArguments(
-    mlir::ValueRange args, mlir::ArrayRef<mlir::Type> constructorTypes, mlir::Location loc,
-    mlir::ConversionPatternRewriter &rewriter, std::vector<mlir::Value> &preparedArgs
-) const {
-
-  preparedArgs.clear();
-  preparedArgs.reserve(constructorTypes.size());
-
-  // Compute the point where the normal arguments end and the var-args begin
-  auto argsEnd = computeVarArgsSplice(args, constructorTypes);
-  // Prepare the arguments up to the splice point. These arguments are passed as is since they are
-  // normal arguments.
-  std::transform(
-      args.begin(), argsEnd, constructorTypes.begin(), std::back_inserter(preparedArgs),
-      [&](mlir::Value v, mlir::Type t) { return prepareArgument(v, t, loc, rewriter); }
-  );
-  if (isVariadic(constructorTypes)) {
-    std::vector<mlir::Value> vargs;
-    auto varType = mlir::dyn_cast<VarArgsType>(constructorTypes.back());
-    assert(varType && "expecting a var args type");
-
-    // If there aren't any arguments left to prepare then argsEnd == args.end() and this call is a
-    // no-op.
-    std::transform(argsEnd, args.end(), std::back_inserter(vargs), [&](mlir::Value v) {
-      return prepareArgument(v, varType.getInner(), loc, rewriter);
-    });
-
-    // Regardless of what std::transform does above add the VarArgsOp to make sure we have the
-    // correct number of arguments.
-    auto va = rewriter.create<VarArgsOp>(loc, constructorTypes.back(), vargs);
-    preparedArgs.push_back(va);
-  }
-
-  assert(preparedArgs.size() == constructorTypes.size() && "incorrect number of arguments");
-}
-
-mlir::Value ZhlConstructLowering::prepareArgument(
-    mlir::Value arg, mlir::Type expectedType, mlir::Location loc,
-    mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto binding = getType(arg);
-  auto type = expectedType;
-
-  if (mlir::succeeded(binding)) {
-    type = materializeTypeBinding(rewriter.getContext(), *binding);
-  }
-  if (arg.getType() == type) {
-    return arg;
-  }
-  auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, type, arg);
-  if (expectedType == cast.getResult(0).getType()) {
-    return cast.getResult(0);
-  }
-  return rewriter.create<SuperCoerceOp>(loc, expectedType, cast.getResult(0));
 }
 
 mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
