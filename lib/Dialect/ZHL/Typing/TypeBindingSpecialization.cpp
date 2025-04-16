@@ -555,7 +555,8 @@ static constexpr StringRef dividerLine =
 namespace {
 struct WrapLog {
   WrapLog(const TypeBinding &b) : binding(&b) {
-    LLVM_DEBUG(llvm::dbgs() << dividerLine << "\n" << "Specializing " << b << "\n";);
+    LLVM_DEBUG(llvm::dbgs() << dividerLine << "\n"
+                            << "Specializing " << b << "\n";);
   }
   ~WrapLog() {
     LLVM_DEBUG(llvm::dbgs() << "Finished specializing " << *binding << "\n"

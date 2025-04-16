@@ -169,7 +169,7 @@ public:
 
   /// Constructs by adopting the shared pointer the view is referencing to. If the view is invalid
   /// will construct a falsey object.
-  ConstExpr(const View &view) : expr(view.view.lock()) {};
+  ConstExpr(const View &view) : expr(view.view.lock()){};
 
   /// Returns a pointer to the underlying expression.
   const detail::ExprBase *get() const override { return expr.get(); }
