@@ -765,14 +765,17 @@ LogicalResult LowerReadBackOp::matchAndRewrite(
     // If the distance is a symbol create an affine expression that negates the symbol.
     // Expects the symbol to be one of the parameters of the current struct. Will generate malformed
     // IR otherwise.
-    auto value = materializeParam(symAttr, rewriter, op->getLoc());
-    ValueRange mapOperands({value});
     replace(
-        AffineMapAttr::get(AffineMap::get(
-            /*dimCount=*/0, /*symbolCount=*/1,
-            rewriter.getAffineConstantExpr(0) - rewriter.getAffineSymbolExpr(0)
-        )),
-        mapOperands, 0
+        AffineMapAttr::get(
+            AffineMap::get(
+                /*dimCount=*/0, /*symbolCount=*/1,
+                rewriter.getAffineConstantExpr(0) - rewriter.getAffineSymbolExpr(0)
+            )
+        ),
+        // materializeParam's Value return will be implicitly cast to a ValueRange.
+        // The previous explicit conversion using `ValueRange mapOperands({value})`
+        // was ambigious and caused errors between clang and gcc.
+        materializeParam(symAttr, rewriter, op->getLoc()), 0
     );
   })
       .Case([&](IntegerAttr intAttr) {

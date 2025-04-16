@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file includes operation interfaces for treating an operation as 
+// This file includes operation interfaces for treating an operation as
 // defining a zirgen component.
 //
 //===----------------------------------------------------------------------===//
@@ -74,12 +74,12 @@ def ComponentInterface
        InterfaceMethod<"Looks up the type of a field inside the component",
                        "::mlir::FailureOr<::mlir::Type>", "lookupFieldType",
                        (ins "::mlir::FlatSymbolRefAttr":$field)>,
-       InterfaceMethod<"Returns wether the component is a builtin or not",
+       InterfaceMethod<"Returns whether the component is a builtin or not",
                        "bool", "getBuiltin", (ins)>,
        InterfaceMethod<
-           "Returns wether the component uses back-variables or not", "bool",
+           "Returns whether the component uses back-variables or not", "bool",
            "getUsesBackVariables", (ins)>,
-       InterfaceMethod<"Returns wether the component is the root 'Component'",
+       InterfaceMethod<"Returns whether the component is the root 'Component'",
                        "bool", "isRoot", (ins)>,
        InterfaceMethod<
            "Returns the region where the component elements are defined",
