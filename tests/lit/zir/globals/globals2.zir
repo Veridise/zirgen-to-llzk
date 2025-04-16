@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s | FileCheck %s --enable-var-scope
+// RUN: zklang -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
 
 extern LookupDelta(table: Val, index: Val, count: Val);
 
