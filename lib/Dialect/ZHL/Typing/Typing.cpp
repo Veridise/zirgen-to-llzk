@@ -110,7 +110,7 @@ private:
     mlir::cast<ComponentSlot>(binding.getSlot())->markColumn();
   }
 
-  /// If the binding has a slot and is either; a subclass of NondetReg, a subclass of a covariant
+  /// If the binding has a slot and is either: a subclass of NondetReg, a subclass of a covariant
   /// Array of NondetReg, or has members of NondetReg type. Then mark the slot as a column in the
   /// constraint system.
   void

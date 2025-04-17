@@ -106,7 +106,7 @@ mlir::FailureOr<TypeBinding> ExternTypingRule::
   if (operands.empty()) {
     return mlir::failure();
   }
-  scope.isExtern();
+  scope.setIsExtern();
   return interpretOp(op, operands[0]);
 }
 
@@ -129,7 +129,7 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   // If we are constructing a component that needs backvariables then we need it in the caller as
   // well.
   if (component.needsBackVariables()) {
-    scope.needsBackVariablesSupport();
+    scope.setNeedsBackVariablesSupport();
   }
   return component;
 }
@@ -608,7 +608,7 @@ mlir::FailureOr<TypeBinding> BackTypeRule::
 
   auto copy = interpretOp(op, operands[1]);
   copy.markSlot(nullptr);
-  scope.needsBackVariablesSupport();
+  scope.setNeedsBackVariablesSupport();
   return copy;
 }
 
@@ -694,7 +694,7 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
     LLVM_DEBUG(llvm::dbgs() << "ReduceOp did not record the size of the array into the frame\n");
   }
   if (operands[2].needsBackVariables()) {
-    scope.needsBackVariablesSupport();
+    scope.setNeedsBackVariablesSupport();
   }
   return interpretOp(op, output);
 }

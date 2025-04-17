@@ -151,9 +151,9 @@ mlir::FailureOr<TypeBinding> ChildScope::getSuperType() const { return parent->g
 Frame &ChildScope::getCurrentFrame() { return parent->getCurrentFrame(); }
 const Frame &ChildScope::getCurrentFrame() const { return parent->getCurrentFrame(); }
 
-void ChildScope::isExtern() { parent->isExtern(); }
+void ChildScope::setIsExtern() { parent->setIsExtern(); }
 
-void ChildScope::needsBackVariablesSupport() { parent->needsBackVariablesSupport(); }
+void ChildScope::setNeedsBackVariablesSupport() { parent->setNeedsBackVariablesSupport(); }
 
 FrameScope::FrameScope(Scope &Parent, Frame Frame) : ChildScope(Sco_Frame, Parent), frame(Frame) {}
 

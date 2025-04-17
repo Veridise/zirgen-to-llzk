@@ -50,8 +50,8 @@ public:
   virtual TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const = 0;
   virtual Frame &getCurrentFrame() = 0;
   virtual const Frame &getCurrentFrame() const = 0;
-  virtual void isExtern() = 0;
-  virtual void needsBackVariablesSupport() = 0;
+  virtual void setIsExtern() = 0;
+  virtual void setNeedsBackVariablesSupport() = 0;
 
   ScopeKind getKind() const { return kind; }
 
@@ -103,9 +103,9 @@ public:
   Frame &getCurrentFrame() override;
   const Frame &getCurrentFrame() const override;
 
-  void isExtern() override { extern_ = true; }
+  void setIsExtern() override { extern_ = true; }
 
-  void needsBackVariablesSupport() override { needsBVs = true; }
+  void setNeedsBackVariablesSupport() override { needsBVs = true; }
 
   static bool classof(const Scope *sco) { return sco->getKind() == Sco_Component; }
 
@@ -137,8 +137,8 @@ public:
   Frame &getCurrentFrame() override;
   const Frame &getCurrentFrame() const override;
   TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const override;
-  void isExtern() override;
-  void needsBackVariablesSupport() override;
+  void setIsExtern() override;
+  void setNeedsBackVariablesSupport() override;
 
   static bool classof(const Scope *sco) {
     return sco->getKind() >= Sco_Child && sco->getKind() < Sco_ChildEnd;

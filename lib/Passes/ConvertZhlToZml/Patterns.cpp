@@ -728,16 +728,10 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     return op->emitOpError() << "could not be lowered because its type could not be infered";
   }
 
-  // ZML_BVDialectHelper TP;
   ComponentBuilder builder;
   auto genericNames = name->getGenericParamNames();
   auto paramLocations = name->getConstructorParamLocations();
   auto ctorType = materializeTypeBindingConstructor(rewriter, *name, getTypeBindings());
-
-  // if (name->needsBackVariables()) {
-  //   ctorType = lang::zir::injectBVFunctionParams(TP, ctorType, 0, &paramLocations);
-  //   builder.usesBackVariables();
-  // }
 
   builder.name(name->getName())
       .location(op->getLoc())
