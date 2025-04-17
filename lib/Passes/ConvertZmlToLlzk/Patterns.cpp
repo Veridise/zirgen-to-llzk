@@ -771,8 +771,8 @@ LogicalResult LowerReadBackOp::matchAndRewrite(
             rewriter.getAffineConstantExpr(0) - rewriter.getAffineSymbolExpr(0)
         )),
         // materializeParam's Value return will be implicitly cast to a ValueRange.
-        // The previous explicit conversion using `ValueRange mapOperands({value})`
-        // was ambigious and caused errors between clang and gcc.
+        // The previous creation of a local variable `ValueRange mapOperands({value})`
+        // causes errors as ValueRange is a thin wrapper.
         materializeParam(symAttr, rewriter, op->getLoc()), 0
     );
   })
