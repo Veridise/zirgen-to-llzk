@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.23)
 project(
   Zklang
   DESCRIPTION
-    "Veridise's ZIR frontend for LLZK"
+    "Veridise's Zirgen frontend for LLZK"
   VERSION 0.1.0
-  HOMEPAGE_URL https://github.com/Veridise/zir-to-zkir) # TODO: Change the repo name
+  HOMEPAGE_URL https://github.com/Veridise/zirgen-to-llzk)
 
 if (NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard")

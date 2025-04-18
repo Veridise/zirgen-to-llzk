@@ -37,6 +37,7 @@
         "flake-utils": "flake-utils",
         "llzk-pkgs": "llzk-pkgs",
         "nixpkgs": [
+          "llzk-pkgs",
           "nixpkgs"
         ]
       },

@@ -15,7 +15,7 @@
 
     llzk = {
       url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "llzk-pkgs/nixpkgs";
     };
   };
 

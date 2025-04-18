@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file includes passes for transforming circuits defined with the 
+// This file includes passes for transforming circuits defined with the
 // ZML dialect.
 //
 //===----------------------------------------------------------------------===//
@@ -41,7 +41,7 @@ def RemoveBuiltIns : Pass<"remove-builtins", "mlir::ModuleOp"> {
 
 def SplitComponentBody : Pass<"split-component-body", "mlir::ModuleOp"> {
   let summary = "Splits the body function of a component into compute and "
-                "constrain functions in preparation for lowering to ZKIR";
+                "constrain functions in preparation for lowering to LLZK";
   let constructor = "zml::createSplitComponentBodyPass()";
 
   let dependentDialects = ["::zml::ZMLDialect", "::mlir::func::FuncDialect"];
