@@ -4,7 +4,8 @@ MLIR modules for transforming Zirgen to LLZK
 
 ## Build instructions
 
-::warning:: This section is out-of-date and will be updated in LLZK-228.
+> [!WARNING]
+> This section is out-of-date and will be updated in LLZK-228.
 
 Install [bazel](https://bazel.build/install) and then run the following command to build everything.
 
