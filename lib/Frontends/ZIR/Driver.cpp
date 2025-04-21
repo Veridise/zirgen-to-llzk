@@ -235,10 +235,7 @@ public:
     std::string out = outputFile;
     if (out.empty()) {
       std::string base = inputFilename;
-      out = base + ".mlir";
-      if (emitBytecode) {
-        out += ".bc";
-      }
+      out = base + (emitBytecode ? ".bc" : ".mlir");
     }
     if (out != "-") {
       llvm::dbgs() << "Writing result to " << out << "\n";
