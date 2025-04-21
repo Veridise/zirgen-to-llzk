@@ -306,6 +306,14 @@ public:
   matchAndRewrite(VarArgsOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerReadBackOp : public mlir::OpConversionPattern<ReadBackOp> {
+public:
+  using mlir::OpConversionPattern<ReadBackOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(ReadBackOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 class LowerGlobalDefOp : public mlir::OpConversionPattern<GlobalDefOp> {
 public:
   using OpConversionPattern<GlobalDefOp>::OpConversionPattern;

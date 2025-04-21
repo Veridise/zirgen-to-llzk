@@ -54,14 +54,20 @@ FrameSlot *Frame::getParentSlot() const { return info->getParentSlot(); }
 
 // FrameSlot
 
-FrameSlot::FrameSlot(FrameSlotKind slotKind) : FrameSlot(slotKind, "$temp") {}
+FrameSlot::FrameSlot(FrameSlotKind slotKind) : FrameSlot(slotKind, "") {}
 
 FrameSlot::FrameSlot(FrameSlotKind slotKind, mlir::StringRef slotName)
     : kind(slotKind), name(slotName) {}
 
 void FrameSlot::rename(mlir::StringRef newName) { name = newName; }
 
-mlir::StringRef FrameSlot::getSlotName() const { return name; }
+mlir::StringRef FrameSlot::getSlotName() const {
+  return isTemporary() ? defaultNameForTemporaries() : mlir::StringRef(name);
+}
+
+mlir::StringRef FrameSlot::defaultNameForTemporaries() const { return "$temp"; }
+
+bool FrameSlot::isTemporary() const { return name.empty(); }
 
 FrameSlot::FrameSlotKind FrameSlot::getKind() const { return kind; }
 
@@ -96,9 +102,11 @@ void FrameSlot::print(llvm::raw_ostream &os) const {
 }
 
 InnerFrame::InnerFrame(const TypeBindings &bindings)
-    : ComponentSlot(FS_Frame, bindings, bindings.Component(), "$inner"), innerFrame{} {
+    : ComponentSlot(FS_Frame, bindings, bindings.Component()), innerFrame{} {
   innerFrame.setParentSlot(this);
 }
+
+mlir::StringRef InnerFrame::defaultNameForTemporaries() const { return "$inner"; }
 
 Frame &InnerFrame::getFrame() { return innerFrame; }
 
@@ -112,11 +120,14 @@ void InnerFrame::print(llvm::raw_ostream &os) const {
 }
 
 ArrayFrame::ArrayFrame(const TypeBindings &bindings)
-    : ComponentSlot(FS_Array, bindings, bindings.Component(), "$array"), iv(nullptr), innerFrame{} {
+    : ComponentSlot(FS_Array, bindings, bindings.Component()), iv(nullptr), innerFrame{},
+      size(bindings.UnkConst()) {
   innerFrame.setParentSlot(this);
 }
 
 bool ArrayFrame::classof(const FrameSlot *S) { return S->getKind() == FS_Array; }
+
+mlir::StringRef ArrayFrame::defaultNameForTemporaries() const { return "$array"; }
 
 Frame &ArrayFrame::getFrame() { return innerFrame; }
 
@@ -175,9 +186,9 @@ ComponentSlot::ComponentSlot(const TypeBindings &Bindings, TypeBinding &Type, ml
 }
 
 ComponentSlot::ComponentSlot(
-    FrameSlotKind Kind, const TypeBindings &Bindings, const TypeBinding &Type, mlir::StringRef Name
+    FrameSlotKind Kind, const TypeBindings &Bindings, const TypeBinding &Type
 )
-    : FrameSlot(Kind, Name), binding(Type), bindingsCtx(&Bindings) {
+    : FrameSlot(Kind), binding(Type), bindingsCtx(&Bindings) {
   binding.markSlot(this);
 }
 
@@ -193,7 +204,7 @@ void ComponentSlot::print(llvm::raw_ostream &os) const {
 template <typename T>
 T traverseNestedArrayFramesT(
     const FrameSlot *root, const FrameSlot *slot, const T &t,
-    std::function<T(const ArrayFrame *, const T &)> onArrayFrame
+    std::function<T(const ArrayFrame &, const T &)> onArrayFrame
 ) {
   if (!slot) {
     return t;
@@ -202,19 +213,19 @@ T traverseNestedArrayFramesT(
     if (auto arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
       /// Make a copy of the array just created to make sure it survives until the recursive
       /// function finishes
-      auto arrayT = onArrayFrame(arrayFrame, t);
+      auto arrayT = onArrayFrame(*arrayFrame, t);
       return traverseNestedArrayFramesT(root, slot->getParentSlot(), arrayT, onArrayFrame);
     }
   }
   return traverseNestedArrayFramesT(root, slot->getParentSlot(), t, onArrayFrame);
 }
 
-void traverseNestedArrayFrames(
+static void traverseNestedArrayFrames(
     const FrameSlot *root, const FrameSlot *slot,
-    std::function<void(const ArrayFrame *)> onArrayFrame
+    std::function<void(const ArrayFrame &)> onArrayFrame
 ) {
   size_t dummy = 0;
-  traverseNestedArrayFramesT<size_t>(root, slot, dummy, [&](const ArrayFrame *frame, auto &) {
+  traverseNestedArrayFramesT<size_t>(root, slot, dummy, [&](const ArrayFrame &frame, auto &) {
     onArrayFrame(frame);
     return 0;
   });
@@ -228,16 +239,16 @@ void ComponentSlot::setBinding(TypeBinding &newBinding) {
 TypeBinding ComponentSlot::getBinding() const {
   return traverseNestedArrayFramesT<TypeBinding>(
       this, this, binding,
-      [&](const ArrayFrame *, const TypeBinding &b) {
-    return bindingsCtx->UnkArray(b, b.getLocation());
+      [&](const ArrayFrame &frame, const TypeBinding &b) {
+    return bindingsCtx->Array(b, frame.getSize(), b.getLocation());
   }
   );
 }
 
 mlir::SmallVector<mlir::Value> ComponentSlot::collectIVs() const {
   mlir::SmallVector<mlir::Value> vec;
-  traverseNestedArrayFrames(this, this, [&](const ArrayFrame *frame) {
-    vec.insert(vec.begin(), frame->getInductionVar());
+  traverseNestedArrayFrames(this, this, [&](const ArrayFrame &frame) {
+    vec.insert(vec.begin(), frame.getInductionVar());
   });
   return vec;
 }

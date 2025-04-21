@@ -27,7 +27,7 @@
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Pass.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
@@ -82,9 +82,8 @@ void ConvertZhlToZmlPass::runOnOperation() {
       ZhlConstrainLowering, ZhlLookupLowering, ZhlArrayLowering, ZhlSubscriptLowering,
       ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
       ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
-      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval>(
-      typeAnalysis, typeConverter, ctx
-  );
+      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval,
+      ZhlBackLowering>(typeAnalysis, typeConverter, ctx);
   patterns.add<ZhlConstructGlobalLowering, ZhlGetGlobalLowering>(
       globalsModule, typeAnalysis, typeConverter, ctx
   );

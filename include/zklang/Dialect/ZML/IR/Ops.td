@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/BuiltinAttributes.td"
 include "Dialect.td"
 include "Types.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -34,12 +35,13 @@ class ComponentOpBase<string prefix, string bodyFuncName,
                                  ComponentInterface]> {
   let summary = prefix#"component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
-      UnitAttr:$generic, UnitAttr:$builtin,
+      UnitAttr:$generic, UnitAttr:$builtin, UnitAttr:$usesBackVariables,
       OptionalAttr<FlatSymbolRefArrayAttr>:$params);
   let regions = (region SizedRegion<1>:$body);
 
   let builders = [OpBuilder<(ins "::mlir::StringRef":$name,
-                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>,
+                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs,
+                      CArg<"bool", "false">:$usesBackVariables)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
                       "::zml::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
@@ -47,7 +49,8 @@ class ComponentOpBase<string prefix, string bodyFuncName,
                       "::zml::IsBuiltIn":$tag)>,
                   OpBuilder<(ins "::mlir::StringRef":$name,
                       "::mlir::ArrayRef<mlir::StringRef>":$params,
-                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs)>];
+                      "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs,
+                      CArg<"bool", "false">:$usesBackVariables)>];
 
   let extraClassDeclaration = [{
     /// Returns the type of the component.
@@ -167,7 +170,7 @@ def FieldDefOp : ZMLOp<"field", [HasParent<"::zml::ComponentOp, "
                                  Symbol]> {
   let summary = "component field definition";
   let arguments = (ins SymbolNameAttr:$sym_name,
-      TypeAttrOf<TypeVarOr<Component>>:$type);
+      TypeAttrOf<TypeVarOr<Component>>:$type, UnitAttr:$column);
 
   let assemblyFormat = [{
     $sym_name `:` $type attr-dict
@@ -260,6 +263,18 @@ def SetGlobalOp
   let assemblyFormat = [{
     $name_ref `=` $val `:` type($val) attr-dict
   }];
+}
+
+def ReadBackOp : ZMLOp<"read_back"> {
+  let summary = "reads a back variable";
+
+  let arguments = (ins Component:$comp, AnyAttrOf<[SymbolRefAttr, Builtin_IntegerAttr, ConstExpr]>:$distance,
+      SymbolNameAttr:$field);
+  let results = (outs TypeVarOr<Component>:$result);
+
+  let assemblyFormat =
+      "$comp `[` $field `]` `:` type($comp) `,` "
+      "type($result) attr-dict";
 }
 
 def ConstrainCallOp : ZMLOp<"constrain_call"> {

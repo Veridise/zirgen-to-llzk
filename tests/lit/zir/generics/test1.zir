@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s | FileCheck %s
+// RUN: zklang -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
 
 // COM: Checks that we emit the corresponding functions with the correct types of each parametric component.
 // COM: LLZK already checks that constrain functions cannot be called from compute functions and vice versa.
@@ -17,9 +17,11 @@ component Head<T: Type, N: Val>(arr: Array<T, N>) {
 // CHECK-LABEL:  llzk.struct @A<[@N]> {
 component A<N: Val>() {
 // CHECK-LABEL:    func @compute
-// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = call @Head::@compute(%[[T0:[0-9a-zA-Z_\.]+]]) : (!llzk.array<3 x !llzk.felt>) -> !llzk.struct<@Head<[!llzk.felt, 3]>>
+// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = call @Head::@compute(%[[T0:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:  : (!llzk.array<3 x !llzk.felt>) -> !llzk.struct<@Head<[!llzk.felt, 3]>>
 // CHECK-LABEL:    func @constrain
-// CHECK:      call @Head::@constrain(%[[T0:[0-9a-zA-Z_\.]+]], %[[T1:[0-9a-zA-Z_\.]+]]) : (!llzk.struct<@Head<[!llzk.felt, 3]>>, !llzk.array<3 x !llzk.felt>) -> ()
+// CHECK:      call @Head::@constrain(%[[T0:[0-9a-zA-Z_\.]+]], %[[T1:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:  : (!llzk.struct<@Head<[!llzk.felt, 3]>>, !llzk.array<3 x !llzk.felt>) -> ()
   Head<Val, 3>([N,N+1,N+2])
 }
 
@@ -28,11 +30,13 @@ component B() {
 // CHECK-LABEL:    func @compute
 // CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = call @A::@compute() : () -> !llzk.struct<@A<[1]>>
 // CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = call @A::@compute() : () -> !llzk.struct<@A<[1]>>
-// CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = call @Head::@compute(%[[T2:[0-9a-zA-Z_\.]+]]) : (!llzk.array<2 x !llzk.struct<@A<[1]>>>) -> !llzk.struct<@Head<[!llzk.struct<@A<[1]>>, 2]>>
+// CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = call @Head::@compute(%[[T2:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:  : (!llzk.array<2 x !llzk.struct<@A<[1]>>>) -> !llzk.struct<@Head<[!llzk.struct<@A<[1]>>, 2]>>
 // CHECK-LABEL:    func @constrain
 // CHECK:      call @A::@constrain(%[[T0:[0-9a-zA-Z_\.]+]]) : (!llzk.struct<@A<[1]>>) -> ()
 // CHECK:      call @A::@constrain(%[[T1:[0-9a-zA-Z_\.]+]]) : (!llzk.struct<@A<[1]>>) -> ()
-// CHECK:      call @Head::@constrain(%[[T2:[0-9a-zA-Z_\.]+]], %[[T3:[0-9a-zA-Z_\.]+]]) : (!llzk.struct<@Head<[!llzk.struct<@A<[1]>>, 2]>>, !llzk.array<2 x !llzk.struct<@A<[1]>>>) -> ()
+// CHECK:      call @Head::@constrain(%[[T2:[0-9a-zA-Z_\.]+]], %[[T3:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:   : (!llzk.struct<@Head<[!llzk.struct<@A<[1]>>, 2]>>, !llzk.array<2 x !llzk.struct<@A<[1]>>>) -> ()
   Head<A<1>, 2>([A<1>(), A<1>()])
 }
 
@@ -46,3 +50,5 @@ component Top() {
   b := B();
   a = b;
 }
+
+

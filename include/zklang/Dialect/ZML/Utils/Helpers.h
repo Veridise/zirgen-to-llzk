@@ -161,6 +161,9 @@ private:
       mlir::Value self, bool builtin
   );
 
+  mlir::Value
+  buildCallWithoutSlot(mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args);
+
   mlir::FunctionType ctorType;
   const zhl::TypeBinding compBinding;
   bool isBuiltin;

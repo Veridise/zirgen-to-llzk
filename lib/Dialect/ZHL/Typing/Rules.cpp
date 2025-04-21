@@ -9,6 +9,7 @@
 
 #include <llvm/ADT/bit.h>
 #include <llvm/Support/Debug.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <numeric>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
@@ -100,11 +101,12 @@ mlir::FailureOr<TypeBinding> ParameterTypingRule::
 }
 
 mlir::FailureOr<TypeBinding> ExternTypingRule::
-    typeCheck(zirgen::Zhl::ExternOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ExternOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.empty()) {
     return mlir::failure();
   }
+  scope.setIsExtern();
   return interpretOp(op, operands[0]);
 }
 
@@ -124,6 +126,11 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   }
   auto component = interpretOp(op, operands[0], operands.drop_front());
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
+  // If we are constructing a component that needs backvariables then we need it in the caller as
+  // well.
+  if (component.needsBackVariables()) {
+    scope.setNeedsBackVariablesSupport();
+  }
   return component;
 }
 
@@ -582,13 +589,27 @@ mlir::FailureOr<TypeBinding> ArrayTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> BackTypeRule::
-    typeCheck(zirgen::Zhl::BackOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::BackOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 2) {
     return mlir::failure();
   }
-  // TODO: Check that distance is a subtype of Val
-  return interpretOp(op, operands[1]);
+  if (failed(operands[0].subtypeOf(getBindings().Get("Val")))) {
+    return op->emitError() << "back-variable expression expects a distance of type 'Val', but got '"
+                           << operands[0] << "'";
+  }
+  if (!operands[0].hasConstExpr()) {
+    return op->emitError() << "distance expression must be a compile time constant";
+  }
+
+  if (!operands[1].getSlot() || operands[1].getSlot()->isTemporary()) {
+    return op->emitError() << "back-variable expression expects a named member";
+  }
+
+  auto copy = interpretOp(op, operands[1]);
+  copy.markSlot(nullptr);
+  scope.setNeedsBackVariablesSupport();
+  return copy;
 }
 
 mlir::FailureOr<TypeBinding> RangeTypeRule::
@@ -629,7 +650,7 @@ mlir::FailureOr<TypeBinding> RangeTypeRule::
 }
 
 mlir::FailureOr<TypeBinding> ReduceTypeRule::
-    typeCheck(zirgen::Zhl::ReduceOp op, mlir::ArrayRef<TypeBinding> operands, Scope &, mlir::ArrayRef<const Scope *>)
+    typeCheck(zirgen::Zhl::ReduceOp op, mlir::ArrayRef<TypeBinding> operands, Scope &scope, mlir::ArrayRef<const Scope *>)
         const {
   if (operands.size() < 3) {
     return failure();
@@ -637,6 +658,10 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
 
   if (!operands[0].isArray()) {
     return op->emitError() << "reduce expression expects an array, but got '" << operands[0] << "'";
+  }
+  auto arrayLen = operands[0].getArraySize([&] { return op->emitError(); });
+  if (failed(arrayLen)) {
+    return failure();
   }
   auto ctorParams = operands[2].getConstructorParams();
   if (ctorParams.size() != 2) {
@@ -662,6 +687,15 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
                            << output << "'";
   }
 
+  if (auto *arrayFrame =
+          mlir::dyn_cast_if_present<ArrayFrame>(scope.getCurrentFrame().getParentSlot())) {
+    arrayFrame->setSize(*arrayLen);
+  } else {
+    LLVM_DEBUG(llvm::dbgs() << "ReduceOp did not record the size of the array into the frame\n");
+  }
+  if (operands[2].needsBackVariables()) {
+    scope.setNeedsBackVariablesSupport();
+  }
   return interpretOp(op, output);
 }
 
@@ -754,6 +788,9 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
       );
       // Any other slot simply gets forwarded
       binding.markSlot(slot);
+    }
+    if (auto *arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
+      arrayFrame->setSize(*arrayLen);
     }
   } else {
     LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << "\n");

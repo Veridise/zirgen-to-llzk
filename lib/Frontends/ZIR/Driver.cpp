@@ -20,6 +20,7 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/Passes.h>
+#include <optional>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zirgen/dsl/lower.h>
 #include <zirgen/dsl/parser.h>
@@ -68,6 +69,13 @@ static cl::opt<enum Action> emitAction(
 static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::value_desc("path"));
 static cl::opt<std::string>
     outputFile("o", cl::desc("Where to write the result"), cl::value_desc("output"));
+static cl::opt<bool> stripDebugInfo(
+    "strip-debug-info", cl::desc("Toggle stripping debug information when writing the output")
+);
+static cl::opt<bool> printDebugInfo(
+    "print-debug-info", cl::desc("Toggle printing debug information when emitting IR"),
+    cl::init(true)
+);
 
 // Dev-oriented command line options only available in debug builds
 // They are defined with external storage to avoid having to wrap
@@ -170,6 +178,9 @@ void Driver::configureLoweringPipeline() {
   }
 
   if (emitAction == Action::PrintZML) {
+    if (stripDebugInfo) {
+      pm.addPass(mlir::createStripDebugInfoPass());
+    }
     return;
   }
 
@@ -186,6 +197,9 @@ void Driver::configureLoweringPipeline() {
   }
 
   if (emitAction == Action::OptimizeZML) {
+    if (stripDebugInfo) {
+      pm.addPass(mlir::createStripDebugInfoPass());
+    }
     return;
   }
   pm.addPass(zklang::createConvertZmlToLlzkPass());
@@ -195,6 +209,9 @@ void Driver::configureLoweringPipeline() {
   }
   if (!DisableCleanupPassesFlag) {
     llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
+  }
+  if (stripDebugInfo) {
+    pm.addPass(mlir::createStripDebugInfoPass());
   }
 }
 
@@ -254,6 +271,10 @@ private:
   llvm::raw_ostream *dst;
 };
 
+static void dumpIR(std::optional<mlir::ModuleOp> &mod, Dst &dst) {
+  mod->print(*dst, OpPrintingFlags(std::nullopt).enableDebugInfo(printDebugInfo));
+}
+
 LogicalResult Driver::run() {
   Dst dst;
   if (dst.error()) {
@@ -278,7 +299,7 @@ LogicalResult Driver::run() {
   }
   ModuleEraseGuard guard(*mod);
   if (emitAction == Action::PrintZHL) {
-    mod->print(*dst);
+    dumpIR(mod, dst);
     return success();
   }
 
@@ -292,7 +313,7 @@ LogicalResult Driver::run() {
     return failure();
   }
 
-  mod->print(*dst);
+  dumpIR(mod, dst);
 
   llvm::WithColor(llvm::errs(), llvm::raw_ostream::GREEN) << "Success!\n";
   return success();
