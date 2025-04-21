@@ -15,6 +15,7 @@
 #include <llvm/Support/WithColor.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llzk/Dialect/LLZK/IR/Dialect.h>
+#include <mlir/Bytecode/BytecodeWriter.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Debug/CLOptionsSetup.h>
 #include <mlir/Pass/PassManager.h>
@@ -68,6 +69,7 @@ static cl::opt<enum Action> emitAction(
 static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::value_desc("path"));
 static cl::opt<std::string>
     outputFile("o", cl::desc("Where to write the result"), cl::value_desc("output"));
+static cl::opt<bool> emitBytecode("emit-bytecode", cl::desc("Emit IR in bytecode format"));
 
 // Dev-oriented command line options only available in debug builds
 // They are defined with external storage to avoid having to wrap
@@ -234,6 +236,9 @@ public:
     if (out.empty()) {
       std::string base = inputFilename;
       out = base + ".mlir";
+      if (emitBytecode) {
+        out += ".bc";
+      }
     }
     if (out != "-") {
       llvm::dbgs() << "Writing result to " << out << "\n";
@@ -248,6 +253,17 @@ public:
   const std::error_code &error() { return EC; }
 
   llvm::raw_ostream &operator*() { return *dst; }
+
+  void writeModule(mlir::ModuleOp mod) {
+    if (emitBytecode) {
+      mlir::BytecodeWriterConfig config;
+      if (mlir::writeBytecodeToFile(mod, *dst, config).failed()) {
+        mod->emitOpError("could not write module bytecode to file").report();
+      }
+    } else {
+      mod->print(*dst);
+    }
+  }
 
 private:
   std::error_code EC;
@@ -278,7 +294,7 @@ LogicalResult Driver::run() {
   }
   ModuleEraseGuard guard(*mod);
   if (emitAction == Action::PrintZHL) {
-    mod->print(*dst);
+    dst.writeModule(*mod);
     return success();
   }
 
@@ -292,7 +308,7 @@ LogicalResult Driver::run() {
     return failure();
   }
 
-  mod->print(*dst);
+  dst.writeModule(*mod);
 
   llvm::WithColor(llvm::errs(), llvm::raw_ostream::GREEN) << "Success!\n";
   return success();
