@@ -41,6 +41,7 @@
         ],
         "llzk-pkgs": "llzk-pkgs",
         "nixpkgs": [
+          "llzk-pkgs",
           "nixpkgs"
         ]
       },
