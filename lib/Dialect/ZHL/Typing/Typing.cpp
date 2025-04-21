@@ -9,10 +9,12 @@
 
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/STLFunctionalExtras.h>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
+#include <mlir/IR/Diagnostics.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
@@ -103,6 +105,62 @@ public:
   }
 
 private:
+  void markColumn(TypeBinding &binding) {
+    assert(binding.getSlot());
+    mlir::cast<ComponentSlot>(binding.getSlot())->markColumn();
+  }
+
+  /// If the binding has a slot and is either: a subclass of NondetReg, a subclass of a covariant
+  /// Array of NondetReg, or has members of NondetReg type. Then mark the slot as a column in the
+  /// constraint system.
+  void
+  markPotentialColumn(TypeBinding &binding, llvm::function_ref<InFlightDiagnostic()> emitError) {
+    if (!binding.getSlot()) {
+      return;
+    }
+    auto NondetReg = getTypeBindings().MaybeGet("NondetReg");
+    if (failed(NondetReg)) {
+      return;
+    }
+    auto NondetExtReg = getTypeBindings().MaybeGet("NondetExtReg");
+    if (failed(NondetExtReg)) {
+      return;
+    }
+
+    auto validSubtype = [&NondetReg, &NondetExtReg](const TypeBinding &Binding) {
+      return succeeded(Binding.subtypeOf(*NondetReg)) ||
+             succeeded(Binding.subtypeOf(*NondetExtReg));
+    };
+
+    if (validSubtype(binding)) {
+      markColumn(binding);
+    }
+
+    if (binding.isArray()) {
+      auto elt = binding.getArrayElement(emitError);
+      assert(succeeded(elt));
+      if (validSubtype(*elt)) {
+        markColumn(binding);
+      }
+    }
+
+    const auto *b = &binding;
+    while (b) {
+      b = [&]() -> const TypeBinding * {
+        for (auto &member : b->getMembers()) {
+          if (member.getValue().has_value() && validSubtype(*member.getValue())) {
+            markColumn(binding);
+            return nullptr;
+          }
+        }
+        if (b->hasSuperType()) {
+          return &b->getSuperType();
+        }
+        return nullptr;
+      }();
+    }
+  }
+
   FailureOr<TypeBinding> typeCheckOp(Operation *op, Scope &scope) {
     assert(op != nullptr);
     LLVM_DEBUG(logLine() << "Checking " << op->getName() << "\n";
@@ -135,6 +193,7 @@ private:
       if (succeeded(ruleResult)) {
         LLVM_DEBUG(logLine() << "SUCCESS: Storing binding "; ruleResult->print(llvm::dbgs(), true);
                    llvm::dbgs() << "\n");
+        markPotentialColumn(*ruleResult, [op] { return op->emitError(); });
         return getBindings().add(op, ruleResult);
       }
     }

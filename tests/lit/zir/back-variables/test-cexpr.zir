@@ -1,0 +1,41 @@
+// RUN: zklang -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
+
+component Foo<N: Val, P: Val>() {
+  x := Reg(2);
+  x@(N+P) = 2;
+}
+
+//       CHECK: #map = affine_map<()[s0, s1] -> (-(s0 + s1))> 
+// CHECK-LABEL: llzk.struct @Foo<[@N, @P]> {
+//       CHECK:    field @"$super" : !llzk.struct<@Component<[]>>
+//       CHECK:    field @"$temp" : !llzk.struct<@Component<[]>>
+//       CHECK:    field @x : !llzk.struct<@Reg<[]>>
+// CHECK-LABEL:    func @compute() -> !llzk.struct<@Foo<[@N, @P]>> {
+//       CHECK:      %[[T2:[0-9a-zA-Z_.]+]] =  constfelt  2
+//       CHECK:      %[[T0:[0-9a-zA-Z_.]+]] =  new_struct : <@Foo<[@N, @P]>>
+//       CHECK:      %[[T9:[0-9a-zA-Z_.]+]] =  call @Reg::@compute(%[[T2]]) : (!llzk.felt) -> !llzk.struct<@Reg<[]>> 
+//       CHECK:      writef %[[T0]][@x] = %[[T9]] : <@Foo<[@N, @P]>>, !llzk.struct<@Reg<[]>>
+//       CHECK:      %[[T31:[0-9a-zA-Z_.]+]] =  call @Component::@compute() : () -> !llzk.struct<@Component<[]>> 
+//       CHECK:      writef %[[T0]][@"$temp"] = %[[T31]] : <@Foo<[@N, @P]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      %[[T32:[0-9a-zA-Z_.]+]] =  readf %[[T0]][@"$temp"] : <@Foo<[@N, @P]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      writef %[[T0]][@"$super"] = %[[T32]] : <@Foo<[@N, @P]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      return %[[T0]] : !llzk.struct<@Foo<[@N, @P]>>
+//       CHECK:    }
+// CHECK-LABEL:    func @constrain
+//  CHECK-SAME:                   (%[[A0:[0-9a-zA-Z_.]+]]: !llzk.struct<@Foo<[@N, @P]>>) {
+//       CHECK:      %[[T1:[0-9a-zA-Z_.]+]] =  constfelt  2
+//       CHECK:      %[[T29:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@x] : <@Foo<[@N, @P]>>, !llzk.struct<@Reg<[]>>
+//       CHECK:      call @Reg::@constrain(%[[T29]], %[[T1]]) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> () 
+//       CHECK:      %[[T6:[0-9a-zA-Z_.]+]] = read_const @N : !llzk.felt
+//       CHECK:      %[[T7:[0-9a-zA-Z_.]+]] = toindex %[[T6]]
+//       CHECK:      %[[T6_1:[0-9a-zA-Z_.]+]] = read_const @P : !llzk.felt
+//       CHECK:      %[[T7_1:[0-9a-zA-Z_.]+]] = toindex %[[T6_1]]
+//       CHECK:      %[[T8:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@x] {()[%[[T7]], %[[T7_1]]]} : <@Foo<[@N, @P]>>, !llzk.struct<@Reg<[]>> {tableOffset = #map}
+//       CHECK:      %[[T15:[0-9a-zA-Z_.]+]] =  readf %[[T8]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
+//       CHECK:      %[[T16:[0-9a-zA-Z_.]+]] =  readf %[[T15]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
+//       CHECK:      emit_eq %[[T16]], %[[T1]] : !llzk.felt, !llzk.felt
+//       CHECK:      %[[T18:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@"$temp"] : <@Foo<[@N, @P]>>, !llzk.struct<@Component<[]>>
+//       CHECK:      call @Component::@constrain(%[[T18]]) : (!llzk.struct<@Component<[]>>) -> () 
+//       CHECK:      return
+//       CHECK:    }
+//       CHECK:  }

@@ -36,6 +36,7 @@ private:
     Identifier name;
     mlir::Type type;
     std::optional<mlir::Location> loc;
+    bool column : 1;
   };
   struct Ctx;
 
@@ -58,6 +59,7 @@ private:
     bool isBuiltin = false;
     bool isClosure = false;
     bool forceSetGeneric = false;
+    bool usesBackVariables = false;
 
     bool isGeneric();
     // Builds a bare component op
@@ -108,6 +110,8 @@ public:
 
   ComponentBuilder &isClosure();
 
+  ComponentBuilder &usesBackVariables();
+
   ComponentBuilder &takeRegion(mlir::Region *region);
 
   ComponentBuilder &fillBody(
@@ -122,9 +126,10 @@ public:
 
   ComponentBuilder &name(mlir::StringRef name);
 
-  ComponentBuilder &field(mlir::StringRef name, mlir::Type type, mlir::Location loc);
+  ComponentBuilder &
+  field(mlir::StringRef name, mlir::Type type, mlir::Location loc, bool isColumn = false);
 
-  ComponentBuilder &field(mlir::StringRef name, mlir::Type type);
+  ComponentBuilder &field(mlir::StringRef name, mlir::Type type, bool isColumn = false);
 
   ComponentBuilder &attrs(mlir::ArrayRef<mlir::NamedAttribute> attrs);
 

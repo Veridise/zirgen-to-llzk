@@ -9,6 +9,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSet.h>
 #include <mlir/Support/LLVM.h>
@@ -100,8 +101,11 @@ TypeBinding ComponentScope::createBinding(StringRef name, Location loc) const {
         paramName, paramData.Type, paramData.Pos + nGenericParams, paramData.Injected
     );
   }
+  TypeBinding::Flags flags;
+  flags.setExtern(extern_).setBackVariablesNeed(needsBVs);
   return bindings->Create(
-      name, loc, bindings->Manage(*superType), genericParamsCopy, constructorParams, members, frame
+      name, loc, bindings->Manage(*superType), genericParamsCopy, constructorParams, members, flags,
+      frame
   );
 }
 
@@ -146,6 +150,10 @@ mlir::FailureOr<TypeBinding> ChildScope::getSuperType() const { return parent->g
 
 Frame &ChildScope::getCurrentFrame() { return parent->getCurrentFrame(); }
 const Frame &ChildScope::getCurrentFrame() const { return parent->getCurrentFrame(); }
+
+void ChildScope::setIsExtern() { parent->setIsExtern(); }
+
+void ChildScope::setNeedsBackVariablesSupport() { parent->setNeedsBackVariablesSupport(); }
 
 FrameScope::FrameScope(Scope &Parent, Frame Frame) : ChildScope(Sco_Frame, Parent), frame(Frame) {}
 

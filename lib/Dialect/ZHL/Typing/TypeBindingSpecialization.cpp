@@ -555,7 +555,8 @@ static constexpr StringRef dividerLine =
 namespace {
 struct WrapLog {
   WrapLog(const TypeBinding &b) : binding(&b) {
-    LLVM_DEBUG(llvm::dbgs() << dividerLine << "\n" << "Specializing " << b << "\n";);
+    LLVM_DEBUG(llvm::dbgs() << dividerLine << "\n"
+                            << "Specializing " << b << "\n";);
   }
   ~WrapLog() {
     LLVM_DEBUG(llvm::dbgs() << "Finished specializing " << *binding << "\n"
@@ -590,7 +591,7 @@ mlir::LogicalResult zhl::specializeTypeBinding(
 mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
     EmitErrorFn emitError, mlir::ArrayRef<TypeBinding> params, TypeBindings &bindings
 ) const {
-  if (specialized) {
+  if (flags.isSpecialized()) {
     return emitError() << "can't respecialize type '" << getName() << "'";
   }
   auto declaredParamsSize = getGenericParamsMapping().sizeOfDeclared();

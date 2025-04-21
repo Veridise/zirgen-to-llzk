@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s | FileCheck %s
+// RUN: zklang -o - %s --print-debug-info=false | FileCheck %s
 
 extern IsFirstCycle() : Val;
 
@@ -22,16 +22,16 @@ component Top() {
 extern PrintVal(v: Val);
 
 test Globals {
-     Top();
-     
-     global MyGlobal : Reg;
-     PrintVal(MyGlobal);
+   Top();
+
+   global MyGlobal : Reg;
+   PrintVal(MyGlobal);
 }
 
 // CHECK-LABEL: module @globals {
 // CHECK-NEXT:    llzk.global @MyGlobal : !llzk.struct<@Reg<[]>>
 // CHECK-NEXT:  }
-// 
+//
 // CHECK-LABEL: llzk.struct @SetGlobal<[]> {
 // CHECK:         field @"$super" : !llzk.struct<@Component<[]>>
 // CHECK:         field @"$temp" : !llzk.struct<@Component<[]>>
@@ -53,7 +53,7 @@ test Globals {
 // CHECK:           return
 // CHECK:         }
 // CHECK:       }
-// 
+//
 // CHECK-LABEL: llzk.struct @CheckGlobal<[]> {
 // CHECK:         field @"$super" : !llzk.struct<@Component<[]>>
 // CHECK:         field @"$temp" : !llzk.struct<@Component<[]>>

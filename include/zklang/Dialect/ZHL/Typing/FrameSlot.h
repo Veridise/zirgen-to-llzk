@@ -40,6 +40,9 @@ public:
   /// non-conflicting name.
   virtual mlir::StringRef getSlotName() const;
 
+  /// Returns true if the slot was not given an explicit name.
+  virtual bool isTemporary() const;
+
   virtual void rename(llvm::StringRef);
 
   FrameSlotKind getKind() const;
@@ -55,6 +58,8 @@ public:
 protected:
   FrameSlot(FrameSlotKind);
   FrameSlot(FrameSlotKind, mlir::StringRef);
+
+  virtual mlir::StringRef defaultNameForTemporaries() const;
 
 private:
   const detail::FrameInfo *getParent() const;

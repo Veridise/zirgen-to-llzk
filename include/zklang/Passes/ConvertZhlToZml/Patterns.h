@@ -25,7 +25,7 @@
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 
 namespace zml {
 
@@ -424,6 +424,14 @@ public:
   mlir::LogicalResult
   matchAndRewrite(zirgen::Zhl::SwitchOp, OpAdaptor, mlir::ConversionPatternRewriter &)
       const override;
+};
+
+class ZhlBackLowering : public ZhlOpLoweringPattern<zirgen::Zhl::BackOp> {
+public:
+  using ZhlOpLoweringPattern<zirgen::Zhl::BackOp>::ZhlOpLoweringPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(zirgen::Zhl::BackOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class ZhlConstructGlobalLowering : public ConstructorLowering<zirgen::Zhl::ConstructGlobalOp>,

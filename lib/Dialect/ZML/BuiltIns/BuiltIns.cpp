@@ -162,7 +162,7 @@ void addNondetRegCommon(mlir::OpBuilder &builder, mlir::StringRef name, Componen
   builtinCommon(ComponentBuilder()
                     .name(name)
                     .field("$super", superType)
-                    .field("reg", superType)
+                    .field("reg", superType, true)
                     .fillBody(
                         {superType}, {componentType},
                         [&componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {

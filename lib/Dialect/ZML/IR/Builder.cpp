@@ -47,7 +47,7 @@ void ComponentBuilder::Ctx::addFields(mlir::OpBuilder &builder) {
   for (auto &field : fields) {
     builder.create<FieldDefOp>(
         field.loc.value_or(builder.getUnknownLoc()), builder.getStringAttr(field.name),
-        mlir::TypeAttr::get(field.type)
+        mlir::TypeAttr::get(field.type), field.column ? builder.getUnitAttr() : nullptr
     );
   }
 }
@@ -57,6 +57,10 @@ void ComponentBuilder::Ctx::checkBareRequirements() {
   assert(loc.has_value());
   assert(!compName.empty());
   assert((isBuiltin || isClosure) == compAttrs.empty());
+  // If the component is a builtin it cannot use back-variables.
+  if (isBuiltin) {
+    assert(!usesBackVariables);
+  }
 }
 
 ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
@@ -72,9 +76,9 @@ ComponentOp ComponentBuilder::Ctx::buildBare(mlir::OpBuilder &builder) {
   if (isGeneric()) {
     SmallVector<StringRef> typeParamsRefs =
         llvm::map_to_vector(typeParams, [](auto &s) { return s.str(); });
-    return builder.create<ComponentOp>(*loc, compName, typeParamsRefs, attrs);
+    return builder.create<ComponentOp>(*loc, compName, typeParamsRefs, attrs, usesBackVariables);
   } else {
-    return builder.create<ComponentOp>(*loc, compName, attrs);
+    return builder.create<ComponentOp>(*loc, compName, attrs, usesBackVariables);
   }
 }
 
@@ -117,13 +121,14 @@ ComponentBuilder &ComponentBuilder::attrs(mlir::ArrayRef<mlir::NamedAttribute> a
   return *this;
 }
 
-ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type) {
-  ctx.fields.push_back({.name = name, .type = type, .loc = std::nullopt});
+ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type, bool isColumn) {
+  ctx.fields.push_back({.name = name, .type = type, .loc = std::nullopt, .column = isColumn});
   return *this;
 }
 
-ComponentBuilder &ComponentBuilder::field(StringRef name, mlir::Type type, mlir::Location loc) {
-  ctx.fields.push_back({.name = name, .type = type, .loc = loc});
+ComponentBuilder &
+ComponentBuilder::field(StringRef name, mlir::Type type, mlir::Location loc, bool isColumn) {
+  ctx.fields.push_back({.name = name, .type = type, .loc = loc, .column = isColumn});
   return *this;
 }
 
@@ -160,6 +165,12 @@ ComponentBuilder &ComponentBuilder::takeRegion(mlir::Region *region) {
 
 ComponentBuilder &ComponentBuilder::isBuiltin() {
   ctx.isBuiltin = true;
+  ctx.usesBackVariables = false; // Force set it to false
+  return *this;
+}
+
+ComponentBuilder &ComponentBuilder::usesBackVariables() {
+  ctx.usesBackVariables = true;
   return *this;
 }
 

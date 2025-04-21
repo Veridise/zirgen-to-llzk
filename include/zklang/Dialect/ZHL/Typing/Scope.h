@@ -50,6 +50,8 @@ public:
   virtual TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const = 0;
   virtual Frame &getCurrentFrame() = 0;
   virtual const Frame &getCurrentFrame() const = 0;
+  virtual void setIsExtern() = 0;
+  virtual void setNeedsBackVariablesSupport() = 0;
 
   ScopeKind getKind() const { return kind; }
 
@@ -101,6 +103,10 @@ public:
   Frame &getCurrentFrame() override;
   const Frame &getCurrentFrame() const override;
 
+  void setIsExtern() override { extern_ = true; }
+
+  void setNeedsBackVariablesSupport() override { needsBVs = true; }
+
   static bool classof(const Scope *sco) { return sco->getKind() == Sco_Component; }
 
 private:
@@ -110,6 +116,8 @@ private:
   ParamsMap genericParams, liftedParams;
   Frame frame;
   mlir::FailureOr<TypeBinding> superType;
+
+  bool extern_ = false, needsBVs = false;
 };
 
 /// A scope that exists inside another
@@ -129,6 +137,8 @@ public:
   Frame &getCurrentFrame() override;
   const Frame &getCurrentFrame() const override;
   TypeBinding createBinding(mlir::StringRef name, mlir::Location loc) const override;
+  void setIsExtern() override;
+  void setNeedsBackVariablesSupport() override;
 
   static bool classof(const Scope *sco) {
     return sco->getKind() >= Sco_Child && sco->getKind() < Sco_ChildEnd;

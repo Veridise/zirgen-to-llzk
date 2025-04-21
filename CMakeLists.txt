@@ -7,8 +7,10 @@ project(
   VERSION 0.1.0
   HOMEPAGE_URL https://github.com/Veridise/zirgen-to-llzk)
 
-if (NOT DEFINED CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard")
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD
+      20
+      CACHE STRING "C++ standard")
 endif()
 
 include(GNUInstallDirs)
@@ -19,6 +21,7 @@ zklang_setup_options()
 zklang_global_options()
 
 set(ZKLANG_EXPORT_TARGETS "ZklangTargets")
+
 include(Dependencies.cmake)
 zklang_setup_dependencies(${ZKLANG_EXPORT_TARGETS})
 

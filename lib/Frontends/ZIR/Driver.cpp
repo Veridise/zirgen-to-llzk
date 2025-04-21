@@ -21,6 +21,7 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/Passes.h>
+#include <optional>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zirgen/dsl/lower.h>
 #include <zirgen/dsl/parser.h>
@@ -70,6 +71,13 @@ static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::
 static cl::opt<std::string>
     outputFile("o", cl::desc("Where to write the result"), cl::value_desc("output"));
 static cl::opt<bool> emitBytecode("emit-bytecode", cl::desc("Emit IR in bytecode format"));
+static cl::opt<bool> stripDebugInfo(
+    "strip-debug-info", cl::desc("Toggle stripping debug information when writing the output")
+);
+static cl::opt<bool> printDebugInfo(
+    "print-debug-info", cl::desc("Toggle printing debug information when emitting IR"),
+    cl::init(true)
+);
 
 // Dev-oriented command line options only available in debug builds
 // They are defined with external storage to avoid having to wrap
@@ -172,6 +180,9 @@ void Driver::configureLoweringPipeline() {
   }
 
   if (emitAction == Action::PrintZML) {
+    if (stripDebugInfo) {
+      pm.addPass(mlir::createStripDebugInfoPass());
+    }
     return;
   }
 
@@ -188,6 +199,9 @@ void Driver::configureLoweringPipeline() {
   }
 
   if (emitAction == Action::OptimizeZML) {
+    if (stripDebugInfo) {
+      pm.addPass(mlir::createStripDebugInfoPass());
+    }
     return;
   }
   pm.addPass(zklang::createConvertZmlToLlzkPass());
@@ -197,6 +211,9 @@ void Driver::configureLoweringPipeline() {
   }
   if (!DisableCleanupPassesFlag) {
     llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
+  }
+  if (stripDebugInfo) {
+    pm.addPass(mlir::createStripDebugInfoPass());
   }
 }
 
@@ -254,11 +271,13 @@ public:
   void writeModule(mlir::ModuleOp mod) {
     if (emitBytecode) {
       mlir::BytecodeWriterConfig config;
+      // This will include the debug info as well unless `--strip-debug-info`
+      // is specified.
       if (mlir::writeBytecodeToFile(mod, *dst, config).failed()) {
         mod->emitOpError("could not write module bytecode to file").report();
       }
     } else {
-      mod->print(*dst);
+      mod->print(*dst, OpPrintingFlags(std::nullopt).enableDebugInfo(printDebugInfo));
     }
   }
 

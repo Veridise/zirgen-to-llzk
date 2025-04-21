@@ -7,10 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/Support/Debug.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/OpDefinition.h>
 #include <mlir/IR/Operation.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
@@ -22,7 +26,7 @@
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 
 using namespace mlir;
 using namespace zhl;
@@ -44,14 +48,18 @@ mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root) {
   return nullptr;
 }
 
-bool calleeIsBuiltin(mlir::Operation *op) {
+template <typename T, typename Fn> T queryComp(mlir::Operation *op, Fn query, T Default = T()) {
   if (auto zmlOp = mlir::dyn_cast<ComponentInterface>(op)) {
-    return zmlOp.getBuiltin();
+    return query(zmlOp);
   }
-  return false;
+  return Default;
 }
 
-#define DEBUG_TYPE "zml-create-slot"
+bool calleeIsBuiltin(mlir::Operation *op) {
+  return queryComp<bool>(op, [](auto zmlOp) { return zmlOp.getBuiltin(); });
+}
+
+#define DEBUG_TYPE "zml-slot-helpers"
 
 FlatSymbolRefAttr createSlot(
     zhl::ComponentSlot *slot, OpBuilder &builder, ComponentInterface component, Location loc
@@ -66,7 +74,9 @@ FlatSymbolRefAttr createSlot(
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(&component.getRegion().front().front());
   auto type = materializeTypeBinding(builder.getContext(), slot->getBinding());
-  auto fieldDef = builder.create<FieldDefOp>(loc, desiredName, TypeAttr::get(type));
+  auto fieldDef = builder.create<FieldDefOp>(
+      loc, desiredName, TypeAttr::get(type), slot->isColumn() ? builder.getUnitAttr() : nullptr
+  );
 
   LLVM_DEBUG(llvm::dbgs() << "Field op: " << fieldDef << "\n");
   // Insert the FieldDefOp into the symbol table to make sure it has an unique name within the
@@ -76,8 +86,6 @@ FlatSymbolRefAttr createSlot(
   slot->rename(name.getValue());
   return mlir::FlatSymbolRefAttr::get(component.getContext(), name);
 }
-
-#undef DEBUG_TYPE
 
 TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
   if (count == 0) {
@@ -124,6 +132,10 @@ void storeSlot(
   auto compSlotIVs = slot.collectIVs();
 
   if (compSlotIVs.empty()) {
+    LLVM_DEBUG(
+        llvm::dbgs() << "slotType == " << slotType << " | value.getType() == " << value.getType()
+                     << "\n"
+    );
     assert(slotType == value.getType() && "result of construction and slot type must be the same");
     // Write the construction in a temporary
     builder.create<WriteFieldOp>(loc, self, slotName, value);
@@ -146,24 +158,33 @@ void storeSlot(
   }
 }
 
+#undef DEBUG_TYPE
+
 void materializeFieldTypes(
     zhl::TypeBinding &binding, MLIRContext *ctx, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<StringRef> &fields
+    SmallVectorImpl<StringRef> &fields, SmallVectorImpl<bool> *columns = nullptr
 ) {
-  llvm::StringMap<Type> map;
+  llvm::StringMap<std::pair<Type, bool>> map;
   SmallVector<StringRef> fieldsToSort;
   fieldsToSort.reserve(binding.getMembers().size());
 
   for (auto &[memberName, memberBinding] : binding.getMembers()) {
     assert(memberBinding.has_value());
     auto memberType = materializeTypeBinding(ctx, *memberBinding);
-    map[memberName] = memberType;
+    bool isColumn = false;
+    if (auto *cslot = mlir::dyn_cast_if_present<ComponentSlot>(memberBinding->getSlot())) {
+      isColumn = cslot->isColumn();
+    }
+    map[memberName] = {memberType, isColumn};
     fieldsToSort.push_back(memberName);
   }
 
   std::sort(fieldsToSort.begin(), fieldsToSort.end());
   for (auto field : fieldsToSort) {
-    types.push_back(map[field]);
+    types.push_back(map[field].first);
+    if (columns) {
+      columns->push_back(map[field].second);
+    }
   }
   fields.insert(fields.end(), fieldsToSort.begin(), fieldsToSort.end());
 }
@@ -217,6 +238,7 @@ void createPODComponent(
 ) {
   SmallVector<Type> argTypes;
   SmallVector<StringRef> fieldNames;
+  SmallVector<bool> columns;
 
   ComponentBuilder cb;
   auto loc = binding.getLocation();
@@ -225,12 +247,14 @@ void createPODComponent(
   auto superType = materializeTypeBinding(builder.getContext(), binding.getSuperType());
   argTypes = {superType};
   fieldNames = {"$super"};
+  columns = {false};
   argTypes.reserve(1 + binding.getMembers().size());
   fieldNames.reserve(1 + binding.getMembers().size());
+  columns.reserve(1 + binding.getMembers().size());
 
-  materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames);
-  for (auto [memberName, memberType] : llvm::zip_equal(fieldNames, argTypes)) {
-    cb.field(memberName, memberType);
+  materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames, &columns);
+  for (auto [memberName, memberType, isColumn] : llvm::zip_equal(fieldNames, argTypes, columns)) {
+    cb.field(memberName, memberType, isColumn);
   }
 
   if (!binding.getGenericParamNames().empty()) {
@@ -298,6 +322,7 @@ mlir::Value CtorCallBuilder::build(
       loc, compBinding.getName(), genericParams.size() - genericParams.sizeOfDeclared(), ctorType,
       isBuiltin
   );
+
   auto call = builder.create<mlir::func::CallIndirectOp>(loc, ref, args);
   Value compValue = call.getResult(0);
 

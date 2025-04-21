@@ -24,6 +24,7 @@
 #include <mlir/Interfaces/FunctionImplementation.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 
@@ -121,38 +122,52 @@ void SplitComponentOp::build(
 
 void ComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    mlir::ArrayRef<mlir::StringRef> typeParams, llvm::ArrayRef<mlir::NamedAttribute> attrs
+    mlir::ArrayRef<mlir::StringRef> typeParams, llvm::ArrayRef<mlir::NamedAttribute> attrs,
+    bool usesBackVariables
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().params = fillParams(builder, state, typeParams);
+  if (usesBackVariables) {
+    state.getOrAddProperties<Properties>().usesBackVariables = builder.getUnitAttr();
+  }
   state.addAttributes(attrs);
   state.addRegion();
 }
 
 void SplitComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    mlir::ArrayRef<mlir::StringRef> params, llvm::ArrayRef<mlir::NamedAttribute> attrs
+    mlir::ArrayRef<mlir::StringRef> params, llvm::ArrayRef<mlir::NamedAttribute> attrs,
+    bool usesBackVariables
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
   state.getOrAddProperties<Properties>().params = fillParams(builder, state, params);
+  if (usesBackVariables) {
+    state.getOrAddProperties<Properties>().usesBackVariables = builder.getUnitAttr();
+  }
   state.addAttributes(attrs);
   state.addRegion();
 }
 
 void ComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    llvm::ArrayRef<mlir::NamedAttribute> attrs
+    llvm::ArrayRef<mlir::NamedAttribute> attrs, bool usesBackVariables
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
+  if (usesBackVariables) {
+    state.getOrAddProperties<Properties>().usesBackVariables = builder.getUnitAttr();
+  }
   state.addAttributes(attrs);
   state.addRegion();
 }
 
 void SplitComponentOp::build(
     mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-    llvm::ArrayRef<mlir::NamedAttribute> attrs
+    llvm::ArrayRef<mlir::NamedAttribute> attrs, bool usesBackVariables
 ) {
   state.getOrAddProperties<Properties>().sym_name = builder.getStringAttr(name);
+  if (usesBackVariables) {
+    state.getOrAddProperties<Properties>().usesBackVariables = builder.getUnitAttr();
+  }
   state.addAttributes(attrs);
   state.addRegion();
 }

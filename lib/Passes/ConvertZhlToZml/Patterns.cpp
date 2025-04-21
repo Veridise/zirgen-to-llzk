@@ -43,7 +43,7 @@
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
-#include <zklang/Passes/ConvertZhlToZml/Helpers.h>
+#include <zklang/Dialect/ZML/Utils/Helpers.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
 #define DEBUG_TYPE "lower-zhl-pass"
@@ -254,6 +254,36 @@ mlir::LogicalResult ZhlParameterLowering::matchAndRewrite(
 ///////////////////////////////////////////////////////////
 /// ZhlConstrainLowering
 ///////////////////////////////////////////////////////////
+
+inline bool validArgCount(bool isVariadic, size_t argCount, size_t formalsCount) {
+  if (isVariadic) {
+    // For variadics it's only valid to have from formalsCount-1 arguments and onwards.
+    return argCount >= formalsCount - 1;
+  }
+  // For non variadics the number of arguments must be equal to the number of formals
+  return argCount == formalsCount;
+}
+
+mlir::ValueRange::iterator
+computeVarArgsSplice(mlir::ValueRange &args, mlir::ArrayRef<mlir::Type> constructorTypes) {
+  if (!isVariadic(constructorTypes)) {
+    return args.end();
+  }
+
+  // If the call does not have any varargs then there are less elements in `args` than there is in
+  // `constructorTypes`. This comparison is safe because the call has already been type checked by
+  // this point.
+  if (args.size() < constructorTypes.size()) {
+    return args.end();
+  }
+
+  // Compute how many arguments are var-args and substract that amount to the number of arguments to
+  // get the offset from args.begin() where the var-args start.
+  size_t C = constructorTypes.size();
+  assert(C > 0);
+  assert(C <= std::numeric_limits<ptrdiff_t>::max());
+  return std::next(args.begin(), static_cast<ptrdiff_t>(C) - 1);
+}
 
 mlir::LogicalResult ZhlConstrainLowering::matchAndRewrite(
     Zhl::ConstraintOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
@@ -700,14 +730,14 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
 
   ComponentBuilder builder;
   auto genericNames = name->getGenericParamNames();
+  auto paramLocations = name->getConstructorParamLocations();
+  auto ctorType = materializeTypeBindingConstructor(rewriter, *name, getTypeBindings());
+
   builder.name(name->getName())
       .location(op->getLoc())
       .attrs(op->getAttrs())
       .typeParams(genericNames)
-      .constructor(
-          materializeTypeBindingConstructor(rewriter, *name, getTypeBindings()),
-          name->getConstructorParamLocations()
-      )
+      .constructor(ctorType, paramLocations)
       .takeRegion(&op.getRegion());
   for (auto &[fieldName, binding] : name->getMembers()) {
     if (!binding.has_value()) {
@@ -1222,6 +1252,38 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
       regions.begin(), regions.end(), condsRange.begin(), block, block.end(), rewriter, retType
   );
   rewriter.replaceOp(op, execRegion);
+
+  return success();
+}
+
+LogicalResult ZhlBackLowering::matchAndRewrite(
+    Zhl::BackOp op, OpAdaptor, ConversionPatternRewriter &rewriter
+) const {
+  auto binding = getType(op);
+  if (failed(binding)) {
+    return op->emitError() << "failed to type check";
+  }
+
+  auto trgBinding = getType(op.getTarget());
+  if (failed(trgBinding)) {
+    return op->emitError() << "failed to type check target";
+  }
+  assert(trgBinding->getSlot());
+
+  auto distBinding = getType(op.getDistance());
+  if (failed(distBinding)) {
+    return op->emitError() << "failed to type check distance expression";
+  }
+
+  auto self = op->getParentOfType<SelfOp>();
+  assert(self);
+  auto *trgSlot = mlir::cast<ComponentSlot>(trgBinding->getSlot());
+  auto slotType = materializeTypeBinding(getContext(), trgSlot->getBinding());
+  auto dist = distBinding->getConstExpr()->convertIntoAttribute(rewriter);
+
+  rewriter.replaceOpWithNewOp<ReadBackOp>(
+      op, slotType, self.getSelfValue(), dist, trgSlot->getSlotName()
+  );
 
   return success();
 }

@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s | FileCheck --enable-var-scope %s
+// RUN: zklang -o - %s --print-debug-info=false | FileCheck --enable-var-scope %s
 
 component Foo(x: ExtVal, y: ExtVal) {
   ExtMul(x, y)
