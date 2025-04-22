@@ -24,11 +24,15 @@
 
 using namespace zml;
 
+static mlir::Location getLocationForBuiltin(mlir::OpBuilder &builder) {
+  return mlir::Location(mlir::FileLineColLoc::get(builder.getContext(), "preamble", 0, 0));
+}
+
 ComponentBuilder &builtinCommon(ComponentBuilder &builder) { return builder.isBuiltin(); }
 
 ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type) {
   return builder.fillBody({type}, {type}, [type](mlir::ValueRange args, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, type);
     // Construct Component superType
@@ -58,7 +62,7 @@ void addBinOpCommon(mlir::OpBuilder &builder, mlir::StringRef name, ComponentTyp
                     .fillBody(
                         {superType, superType}, {componentType},
                         [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
@@ -91,7 +95,7 @@ void addUnaryOpCommon(mlir::OpBuilder &builder, mlir::StringRef name, ComponentT
                     .fillBody(
                         {superType}, {componentType},
                         [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
@@ -125,7 +129,7 @@ void addInRange(mlir::OpBuilder &builder) {
                     .fillBody(
                         {superType, superType, superType}, {componentType},
                         [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
@@ -148,7 +152,7 @@ void addComponent(mlir::OpBuilder &builder) {
                     .fillBody(
                         args, {componentType},
                         [&componentType](mlir::ValueRange, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     auto op = bldr.create<SelfOp>(loc, componentType);
     bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({op}));
   }
@@ -166,7 +170,7 @@ void addNondetRegCommon(mlir::OpBuilder &builder, mlir::StringRef name, Componen
                     .fillBody(
                         {superType}, {componentType},
                         [&componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     bldr.create<WriteFieldOp>(loc, self, "reg", args[0]);
@@ -200,7 +204,7 @@ void addMakeExt(mlir::OpBuilder &builder) {
                     .fillBody(
                         {valType}, {componentType},
                         [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     auto ext = bldr.create<MakeExtOp>(loc, superType, args[0]);
@@ -225,7 +229,7 @@ void addEqzExt(mlir::OpBuilder &builder) {
                     .fillBody(
                         {valType}, {componentType},
                         [&superType, &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr) {
-    mlir::Location loc = bldr.getUnknownLoc();
+    mlir::Location loc = getLocationForBuiltin(bldr);
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     bldr.create<EqzExtOp>(loc, args[0]);

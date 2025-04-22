@@ -20,6 +20,7 @@ endmacro()
 macro(zklang_setup_options)
   option(ZKLANG_ENABLE_HARDENING "Enable hardening" ON)
   option(ZKLANG_ENABLE_COVERAGE "Enable coverage reporting" OFF)
+  option(ZKLANG_ENABLE_COLOR_DIAGNOSTICS "Enable colored diagnostics" ON)
   cmake_dependent_option(
     ZKLANG_ENABLE_GLOBAL_HARDENING
     "Attempt to push hardening options to built dependencies"
