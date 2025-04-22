@@ -1,0 +1,5 @@
+added:
+  Documentation:
+    - Added doxygen configuration and additional documentation
+  Logistics:
+    - Added github workflows for changelog valiation and release management
