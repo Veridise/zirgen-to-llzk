@@ -1,0 +1,19 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version to prepare"
+        required: true
+        type: string
+      checkout_from:
+        description: "Git ref to checkout from. It could be a branch, a tag or a commit hash"
+        required: true
+        type: string
+        default: main
+
+jobs:
+  call-workflow-prepare-release:
+    uses: Veridise/open-source-release-helpers/.github/workflows/prepare-release.yml@main
+    secrets: inherit
