@@ -136,19 +136,22 @@ mlir::Value ConstructorLowering<Op>::prepareArgument(
     mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto binding = this->getType(arg);
-  auto type = expectedType;
+  Type type = mlir::succeeded(binding) ? materializeTypeBinding(rewriter.getContext(), *binding)
+                                       : expectedType;
 
-  if (mlir::succeeded(binding)) {
-    type = materializeTypeBinding(rewriter.getContext(), *binding);
-  }
   if (arg.getType() == type) {
     return arg;
   }
+
   auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, type, arg);
-  if (expectedType == cast.getResult(0).getType()) {
-    return cast.getResult(0);
+  Value castResult = cast.getResult(0);
+  if (castResult.getType() == expectedType) {
+    return castResult;
   }
-  return rewriter.create<SuperCoerceOp>(loc, expectedType, cast.getResult(0));
+  if (mlir::isa<zml::TypeVarType>(type)) {
+    return rewriter.create<zml::UnifiableCastOp>(loc, expectedType, castResult);
+  }
+  return rewriter.create<SuperCoerceOp>(loc, expectedType, castResult);
 }
 
 template <typename Op>

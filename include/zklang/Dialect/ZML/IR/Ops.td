@@ -232,6 +232,16 @@ def NopOp : ZMLOp<"nop", [Pure]> {
   let hasCanonicalizeMethod = 1;
 }
 
+def LLZK_UnifiableCastOp : ZMLOp<"unifiable_cast", [Pure]> {
+  let arguments = (ins AnyZMLType:$input);
+
+  let results = (outs AnyZMLType:$result);
+
+  let assemblyFormat = [{
+    $input `:` functional-type($input, results) attr-dict
+  }];
+}
+
 def GlobalDefOp : ZMLOp<"global_decl", [HasParent<"::mlir::ModuleOp">]> {
   let summary = "declares a global component";
 

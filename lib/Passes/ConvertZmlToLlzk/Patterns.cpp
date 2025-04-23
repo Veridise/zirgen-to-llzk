@@ -173,6 +173,15 @@ LogicalResult LowerNopOp::matchAndRewrite(
   return success();
 }
 
+LogicalResult LowerUnifiableCastOp::matchAndRewrite(
+    UnifiableCastOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
+) const {
+  rewriter.replaceOpWithNewOp<llzk::UnifiableCastOp>(
+      op, getTypeConverter()->convertType(op.getType()), adaptor.getInput()
+  );
+  return success();
+}
+
 // Set of the builtins (by name) that are converted to a LLZK felt or a extended field element
 // representation. Used for shortcircuiting the lowering of SuperCoerceOp and for removing the calls
 // to @constrain that point to structs that get removed during lowering because the implementation

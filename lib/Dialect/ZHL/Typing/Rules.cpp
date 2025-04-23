@@ -121,10 +121,12 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       Meaning, any builtin that was not overriden and that will lower to a llzk operation that
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
-  if (operands[0].isBuiltin() && zml::isBuiltinDontNeedAlloc(operands[0].getName())) {
-    return interpretOp(op, operands[0], operands.drop_front());
+  const TypeBinding &baseOperand = operands[0];
+  if (baseOperand.isBuiltin() && zml::isBuiltinDontNeedAlloc(baseOperand.getName())) {
+    return interpretOp(op, baseOperand, operands.drop_front());
   }
-  auto component = interpretOp(op, operands[0], operands.drop_front());
+  TypeBinding component = interpretOp(op, baseOperand, operands.drop_front());
+
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
   // If we are constructing a component that needs backvariables then we need it in the caller as
   // well.
