@@ -67,7 +67,6 @@ in
     postConfigure = ''
       if [[ "$(uname)" == "Darwin" ]]; then
         export PATH=$OLD_PATH
-        # unset OLD_PATH
       fi
     '';
 

@@ -51,8 +51,7 @@ set(LLVM_TARGET_DEFINITIONS "${ZIRGEN_SRC}/zirgen/Dialect/ZHL/IR/Ops.td")
 mlir_tablegen(zirgen/Dialect/ZHL/IR/Ops.h.inc -gen-op-decls -I${ZIRGEN_SRC})
 mlir_tablegen(zirgen/Dialect/ZHL/IR/Ops.cpp.inc -gen-op-defs -I${ZIRGEN_SRC})
 
-# TODO: Adapt to this repo
-# llzk_add_mlir_doc(LLZKOpsDocGen Dialect.md -gen-dialect-doc -dialect=llzk)
+zklang_add_mlir_doc(ZhlOpsDocGen ZHLDialect.md -gen-dialect-doc -dialect=zhl -I${ZIRGEN_SRC})
 
 add_public_tablegen_target(ZHLDialectIncGen)
 add_dependencies(mlir-headers ZHLDialectIncGen)

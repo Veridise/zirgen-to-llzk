@@ -1,18 +1,16 @@
-#!/bin/bash 
+#!/bin/bash
 
 set -o nounset
 set -o pipefail
 
 # Script for testing what risc0 v2 circuit files compile properly.
 # The path is bounded to a location in my dev machine.
-# If you have access to the circuit and want to run it change the path 
+# If you have access to the circuit and want to run it change the path
 # to the location where you have it.
 
 CIRCUIT_PATH=$HOME/code/veridise/zir-benchmarks/rv32im-v2/
 KECCAK_PATH=$HOME/code/veridise/zir-benchmarks/keccak2/
 DEST=../risc0_v2_circuit_build_results/$(date +%Y-%m-%d-%H-%M)
-# BAZELFLAGS=--local_resources=cpu='HOST_CPUS*0.5' 
-BAZELFLAGS= 
 ZKLANG_FLAGS=
 DERIVATION='.?submodules=1#withGCC'
 
@@ -28,7 +26,7 @@ function run_zklang {
   nix run "$DERIVATION" -- $@
 }
 
-else 
+else
 
 function build_zklang {
   cmake --build build/Debug --target zklang
@@ -74,7 +72,7 @@ function build_zir {
   tail $stdout
   echo " ========== $name stderr =========="
   tail $stderr
-  
+
 }
 
 function build_project {
@@ -82,7 +80,7 @@ function build_project {
   workdir=$(realpath $2)
   dst=$(realpath $3)/$name
   mkdir -p $dst
-  for zir in $(zir_files $workdir); do 
+  for zir in $(zir_files $workdir); do
     build_zir $zir $workdir $dst
   done
 }

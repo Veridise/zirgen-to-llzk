@@ -20,7 +20,7 @@ set(LLVM_TARGET_DEFINITIONS "Ops.td")
 mlir_tablegen(Ops.h.inc -gen-op-decls)
 mlir_tablegen(Ops.cpp.inc -gen-op-defs)
 
-zklang_add_mlir_doc(ZmlDialectDocGen Dialect.md -gen-dialect-doc -dialect=zml)
+zklang_add_mlir_doc(ZmlDialectDocGen ZMLDialect.md -gen-dialect-doc -dialect=zml)
 
 add_public_tablegen_target(ZMLDialectIncGen)
 add_dependencies(mlir-headers ZMLDialectIncGen)

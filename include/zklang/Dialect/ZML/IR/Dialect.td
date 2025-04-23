@@ -19,7 +19,10 @@ include "mlir/IR/DialectBase.td"
 def ZMLDialect : Dialect {
   let name = "zml";
   let cppNamespace = "::zml";
-  let summary = "ZIR medium-level dialect";
+  let summary = "Zirgen medium-level dialect";
+  let description = [{
+    This dialect
+  }];
 
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;

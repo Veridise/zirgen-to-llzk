@@ -47,11 +47,21 @@ Notes:
 
 # Manual Build Setup
 
-LLZK requires the following to be installed:
+Zklang requires the following to be installed:
 
 * CMake 3.18 or newer
 * Ninja
 * Z3
+* LLZK library
+
+> ![WARNING]
+> The below instructions assume you have LLZK installed system-wide. To
+> reference a local installation, you will need to add the installation path
+> to the `CMAKE_MODULE_PATH` so that `find_package(LLZK)` in CMake will locate
+> the LLZK installation.
+
+Zklang also requires access to Veridise's fork of the Zirgen source code (located
+in [this repo][veridise-zirgen]).
 
 To optionally generate API documentation, you need:
 * Doxygen (tested on 1.10 and newer)
@@ -95,8 +105,8 @@ cmake ../llvm -GNinja -DCMAKE_BUILD_TYPE=Release \
   -DLLVM_ENABLE_EH=on \
   -DLLVM_ENABLE_ASSERTIONS=on \
   -DLLVM_ENABLE_Z3_SOLVER=on
-# Note that using llvm dylib will cause llzk to be linked to the built LLVM
-# dylib; if you'd like llzk to be used independent of the build folder, you
+# Note that using llvm dylib will cause zklang to be linked to the built LLVM
+# dylib; if you'd like zklang to be used independent of the build folder, you
 # should leave off the dylib settings.
 
 cmake --build .
@@ -109,7 +119,13 @@ popd # back to top level
 ln -sv $PWD/third-party/llvm-install-root ~/llvm-install-root-llzklib
 export INSTALL_ROOT=~/llvm-install-root-llzklib
 
-# Generate LLZK build configuration.
+# Clone the Veridise fork of the Zirgen source
+pushd third-party
+git clone https://github.com/Veridise/zirgen --depth 1 --revision 8e4eaa65a45f4b7c38bd672729e6e1a3ba9ae2a7
+export ZIRGEN_SRC=$(realpath zirgen)
+popd # back to top level
+
+# Generate zklang build configuration.
 # You can set BUILD_TESTING=off if you don't want to enable tests.
 mkdir build && cd build
 cmake .. -GNinja \
@@ -118,7 +134,7 @@ cmake .. -GNinja \
   -DMLIR_DIR="$INSTALL_ROOT"/lib/cmake/mlir \
   -DLLVM_EXTERNAL_LIT="$INSTALL_ROOT"/bin/lit \
   -DGTEST_ROOT="$INSTALL_ROOT" \
-  -DLLZK_BUILD_DEVTOOLS=ON
+  -DZIRGEN_SRC="$ZIRGEN_SRC"
 ```
 
 # Development Workflow {#dev-workflow}
@@ -149,3 +165,5 @@ like include paths, etc.
 |:------------------|----------------------------------:|
 | \ref overview | \ref tools |
 </div>
+
+[veridise-zirgen]: https://github.com/Veridise/zirgen
