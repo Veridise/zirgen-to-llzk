@@ -410,10 +410,14 @@ mlir::FailureOr<TypeBinding> ConstrainTypeRule::
     return op.emitError() << "constraint expression expects 2 operands, but got "
                           << operands.size();
   }
-  auto &lhs = operands[0];
-  auto &rhs = operands[1];
+  const TypeBinding &lhs = operands[0];
+  const TypeBinding &rhs = operands[1];
 
-  auto leastCommon = lhs.commonSupertypeWith(rhs);
+  TypeBinding leastCommon = lhs.commonSupertypeWith(rhs);
+  if (leastCommon.isGenericParam()) {
+    return interpretOp(op, leastCommon);
+  }
+
   if (leastCommon.isArray()) {
     auto leastCommonArray = leastCommon.getConcreteArrayType();
     if (mlir::failed(leastCommonArray)) {
@@ -422,7 +426,8 @@ mlir::FailureOr<TypeBinding> ConstrainTypeRule::
     }
     return interpretOp(op, *leastCommonArray);
   }
-  auto &Val = getBindings().Get("Val");
+
+  const TypeBinding &Val = getBindings().Get("Val");
   if (succeeded(leastCommon.subtypeOf(Val))) {
     return interpretOp(op, Val);
   }
