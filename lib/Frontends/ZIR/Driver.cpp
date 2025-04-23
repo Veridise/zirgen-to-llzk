@@ -169,6 +169,13 @@ Driver::Driver(int &argc, char **&argv)
 
 void Driver::configureLoweringPipeline() {
   pm.clear();
+  if (emitAction == Action::PrintZHL) {
+    if (stripDebugInfo) {
+      pm.addPass(mlir::createStripDebugInfoPass());
+    }
+    return;
+  }
+
   if (emitAction >= Action::PrintLlzk || emitAction == Action::None) {
     pm.addPass(zklang::createInjectLlzkModAttrsPass());
   }
@@ -309,11 +316,6 @@ LogicalResult Driver::run() {
     return failure();
   }
   ModuleEraseGuard guard(*mod);
-  if (emitAction == Action::PrintZHL) {
-    dst.writeModule(*mod);
-    return success();
-  }
-
   configureLoweringPipeline();
   pm.dump();
   if (failed(pm.run(*mod))) {
