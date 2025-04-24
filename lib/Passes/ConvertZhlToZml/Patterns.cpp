@@ -135,15 +135,15 @@ mlir::Value ConstructorLowering<Op>::prepareArgument(
     mlir::Value arg, mlir::Type expectedType, mlir::Location loc,
     mlir::ConversionPatternRewriter &rewriter
 ) const {
+  if (arg.getType() == expectedType) {
+    return arg;
+  }
+
   auto binding = this->getType(arg);
   Type type = mlir::succeeded(binding) ? materializeTypeBinding(rewriter.getContext(), *binding)
                                        : expectedType;
 
-  if (arg.getType() == type) {
-    return arg;
-  }
-
-  auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, type, arg);
+  auto cast = rewriter.create<UnrealizedConversionCastOp>(loc, type, arg);
   Value castResult = cast.getResult(0);
   if (castResult.getType() == expectedType) {
     return castResult;
