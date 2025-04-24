@@ -139,6 +139,20 @@ mlir::Value ConstructorLowering<Op>::prepareArgument(
     return arg;
   }
 
+  // If the input arg is an UnrealizedConversionCastOp and the expected type is a superclass of the
+  // cast's input type, then generate a SuperCoerceOp directly on the input arg of the cast.
+  if (auto argCast = mlir::dyn_cast<UnrealizedConversionCastOp>(arg.getDefiningOp())) {
+    Operation::operand_range castInputs = argCast.getInputs();
+    if (castInputs.size() == 1) {
+      Value singleInput = castInputs[0];
+      if (auto inpCompType = mlir::dyn_cast<ComponentType>(singleInput.getType())) {
+        if (inpCompType.subtypeOf(expectedType)) {
+          return rewriter.create<SuperCoerceOp>(loc, expectedType, singleInput);
+        }
+      }
+    }
+  }
+
   auto binding = this->getType(arg);
   Type type = mlir::succeeded(binding) ? materializeTypeBinding(rewriter.getContext(), *binding)
                                        : expectedType;
