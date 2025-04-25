@@ -314,7 +314,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     return copy;
   };
 
-  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Type checking op " << op << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Type checking op " << op << '\n');
   auto decl = getDeclaration(op);
   if (mlir::failed(decl)) {
     return op->emitError() << "malformed IR: Definition must have a declaration operand";
@@ -348,14 +348,14 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     } else {
       LLVM_DEBUG(
           llvm::dbgs() << "Allocating a new slot '" << decl->getMember() << "' for type " << binding
-                       << "\n"
+                       << '\n'
       );
       auto copy = copyWithoutSlot(binding);
       auto *slot = scope.getCurrentFrame().allocateSlot<ComponentSlot>(
           getBindings(), copy, decl->getMember()
       );
       (void)slot;
-      LLVM_DEBUG(llvm::dbgs() << "Created a new slot " << slot << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Created a new slot " << slot << '\n');
       return copy;
     }
   };
@@ -762,19 +762,20 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
   if (regionScopes.size() != 1) {
     return op->emitError() << "was expecting to have only one region";
   }
-
-  if (!operands[0].isArray()) {
-    return op->emitOpError() << "was expecting a array as input. Got '" << operands[0].getName()
-                             << "'";
+  if (operands.size() != 1) {
+    return op->emitError() << "was expecting to have only one operand";
   }
-  auto arrayLen = operands[0].getArraySize([&] { return op->emitError(); });
+  TypeBinding operandBinding = operands[0];
+  if (!operandBinding.isArray()) {
+    return op->emitOpError() << "was expecting array as input. Got '" << operandBinding.getName()
+                             << '\'';
+  }
+  auto arrayLen = operandBinding.getArraySize([&] { return op->emitError(); });
   if (failed(arrayLen)) {
     return failure();
   }
-
   assert(arrayLen->isConst() || arrayLen->hasConstExpr());
 
-  assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
   if (failed(super)) {
     return op->emitOpError() << "failed to deduce the super type";
@@ -784,7 +785,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
   if (auto slot = scope.getCurrentFrame().getParentSlot()) {
     if (auto compSlot = dyn_cast<ComponentSlot>(slot)) {
       LLVM_DEBUG(
-          llvm::dbgs() << "Setting binding  of slot " << compSlot << " to " << binding << "\n"
+          llvm::dbgs() << "Setting binding  of slot " << compSlot << " to " << binding << '\n'
       );
       // Is a component slot so we change the type
       compSlot->setBinding(binding);
@@ -800,7 +801,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
       arrayFrame->setSize(*arrayLen);
     }
   } else {
-    LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << '\n');
   }
   return binding;
 }
