@@ -239,36 +239,59 @@ FailureOr<TypeBinding> TypeBinding::getMember(StringRef memberName, EmitErrorFn 
   return **memberLookupRes;
 }
 
-mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
-  if (!isArray()) {
+FailureOr<TypeBinding> TypeBinding::map(Params params, EmitErrorFn emitError) const {
+  if (isGenericParam() && params.contains(getGenericParamName())) {
+    auto result = params[getGenericParamName()];
+    if (!result) {
+      return emitError() << "parameter '" << getGenericParamName() << "' not found";
+    }
+    return *result;
+  }
+  if (hasConstExpr()) {
+    auto replacement = constExpr.remap(params, emitError);
+    if (failed(replacement)) {
+      return failure();
+    }
+    return WithExpr(*this, *replacement);
+  }
+  return *this;
+}
+
+static FailureOr<TypeBinding>
+maybeMap(FailureOr<TypeBinding> binding, Params params, EmitErrorFn emitError) {
+  if (failed(binding)) {
+    return binding;
+  }
+  return binding->map(params, emitError);
+}
+
+static mlir::FailureOr<TypeBinding>
+getArrayProperty(size_t idx, EmitErrorFn emitError, const TypeBinding &binding) {
+  auto name = binding.getName();
+  auto params = binding.getGenericParamsMapping();
+  if (!binding.isArray()) {
     return emitError() << "non array type '" << name << "' cannot be subscripted";
   }
   // A component with an array super type can behave like an array but it doesn't have all the
   // information required. In that case we defer the answer to the super type.
   if (name != "Array") {
-    if (!hasSuperType()) {
+    if (!binding.hasSuperType()) {
       return failure();
     }
-    return getSuperType().getArrayElement(emitError);
+    // Get the property from the parent and adapt it to this context.
+    return maybeMap(getArrayProperty(idx, emitError, binding.getSuperType()), params, emitError);
   }
-  assert(getGenericParamsMapping().size() == 2);
-  return getGenericParamsMapping().getParam(0);
+  assert(params.size() == 2);
+  auto &prop = params.getParam(idx);
+  return params.getParam(idx);
+}
+
+mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
+  return getArrayProperty(0, emitError, *this);
 }
 
 mlir::FailureOr<TypeBinding> TypeBinding::getArraySize(EmitErrorFn emitError) const {
-  if (!isArray()) {
-    return emitError() << "non array type '" << name << "' cannot be subscripted";
-  }
-  // A component with an array super type can behave like an array but it doesn't have all the
-  // information required. In that case we defer the answer to the super type.
-  if (name != "Array") {
-    if (!hasSuperType()) {
-      return failure();
-    }
-    return getSuperType().getArraySize(emitError);
-  }
-  assert(getGenericParamsMapping().size() == 2);
-  return getGenericParamsMapping().getParam(1);
+  return getArrayProperty(1, emitError, *this);
 }
 
 FailureOr<TypeBinding> TypeBinding::getConcreteArrayType() const {

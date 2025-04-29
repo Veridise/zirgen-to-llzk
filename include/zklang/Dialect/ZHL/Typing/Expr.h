@@ -25,6 +25,7 @@
 #include <mlir/IR/Attributes.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
 
 namespace llvm {
 class raw_ostream;
@@ -36,6 +37,8 @@ class Builder;
 } // namespace mlir
 
 namespace zhl::expr {
+
+using EmitErrorFn = llvm::function_ref<mlir::InFlightDiagnostic()>;
 
 class ConstExpr;
 class SimpleExprView;
@@ -72,6 +75,11 @@ public:
 
   /// Collects all the free symbols in the expression.
   virtual void collectFreeSymbols(llvm::StringSet<> &) const = 0;
+
+  /// Remaps the free symbols in the expression to other expressions and returns
+  /// the replaced expression. Matching TypeBindings must have a const expression.
+  /// if that is not the case this method returns nullptr.
+  virtual ExprBase *remap(Params, EmitErrorFn) const = 0;
 
   /// Wrap the expression into a simple view without lifetime considerations.
   operator SimpleExprView() const;
@@ -169,7 +177,11 @@ public:
 
   /// Constructs by adopting the shared pointer the view is referencing to. If the view is invalid
   /// will construct a falsey object.
-  ConstExpr(const View &view) : expr(view.view.lock()){};
+  ConstExpr(const View &view) : expr(view.view.lock()) {};
+
+  /// Remaps the inner expression using the given parameters. If the replacement fails
+  /// returns `mlir::failure()`.
+  mlir::FailureOr<ConstExpr> remap(Params, EmitErrorFn) const;
 
   /// Returns a pointer to the underlying expression.
   const detail::ExprBase *get() const override { return expr.get(); }
@@ -242,6 +254,8 @@ public:
 
   void collectFreeSymbols(llvm::StringSet<> &) const override {}
 
+  ExprBase *remap(Params, EmitErrorFn) const override;
+
   uint64_t getValue() const { return value; }
 
 private:
@@ -261,6 +275,8 @@ public:
   mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
 
   void collectFreeSymbols(llvm::StringSet<> &symbols) const override { symbols.insert(name); }
+
+  ExprBase *remap(Params, EmitErrorFn) const override;
 
   mlir::StringRef getName() const { return name; }
 
@@ -284,6 +300,10 @@ public:
     using value_type = ExprBase *;
     using reference = ArgsList::reference;
 
+    /// Clones the given expressions used as arguments.
+    Arguments(mlir::SmallVectorImpl<value_type> &);
+    /// Adopts ownership of the given expressions used as arguments. Cannot have null values in the
+    /// vector.
     Arguments(mlir::SmallVectorImpl<value_type> &&);
     Arguments(const Arguments &);
     Arguments &operator=(const Arguments &);
@@ -314,6 +334,8 @@ public:
   mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
   mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
   void collectFreeSymbols(llvm::StringSet<> &) const override;
+
+  ExprBase *remap(Params, EmitErrorFn) const override;
 
   Arguments &arguments() { return args; }
   const Arguments &arguments() const { return args; }

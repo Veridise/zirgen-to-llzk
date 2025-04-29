@@ -774,7 +774,15 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
   if (failed(arrayLen)) {
     return failure();
   }
-  assert(arrayLen->isConst() || arrayLen->hasConstExpr());
+  if (!(arrayLen->isConst() || arrayLen->hasConstExpr())) {
+    return op->emitError() << "was expecting a known compile time constant array size but got '"
+                           << *arrayLen << "'";
+  }
+
+  // We need to adapt the length to the context.
+  // We should know the mapping between the parameter N of the array and the context.
+  // We need to obtain all the parameters from the expression and rewrite them to the ones
+  // that specialized the type.
 
   auto super = regionScopes[0]->getSuperType();
   if (failed(super)) {
@@ -782,26 +790,27 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
   }
 
   auto binding = interpretOp(op, getBindings().Array(*super, *arrayLen, op.getLoc()));
-  if (auto slot = scope.getCurrentFrame().getParentSlot()) {
-    if (auto compSlot = dyn_cast<ComponentSlot>(slot)) {
-      LLVM_DEBUG(
-          llvm::dbgs() << "Setting binding  of slot " << compSlot << " to " << binding << '\n'
-      );
-      // Is a component slot so we change the type
-      compSlot->setBinding(binding);
-    } else {
-      LLVM_DEBUG(
-          llvm::dbgs() << "Marking binding " << binding << " with slot " << slot
-                       << " (name = " << slot->getSlotName() << ")\n"
-      );
-      // Any other slot simply gets forwarded
-      binding.markSlot(slot);
-    }
-    if (auto *arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
-      arrayFrame->setSize(*arrayLen);
-    }
-  } else {
+  auto slot = scope.getCurrentFrame().getParentSlot();
+  if (!slot) {
     LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << '\n');
+    return binding;
+  }
+  if (auto compSlot = dyn_cast<ComponentSlot>(slot)) {
+    LLVM_DEBUG(
+        llvm::dbgs() << "Setting binding  of slot " << compSlot << " to " << binding << '\n'
+    );
+    // Is a component slot so we change the type
+    compSlot->setBinding(binding);
+  } else {
+    LLVM_DEBUG(
+        llvm::dbgs() << "Marking binding " << binding << " with slot " << slot
+                     << " (name = " << slot->getSlotName() << ")\n"
+    );
+    // Any other slot simply gets forwarded
+    binding.markSlot(slot);
+  }
+  if (auto *arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
+    arrayFrame->setSize(*arrayLen);
   }
   return binding;
 }

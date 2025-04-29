@@ -28,6 +28,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
@@ -638,10 +639,15 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
     auto &values = mapOperandsMem[idx];
     for (uint64_t formal : constExpr.getFormals()) {
       assert(formal <= std::numeric_limits<unsigned int>::max());
-      assert(
-          static_cast<unsigned int>(formal) < compParams.size() &&
-          "Can only use as map operands declared parameters"
-      );
+      /*assert(*/
+      /*    static_cast<unsigned int>(formal) < compParams.size() &&*/
+      /*    "Can only use as map operands declared parameters"*/
+      /*);*/
+      if (static_cast<unsigned int>(formal) >= compParams.size()) {
+        return op->emitError() << "requested parameter #" << formal
+                               << ", but component in scope only has " << compParams.size()
+                               << " parameters";
+      }
       values.push_back(
           materializeParam(compParams[static_cast<unsigned int>(formal)], rewriter, op->getLoc())
       );

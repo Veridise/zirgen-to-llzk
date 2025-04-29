@@ -368,6 +368,10 @@ public:
     getGenericParamsMapping().replaceParam(paramName, binding);
   }
 
+  /// If this matches a parameter in the given set returns the associated binding. Otherwise returns
+  /// a copy of itself.
+  mlir::FailureOr<TypeBinding> map(Params, EmitErrorFn) const;
+
   //==---------------------------------------------------------------------==//
   // Constructor perameters
   //==---------------------------------------------------------------------==//

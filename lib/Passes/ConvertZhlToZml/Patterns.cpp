@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/CommandLine.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -22,6 +23,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/Region.h>
 #include <mlir/IR/ValueRange.h>
@@ -704,20 +706,14 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   }
   auto elementType = materializeTypeBinding(getContext(), *elementTypeBinding);
 
-  llvm::SmallVector<FailureOr<TypeBinding>, 1> argBindings;
-  std::transform(
-      op.getElements().begin(), op.getElements().end(), std::back_inserter(argBindings),
-      [&](auto element) { return getType(element); }
-  );
-
-  if (std::any_of(argBindings.begin(), argBindings.end(), failed)) {
-    return op->emitOpError() << "failed to type check array values";
-  }
-
   if (adaptor.getElements().empty()) {
-    assert(false && "TODO");
+    return op->emitOpError() << "cannot be an empty array literal";
+  }
+  llvm::SmallVector<FailureOr<TypeBinding>, 1> argBindings =
+      llvm::map_to_vector(op.getElements(), [this](auto element) { return getType(element); });
 
-    return mlir::failure();
+  if (llvm::any_of(argBindings, failed)) {
+    return op->emitOpError() << "failed to type check array values";
   }
 
   llvm::SmallVector<mlir::Value> args;
@@ -888,7 +884,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), outputType);
   auto one = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
   auto zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *arrValue);
+  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *concreteArrValue);
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
