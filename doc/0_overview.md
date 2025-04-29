@@ -11,7 +11,7 @@ circuit languages.
 The Zklang repo consists of two main components:
 
 1. **`zklang`**, the frontend compiler which translates Zirgen circuit source code into MLIR dialects.
-2. **`zklang-opt`**, and `mlir-opt`-style tool which can be used to manipulate the MLIR dialects produced by `zklang`.
+2. **`zklang-opt`**, an `mlir-opt`-style tool which can be used to manipulate the MLIR dialects produced by `zklang`.
 
 The general workflow of using `zklang` is as follows:
 1. Translate the source language into LLZK IR using `zklang`.
