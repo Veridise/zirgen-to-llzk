@@ -282,7 +282,6 @@ getArrayProperty(size_t idx, EmitErrorFn emitError, const TypeBinding &binding) 
     return maybeMap(getArrayProperty(idx, emitError, binding.getSuperType()), params, emitError);
   }
   assert(params.size() == 2);
-  auto &prop = params.getParam(idx);
   return params.getParam(idx);
 }
 
