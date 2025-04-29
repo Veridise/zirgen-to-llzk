@@ -114,7 +114,7 @@ ConstExpr ConstExpr::Ctor(StringRef name, ArrayRef<ConstExpr> args) {
 mlir::FailureOr<ConstExpr> ConstExpr::remap(Params params, EmitErrorFn emitError) const {
   // If this pointer is "null" return a null pointer as well.
   if (!expr) {
-    return ConstExpr();
+    return ConstExpr(nullptr);
   }
 
   auto *replacement = expr->remap(params, emitError);
