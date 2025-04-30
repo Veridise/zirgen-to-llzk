@@ -50,7 +50,7 @@ private:
   Type materializeImpl(const TypeBinding &binding) {
     checkCycle(binding);
 
-    Type base = materializeBaseType(binding);
+    auto base = materializeBaseType(binding);
 
     seen.pop_back();
     if (binding.isVariadic()) {

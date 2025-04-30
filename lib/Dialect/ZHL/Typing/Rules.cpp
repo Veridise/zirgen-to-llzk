@@ -766,10 +766,6 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return op->emitError() << "was expecting to have only one operand";
   }
   TypeBinding operandBinding = operands[0];
-  if (!operandBinding.isArray()) {
-    return op->emitOpError() << "was expecting array as input. Got '" << operandBinding.getName()
-                             << '\'';
-  }
   auto arrayLen = operandBinding.getArraySize([&] { return op->emitError(); });
   if (failed(arrayLen)) {
     return failure();
@@ -778,11 +774,6 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return op->emitError() << "was expecting a known compile time constant array size but got '"
                            << *arrayLen << "'";
   }
-
-  // We need to adapt the length to the context.
-  // We should know the mapping between the parameter N of the array and the context.
-  // We need to obtain all the parameters from the expression and rewrite them to the ones
-  // that specialized the type.
 
   auto super = regionScopes[0]->getSuperType();
   if (failed(super)) {

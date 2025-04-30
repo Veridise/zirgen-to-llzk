@@ -126,7 +126,6 @@ public:
   /// Convert the viewed expression into a managed expression. How this is achieved is
   /// implementation specific.
   virtual operator ConstExpr() const = 0;
-  /*virtual operator mlir::FailureOr<ConstExpr>() const = 0;*/
 
   /// Returns a pointer to the viewed expression.
   virtual const detail::ExprBase *get() const = 0;
@@ -157,9 +156,6 @@ public:
     /// If the view is valid creates a ConstExpr that shares the pointer with other ConstExpr
     /// instances. If the view is not valid returns a falsey ConstExpr.
     operator ConstExpr() const override { return ConstExpr(*this); }
-    /*operator mlir::FailureOr<ConstExpr>() const override {*/
-    /*  return mlir::FailureOr(ConstExpr(*this));*/
-    /*}*/
 
   private:
     std::weak_ptr<detail::ExprBase> view;
@@ -202,8 +198,6 @@ public:
 
   /// Trivially copies itself.
   operator ConstExpr() const override { return *this; }
-  /*operator mlir::FailureOr<ConstExpr>() const override { return mlir::FailureOr(ConstExpr(*this));
-   * }*/
 
 private:
   explicit ConstExpr(detail::ExprBase *ptr) : expr(ptr) {}
@@ -227,10 +221,6 @@ public:
 
   /// Clone the viewed expression and wrap it.
   operator ConstExpr() const override { return ConstExpr(*arg); }
-
-  /// Clone the viewed expression and wrap it.
-  /*operator mlir::FailureOr<ConstExpr>() const override { return mlir::FailureOr(ConstExpr(*arg));
-   * }*/
 
 private:
   const detail::ExprBase *arg;
@@ -407,9 +397,6 @@ public:
   /// Delegates the convertion to ConstExpr to the inner view. Returns a falsey ConstExpr object if
   /// the view is null.
   operator ConstExpr() const override { return view ? ConstExpr(*view) : ConstExpr(); }
-  /*operator mlir::FailureOr<ConstExpr>() const override {*/
-  /*  return mlir::FailureOr(view ? ConstExpr(*view) : ConstExpr());*/
-  /*}*/
 
 private:
   const ExprView *view;
@@ -446,8 +433,6 @@ public:
 
   /// Returns a copy of the underlying ConstExpr object.
   operator ConstExpr() const override { return expr; }
-  /*operator mlir::FailureOr<ConstExpr>() const override { return mlir::FailureOr(ConstExpr(expr));
-   * }*/
 
   const detail::ExprBase *base() const override { return expr.get(); }
 

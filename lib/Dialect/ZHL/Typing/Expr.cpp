@@ -165,8 +165,6 @@ ExprBase *Symbol::remap(Params params, EmitErrorFn emitError) const {
   auto *binding = params[name];
   if (!binding) {
     return clone();
-    /*emitError() << "parameter '" << name << "' not found";*/
-    /*return nullptr;*/
   }
   if (!binding->hasConstExpr()) {
     emitError() << "was expecting a constant expression but got '" << *binding << "'";
