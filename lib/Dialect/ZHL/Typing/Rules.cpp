@@ -771,7 +771,7 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
     return failure();
   }
   if (!(arrayLen->isConst() || arrayLen->hasConstExpr())) {
-    return op->emitError() << "was expecting a known compile time constant array size but got '"
+    return op->emitError() << "was expecting a known compile-time constant array size but got '"
                            << *arrayLen << "'";
   }
 

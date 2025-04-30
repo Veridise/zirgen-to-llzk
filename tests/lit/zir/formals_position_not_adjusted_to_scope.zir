@@ -1,6 +1,6 @@
 // RUN: zklang -o - %s --emit=zml | FileCheck %s
 
-// COM: Checks that the array super type of Foo correctly adapts it's length
+// COM: Checks that the array super type of Foo correctly adapts its length
 // COM: parameter when used in an outer scope. In this case the length is 
 // COM: determined by Foo's N parameter, but in the outer scope is determined 
 // COM: by Bar's M parameter. These parameters have different positions and 

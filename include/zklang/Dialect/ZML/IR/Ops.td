@@ -232,7 +232,7 @@ def NopOp : ZMLOp<"nop", [Pure]> {
   let hasCanonicalizeMethod = 1;
 }
 
-def LLZK_UnifiableCastOp : ZMLOp<"unifiable_cast", [Pure]> {
+def UnifiableCastOp : ZMLOp<"unifiable_cast", [Pure]> {
   let arguments = (ins AnyZMLType:$input);
 
   let results = (outs AnyZMLType:$result);
