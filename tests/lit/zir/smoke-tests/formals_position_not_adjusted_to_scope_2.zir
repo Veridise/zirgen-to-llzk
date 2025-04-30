@@ -1,3 +1,4 @@
+// RUN: zklang -o - %s
 component Pegs<N: Val>(pegs: Array<Val, N>) {
   for peg : pegs { Reg(peg) }
 }

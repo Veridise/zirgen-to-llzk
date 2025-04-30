@@ -1,0 +1,28 @@
+// RUN: zklang -o - %s --emit=zml | FileCheck %s
+
+// COM: Checks that the array super type of Foo correctly adapts it's length
+// COM: parameter when used in an outer scope. In this case the length is 
+// COM: determined by Foo's N parameter, but in the outer scope is determined 
+// COM: by Bar's M parameter. These parameters have different positions and 
+// COM: needs to be adjusted. 
+// COM: The crash happened because that array type would be used to create
+// COM: another array where the result of the map expression is stored and 
+// COM: since Bar only has one (generic) formal the generated operation would 
+// COM: have a formal position out of bounds.
+
+component Foo<Dummy: Val, N: Val>() {
+  for i : 0..N { Reg(i) }
+}
+
+component Bar<M: Val>() {
+// CHECK-LABEL: zml.component @Bar 
+//       CHECK: %{{[0-9a-zA-Z_\.]+}} = zml.alloc_array :
+//  CHECK-SAME:     <@Array true<
+//  CHECK-SAME:         !zml.comp<@Mul true : 
+//  CHECK-SAME:            !zml.comp<@Val true : !zml.comp<@Component true>>
+//  CHECK-SAME:         >, #zml.cexpr<()[s0] -> (s0), formals = 0>
+//  CHECK-SAME:     > : !zml.comp<@Component true>>
+  for i: Foo<1, M>() {
+    i * 10
+  }
+}

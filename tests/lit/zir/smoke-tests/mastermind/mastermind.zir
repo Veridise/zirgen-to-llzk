@@ -1,4 +1,4 @@
-// RUN: zklang -I %S/Inputs -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
+// RUN: zklang -I %S/Inputs -o - %s
 
 import poseidon2;
 

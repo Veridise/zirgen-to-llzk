@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s | FileCheck %s
+// RUN: not zklang -o - %s | FileCheck %s
 // XFAIL: *
 
 component ValU32(low: Val, high: Val) {
@@ -19,7 +19,7 @@ component A() {
 }
 
 component Top() {
-  // error: Attempt to change type of global "a"
+// CHECK: error: Attempt to change type of global "a"
   global a : DigestReg;
   A();
 }

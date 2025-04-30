@@ -1,9 +1,0 @@
-component Foo<Dummy: Val, N: Val>() {
-  for i : 0..N { Reg(i) }
-}
-
-component Bar<M: Val>() {
-  for i: Foo<1, M>() {
-    i * 10
-  }
-}
