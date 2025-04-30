@@ -1,5 +1,4 @@
-// RUN: not zklang -o - %s | FileCheck %s
-// XFAIL: *
+// RUN: not zklang -o - %s 2>&1 | FileCheck %s
 
 component ValU32(low: Val, high: Val) {
   public low := low;
