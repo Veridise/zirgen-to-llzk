@@ -177,7 +177,7 @@ public:
 
   /// Constructs by adopting the shared pointer the view is referencing to. If the view is invalid
   /// will construct a falsey object.
-  ConstExpr(const View &view) : expr(view.view.lock()) {};
+  ConstExpr(const View &view) : expr(view.view.lock()) {}
 
   /// Remaps the inner expression using the given parameters. If the replacement fails
   /// returns `mlir::failure()`.
