@@ -369,11 +369,12 @@ public:
   }
 
   /// If this matches a parameter in the given set returns the associated binding. Otherwise returns
-  /// a copy of itself.
+  /// a copy of itself. Returns failure() if the type binding is a const expression and its
+  /// internal mapping failed.
   mlir::FailureOr<TypeBinding> map(Params, EmitErrorFn) const;
 
   //==---------------------------------------------------------------------==//
-  // Constructor perameters
+  // Constructor parameters
   //==---------------------------------------------------------------------==//
 
   /// Returns a view of the constructor parameters.
