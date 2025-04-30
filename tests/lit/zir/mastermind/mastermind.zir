@@ -114,15 +114,15 @@ component MakeGuess<COLORS: Val, PEGS: Val>(nonce: Nonce, pegs: Pegs<PEGS>, hash
   code := SetCode<COLORS, PEGS>(nonce, pegs);
   AssertArrsEq<Val, 24>(hash, code);
 
-  correct := reduce for p : Zip<Val, Val, PEGS>(pegs, guess) { IsZero(p.fst - p.snd) } init 0 with Add;
-  Log("Correct guesses: %u", correct);
-  partial := (reduce for c : 0..COLORS {
+  correctGuesses := reduce for p : Zip<Val, Val, PEGS>(pegs, guess) { IsZero(p.fst - p.snd) } init 0 with Add;
+  Log("Correct guesses: %u", correctGuesses);
+  partialGuesses := (reduce for c : 0..COLORS {
     guessCount := CountColors<PEGS>(guess, c);
     pegsCount := CountColors<PEGS>(pegs, c);
     Minimum(guessCount, pegsCount)
-  } init 0 with Add) - correct;
-  Log("Partial guesses: %u", partial);
-  Guess(correct, partial)
+  } init 0 with Add) - correctGuesses;
+  Log("Partial guesses: %u", partialGuesses);
+  Guess(correctGuesses, partialGuesses)
 }
 
 

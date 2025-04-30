@@ -18,6 +18,7 @@
 #include <llzk/Dialect/LLZK/IR/Types.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/IR/Attributes.h>
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
@@ -152,7 +153,54 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
   });
 
   addSourceMaterialization(unrealizedCastMaterialization);
+  addSourceMaterialization(
+      [this](
+          OpBuilder &builder, Type type, ValueRange inputs, Location loc
+      ) -> std::optional<Value> {
+    if (inputs.size() != 1) {
+      return std::nullopt;
+    }
+
+    auto inputType = inputs[0].getType();
+    auto convertedTarget = convertType(type);
+    if (!convertedTarget) {
+      return std::nullopt;
+    }
+    if (inputType == convertedTarget) {
+      return unrealizedCastMaterialization(builder, type, inputs, loc);
+    }
+    if (llzk::typesUnify(inputType, convertedTarget)) {
+      auto unifyCast = builder.create<llzk::UnifiableCastOp>(loc, convertedTarget, inputs[0]);
+      return unrealizedCastMaterialization(builder, type, unifyCast.getResult(), loc);
+    }
+    return std::nullopt;
+  }
+  );
   addTargetMaterialization(unrealizedCastMaterialization);
+  addTargetMaterialization(
+      [this](
+          OpBuilder &builder, Type type, ValueRange inputs, Location loc
+      ) -> std::optional<Value> {
+    if (inputs.size() != 1) {
+      return std::nullopt;
+    }
+
+    auto convertedInput = convertType(inputs[0].getType());
+    if (!convertedInput) {
+      return std::nullopt;
+    }
+    if (convertedInput == type) {
+      return unrealizedCastMaterialization(builder, type, inputs, loc);
+    }
+    if (llzk::typesUnify(convertedInput, type)) {
+      auto cast = unrealizedCastMaterialization(builder, convertedInput, inputs, loc);
+      if (cast.has_value()) {
+        return builder.create<llzk::UnifiableCastOp>(loc, type, *cast);
+      }
+    }
+    return std::nullopt;
+  }
+  );
   addArgumentMaterialization(unrealizedCastMaterialization);
 }
 

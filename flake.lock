@@ -46,16 +46,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1744824382,
-        "narHash": "sha256-Zn2b2de8w8qBf1yW0OxtEtjMq2ufPki0f/o+vHkxSes=",
-        "ref": "main",
-        "rev": "88bb1a8565839b09c4f99c71149832b9c5d8c073",
-        "revCount": 173,
+        "lastModified": 1745940977,
+        "narHash": "sha256-G7fREjeD/fPmxLZ1nda0ILgXLcSrps4bUt67IPjLKuE=",
+        "ref": "dani/reenable-dynamic-size-arrays",
+        "rev": "04eaa38b04e0349b8b44b90fe02fd599a0cd0acb",
+        "revCount": 175,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
       "original": {
-        "ref": "main",
+        "ref": "dani/reenable-dynamic-size-arrays",
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       }
