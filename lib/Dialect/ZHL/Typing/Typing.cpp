@@ -217,15 +217,13 @@ private:
   }
 
   FailureOr<TypeBinding> typeCheckValue(Value v, Scope &scope) {
-    auto op = v.getDefiningOp();
-    if (op) {
+    if (Operation *op = v.getDefiningOp()) {
       return typeCheckOp(op, scope);
-    } else {
-      if (getBindings().containsValue(v)) {
-        return getBindings().getValue(v);
-      }
-      return failure();
     }
+    if (getBindings().containsValue(v)) {
+      return getBindings().getValue(v);
+    }
+    return failure();
   }
 
   FailureOr<TypeBinding>

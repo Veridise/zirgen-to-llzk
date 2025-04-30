@@ -573,23 +573,23 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto comp = adaptor.getComponent();
-  LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << '\n');
   auto originalComp = getType(op.getComponent());
   if (mlir::failed(originalComp)) {
     return op->emitOpError() << "failed to type check component reference";
   }
-  LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << "\n";
+  LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << '\n';
              llvm::dbgs() << "Full printout: \n"; originalComp->print(llvm::dbgs(), true);
-             llvm::dbgs() << "\n");
+             llvm::dbgs() << '\n');
   auto materializedType = materializeTypeBinding(getContext(), *originalComp);
-  LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << '\n');
   auto compType = mlir::dyn_cast<ComponentType>(materializedType);
   if (!compType) {
     return op->emitError() << "type mismatch, cannot access a member for a non-component type "
                            << materializedType;
   }
   if (comp.getType() != compType) {
-    LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << '\n');
     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
     comp = cast.getResult(0);
   }
@@ -598,11 +598,11 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
   auto compDef = compType.getDefinition(st, mod);
   assert(compDef && "Component type without a definition!");
 
-  LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << '\n');
 
   LLVM_DEBUG(
       llvm::dbgs() << "Starting search for member " << adaptor.getMember() << " starting with type "
-                   << compType << "\n"
+                   << compType << '\n'
   );
   auto nameSym = mlir::SymbolRefAttr::get(adaptor.getMemberAttr());
   while (mlir::failed(compDef.lookupFieldType(nameSym))) {
@@ -620,7 +620,7 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     }
 
     compDef = compType.getDefinition(st, mod);
-    LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << '\n');
   }
 
   auto field = originalComp->getMember(nameSym.getValue(), [&op] { return op->emitError(); });
@@ -871,8 +871,8 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     return mlir::failure();
   }
 
-  auto itType = materializeTypeBinding(getContext(), *innerInputBinding);
-  auto outputType = materializeTypeBinding(getContext(), *binding);
+  Type itType = materializeTypeBinding(getContext(), *innerInputBinding);
+  Type outputType = materializeTypeBinding(getContext(), *binding);
 
   auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
   assert(succeeded(arrValue) && "this binding was validated above");

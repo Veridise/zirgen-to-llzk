@@ -127,7 +127,7 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
   auto logLine = [&](unsigned offset = 0) -> llvm::raw_ostream & {
     return llvm::dbgs().indent(indentLevel + offset);
   };
-  auto nl = []() { llvm::dbgs() << "\n"; };
+  auto nl = []() { llvm::dbgs() << '\n'; };
 #endif
   LLVM_DEBUG(print(logLine() << " this  = ", true); nl();
              other.print(logLine() << " other = ", true); nl(););
@@ -208,7 +208,7 @@ void TypeBinding::markSlot(FrameSlot *newSlot) {
     return;
   }
   LLVM_DEBUG(print(llvm::dbgs() << "Binding "); llvm::dbgs() << ": Current slot is ";
-             p(slot) << " and the new slot is "; p(newSlot) << "\n");
+             p(slot) << " and the new slot is "; p(newSlot) << '\n');
   assert((!slot == !!newSlot) && "Writing over an existing slot!");
   slot = newSlot;
 }
@@ -272,17 +272,17 @@ getArrayProperty(size_t idx, EmitErrorFn emitError, const TypeBinding &binding) 
   if (!binding.isArray()) {
     return emitError() << "non array type '" << name << "' cannot be subscripted";
   }
+  if (name == "Array") {
+    assert(params.size() == 2);
+    return params.getParam(idx);
+  }
   // A component with an array super type can behave like an array but it doesn't have all the
   // information required. In that case we defer the answer to the super type.
-  if (name != "Array") {
-    if (!binding.hasSuperType()) {
-      return failure();
-    }
-    // Get the property from the parent and adapt it to this context.
-    return maybeMap(getArrayProperty(idx, emitError, binding.getSuperType()), params, emitError);
+  if (!binding.hasSuperType()) {
+    return failure();
   }
-  assert(params.size() == 2);
-  return params.getParam(idx);
+  // Get the property from the parent and adapt it to this context.
+  return maybeMap(getArrayProperty(idx, emitError, binding.getSuperType()), params, emitError);
 }
 
 mlir::FailureOr<TypeBinding> TypeBinding::getArrayElement(EmitErrorFn emitError) const {
