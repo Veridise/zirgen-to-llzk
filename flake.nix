@@ -14,7 +14,7 @@
     };
 
     llzk = {
-      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=dev/LLZK-236-dialect-refactor";
+      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
       inputs.nixpkgs.follows = "llzk-pkgs/nixpkgs";
     };
   };

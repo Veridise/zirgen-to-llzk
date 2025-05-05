@@ -14,7 +14,11 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/WithColor.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llzk/Dialect/Array/IR/Dialect.h>
+#include <llzk/Dialect/Felt/IR/Dialect.h>
+#include <llzk/Dialect/Global/IR/Dialect.h>
 #include <llzk/Dialect/LLZK/IR/Dialect.h>
+#include <llzk/Dialect/Struct/IR/Dialect.h>
 #include <mlir/Bytecode/BytecodeWriter.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Debug/CLOptionsSetup.h>
@@ -112,6 +116,10 @@ struct ZirFrontendDialects {
     registry.insert<zml::ZMLDialect>();
     registry.insert<zirgen::Zhl::ZhlDialect>();
     registry.insert<llzk::LLZKDialect>();
+    registry.insert<llzk::felt::FeltDialect>();
+    registry.insert<llzk::array::ArrayDialect>();
+    registry.insert<llzk::component::StructDialect>();
+    registry.insert<llzk::global::GlobalDialect>();
   }
   mlir::DialectRegistry registry;
 };
@@ -212,7 +220,7 @@ void Driver::configureLoweringPipeline() {
     return;
   }
   pm.addPass(zklang::createConvertZmlToLlzkPass());
-  auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
+  auto &llzkStructPipeline = pm.nest<llzk::component::StructDefOp>();
   if (!DisableCastReconciliationFlag) {
     llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
   }

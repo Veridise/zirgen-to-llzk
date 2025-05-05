@@ -1,4 +1,4 @@
-target_sources(ZIRC PRIVATE 
+target_sources(ZMLDialect PRIVATE 
   Builder.cpp
   Dialect.cpp 
   Ops.cpp

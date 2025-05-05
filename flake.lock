@@ -47,16 +47,16 @@
         "release-helpers": "release-helpers"
       },
       "locked": {
-        "lastModified": 1745986934,
-        "narHash": "sha256-DpYK/y9IS+CJTwMWe6cjjSyNIKjr/werZ93zVnztICc=",
-        "ref": "dev/LLZK-236-dialect-refactor",
-        "rev": "b3a346829e35c8175562d66f45e1c3080100d4c1",
-        "revCount": 222,
+        "lastModified": 1746223854,
+        "narHash": "sha256-4w4Rdkxd5bcE/W7PZ8hbUVKXy/nhLPQGKn57tzBuMz4=",
+        "ref": "main",
+        "rev": "25f7c774ef8e647f3964fc66d6741d5200cdea08",
+        "revCount": 180,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
       "original": {
-        "ref": "dev/LLZK-236-dialect-refactor",
+        "ref": "main",
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       }

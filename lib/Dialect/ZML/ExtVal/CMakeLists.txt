@@ -1,5 +1,1 @@
-target_sources(ZIRC PRIVATE 
-  Conversion.cpp
-  Patterns.cpp
-  BabyBear.cpp
-)
+target_sources(ZMLDialect PRIVATE Conversion.cpp Patterns.cpp BabyBear.cpp)

@@ -8,8 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "zklang/Dialect/ZML/ExtVal/BabyBear.h"
-#include <llzk/Dialect/LLZK/IR/Ops.h>
-#include <llzk/Dialect/LLZK/IR/Types.h>
+#include <llzk/Dialect/Felt/IR/Ops.h>
+#include <llzk/Dialect/Felt/IR/Types.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>

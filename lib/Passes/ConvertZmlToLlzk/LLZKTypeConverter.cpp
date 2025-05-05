@@ -14,8 +14,16 @@
 #include <llvm/ADT/TypeSwitch.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FileSystem.h>
-#include <llzk/Dialect/LLZK/IR/Ops.h>
-#include <llzk/Dialect/LLZK/IR/Types.h>
+#include <llzk/Dialect/Array/IR/Ops.h>
+#include <llzk/Dialect/Array/IR/Types.h>
+#include <llzk/Dialect/Bool/IR/Ops.h>
+#include <llzk/Dialect/Felt/IR/Ops.h>
+#include <llzk/Dialect/Felt/IR/Types.h>
+#include <llzk/Dialect/Polymorphic/IR/Types.h>
+#include <llzk/Dialect/String/IR/Types.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Types.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -29,6 +37,9 @@
 #define DEBUG_TYPE "llzk-type-converter"
 
 using namespace llzk;
+using namespace llzk::array;
+using namespace llzk::felt;
+using namespace llzk::boolean;
 using namespace mlir;
 
 static std::optional<mlir::Value> unrealizedCastMaterialization(
@@ -97,7 +108,9 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
 
   addConversion([&](zml::ComponentType t) -> mlir::Type {
     auto convertedAttrs = convertParamAttrs(t.getParams(), *this);
-    return llzk::StructType::get(t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs));
+    return llzk::component::StructType::get(
+        t.getName(), mlir::ArrayAttr::get(t.getContext(), convertedAttrs)
+    );
   });
 
   addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {
@@ -118,18 +131,18 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
 
     llvm::SmallVector<mlir::Attribute> dims({getSizeAttr(sizeAttr)});
     auto inner = convertType(deduceArrayType(typeAttr));
-    if (auto innerArr = mlir::dyn_cast<llzk::ArrayType>(inner)) {
+    if (auto innerArr = mlir::dyn_cast<llzk::array::ArrayType>(inner)) {
       auto innerDims = innerArr.getDimensionSizes();
       dims.insert(dims.end(), innerDims.begin(), innerDims.end());
       inner = innerArr.getElementType();
     }
 
-    return llzk::ArrayType::get(inner, dims);
+    return llzk::array::ArrayType::get(inner, dims);
   });
 
   addConversion([](zml::ComponentType t) -> std::optional<mlir::Type> {
     if (t.getName().getValue() == "String") {
-      return llzk::StringType::get(t.getContext());
+      return llzk::string::StringType::get(t.getContext());
     }
     return std::nullopt;
   });
@@ -137,18 +150,18 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
   addConversion([&](zml::ComponentType t) -> std::optional<mlir::Type> {
     if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
         t.getBuiltin()) {
-      return llzk::FeltType::get(t.getContext());
+      return llzk::felt::FeltType::get(t.getContext());
     }
     return std::nullopt;
   });
 
   addConversion([&](zml::VarArgsType t) {
     std::vector<int64_t> shape = {mlir::ShapedType::kDynamic};
-    return llzk::ArrayType::get(convertType(t.getInner()), shape);
+    return llzk::array::ArrayType::get(convertType(t.getInner()), shape);
   });
 
   addConversion([](zml::TypeVarType t) {
-    return llzk::TypeVarType::get(t.getContext(), t.getName());
+    return llzk::polymorphic::TypeVarType::get(t.getContext(), t.getName());
   });
 
   addSourceMaterialization(unrealizedCastMaterialization);
@@ -157,7 +170,9 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
 }
 
 mlir::Type LLZKTypeConverter::createArrayRepr(mlir::MLIRContext *ctx) const {
-  return llzk::ArrayType::get(llzk::FeltType::get(ctx), {static_cast<long>(field.degree)});
+  return llzk::array::ArrayType::get(
+      llzk::felt::FeltType::get(ctx), {static_cast<long>(field.degree)}
+  );
 }
 
 mlir::Value LLZKTypeConverter::collectValues(
@@ -209,20 +224,18 @@ mlir::Value LLZKTypeConverter::createInvOp(mlir::Value v, mlir::OpBuilder &build
 }
 
 mlir::Value LLZKTypeConverter::createLitOp(uint64_t v, mlir::OpBuilder &builder) const {
-  llzk::FeltType felt = llzk::FeltType::get(builder.getContext());
-  return builder.create<llzk::FeltConstantOp>(
-      builder.getUnknownLoc(), felt,
-      llzk::FeltConstAttr::get(builder.getContext(), llvm::APInt(64, v))
+  auto felt = FeltType::get(builder.getContext());
+  return builder.create<FeltConstantOp>(
+      builder.getUnknownLoc(), felt, FeltConstAttr::get(builder.getContext(), llvm::APInt(64, v))
   );
 }
 
 mlir::Value LLZKTypeConverter::createIszOp(mlir::Value v, mlir::OpBuilder &builder) const {
-  auto zero = builder.create<llzk::FeltConstantOp>(
-      v.getLoc(), llzk::FeltConstAttr::get(builder.getContext(), mlir::APInt::getZero(64))
+  auto zero = builder.create<FeltConstantOp>(
+      v.getLoc(), FeltConstAttr::get(builder.getContext(), mlir::APInt::getZero(64))
   );
-  return builder.create<llzk::CmpOp>(
-      v.getLoc(), llzk::FeltCmpPredicateAttr::get(builder.getContext(), llzk::FeltCmpPredicate::EQ),
-      v, zero
+  return builder.create<CmpOp>(
+      v.getLoc(), FeltCmpPredicateAttr::get(builder.getContext(), FeltCmpPredicate::EQ), v, zero
   );
 }
 

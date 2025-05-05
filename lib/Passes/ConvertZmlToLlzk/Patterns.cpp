@@ -17,9 +17,20 @@
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/SmallVectorExtras.h>
-#include <llzk/Dialect/LLZK/IR/Ops.h>
-#include <llzk/Dialect/LLZK/IR/Types.h>
-#include <llzk/Dialect/LLZK/Util/AttributeHelper.h>
+#include <llzk/Dialect/Array/IR/Ops.h>
+#include <llzk/Dialect/Bool/IR/Ops.h>
+#include <llzk/Dialect/Cast/IR/Ops.h>
+#include <llzk/Dialect/Constrain/IR/Ops.h>
+#include <llzk/Dialect/Felt/IR/Attrs.h>
+#include <llzk/Dialect/Felt/IR/Ops.h>
+#include <llzk/Dialect/Felt/IR/Types.h>
+#include <llzk/Dialect/Function/IR/Ops.h>
+#include <llzk/Dialect/Global/IR/Ops.h>
+#include <llzk/Dialect/LLZK/IR/AttributeHelper.h>
+#include <llzk/Dialect/Polymorphic/IR/Ops.h>
+#include <llzk/Dialect/String/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Types.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
@@ -43,15 +54,11 @@
 using namespace zml;
 using namespace mlir;
 
-///////////////////////////////////////////////////////////
-/// ZmirLitValOpLowering
-///////////////////////////////////////////////////////////
-
 mlir::LogicalResult LitValOpLowering::matchAndRewrite(
     LitValOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::FeltConstantOp>(
-      op, llzk::FeltConstAttr::get(getContext(), llvm::APInt(64, adaptor.getValue()))
+  rewriter.replaceOpWithNewOp<llzk::felt::FeltConstantOp>(
+      op, llzk::felt::FeltConstAttr::get(getContext(), llvm::APInt(64, adaptor.getValue()))
   );
   return mlir::success();
 }
@@ -59,14 +66,16 @@ mlir::LogicalResult LitValOpLowering::matchAndRewrite(
 LogicalResult LitStrOpLowering::matchAndRewrite(
     LitStrOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::LitStringOp>(op, adaptor.getValue());
+  rewriter.replaceOpWithNewOp<llzk::string::LitStringOp>(
+      op, llzk::string::StringType::get(rewriter.getContext()), adaptor.getValue()
+  );
   return success();
 }
 
 mlir::LogicalResult ComponentLowering::matchAndRewrite(
     SplitComponentOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto newOp = rewriter.create<llzk::StructDefOp>(
+  auto newOp = rewriter.create<llzk::component::StructDefOp>(
       op.getLoc(), op.getNameAttr(),
       op.getParams().has_value() ? *op.getParams() : rewriter.getArrayAttr({})
   );
@@ -78,14 +87,14 @@ mlir::LogicalResult ComponentLowering::matchAndRewrite(
 mlir::LogicalResult FieldDefOpLowering::matchAndRewrite(
     FieldDefOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::FieldDefOp>(
+  rewriter.replaceOpWithNewOp<llzk::component::FieldDefOp>(
       op, op.getNameAttr(), getTypeConverter()->convertType(op.getType()), op.getColumn()
   );
   return mlir::success();
 }
 
 /// Inspired by FuncOp::cloneInto
-void cloneAttrsIntoLlzkFunc(mlir::func::FuncOp src, llzk::FuncOp dest) {
+void cloneAttrsIntoLlzkFunc(mlir::func::FuncOp src, llzk::function::FuncDefOp dest) {
   // Add the attributes of this function to dest (except visibility unless is
   // extern).
   llvm::MapVector<mlir::StringAttr, mlir::Attribute> newAttrMap;
@@ -124,7 +133,8 @@ mlir::LogicalResult FuncOpLowering::matchAndRewrite(
   auto newType =
       mlir::FunctionType::get(rewriter.getContext(), result.getConvertedTypes(), newResults);
 
-  auto newFuncOp = rewriter.create<llzk::FuncOp>(op.getLoc(), op.getNameAttr(), newType);
+  auto newFuncOp =
+      rewriter.create<llzk::function::FuncDefOp>(op.getLoc(), op.getNameAttr(), newType);
   cloneAttrsIntoLlzkFunc(op, newFuncOp);
   rewriter.inlineRegionBefore(op.getRegion(), newFuncOp.getRegion(), newFuncOp.end());
   rewriter.replaceOp(op, newFuncOp);
@@ -134,7 +144,7 @@ mlir::LogicalResult FuncOpLowering::matchAndRewrite(
 mlir::LogicalResult ReturnOpLowering::matchAndRewrite(
     mlir::func::ReturnOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::ReturnOp>(op, adaptor.getOperands());
+  rewriter.replaceOpWithNewOp<llzk::function::ReturnOp>(op, adaptor.getOperands());
   return mlir::success();
 }
 
@@ -156,7 +166,7 @@ mlir::LogicalResult ExternCallOpLowering::matchAndRewrite(
   if (mlir::failed(convRes)) {
     return op->emitError("failed to transform zml types into llzk types");
   }
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(
+  rewriter.replaceOpWithNewOp<llzk::function::CallOp>(
       op, results, callee.getNameAttr(), adaptor.getCalleeOperands()
   );
   return mlir::success();
@@ -188,19 +198,19 @@ static bool wasConvertedToPrimitiveType(ComponentType t) {
 }
 
 static Value readArray(Value src, Value iv, OpBuilder &builder, Location loc) {
-  auto type = mlir::cast<llzk::ArrayType>(src.getType());
+  auto type = mlir::cast<llzk::array::ArrayType>(src.getType());
   if (type.getDimensionSizes().size() == 1) {
-    return builder.create<llzk::ReadArrayOp>(loc, src, iv);
+    return builder.create<llzk::array::ReadArrayOp>(loc, src, iv);
   }
-  return builder.create<llzk::ExtractArrayOp>(loc, src, iv);
+  return builder.create<llzk::array::ExtractArrayOp>(loc, src, iv);
 }
 
 static void writeArray(Value dst, Value iv, Value val, OpBuilder &builder, Location loc) {
-  auto type = mlir::cast<llzk::ArrayType>(dst.getType());
+  auto type = mlir::cast<llzk::array::ArrayType>(dst.getType());
   if (type.getDimensionSizes().size() == 1) {
-    builder.create<llzk::WriteArrayOp>(loc, dst, iv, val);
+    builder.create<llzk::array::WriteArrayOp>(loc, dst, iv, val);
   } else {
-    builder.create<llzk::InsertArrayOp>(loc, dst, iv, val);
+    builder.create<llzk::array::InsertArrayOp>(loc, dst, iv, val);
   }
 }
 
@@ -214,12 +224,12 @@ static Value copyArraySuperFields(
     OpBuilder &builder
 ) {
   auto targetInner = mlir::cast<ComponentType>(target).getArrayInnerType();
-  auto targetArrayType = mlir::cast<llzk::ArrayType>(tc.convertType(target));
+  auto targetArrayType = mlir::cast<llzk::array::ArrayType>(tc.convertType(target));
 
-  auto array = builder.create<llzk::CreateArrayOp>(loc, targetArrayType);
+  auto array = builder.create<llzk::array::CreateArrayOp>(loc, targetArrayType);
 
   auto lb = builder.create<arith::ConstantIndexOp>(loc, 0);
-  auto ub = builder.create<llzk::ArrayLengthOp>(
+  auto ub = builder.create<llzk::array::ArrayLengthOp>(
       loc, TypeRange({IndexType::get(builder.getContext())}), chain, lb
   );
   auto stride = builder.create<arith::ConstantIndexOp>(loc, 1);
@@ -246,11 +256,11 @@ static Value handleArraySpecialCases(
     return chain;
   }
 
-  auto targetLlzkType = mlir::cast<llzk::ArrayType>(tc.convertType(target));
+  auto targetLlzkType = mlir::cast<llzk::array::ArrayType>(tc.convertType(target));
   // We don't need to create the copying code if the llzk versions of the types are going to unify.
   if (llzk::typesUnify(chain.getType(), targetLlzkType)) {
     // Cast the output type to the equivalent target type to avoid an unrealizable conversion cast.
-    return builder.create<llzk::UnifiableCastOp>(loc, targetLlzkType, chain);
+    return builder.create<llzk::polymorphic::UnifiableCastOp>(loc, targetLlzkType, chain);
   }
 
   // If the target is an array component then read the super fields of the inner elements and
@@ -276,7 +286,7 @@ static Value readSuperFields(
     return handleArraySpecialCases(type, chain, target, tc, loc, builder);
   }
 
-  auto read = builder.create<llzk::FieldReadOp>(
+  auto read = builder.create<llzk::component::FieldReadOp>(
       loc, tc.convertType(superComp), chain, builder.getStringAttr("$super")
   );
   return readSuperFields(superComp, read, target, tc, loc, builder);
@@ -313,7 +323,7 @@ LogicalResult LowerConstrainCallOp::matchAndRewrite(
   auto sym = mlir::SymbolRefAttr::get(
       compName, {mlir::SymbolRefAttr::get(rewriter.getStringAttr("constrain"))}
   );
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, TypeRange(), sym, adaptor.getOperands());
+  rewriter.replaceOpWithNewOp<llzk::function::CallOp>(op, TypeRange(), sym, adaptor.getOperands());
 
   return success();
 }
@@ -321,8 +331,8 @@ LogicalResult LowerConstrainCallOp::matchAndRewrite(
 LogicalResult LowerLoadValParamOp::matchAndRewrite(
     LoadValParamOp op, OpAdaptor, ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::ConstReadOp>(
-      op, llzk::FeltType::get(getContext()), mlir::SymbolRefAttr::get(op.getParamAttr())
+  rewriter.replaceOpWithNewOp<llzk::polymorphic::ConstReadOp>(
+      op, llzk::felt::FeltType::get(getContext()), mlir::SymbolRefAttr::get(op.getParamAttr())
   );
   return success();
 }
@@ -331,10 +341,10 @@ LogicalResult LowerLoadValParamOp::matchAndRewrite(
 /// IntegerAttr. Any other kind of Attribute is considered malformed IR and will abort.
 static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) {
   if (auto symAttr = mlir::dyn_cast<SymbolRefAttr>(attr)) {
-    auto param = builder.create<llzk::ConstReadOp>(
-        loc, llzk::FeltType::get(builder.getContext()), symAttr.getRootReference()
+    auto param = builder.create<llzk::polymorphic::ConstReadOp>(
+        loc, llzk::felt::FeltType::get(builder.getContext()), symAttr.getRootReference()
     );
-    return builder.create<llzk::FeltToIndexOp>(loc, param);
+    return builder.create<llzk::cast::FeltToIndexOp>(loc, builder.getIndexType(), param);
   }
   if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
     return builder.create<arith::ConstantIndexOp>(loc, llzk::fromAPInt(intAttr.getValue()));
@@ -389,7 +399,7 @@ static void materializeValuesForParams(
 mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
     mlir::func::CallIndirectOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto parent = op->getParentOfType<llzk::FuncOp>();
+  auto parent = op->getParentOfType<llzk::function::FuncDefOp>();
   if (!parent || parent.getName() != "compute") {
     return failure(); // Don't operate on non compute calls
   }
@@ -401,7 +411,7 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
 
   Params params{
       .callee = mlir::cast<ComponentType>(op.getResult(0).getType()).getParams(),
-      .caller = op->getParentOfType<llzk::StructDefOp>()
+      .caller = op->getParentOfType<llzk::component::StructDefOp>()
                     .getConstParams()
                     .value_or(rewriter.getArrayAttr({}))
                     .getValue()
@@ -445,14 +455,16 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
       mlir::iterator_range(adaptor.getOperands().begin() + 1, adaptor.getOperands().end())
   );
 
-  rewriter.replaceOpWithNewOp<llzk::CallOp>(op, types, sym, mapOperands, dimsPerMap, args);
+  rewriter.replaceOpWithNewOp<llzk::function::CallOp>(
+      op, types, sym, mapOperands, dimsPerMap, args
+  );
   return mlir::success();
 }
 
 mlir::LogicalResult WriteFieldOpLowering::matchAndRewrite(
     WriteFieldOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::FieldWriteOp>(
+  rewriter.replaceOpWithNewOp<llzk::component::FieldWriteOp>(
       op, adaptor.getComponent(), adaptor.getFieldNameAttr(), adaptor.getVal()
   );
   return mlir::success();
@@ -475,7 +487,7 @@ mlir::LogicalResult RemoveExternFnRefOp::matchAndRewrite(
 mlir::LogicalResult LowerReadFieldOp::matchAndRewrite(
     ReadFieldOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::FieldReadOp>(
+  rewriter.replaceOpWithNewOp<llzk::component::FieldReadOp>(
       op, getTypeConverter()->convertType(op.getType()), adaptor.getComponent(),
       adaptor.getFieldNameAttr().getAttr()
   );
@@ -485,24 +497,29 @@ mlir::LogicalResult LowerReadFieldOp::matchAndRewrite(
 mlir::LogicalResult LowerConstrainOp::matchAndRewrite(
     ConstrainOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::EmitEqualityOp>(op, adaptor.getLhs(), adaptor.getRhs());
+  rewriter.replaceOpWithNewOp<llzk::constrain::EmitEqualityOp>(
+      op, adaptor.getLhs(), adaptor.getRhs()
+  );
   return mlir::success();
 }
 
 mlir::LogicalResult LowerInRangeOp::matchAndRewrite(
     InRangeOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto le = rewriter.create<llzk::CmpOp>(
-      op.getLoc(), llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::LE),
+  auto le = rewriter.create<llzk::boolean::CmpOp>(
+      op.getLoc(),
+      llzk::boolean::FeltCmpPredicateAttr::get(getContext(), llzk::boolean::FeltCmpPredicate::LE),
       adaptor.getLow(), adaptor.getMid()
   );
-  auto lt = rewriter.create<llzk::CmpOp>(
-      op.getLoc(), llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::LT),
+  auto lt = rewriter.create<llzk::boolean::CmpOp>(
+      op.getLoc(),
+      llzk::boolean::FeltCmpPredicateAttr::get(getContext(), llzk::boolean::FeltCmpPredicate::LT),
       adaptor.getMid(), adaptor.getHigh()
   );
-  auto convLe = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), le);
-  auto convLt = rewriter.create<llzk::IntToFeltOp>(op.getLoc(), lt);
-  auto mul = rewriter.create<llzk::MulFeltOp>(op.getLoc(), convLe, convLt);
+  auto felt = llzk::felt::FeltType::get(getContext());
+  auto convLe = rewriter.create<llzk::cast::IntToFeltOp>(op.getLoc(), felt, le);
+  auto convLt = rewriter.create<llzk::cast::IntToFeltOp>(op.getLoc(), felt, lt);
+  auto mul = rewriter.create<llzk::felt::MulFeltOp>(op.getLoc(), convLe, convLt);
   rewriter.replaceOp(op, mul);
 
   return mlir::success();
@@ -515,23 +532,24 @@ mlir::LogicalResult LowerNewArrayOp::matchAndRewrite(
   // if the inputs are scalar or arrays
 
   auto type = getTypeConverter()->convertType(op.getType());
-  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  auto arrType = dyn_cast<llzk::array::ArrayType>(type);
   if (!arrType) {
     return op.emitOpError() << "was expecting an array type";
   }
 
   // If it's an array then we allocate an empty one and then insert each operand with InsertArrayOp
-  if (!adaptor.getElements().empty() && isa<llzk::ArrayType>(adaptor.getElements()[0].getType())) {
+  if (!adaptor.getElements().empty() &&
+      isa<llzk::array::ArrayType>(adaptor.getElements()[0].getType())) {
     Location cachedLoc = op.getLoc();
-    auto arr = rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange());
+    auto arr = rewriter.replaceOpWithNewOp<llzk::array::CreateArrayOp>(op, arrType, ValueRange());
     for (size_t i = 0; i < adaptor.getElements().size(); i++) {
       auto idx = rewriter.create<arith::ConstantIndexOp>(cachedLoc, i);
-      rewriter.create<llzk::InsertArrayOp>(
+      rewriter.create<llzk::array::InsertArrayOp>(
           cachedLoc, arr, ValueRange({idx}), adaptor.getElements()[i]
       );
     }
   } else {
-    rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, adaptor.getElements());
+    rewriter.replaceOpWithNewOp<llzk::array::CreateArrayOp>(op, arrType, adaptor.getElements());
   }
   return mlir::success();
 }
@@ -540,46 +558,40 @@ mlir::LogicalResult LowerLitValArrayOp::matchAndRewrite(
     LitValArrayOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto type = getTypeConverter()->convertType(op.getType());
-  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  auto arrType = dyn_cast<llzk::array::ArrayType>(type);
   if (!arrType) {
     return op.emitOpError() << "was expecting an array type";
   }
 
-  SmallVector<Value> lits;
-  llzk::FeltType felt = llzk::FeltType::get(getContext());
-  std::transform(
-      op.getElements().begin(), op.getElements().end(), std::back_inserter(lits),
-      [&](int64_t value) {
-    return rewriter.create<llzk::FeltConstantOp>(
-        op.getLoc(), felt, llzk::FeltConstAttr::get(getContext(), llzk::toAPInt(value))
+  llzk::felt::FeltType felt = llzk::felt::FeltType::get(getContext());
+  SmallVector<Value> lits = llvm::map_to_vector(op.getElements(), [&](int64_t value) -> Value {
+    return rewriter.create<llzk::felt::FeltConstantOp>(
+        op.getLoc(), felt, llzk::felt::FeltConstAttr::get(getContext(), llzk::toAPInt(value))
     );
-  }
-  );
+  });
 
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, ValueRange(lits));
+  rewriter.replaceOpWithNewOp<llzk::array::CreateArrayOp>(op, arrType, ValueRange(lits));
   return success();
 }
 
 mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
     ReadArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  llvm::SmallVector<mlir::Value> toIndexOps;
-  std::transform(
-      adaptor.getIndices().begin(), adaptor.getIndices().end(), std::back_inserter(toIndexOps),
-      [&](mlir::Value index) -> mlir::TypedValue<mlir::IndexType> {
+  llvm::SmallVector<mlir::Value> toIndexOps =
+      llvm::map_to_vector(adaptor.getIndices(), [&](mlir::Value index) -> mlir::Value {
     if (mlir::isa<mlir::IndexType>(index.getType())) {
       return mlir::cast<mlir::TypedValue<mlir::IndexType>>(index);
     }
-    return rewriter.create<llzk::FeltToIndexOp>(op.getLoc(), index).getResult();
-  }
-  );
+    return rewriter.create<llzk::cast::FeltToIndexOp>(op.getLoc(), rewriter.getIndexType(), index)
+        .getResult();
+  });
   auto convertedType = getTypeConverter()->convertType(op.getType());
-  if (isa<llzk::ArrayType>(convertedType)) {
-    rewriter.replaceOpWithNewOp<llzk::ExtractArrayOp>(
+  if (isa<llzk::array::ArrayType>(convertedType)) {
+    rewriter.replaceOpWithNewOp<llzk::array::ExtractArrayOp>(
         op, convertedType, adaptor.getLvalue(), toIndexOps
     );
   } else {
-    rewriter.replaceOpWithNewOp<llzk::ReadArrayOp>(
+    rewriter.replaceOpWithNewOp<llzk::array::ReadArrayOp>(
         op, convertedType, adaptor.getLvalue(), toIndexOps
     );
   }
@@ -589,14 +601,16 @@ mlir::LogicalResult LowerReadArrayOp::matchAndRewrite(
 mlir::LogicalResult LowerIsz::matchAndRewrite(
     IsZeroOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto zero = rewriter.create<llzk::FeltConstantOp>(
-      op.getLoc(), llzk::FeltConstAttr::get(getContext(), mlir::APInt::getZero(64))
+  auto zero = rewriter.create<llzk::felt::FeltConstantOp>(
+      op.getLoc(), llzk::felt::FeltConstAttr::get(getContext(), mlir::APInt::getZero(64))
   );
-  auto cmpOp = rewriter.create<llzk::CmpOp>(
-      op.getLoc(), llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::EQ),
+  auto cmpOp = rewriter.create<llzk::boolean::CmpOp>(
+      op.getLoc(),
+      llzk::boolean::FeltCmpPredicateAttr::get(getContext(), llzk::boolean::FeltCmpPredicate::EQ),
       adaptor.getIn(), zero
   );
-  rewriter.replaceOpWithNewOp<llzk::IntToFeltOp>(op, cmpOp);
+  auto felt = llzk::felt::FeltType::get(getContext());
+  rewriter.replaceOpWithNewOp<llzk::cast::IntToFeltOp>(op, felt, cmpOp);
   return mlir::success();
 }
 
@@ -604,12 +618,12 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
     AllocArrayOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto type = getTypeConverter()->convertType(op.getType());
-  auto arrType = dyn_cast<llzk::ArrayType>(type);
+  auto arrType = dyn_cast<llzk::array::ArrayType>(type);
   if (!arrType) {
     return op.emitOpError() << "was expecting an array type";
   }
 
-  ArrayAttr compParams = op->getParentOfType<llzk::StructDefOp>().getType().getParams();
+  ArrayAttr compParams = op->getParentOfType<llzk::component::StructDefOp>().getType().getParams();
   SmallVector<ConstExprAttr> affineArrayParams;
   ComponentType cType = op.getResult().getType();
   for (Attribute attr : cType.getParams()) {
@@ -640,7 +654,7 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
     mapOperands.push_back(values);
   }
 
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(op, arrType, mapOperands, dimsPerMap);
+  rewriter.replaceOpWithNewOp<llzk::array::CreateArrayOp>(op, arrType, mapOperands, dimsPerMap);
 
   return mlir::success();
 }
@@ -651,7 +665,7 @@ mlir::LogicalResult LowerArrayLengthOp::matchAndRewrite(
   auto c = rewriter.create<mlir::arith::ConstantOp>(
       op.getLoc(), mlir::IndexType::get(getContext()), rewriter.getIndexAttr(0)
   );
-  rewriter.replaceOpWithNewOp<llzk::ArrayLengthOp>(op, adaptor.getArray(), c);
+  rewriter.replaceOpWithNewOp<llzk::array::ArrayLengthOp>(op, adaptor.getArray(), c);
 
   return mlir::success();
 }
@@ -659,8 +673,8 @@ mlir::LogicalResult LowerArrayLengthOp::matchAndRewrite(
 mlir::LogicalResult LowerIndexToValOp::matchAndRewrite(
     IndexToValOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::IntToFeltOp>(
-      op, llzk::FeltType::get(getContext()), adaptor.getIndex()
+  rewriter.replaceOpWithNewOp<llzk::cast::IntToFeltOp>(
+      op, llzk::felt::FeltType::get(getContext()), adaptor.getIndex()
   );
 
   return mlir::success();
@@ -673,7 +687,9 @@ mlir::LogicalResult LowerValToIndexOp::matchAndRewrite(
     rewriter.replaceAllUsesWith(op, adaptor.getVal());
     rewriter.eraseOp(op);
   } else {
-    rewriter.replaceOpWithNewOp<llzk::FeltToIndexOp>(op, adaptor.getVal());
+    rewriter.replaceOpWithNewOp<llzk::cast::FeltToIndexOp>(
+        op, rewriter.getIndexType(), adaptor.getVal()
+    );
   }
 
   return mlir::success();
@@ -682,12 +698,12 @@ mlir::LogicalResult LowerValToIndexOp::matchAndRewrite(
 mlir::LogicalResult LowerWriteArrayOp::matchAndRewrite(
     WriteArrayOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
-  if (mlir::isa<llzk::ArrayType>(adaptor.getValue().getType())) {
-    rewriter.replaceOpWithNewOp<llzk::InsertArrayOp>(
+  if (mlir::isa<llzk::array::ArrayType>(adaptor.getValue().getType())) {
+    rewriter.replaceOpWithNewOp<llzk::array::InsertArrayOp>(
         op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
     );
   } else {
-    rewriter.replaceOpWithNewOp<llzk::WriteArrayOp>(
+    rewriter.replaceOpWithNewOp<llzk::array::WriteArrayOp>(
         op, adaptor.getArray(), adaptor.getIndices(), adaptor.getValue()
     );
   }
@@ -712,12 +728,13 @@ mlir::LogicalResult UpdateScfExecuteRegionOpTypes::matchAndRewrite(
 LogicalResult ValToI1OpLowering::matchAndRewrite(
     ValToI1Op op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  auto zero = rewriter.create<llzk::FeltConstantOp>(
-      op.getLoc(), llzk::FeltType::get(getContext()),
-      llzk::FeltConstAttr::get(getContext(), APInt(1, 0))
+  auto zero = rewriter.create<llzk::felt::FeltConstantOp>(
+      op.getLoc(), llzk::felt::FeltType::get(getContext()),
+      llzk::felt::FeltConstAttr::get(getContext(), APInt(1, 0))
   );
-  rewriter.replaceOpWithNewOp<llzk::CmpOp>(
-      op, llzk::FeltCmpPredicateAttr::get(getContext(), llzk::FeltCmpPredicate::NE),
+  rewriter.replaceOpWithNewOp<llzk::boolean::CmpOp>(
+      op,
+      llzk::boolean::FeltCmpPredicateAttr::get(getContext(), llzk::boolean::FeltCmpPredicate::NE),
       adaptor.getVal(), zero
   );
   return success();
@@ -726,7 +743,9 @@ LogicalResult ValToI1OpLowering::matchAndRewrite(
 LogicalResult AssertOpLowering::matchAndRewrite(
     AssertOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::AssertOp>(op, adaptor.getCond(), rewriter.getStringAttr(""));
+  rewriter.replaceOpWithNewOp<llzk::boolean::AssertOp>(
+      op, adaptor.getCond(), rewriter.getStringAttr("")
+  );
   return success();
 }
 
@@ -734,9 +753,9 @@ LogicalResult LowerVarArgsOp::matchAndRewrite(
     VarArgsOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
   assert(adaptor.getElements().size() <= std::numeric_limits<int64_t>::max());
-  rewriter.replaceOpWithNewOp<llzk::CreateArrayOp>(
+  rewriter.replaceOpWithNewOp<llzk::array::CreateArrayOp>(
       op,
-      llzk::ArrayType::get(
+      llzk::array::ArrayType::get(
           getTypeConverter()->convertType(
               mlir::cast<VarArgsType>(op.getResult().getType()).getInner()
           ),
@@ -755,7 +774,7 @@ LogicalResult LowerReadBackOp::matchAndRewrite(
 
   auto replace = [&](auto... args) {
     auto outType = converter->convertType(op.getResult().getType());
-    rewriter.replaceOpWithNewOp<llzk::FieldReadOp>(
+    rewriter.replaceOpWithNewOp<llzk::component::FieldReadOp>(
         op, outType, adaptor.getComp(), adaptor.getFieldAttr(),
         std::forward<decltype(args)>(args)...
     );
@@ -793,7 +812,7 @@ LogicalResult LowerReadBackOp::matchAndRewrite(
     );
     auto newMap = templMap.compose(cexpAttr.getMap());
     auto newCexpr = ConstExprAttr::get(newMap, cexpAttr.getFormals());
-    auto params = op->getParentOfType<llzk::StructDefOp>()
+    auto params = op->getParentOfType<llzk::component::StructDefOp>()
                       .getConstParams()
                       .value_or(rewriter.getArrayAttr({}))
                       .getValue();
@@ -810,14 +829,18 @@ LogicalResult LowerGlobalDefOp::matchAndRewrite(
     GlobalDefOp op, OpAdaptor, ConversionPatternRewriter &rewriter
 ) const {
   Type newType = getTypeConverter()->convertType(op.getType());
-  rewriter.replaceOpWithNewOp<llzk::GlobalDefOp>(op, op.getSymName(), false, newType, nullptr);
+  rewriter.replaceOpWithNewOp<llzk::global::GlobalDefOp>(
+      op, op.getSymName(), false, newType, nullptr
+  );
   return success();
 }
 
 LogicalResult LowerSetGlobalOp::matchAndRewrite(
     SetGlobalOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::GlobalWriteOp>(op, op.getNameRefAttr(), adaptor.getVal());
+  rewriter.replaceOpWithNewOp<llzk::global::GlobalWriteOp>(
+      op, op.getNameRefAttr(), adaptor.getVal()
+  );
   return success();
 }
 
@@ -825,6 +848,6 @@ LogicalResult LowerGetGlobalOp::matchAndRewrite(
     GetGlobalOp op, OpAdaptor, ConversionPatternRewriter &rewriter
 ) const {
   Type newType = getTypeConverter()->convertType(op.getResult().getType());
-  rewriter.replaceOpWithNewOp<llzk::GlobalReadOp>(op, newType, op.getNameRef());
+  rewriter.replaceOpWithNewOp<llzk::global::GlobalReadOp>(op, newType, op.getNameRef());
   return success();
 }
