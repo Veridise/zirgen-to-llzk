@@ -56,7 +56,7 @@
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
       "original": {
-        "ref": "dani/reenable-dynamic-size-arrays",
+        "ref": "main",
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       }
@@ -145,11 +145,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1745443947,
-        "narHash": "sha256-pVeR/bEi4RL5qNyzk4W8Qfa4Tqgm5yQ79VrrBPKaQBY=",
+        "lastModified": 1745285208,
+        "narHash": "sha256-e3egycUQrYO/lfmiqTGV11iv2/iLP0koPoHFZI0LP3s=",
         "owner": "Veridise",
         "repo": "open-source-release-helpers",
-        "rev": "7f5a2d11236e9dd04718ae63e1fda5b6d642f488",
+        "rev": "6eb64656f26ee534ecae22bf02f8aa8d8eb23e97",
         "type": "github"
       },
       "original": {

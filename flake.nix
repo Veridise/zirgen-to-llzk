@@ -14,7 +14,7 @@
     };
 
     llzk = {
-      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=dani/reenable-dynamic-size-arrays";
+      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
       inputs.nixpkgs.follows = "llzk-pkgs/nixpkgs";
     };
   };
