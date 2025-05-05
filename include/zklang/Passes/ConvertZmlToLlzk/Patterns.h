@@ -284,6 +284,14 @@ public:
   matchAndRewrite(NopOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
+class LowerUnifiableCastOp : public mlir::OpConversionPattern<UnifiableCastOp> {
+public:
+  using mlir::OpConversionPattern<UnifiableCastOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(UnifiableCastOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
 class LowerSuperCoerceOp : public mlir::OpConversionPattern<SuperCoerceOp> {
 public:
   using mlir::OpConversionPattern<SuperCoerceOp>::OpConversionPattern;

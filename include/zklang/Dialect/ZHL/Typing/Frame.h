@@ -39,10 +39,13 @@ public:
     return static_cast<Slot *>(info->allocateSlot<Slot, Args...>(std::forward<Args>(args)...));
   }
 
-  detail::FrameInfo::SlotsList::iterator begin();
-  detail::FrameInfo::SlotsList::const_iterator begin() const;
-  detail::FrameInfo::SlotsList::iterator end();
-  detail::FrameInfo::SlotsList::const_iterator end() const;
+  using iterator = detail::FrameInfo::iterator;
+  using const_iterator = detail::FrameInfo::const_iterator;
+
+  iterator begin();
+  const_iterator begin() const;
+  iterator end();
+  const_iterator end() const;
 
   // The frame information forms a tree of slots.
   // Thus, each frame may be contained inside a slot of a frame in an upper level of the hierarchy.

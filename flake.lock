@@ -56,7 +56,7 @@
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
       "original": {
-        "ref": "main",
+        "ref": "dani/reenable-dynamic-size-arrays",
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       }

@@ -98,7 +98,7 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerAdd, LowerSub, LowerMul, LowerInv, LowerIsz, LowerNeg, LowerConstrainOp,
       LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp, LowerAllocArrayOp,
       LowerArrayLengthOp, LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp,
-      WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod,
+      WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerUnifiableCastOp, LowerSuperCoerceOp, LowerMod,
       LowerLoadValParamOp, ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering,
       ExternCallOpLowering, CallIndirectOpLoweringInCompute, RemoveConstructorRefOp,
       RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering, AssertOpLowering,

@@ -1,0 +1,16 @@
+// RUN: zklang -o - %s
+component Pegs<N: Val>(pegs: Array<Val, N>) {
+  for peg : pegs { Reg(peg) }
+}
+
+component MulReg(lhs: NondetReg, rhs: NondetReg) {
+  NondetReg(lhs * rhs)
+}
+
+component CheckBounds<COLORS: Val, PEGS: Val>(pegs: Pegs<PEGS>) {
+  for peg : pegs {
+    check := Reg(reduce for c :  0..COLORS { NondetReg(c - peg) } init NondetReg(1) with MulReg);
+    check = 0;
+    Assert(check, "Not a valid color");
+  }
+}

@@ -19,7 +19,6 @@
 #include <llvm/ADT/ilist_node_options.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/Support/LLVM.h>
-#include <zklang/Dialect/ZHL/Typing/FrameInfo.h>
 
 namespace zhl {
 
@@ -27,6 +26,7 @@ namespace detail {
 class FrameInfo;
 }
 
+class Frame;
 class FrameRef;
 
 /// Base class for anything that can be allocated in a frame.

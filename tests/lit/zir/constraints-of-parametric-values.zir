@@ -1,0 +1,57 @@
+// RUN: zklang -I %S/Inputs -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
+
+component IsZero(val: Val) {
+  isZero := NondetReg(Isz(val));
+  isZero
+}
+
+component Eq(a: Val, b: Val) {
+  IsZero(a - b)
+}
+
+component EnsureEq<T: Type>(a: T, b: T) {
+  a = b;
+  r := Eq(a, b);
+  Assert(Isz(r), "Provided values are not equal");
+  r
+}
+
+test Mastermind {
+  EnsureEq<Val>(45, 46);
+}
+
+// CHECK-LABEL: llzk.struct @EnsureEq<[@T]> {
+// CHECK-NEXT:    field @"$super" : !llzk.struct<@Eq<[]>>
+// CHECK-NEXT:    field @"$temp" : !llzk.struct<@Assert<[]>>
+// CHECK-NEXT:    field @r : !llzk.struct<@Eq<[]>> {column}
+// CHECK-LABEL:   func @compute(%arg0: !llzk.tvar<@T>, %arg1: !llzk.tvar<@T>) -> !llzk.struct<@EnsureEq<[@T]>> {
+// CHECK-NEXT:      %0 = new_string "Provided values are not equal"
+// CHECK-NEXT:      %felt_const_0 = constfelt  0
+// CHECK-NEXT:      %self = new_struct : <@EnsureEq<[@T]>>
+// CHECK-NEXT:      %1 = unifiable_cast %arg0 : (!llzk.tvar<@T>) -> !llzk.felt
+// CHECK-NEXT:      %2 = unifiable_cast %arg1 : (!llzk.tvar<@T>) -> !llzk.felt
+// CHECK-NEXT:      %3 = call @Eq::@compute(%1, %2) : (!llzk.felt, !llzk.felt) -> !llzk.struct<@Eq<[]>> 
+// CHECK-NEXT:      writef %self[@r] = %3 : <@EnsureEq<[@T]>>, !llzk.struct<@Eq<[]>>
+// CHECK-NEXT:      %4 = readf %self[@r] : <@EnsureEq<[@T]>>, !llzk.struct<@Eq<[]>>
+// CHECK-NEXT:      %5 = readf %4[@"$super"] : <@Eq<[]>>, !llzk.struct<@IsZero<[]>>
+// CHECK-NEXT:      %6 = readf %5[@"$super"] : <@IsZero<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:      %7 = readf %6[@"$super"] : <@NondetReg<[]>>, !llzk.felt
+// CHECK-NEXT:      %8 = cmp eq(%7, %felt_const_0)
+// CHECK-NEXT:      %9 = tofelt %8 : i1
+// CHECK-NEXT:      %10 = call @Assert::@compute(%9, %0) : (!llzk.felt, !llzk.string) -> !llzk.struct<@Assert<[]>> 
+//
+// CHECK-LABEL:   func @constrain(%arg0: !llzk.struct<@EnsureEq<[@T]>>, %arg1: !llzk.tvar<@T>, %arg2: !llzk.tvar<@T>) {
+// CHECK-NEXT:      %0 = new_string "Provided values are not equal"
+// CHECK-NEXT:      %felt_const_0 = constfelt  0
+// CHECK-NEXT:      emit_eq %arg1, %arg2 : !llzk.tvar<@T>, !llzk.tvar<@T>
+// CHECK-NEXT:      %1 = unifiable_cast %arg1 : (!llzk.tvar<@T>) -> !llzk.felt
+// CHECK-NEXT:      %2 = unifiable_cast %arg2 : (!llzk.tvar<@T>) -> !llzk.felt
+// CHECK-NEXT:      %3 = readf %arg0[@r] : <@EnsureEq<[@T]>>, !llzk.struct<@Eq<[]>>
+// CHECK-NEXT:      call @Eq::@constrain(%3, %1, %2) : (!llzk.struct<@Eq<[]>>, !llzk.felt, !llzk.felt) -> () 
+// CHECK-NEXT:      %4 = readf %3[@"$super"] : <@Eq<[]>>, !llzk.struct<@IsZero<[]>>
+// CHECK-NEXT:      %5 = readf %4[@"$super"] : <@IsZero<[]>>, !llzk.struct<@NondetReg<[]>>
+// CHECK-NEXT:      %6 = readf %5[@"$super"] : <@NondetReg<[]>>, !llzk.felt
+// CHECK-NEXT:      %7 = cmp eq(%6, %felt_const_0)
+// CHECK-NEXT:      %8 = tofelt %7 : i1
+// CHECK-NEXT:      %9 = readf %arg0[@"$temp"] : <@EnsureEq<[@T]>>, !llzk.struct<@Assert<[]>>
+// CHECK-NEXT:      call @Assert::@constrain(%9, %8, %0) : (!llzk.struct<@Assert<[]>>, !llzk.felt, !llzk.string) -> () 

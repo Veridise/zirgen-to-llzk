@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/CommandLine.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -22,6 +23,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/Region.h>
 #include <mlir/IR/ValueRange.h>
@@ -32,7 +34,6 @@
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
-#include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
@@ -135,20 +136,37 @@ mlir::Value ConstructorLowering<Op>::prepareArgument(
     mlir::Value arg, mlir::Type expectedType, mlir::Location loc,
     mlir::ConversionPatternRewriter &rewriter
 ) const {
-  auto binding = this->getType(arg);
-  auto type = expectedType;
-
-  if (mlir::succeeded(binding)) {
-    type = materializeTypeBinding(rewriter.getContext(), *binding);
-  }
-  if (arg.getType() == type) {
+  if (arg.getType() == expectedType) {
     return arg;
   }
-  auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(loc, type, arg);
-  if (expectedType == cast.getResult(0).getType()) {
-    return cast.getResult(0);
+
+  // If the input arg is an UnrealizedConversionCastOp and the expected type is a superclass of the
+  // cast's input type, then generate a SuperCoerceOp directly on the input arg of the cast.
+  if (auto argCast = mlir::dyn_cast<UnrealizedConversionCastOp>(arg.getDefiningOp())) {
+    Operation::operand_range castInputs = argCast.getInputs();
+    if (castInputs.size() == 1) {
+      Value singleInput = castInputs[0];
+      if (auto inpCompType = mlir::dyn_cast<ComponentType>(singleInput.getType())) {
+        if (inpCompType.subtypeOf(expectedType)) {
+          return rewriter.create<SuperCoerceOp>(loc, expectedType, singleInput);
+        }
+      }
+    }
   }
-  return rewriter.create<SuperCoerceOp>(loc, expectedType, cast.getResult(0));
+
+  auto binding = this->getType(arg);
+  Type type = mlir::succeeded(binding) ? materializeTypeBinding(rewriter.getContext(), *binding)
+                                       : expectedType;
+
+  auto cast = rewriter.create<UnrealizedConversionCastOp>(loc, type, arg);
+  Value castResult = cast.getResult(0);
+  if (castResult.getType() == expectedType) {
+    return castResult;
+  }
+  if (mlir::isa<zml::TypeVarType>(type)) {
+    return rewriter.create<zml::UnifiableCastOp>(loc, expectedType, castResult);
+  }
+  return rewriter.create<SuperCoerceOp>(loc, expectedType, castResult);
 }
 
 template <typename Op>
@@ -555,23 +573,23 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   auto comp = adaptor.getComponent();
-  LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << '\n');
   auto originalComp = getType(op.getComponent());
   if (mlir::failed(originalComp)) {
     return op->emitOpError() << "failed to type check component reference";
   }
-  LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << "\n";
+  LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << '\n';
              llvm::dbgs() << "Full printout: \n"; originalComp->print(llvm::dbgs(), true);
-             llvm::dbgs() << "\n");
+             llvm::dbgs() << '\n');
   auto materializedType = materializeTypeBinding(getContext(), *originalComp);
-  LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << '\n');
   auto compType = mlir::dyn_cast<ComponentType>(materializedType);
   if (!compType) {
     return op->emitError() << "type mismatch, cannot access a member for a non-component type "
                            << materializedType;
   }
   if (comp.getType() != compType) {
-    LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << '\n');
     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
     comp = cast.getResult(0);
   }
@@ -580,11 +598,11 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
   auto compDef = compType.getDefinition(st, mod);
   assert(compDef && "Component type without a definition!");
 
-  LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << '\n');
 
   LLVM_DEBUG(
       llvm::dbgs() << "Starting search for member " << adaptor.getMember() << " starting with type "
-                   << compType << "\n"
+                   << compType << '\n'
   );
   auto nameSym = mlir::SymbolRefAttr::get(adaptor.getMemberAttr());
   while (mlir::failed(compDef.lookupFieldType(nameSym))) {
@@ -602,7 +620,7 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
     }
 
     compDef = compType.getDefinition(st, mod);
-    LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << '\n');
   }
 
   auto field = originalComp->getMember(nameSym.getValue(), [&op] { return op->emitError(); });
@@ -687,20 +705,14 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   }
   auto elementType = materializeTypeBinding(getContext(), *elementTypeBinding);
 
-  llvm::SmallVector<FailureOr<TypeBinding>, 1> argBindings;
-  std::transform(
-      op.getElements().begin(), op.getElements().end(), std::back_inserter(argBindings),
-      [&](auto element) { return getType(element); }
-  );
-
-  if (std::any_of(argBindings.begin(), argBindings.end(), failed)) {
-    return op->emitOpError() << "failed to type check array values";
-  }
-
   if (adaptor.getElements().empty()) {
-    assert(false && "TODO");
+    return op->emitOpError() << "cannot be an empty array literal";
+  }
+  llvm::SmallVector<FailureOr<TypeBinding>, 1> argBindings =
+      llvm::map_to_vector(op.getElements(), [this](auto element) { return getType(element); });
 
-    return mlir::failure();
+  if (llvm::any_of(argBindings, failed)) {
+    return op->emitOpError() << "failed to type check array values";
   }
 
   llvm::SmallVector<mlir::Value> args;
@@ -859,8 +871,8 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
     return mlir::failure();
   }
 
-  auto itType = materializeTypeBinding(getContext(), *innerInputBinding);
-  auto outputType = materializeTypeBinding(getContext(), *binding);
+  Type itType = materializeTypeBinding(getContext(), *innerInputBinding);
+  Type outputType = materializeTypeBinding(getContext(), *binding);
 
   auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
   assert(succeeded(arrValue) && "this binding was validated above");
@@ -871,7 +883,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), outputType);
   auto one = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
   auto zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *arrValue);
+  auto len = rewriter.create<GetArrayLenOp>(op.getLoc(), *concreteArrValue);
 
   auto loop = rewriter.create<mlir::scf::ForOp>(
       op.getLoc(), zero, len->getResult(0), one, mlir::ValueRange(arrAlloc),
