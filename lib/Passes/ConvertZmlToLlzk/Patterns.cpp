@@ -187,7 +187,7 @@ LogicalResult LowerNopOp::matchAndRewrite(
 LogicalResult LowerUnifiableCastOp::matchAndRewrite(
     UnifiableCastOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  rewriter.replaceOpWithNewOp<llzk::UnifiableCastOp>(
+  rewriter.replaceOpWithNewOp<llzk::polymorphic::UnifiableCastOp>(
       op, getTypeConverter()->convertType(op.getType()), adaptor.getInput()
   );
   return success();

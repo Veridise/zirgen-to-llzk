@@ -19,6 +19,7 @@
 #include <llzk/Dialect/Bool/IR/Ops.h>
 #include <llzk/Dialect/Felt/IR/Ops.h>
 #include <llzk/Dialect/Felt/IR/Types.h>
+#include <llzk/Dialect/Polymorphic/IR/Ops.h>
 #include <llzk/Dialect/Polymorphic/IR/Types.h>
 #include <llzk/Dialect/String/IR/Types.h>
 #include <llzk/Dialect/Struct/IR/Ops.h>
@@ -183,7 +184,8 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
       return unrealizedCastMaterialization(builder, type, inputs, loc);
     }
     if (llzk::typesUnify(inputType, convertedTarget)) {
-      auto unifyCast = builder.create<llzk::UnifiableCastOp>(loc, convertedTarget, inputs[0]);
+      auto unifyCast =
+          builder.create<llzk::polymorphic::UnifiableCastOp>(loc, convertedTarget, inputs[0]);
       return unrealizedCastMaterialization(builder, type, unifyCast.getResult(), loc);
     }
     return std::nullopt;
@@ -208,7 +210,7 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
     if (llzk::typesUnify(convertedInput, type)) {
       auto cast = unrealizedCastMaterialization(builder, convertedInput, inputs, loc);
       if (cast.has_value()) {
-        return builder.create<llzk::UnifiableCastOp>(loc, type, *cast);
+        return builder.create<llzk::polymorphic::UnifiableCastOp>(loc, type, *cast);
       }
     }
     return std::nullopt;
