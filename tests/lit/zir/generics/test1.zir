@@ -3,49 +3,49 @@
 // COM: Checks that we emit the corresponding functions with the correct types of each parametric component.
 // COM: LLZK already checks that constrain functions cannot be called from compute functions and vice versa.
 
-// CHECK-LABEL:  llzk.struct @Head<[@T, @N]> {
+// CHECK-LABEL:  struct.def @Head<[@T, @N]> {
 component Head<T: Type, N: Val>(arr: Array<T, N>) {
-// CHECK-LABEL:    func @compute
-// CHECK-SAME:    %[[A0:[0-9a-zA-Z_\.]+]]: !llzk.array<@N x !llzk.tvar<@T>>
+// CHECK-LABEL:    function.def @compute
+// CHECK-SAME:    %[[A0:[0-9a-zA-Z_\.]+]]: !array.type<@N x !poly.tvar<@T>>
 
-// CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = constfelt  0
-// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = toindex %[[T0]]
-// CHECK:      %[[T2:[0-9a-zA-Z_\.]+]] = readarr %[[A0]][%[[T1]]] : <@N x !llzk.tvar<@T>>, !llzk.tvar<@T>
+// CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = felt.const  0
+// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T0]]
+// CHECK:      %[[T2:[0-9a-zA-Z_\.]+]] = array.read %[[A0]][%[[T1]]] : <@N x !poly.tvar<@T>>, !poly.tvar<@T>
   arr[0]
 }
 
-// CHECK-LABEL:  llzk.struct @A<[@N]> {
+// CHECK-LABEL:  struct.def @A<[@N]> {
 component A<N: Val>() {
-// CHECK-LABEL:    func @compute
-// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = call @Head::@compute(%[[T0:[0-9a-zA-Z_\.]+]]) 
-// CHECK-SAME:  : (!llzk.array<3 x !llzk.felt>) -> !llzk.struct<@Head<[!llzk.felt, 3]>>
-// CHECK-LABEL:    func @constrain
-// CHECK:      call @Head::@constrain(%[[T0:[0-9a-zA-Z_\.]+]], %[[T1:[0-9a-zA-Z_\.]+]]) 
-// CHECK-SAME:  : (!llzk.struct<@Head<[!llzk.felt, 3]>>, !llzk.array<3 x !llzk.felt>) -> ()
+// CHECK-LABEL:    function.def @compute
+// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = function.call @Head::@compute(%[[T0:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:  : (!array.type<3 x !felt.type>) -> !struct.type<@Head<[!felt.type, 3]>>
+// CHECK-LABEL:    function.def @constrain
+// CHECK:      function.call @Head::@constrain(%[[T0:[0-9a-zA-Z_\.]+]], %[[T1:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:  : (!struct.type<@Head<[!felt.type, 3]>>, !array.type<3 x !felt.type>) -> ()
   Head<Val, 3>([N,N+1,N+2])
 }
 
-// CHECK-LABEL:  llzk.struct @B<[]> {
+// CHECK-LABEL:  struct.def @B<[]> {
 component B() {
-// CHECK-LABEL:    func @compute
-// CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = call @A::@compute() : () -> !llzk.struct<@A<[1]>>
-// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = call @A::@compute() : () -> !llzk.struct<@A<[1]>>
-// CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = call @Head::@compute(%[[T2:[0-9a-zA-Z_\.]+]]) 
-// CHECK-SAME:  : (!llzk.array<2 x !llzk.struct<@A<[1]>>>) -> !llzk.struct<@Head<[!llzk.struct<@A<[1]>>, 2]>>
-// CHECK-LABEL:    func @constrain
-// CHECK:      call @A::@constrain(%[[T0:[0-9a-zA-Z_\.]+]]) : (!llzk.struct<@A<[1]>>) -> ()
-// CHECK:      call @A::@constrain(%[[T1:[0-9a-zA-Z_\.]+]]) : (!llzk.struct<@A<[1]>>) -> ()
-// CHECK:      call @Head::@constrain(%[[T2:[0-9a-zA-Z_\.]+]], %[[T3:[0-9a-zA-Z_\.]+]]) 
-// CHECK-SAME:   : (!llzk.struct<@Head<[!llzk.struct<@A<[1]>>, 2]>>, !llzk.array<2 x !llzk.struct<@A<[1]>>>) -> ()
+// CHECK-LABEL:    function.def @compute
+// CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = function.call @A::@compute() : () -> !struct.type<@A<[1]>>
+// CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = function.call @A::@compute() : () -> !struct.type<@A<[1]>>
+// CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = function.call @Head::@compute(%[[T2:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:  : (!array.type<2 x !struct.type<@A<[1]>>>) -> !struct.type<@Head<[!struct.type<@A<[1]>>, 2]>>
+// CHECK-LABEL:    function.def @constrain
+// CHECK:      function.call @A::@constrain(%[[T0:[0-9a-zA-Z_\.]+]]) : (!struct.type<@A<[1]>>) -> ()
+// CHECK:      function.call @A::@constrain(%[[T1:[0-9a-zA-Z_\.]+]]) : (!struct.type<@A<[1]>>) -> ()
+// CHECK:      function.call @Head::@constrain(%[[T2:[0-9a-zA-Z_\.]+]], %[[T3:[0-9a-zA-Z_\.]+]]) 
+// CHECK-SAME:   : (!struct.type<@Head<[!struct.type<@A<[1]>>, 2]>>, !array.type<2 x !struct.type<@A<[1]>>>) -> ()
   Head<A<1>, 2>([A<1>(), A<1>()])
 }
 
-// CHECK-LABEL:  llzk.struct @Top<[]> {
+// CHECK-LABEL:  struct.def @Top<[]> {
 component Top() {
-// CHECK-LABEL:    func @compute
-// CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = call @A::@compute() : () -> !llzk.struct<@A<[1]>>
-// CHECK-LABEL:    func @constrain
-// CHECK:      call @A::@constrain(%[[T0:[0-9a-zA-Z_\.]+]]) : (!llzk.struct<@A<[1]>>) -> ()
+// CHECK-LABEL:    function.def @compute
+// CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = function.call @A::@compute() : () -> !struct.type<@A<[1]>>
+// CHECK-LABEL:    function.def @constrain
+// CHECK:      function.call @A::@constrain(%[[T0:[0-9a-zA-Z_\.]+]]) : (!struct.type<@A<[1]>>) -> ()
   a := A<1>();
   b := B();
   a = b;

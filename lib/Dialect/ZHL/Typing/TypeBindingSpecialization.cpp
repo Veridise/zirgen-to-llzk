@@ -265,7 +265,7 @@ constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t ind
   auto *replacement = scopes[name];
   if (replacement == nullptr) {
     LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Symbol '" << name << "' is not in scope\n");
-    return expr;
+    return ConstExpr(expr);
   }
   if (replacement->isKnownConst()) {
     LLVM_DEBUG(spaces(indent + 1);
@@ -274,14 +274,14 @@ constantFoldSymExpr(const SymbolView &expr, ParamsScopeStack &scopes, size_t ind
   }
 
   LLVM_DEBUG(spaces(indent + 1); llvm::dbgs() << "Sym expr " << expr << " was not modified\n");
-  return expr;
+  return ConstExpr(expr);
 }
 
 static FailureOr<ConstExpr>
 constantFoldValExpr(const ValView &expr, ParamsScopeStack &, size_t indent) {
   LLVM_DEBUG(spaces(indent);
              llvm::dbgs() << "Propagating constants in Val expr " << expr << " is trivial\n");
-  return expr;
+  return ConstExpr(expr);
 }
 
 static FailureOr<ConstExpr> constantFoldExpr(const ExprView &, ParamsScopeStack &, size_t);
@@ -315,7 +315,7 @@ constantFoldCtorExpr(const CtorView &expr, ParamsScopeStack &scopes, size_t inde
   LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in Ctor expr" << expr << "\n");
   if (!FoldableComponents.contains(typeName)) {
     LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Expr " << expr << " is not foldable\n");
-    return expr;
+    return ConstExpr(expr);
   }
 
   if (typeName == "Neg") {

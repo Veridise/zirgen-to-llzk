@@ -1,0 +1,87 @@
+// RUN: zklang -I %S/Inputs -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
+
+component CheckBounds(pegs: Array<Reg, 3>) {
+  for peg : pegs {
+    reduce for c : 0..1 { NondetReg(peg) } init 64 with Div
+  }
+}
+// CHECK-LABEL: struct.def @CheckBounds<[]> {
+// CHECK-DAG:     field @"$super" : !array.type<3 x !felt.type>
+// CHECK-DAG:     field @"$temp_0" : !array.type<3,1 x !struct.type<@Div<[]>>>
+// CHECK-DAG:     field @"$temp" : !array.type<3,1 x !struct.type<@NondetReg<[]>>> {column}
+// CHECK-DAG:     field @"$array_0" : !array.type<3,1 x !struct.type<@NondetReg<[]>>> {column}
+// CHECK-DAG:     field @"$array" : !array.type<3 x !felt.type>
+// CHECK-LABEL:   function.def @compute(
+// CHECK-SAME:                  %[[V0:[0-9a-zA-Z_\.]+]]: !array.type<3 x !struct.type<@Reg<[]>>>) -> !struct.type<@CheckBounds<[]>>
+// CHECK-DAG:       %[[V1:[0-9a-zA-Z_\.]+]] = felt.const  64
+// CHECK-DAG:       %[[V3:[0-9a-zA-Z_\.]+]] = arith.constant 3 : index
+// CHECK-DAG:       %[[V4:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
+// CHECK-DAG:       %[[V5:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
+// CHECK-DAG:       %[[V6:[0-9a-zA-Z_\.]+]] = struct.new : <@CheckBounds<[]>>
+// CHECK-DAG:       %[[V7:[0-9a-zA-Z_\.]+]] = array.new  : <3 x !felt.type>
+// CHECK-DAG:       scf.for %[[V8:[0-9a-zA-Z_\.]+]] = %[[V4]] to %[[V3]] step %[[V5]] {
+// CHECK-DAG:         %[[V9:[0-9a-zA-Z_\.]+]] = array.read %[[V0]]{{\[}}%[[V8]]] : <3 x !struct.type<@Reg<[]>>>, !struct.type<@Reg<[]>>
+// CHECK-DAG:         %[[V11:[0-9a-zA-Z_\.]+]] = array.new  : <1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V13:[0-9a-zA-Z_\.]+]] = struct.readf %[[V9]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         %[[V14:[0-9a-zA-Z_\.]+]] = struct.readf %[[V13]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:         %[[V15:[0-9a-zA-Z_\.]+]] = function.call @NondetReg::@compute(%[[V14]]) : (!felt.type) -> !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         %[[V16:[0-9a-zA-Z_\.]+]] = struct.readf %[[V6]][@"$temp"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         array.write %[[V16]]{{\[}}%[[V8]], %[[V4]]] = %[[V15]] : <3,1 x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         struct.writef %[[V6]][@"$temp"] = %[[V16]] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V17:[0-9a-zA-Z_\.]+]] = struct.readf %[[V6]][@"$temp"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V18:[0-9a-zA-Z_\.]+]] = array.read %[[V17]]{{\[}}%[[V8]], %[[V4]]] : <3,1 x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         array.write %[[V11]]{{\[}}%[[V4]]] = %[[V18]] : <1 x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         %[[V19:[0-9a-zA-Z_\.]+]] = struct.readf %[[V6]][@"$array_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         array.insert %[[V19]]{{\[}}%[[V8]]] = %[[V11]] : <3,1 x !struct.type<@NondetReg<[]>>>, <1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         struct.writef %[[V6]][@"$array_0"] = %[[V19]] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V20:[0-9a-zA-Z_\.]+]] = struct.readf %[[V6]][@"$array_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V21:[0-9a-zA-Z_\.]+]] = array.extract %[[V20]]{{\[}}%[[V8]]] : <3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V22:[0-9a-zA-Z_\.]+]] = array.read %[[V21]]{{\[}}%[[V4]]] : <1 x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         %[[V23:[0-9a-zA-Z_\.]+]] = struct.readf %[[V22]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:         %[[V24:[0-9a-zA-Z_\.]+]] = function.call @Div::@compute(%[[V1]], %[[V23]]) : (!felt.type, !felt.type) -> !struct.type<@Div<[]>>
+// CHECK-DAG:         %[[V25:[0-9a-zA-Z_\.]+]] = struct.readf %[[V6]][@"$temp_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@Div<[]>>>
+// CHECK-DAG:         array.write %[[V25]]{{\[}}%[[V8]], %[[V4]]] = %[[V24]] : <3,1 x !struct.type<@Div<[]>>>, !struct.type<@Div<[]>>
+// CHECK-DAG:         struct.writef %[[V6]][@"$temp_0"] = %[[V25]] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@Div<[]>>>
+// CHECK-DAG:         %[[V26:[0-9a-zA-Z_\.]+]] = struct.readf %[[V6]][@"$temp_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@Div<[]>>>
+// CHECK-DAG:         %[[V27:[0-9a-zA-Z_\.]+]] = array.read %[[V26]]{{\[}}%[[V8]], %[[V4]]] : <3,1 x !struct.type<@Div<[]>>>, !struct.type<@Div<[]>>
+// CHECK-DAG:         %[[V28:[0-9a-zA-Z_\.]+]] = struct.readf %[[V27]][@"$super"] : <@Div<[]>>, !felt.type
+// CHECK-DAG:         array.write %[[V7]]{{\[}}%[[V8]]] = %[[V28]] : <3 x !felt.type>, !felt.type
+// CHECK-DAG:       } {original_op = "map"}
+// CHECK-DAG:       struct.writef %[[V6]][@"$array"] = %[[V7]] : <@CheckBounds<[]>>, !array.type<3 x !felt.type>
+// CHECK-DAG:       %[[V29:[0-9a-zA-Z_\.]+]] = struct.readf %[[V6]][@"$array"] : <@CheckBounds<[]>>, !array.type<3 x !felt.type>
+// CHECK-DAG:       struct.writef %[[V6]][@"$super"] = %[[V29]] : <@CheckBounds<[]>>, !array.type<3 x !felt.type>
+// CHECK-DAG:       return %[[V6]] : !struct.type<@CheckBounds<[]>>
+// CHECK-DAG:     }
+// CHECK-LABEL:   function.def @constrain(
+// CHECK-SAME:                  %[[V30:[0-9a-zA-Z_\.]+]]: !struct.type<@CheckBounds<[]>>, %[[V31:[0-9a-zA-Z_\.]+]]: !array.type<3 x !struct.type<@Reg<[]>>>) 
+// CHECK-DAG:       %[[V32:[0-9a-zA-Z_\.]+]] = felt.const  64
+// CHECK-DAG:       %[[V33:[0-9a-zA-Z_\.]+]] = felt.const  0
+// CHECK-DAG:       %[[V34:[0-9a-zA-Z_\.]+]] = arith.constant 3 : index
+// CHECK-DAG:       %[[V35:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
+// CHECK-DAG:       %[[V36:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
+// CHECK-DAG:       %[[V37:[0-9a-zA-Z_\.]+]] = array.new  : <3 x !felt.type>
+// CHECK-DAG:       scf.for %[[V38:[0-9a-zA-Z_\.]+]] = %[[V35]] to %[[V34]] step %[[V36]] {
+// CHECK-DAG:         %[[V39:[0-9a-zA-Z_\.]+]] = array.read %[[V31]]{{\[}}%[[V38]]] : <3 x !struct.type<@Reg<[]>>>, !struct.type<@Reg<[]>>
+// CHECK-DAG:         %[[V41:[0-9a-zA-Z_\.]+]] = array.new  : <1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V43:[0-9a-zA-Z_\.]+]] = struct.readf %[[V39]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         %[[V44:[0-9a-zA-Z_\.]+]] = struct.readf %[[V43]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:         %[[V45:[0-9a-zA-Z_\.]+]] = struct.readf %[[V30]][@"$temp"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V46:[0-9a-zA-Z_\.]+]] = struct.readf %[[V30]][@"$temp"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V47:[0-9a-zA-Z_\.]+]] = array.read %[[V46]]{{\[}}%[[V38]], %[[V35]]] : <3,1 x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         function.call @NondetReg::@constrain(%[[V47]], %[[V44]]) : (!struct.type<@NondetReg<[]>>, !felt.type) -> ()
+// CHECK-DAG:         array.write %[[V41]]{{\[}}%[[V35]]] = %[[V47]] : <1 x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         %[[V48:[0-9a-zA-Z_\.]+]] = struct.readf %[[V30]][@"$array_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V49:[0-9a-zA-Z_\.]+]] = struct.readf %[[V30]][@"$array_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V50:[0-9a-zA-Z_\.]+]] = array.extract %[[V49]]{{\[}}%[[V38]]] : <3,1 x !struct.type<@NondetReg<[]>>>
+// CHECK-DAG:         %[[V51:[0-9a-zA-Z_\.]+]] = array.read %[[V50]]{{\[}}%[[V35]]] : <1 x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:         %[[V52:[0-9a-zA-Z_\.]+]] = struct.readf %[[V51]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:         %[[V53:[0-9a-zA-Z_\.]+]] = struct.readf %[[V30]][@"$temp_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@Div<[]>>>
+// CHECK-DAG:         %[[V54:[0-9a-zA-Z_\.]+]] = struct.readf %[[V30]][@"$temp_0"] : <@CheckBounds<[]>>, !array.type<3,1 x !struct.type<@Div<[]>>>
+// CHECK-DAG:         %[[V55:[0-9a-zA-Z_\.]+]] = array.read %[[V54]]{{\[}}%[[V38]], %[[V35]]] : <3,1 x !struct.type<@Div<[]>>>, !struct.type<@Div<[]>>
+// CHECK-DAG:         function.call @Div::@constrain(%[[V55]], %[[V32]], %[[V52]]) : (!struct.type<@Div<[]>>, !felt.type, !felt.type) -> ()
+// CHECK-DAG:         %[[V56:[0-9a-zA-Z_\.]+]] = struct.readf %[[V55]][@"$super"] : <@Div<[]>>, !felt.type
+// CHECK-DAG:         array.write %[[V37]]{{\[}}%[[V38]]] = %[[V56]] : <3 x !felt.type>, !felt.type
+// CHECK-DAG:       } {original_op = "map"}
+// CHECK-DAG:       return
+// CHECK-DAG:     }
+// CHECK-DAG:   }

@@ -1,0 +1,57 @@
+// RUN: zklang -I %S/Inputs -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
+
+component IsZero(val: Val) {
+  isZero := NondetReg(Isz(val));
+  isZero
+}
+
+component Eq(a: Val, b: Val) {
+  IsZero(a - b)
+}
+
+component EnsureEq<T: Type>(a: T, b: T) {
+  a = b;
+  r := Eq(a, b);
+  Assert(Isz(r), "Provided values are not equal");
+  r
+}
+
+test Mastermind {
+  EnsureEq<Val>(45, 46);
+}
+
+// CHECK-LABEL: struct.def @EnsureEq<[@T]> {
+// CHECK-NEXT:    field @"$super" : !struct.type<@Eq<[]>>
+// CHECK-NEXT:    field @"$temp" : !struct.type<@Assert<[]>>
+// CHECK-NEXT:    field @r : !struct.type<@Eq<[]>> {column}
+// CHECK-LABEL:   function.def @compute(%arg0: !poly.tvar<@T>, %arg1: !poly.tvar<@T>) -> !struct.type<@EnsureEq<[@T]>>
+// CHECK-NEXT:      %0 = string.new "Provided values are not equal"
+// CHECK-NEXT:      %felt_const_0 = felt.const  0
+// CHECK-NEXT:      %self = struct.new : <@EnsureEq<[@T]>>
+// CHECK-NEXT:      %1 = poly.unifiable_cast %arg0 : (!poly.tvar<@T>) -> !felt.type
+// CHECK-NEXT:      %2 = poly.unifiable_cast %arg1 : (!poly.tvar<@T>) -> !felt.type
+// CHECK-NEXT:      %3 = function.call @Eq::@compute(%1, %2) : (!felt.type, !felt.type) -> !struct.type<@Eq<[]>> 
+// CHECK-NEXT:      struct.writef %self[@r] = %3 : <@EnsureEq<[@T]>>, !struct.type<@Eq<[]>>
+// CHECK-NEXT:      %4 = struct.readf %self[@r] : <@EnsureEq<[@T]>>, !struct.type<@Eq<[]>>
+// CHECK-NEXT:      %5 = struct.readf %4[@"$super"] : <@Eq<[]>>, !struct.type<@IsZero<[]>>
+// CHECK-NEXT:      %6 = struct.readf %5[@"$super"] : <@IsZero<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-NEXT:      %7 = struct.readf %6[@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-NEXT:      %8 = bool.cmp eq(%7, %felt_const_0)
+// CHECK-NEXT:      %9 = cast.tofelt %8 : i1
+// CHECK-NEXT:      %10 = function.call @Assert::@compute(%9, %0) : (!felt.type, !string.type) -> !struct.type<@Assert<[]>> 
+//
+// CHECK-LABEL:   function.def @constrain(%arg0: !struct.type<@EnsureEq<[@T]>>, %arg1: !poly.tvar<@T>, %arg2: !poly.tvar<@T>) 
+// CHECK-NEXT:      %0 = string.new "Provided values are not equal"
+// CHECK-NEXT:      %felt_const_0 = felt.const  0
+// CHECK-NEXT:      constrain.eq %arg1, %arg2 : !poly.tvar<@T>, !poly.tvar<@T>
+// CHECK-NEXT:      %1 = poly.unifiable_cast %arg1 : (!poly.tvar<@T>) -> !felt.type
+// CHECK-NEXT:      %2 = poly.unifiable_cast %arg2 : (!poly.tvar<@T>) -> !felt.type
+// CHECK-NEXT:      %3 = struct.readf %arg0[@r] : <@EnsureEq<[@T]>>, !struct.type<@Eq<[]>>
+// CHECK-NEXT:      function.call @Eq::@constrain(%3, %1, %2) : (!struct.type<@Eq<[]>>, !felt.type, !felt.type) -> () 
+// CHECK-NEXT:      %4 = struct.readf %3[@"$super"] : <@Eq<[]>>, !struct.type<@IsZero<[]>>
+// CHECK-NEXT:      %5 = struct.readf %4[@"$super"] : <@IsZero<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-NEXT:      %6 = struct.readf %5[@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-NEXT:      %7 = bool.cmp eq(%6, %felt_const_0)
+// CHECK-NEXT:      %8 = cast.tofelt %7 : i1
+// CHECK-NEXT:      %9 = struct.readf %arg0[@"$temp"] : <@EnsureEq<[@T]>>, !struct.type<@Assert<[]>>
+// CHECK-NEXT:      function.call @Assert::@constrain(%9, %8, %0) : (!struct.type<@Assert<[]>>, !felt.type, !string.type) -> () 

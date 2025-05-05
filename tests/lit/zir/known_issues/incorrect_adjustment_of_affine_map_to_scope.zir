@@ -1,0 +1,17 @@
+// RUN: zklang -o - %s 
+// XFAIL: *
+// COM: https://veridise.atlassian.net/browse/LLZK-256
+
+// COM: This test currently fails because it fails to unify the 
+// COM: array size expressions [s0, s1] -> s1 - s0 and 
+// COM: [s0] -> (s0 - 1).
+
+component Foo<A: Val, N: Val>() {
+  for i : A..N { Reg(i) }
+}
+
+component Bar<M: Val>() {
+  for i: Foo<1, M>() {
+    i * 10
+  }
+}

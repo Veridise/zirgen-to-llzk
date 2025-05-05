@@ -14,7 +14,9 @@
 
 #pragma once
 
-#include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <llzk/Dialect/Felt/IR/Ops.h>
+#include <llzk/Dialect/Felt/IR/Types.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>
@@ -146,13 +148,13 @@ public:
   }
 };
 
-using LowerBitAnd = LowerArithBuiltIns<BitAndOp, llzk::AndFeltOp>;
-using LowerAdd = LowerArithBuiltIns<AddOp, llzk::AddFeltOp>;
-using LowerSub = LowerArithBuiltIns<SubOp, llzk::SubFeltOp>;
-using LowerMul = LowerArithBuiltIns<MulOp, llzk::MulFeltOp>;
-using LowerMod = LowerArithBuiltIns<ModOp, llzk::ModFeltOp>;
-using LowerInv = LowerArithBuiltIns<InvOp, llzk::InvFeltOp>;
-using LowerNeg = LowerArithBuiltIns<NegOp, llzk::NegFeltOp>;
+using LowerBitAnd = LowerArithBuiltIns<BitAndOp, llzk::felt::AndFeltOp>;
+using LowerAdd = LowerArithBuiltIns<AddOp, llzk::felt::AddFeltOp>;
+using LowerSub = LowerArithBuiltIns<SubOp, llzk::felt::SubFeltOp>;
+using LowerMul = LowerArithBuiltIns<MulOp, llzk::felt::MulFeltOp>;
+using LowerMod = LowerArithBuiltIns<ModOp, llzk::felt::ModFeltOp>;
+using LowerInv = LowerArithBuiltIns<InvOp, llzk::felt::InvFeltOp>;
+using LowerNeg = LowerArithBuiltIns<NegOp, llzk::felt::NegFeltOp>;
 
 class LowerIsz : public mlir::OpConversionPattern<IsZeroOp> {
 public:
@@ -280,6 +282,14 @@ public:
 
   mlir::LogicalResult
   matchAndRewrite(NopOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
+};
+
+class LowerUnifiableCastOp : public mlir::OpConversionPattern<UnifiableCastOp> {
+public:
+  using mlir::OpConversionPattern<UnifiableCastOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(UnifiableCastOp, OpAdaptor, mlir::ConversionPatternRewriter &) const override;
 };
 
 class LowerSuperCoerceOp : public mlir::OpConversionPattern<SuperCoerceOp> {

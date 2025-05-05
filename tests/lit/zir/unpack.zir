@@ -4,9 +4,9 @@ component Unpack<N: Val, P: Val>(in: Array<Val, N/P>) {
   in[0]
 }
 
-// CHECK-LABEL: func @compute() -> !llzk.struct<@User1<[]>> {
+// CHECK-LABEL: function.def @compute() -> !struct.type<@User1<[]>> 
 component User1() {
   Unpack<8,2>([0,0,0,0])
-// CHECK: %{{[0-9a-zA-Z_\.]+}} = call @Unpack::@compute(%{{[0-9a-zA-Z_\.]+}}) : (!llzk.array<4 x !llzk.felt>) -> !llzk.struct<@Unpack<[8, 2, 4]>> 
-// CHECK-LABEL: func @constrain(%{{[0-9a-zA-Z_\.]+}}: !llzk.struct<@User1<[]>>) {
+// CHECK: %{{[0-9a-zA-Z_\.]+}} = function.call @Unpack::@compute(%{{[0-9a-zA-Z_\.]+}}) : (!array.type<4 x !felt.type>) -> !struct.type<@Unpack<[8, 2, 4]>> 
+// CHECK-LABEL: function.def @constrain(%{{[0-9a-zA-Z_\.]+}}: !struct.type<@User1<[]>>) 
 }

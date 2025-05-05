@@ -8,13 +8,13 @@ component Top() {
   a := A<1>();
 }
 
-//      CHECK-LABEL:   llzk.struct @A<[@N]> {
-// CHECK-LABEL:     func @compute() -> !llzk.struct<@A<[@N]>> {
-// CHECK-DAG:       %[[T1:[0-9a-zA-Z_\.]+]] = constfelt  1
-// CHECK-DAG:       %[[T2:[0-9a-zA-Z_\.]+]] = new_struct : <@A<[@N]>>
-// CHECK-DAG:       %[[T3:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
-// CHECK-DAG:       %[[T4:[0-9a-zA-Z_\.]+]] = add %[[T3]], %[[T1]] : !llzk.felt, !llzk.felt
-// CHECK-DAG:       writef %[[T2]][@"$super"] = %[[T4]] : <@A<[@N]>>, !llzk.felt
-// CHECK-DAG:       return %[[T2]] : !llzk.struct<@A<[@N]>>
-// CHECK-LABEL:     func @constrain(%arg0: !llzk.struct<@A<[@N]>>) {
+//      CHECK-LABEL:   struct.def @A<[@N]> {
+// CHECK-LABEL:     function.def @compute() -> !struct.type<@A<[@N]>> 
+// CHECK-DAG:       %[[T1:[0-9a-zA-Z_\.]+]] = felt.const  1
+// CHECK-DAG:       %[[T2:[0-9a-zA-Z_\.]+]] = struct.new : <@A<[@N]>>
+// CHECK-DAG:       %[[T3:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
+// CHECK-DAG:       %[[T4:[0-9a-zA-Z_\.]+]] = felt.add %[[T3]], %[[T1]] : !felt.type, !felt.type
+// CHECK-DAG:       struct.writef %[[T2]][@"$super"] = %[[T4]] : <@A<[@N]>>, !felt.type
+// CHECK-DAG:       return %[[T2]] : !struct.type<@A<[@N]>>
+// CHECK-LABEL:     function.def @constrain(%arg0: !struct.type<@A<[@N]>>) 
 

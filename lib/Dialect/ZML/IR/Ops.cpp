@@ -12,7 +12,7 @@
 #include <functional>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
-#include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
@@ -302,7 +302,7 @@ mlir::LogicalResult ConstructorRefOp::verify() {
   if (!comp) {
     // The constructor reference could be temporarly pointing
     // to an LLZK struct. Assume it is correct if that's the case.
-    auto structComp = mod.lookupSymbol<llzk::StructDefOp>(compName);
+    auto structComp = mod.lookupSymbol<llzk::component::StructDefOp>(compName);
     if (structComp) {
       return mlir::success();
     }

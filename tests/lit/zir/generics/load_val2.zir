@@ -1,16 +1,16 @@
 // RUN: zklang -o - %s | FileCheck %s
 
 component A<N: Val>() {
-// CHECK-LABEL:   llzk.struct @A<[@N]> {
-// CHECK-LABEL:     func @compute() -> !llzk.struct<@A<[@N]>> {
-// CHECK-DAG:       %[[T1:[0-9a-zA-Z_\.]+]] = constfelt  1
-// CHECK-DAG:       %[[T2:[0-9a-zA-Z_\.]+]] = new_struct : <@A<[@N]>>
-// CHECK-DAG:       %[[T3:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
-// CHECK-DAG:       %[[T4:[0-9a-zA-Z_\.]+]] = add %[[T3]], %[[T1]] : !llzk.felt, !llzk.felt
-// CHECK-DAG:       %[[T5:[0-9a-zA-Z_\.]+]] = new_array %[[T3]], %[[T4]] : <2 x !llzk.felt>
-// CHECK-DAG:       writef %[[T2]][@"$super"] = %[[T5]] : <@A<[@N]>>, !llzk.array<2 x !llzk.felt>
-// CHECK-DAG:       return %[[T2]] : !llzk.struct<@A<[@N]>>
-// CHECK-LABEL:     func @constrain
+// CHECK-LABEL:   struct.def @A<[@N]> {
+// CHECK-LABEL:     function.def @compute() -> !struct.type<@A<[@N]>> 
+// CHECK-DAG:       %[[T1:[0-9a-zA-Z_\.]+]] = felt.const  1
+// CHECK-DAG:       %[[T2:[0-9a-zA-Z_\.]+]] = struct.new : <@A<[@N]>>
+// CHECK-DAG:       %[[T3:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
+// CHECK-DAG:       %[[T4:[0-9a-zA-Z_\.]+]] = felt.add %[[T3]], %[[T1]] : !felt.type, !felt.type
+// CHECK-DAG:       %[[T5:[0-9a-zA-Z_\.]+]] = array.new %[[T3]], %[[T4]] : <2 x !felt.type>
+// CHECK-DAG:       struct.writef %[[T2]][@"$super"] = %[[T5]] : <@A<[@N]>>, !array.type<2 x !felt.type>
+// CHECK-DAG:       return %[[T2]] : !struct.type<@A<[@N]>>
+// CHECK-LABEL:     function.def @constrain
   [N,N+1]
 }
 

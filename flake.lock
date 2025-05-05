@@ -43,14 +43,15 @@
         "nixpkgs": [
           "llzk-pkgs",
           "nixpkgs"
-        ]
+        ],
+        "release-helpers": "release-helpers"
       },
       "locked": {
-        "lastModified": 1744824382,
-        "narHash": "sha256-Zn2b2de8w8qBf1yW0OxtEtjMq2ufPki0f/o+vHkxSes=",
+        "lastModified": 1746223854,
+        "narHash": "sha256-4w4Rdkxd5bcE/W7PZ8hbUVKXy/nhLPQGKn57tzBuMz4=",
         "ref": "main",
-        "rev": "88bb1a8565839b09c4f99c71149832b9c5d8c073",
-        "revCount": 173,
+        "rev": "25f7c774ef8e647f3964fc66d6741d5200cdea08",
+        "revCount": 180,
         "type": "git",
         "url": "ssh://git@github.com/Veridise/llzk-lib.git"
       },
@@ -133,10 +134,12 @@
     "release-helpers": {
       "inputs": {
         "flake-utils": [
+          "llzk",
           "llzk-pkgs",
           "flake-utils"
         ],
         "nixpkgs": [
+          "llzk",
           "llzk-pkgs",
           "nixpkgs"
         ]

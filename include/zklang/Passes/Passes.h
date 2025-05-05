@@ -15,7 +15,7 @@
 #pragma once
 
 #include <llzk/Dialect/LLZK/IR/Dialect.h>
-#include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/Pass/Pass.h>

@@ -1,1 +1,1 @@
-target_sources(ZIRC PRIVATE BuiltIns.cpp)
+target_sources(ZMLDialect PRIVATE BuiltIns.cpp)

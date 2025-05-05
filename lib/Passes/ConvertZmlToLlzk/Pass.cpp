@@ -13,9 +13,17 @@
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
-#include <llzk/Dialect/LLZK/IR/Dialect.h>
-#include <llzk/Dialect/LLZK/IR/Ops.h>
-#include <llzk/Dialect/LLZK/Util/SymbolHelper.h>
+#include <llzk/Dialect/Array/IR/Dialect.h>
+#include <llzk/Dialect/Bool/IR/Dialect.h>
+#include <llzk/Dialect/Cast/IR/Dialect.h>
+#include <llzk/Dialect/Constrain/IR/Dialect.h>
+#include <llzk/Dialect/Function/IR/Dialect.h>
+#include <llzk/Dialect/Global/IR/Dialect.h>
+#include <llzk/Dialect/Polymorphic/IR/Dialect.h>
+#include <llzk/Dialect/String/IR/Dialect.h>
+#include <llzk/Dialect/Struct/IR/Dialect.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
+#include <llzk/Util/SymbolHelper.h>
 #include <memory>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -86,23 +94,28 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   mlir::RewritePatternSet patterns(ctx);
 
   patterns.add<
-      LitValOpLowering, ReplaceSelfWith<NewOp<llzk::CreateStructOp>>, LowerBitAnd, LowerAdd,
-      LowerSub, LowerMul, LowerInv, LowerIsz, LowerNeg, LowerConstrainOp, LowerReadFieldOp,
-      LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp, LowerAllocArrayOp, LowerArrayLengthOp,
-      LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp, WriteFieldOpLowering,
-      LowerConstrainCallOp, LowerNopOp, LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp,
-      ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering, ExternCallOpLowering,
-      CallIndirectOpLoweringInCompute, RemoveConstructorRefOp, RemoveExternFnRefOp,
-      UpdateScfExecuteRegionOpTypes, ValToI1OpLowering, AssertOpLowering, LowerLitValArrayOp,
-      LitStrOpLowering, LowerVarArgsOp, LowerGlobalDefOp, LowerSetGlobalOp, LowerGetGlobalOp,
-      LowerReadBackOp>(*typeConverter, ctx);
+      LitValOpLowering, ReplaceSelfWith<NewOp<llzk::component::CreateStructOp>>, LowerBitAnd,
+      LowerAdd, LowerSub, LowerMul, LowerInv, LowerIsz, LowerNeg, LowerConstrainOp,
+      LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp, LowerAllocArrayOp,
+      LowerArrayLengthOp, LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp,
+      WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerUnifiableCastOp,
+      LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp, ComponentLowering, FieldDefOpLowering,
+      FuncOpLowering, ReturnOpLowering, ExternCallOpLowering, CallIndirectOpLoweringInCompute,
+      RemoveConstructorRefOp, RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering,
+      AssertOpLowering, LowerLitValArrayOp, LitStrOpLowering, LowerVarArgsOp, LowerGlobalDefOp,
+      LowerSetGlobalOp, LowerGetGlobalOp, LowerReadBackOp>(*typeConverter, ctx);
 
   populateExtValToLlzkConversionPatterns(patterns, *typeConverter, ctx, *extValConverter);
 
   scf::populateSCFStructuralTypeConversions(*typeConverter, patterns);
 
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect>();
+  target.addLegalDialect<
+      llzk::LLZKDialect, llzk::global::GlobalDialect, llzk::component::StructDialect,
+      llzk::function::FunctionDialect, llzk::boolean::BoolDialect, llzk::array::ArrayDialect,
+      llzk::constrain::ConstrainDialect, llzk::felt::FeltDialect, llzk::string::StringDialect,
+      llzk::polymorphic::PolymorphicDialect, llzk::cast::CastDialect, mlir::arith::ArithDialect,
+      index::IndexDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
   target.addIllegalDialect<ZMLDialect, mlir::func::FuncDialect>();
 

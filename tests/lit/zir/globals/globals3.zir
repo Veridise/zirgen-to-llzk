@@ -27,81 +27,81 @@ test TestRunner {
 }
 
 // CHECK-LABEL: module @globals {
-// CHECK-NEXT:    llzk.global @c : !llzk.struct<@Reg<[]>>
-// CHECK-NEXT:    llzk.global @b : !llzk.struct<@Reg<[]>>
-// CHECK-NEXT:    llzk.global @a : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    global.def @c : !struct.type<@Reg<[]>>
+// CHECK-NEXT:    global.def @b : !struct.type<@Reg<[]>>
+// CHECK-NEXT:    global.def @a : !struct.type<@Reg<[]>>
 // CHECK-NEXT:  }
 //
-// CHECK-LABEL: llzk.struct @A<[]> {
-// CHECK-LABEL:   func @compute() -> !llzk.struct<@A<[]>> {
-// CHECK-DAG:       %[[VAL_0:.*]] = constfelt  1
-// CHECK-DAG:       %[[VAL_1:.*]] = new_struct : <@A<[]>>
-// CHECK-DAG:       %[[VAL_2:.*]] = call @Reg::@compute(%[[VAL_0]]) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       writeg @globals::@a = %[[VAL_2]] : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       %[[VAL_4:.*]] = readg @globals::@a : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       return %[[VAL_1]] : !llzk.struct<@A<[]>>
+// CHECK-LABEL: struct.def @A<[]> {
+// CHECK-LABEL:   function.def @compute() -> !struct.type<@A<[]>> 
+// CHECK-DAG:       %[[VAL_0:.*]] = felt.const  1
+// CHECK-DAG:       %[[VAL_1:.*]] = struct.new : <@A<[]>>
+// CHECK-DAG:       %[[VAL_2:.*]] = function.call @Reg::@compute(%[[VAL_0]]) : (!felt.type) -> !struct.type<@Reg<[]>>
+// CHECK-DAG:       global.write @globals::@a = %[[VAL_2]] : !struct.type<@Reg<[]>>
+// CHECK-DAG:       %[[VAL_4:.*]] = global.read @globals::@a : !struct.type<@Reg<[]>>
+// CHECK-DAG:       return %[[VAL_1]] : !struct.type<@A<[]>>
 // CHECK-DAG:     }
-// CHECK-LABEL:   func @constrain
-// CHECK-SAME:    (%[[VAL_9:.*]]: !llzk.struct<@A<[]>>) {
-// CHECK-DAG:       %[[VAL_10:.*]] = constfelt  1
-// CHECK-DAG:       %[[VAL_11:.*]] = readg @globals::@a : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       call @Reg::@constrain(%[[VAL_11]], %[[VAL_10]]) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> ()
-// CHECK-DAG:       %[[VAL_12:.*]] = readg @globals::@a : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       %[[VAL_13:.*]] = readf %[[VAL_12]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
-// CHECK-DAG:       %[[VAL_14:.*]] = readf %[[VAL_13]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-// CHECK-DAG:       emit_eq %[[VAL_14]], %[[VAL_10]] : !llzk.felt, !llzk.felt
-// CHECK-DAG:       %[[VAL_15:.*]] = readf %[[VAL_9]][@"$temp"] : <@A<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       call @Component::@constrain(%[[VAL_15]]) : (!llzk.struct<@Component<[]>>) -> ()
+// CHECK-LABEL:   function.def @constrain
+// CHECK-SAME:    (%[[VAL_9:.*]]: !struct.type<@A<[]>>) 
+// CHECK-DAG:       %[[VAL_10:.*]] = felt.const  1
+// CHECK-DAG:       %[[VAL_11:.*]] = global.read @globals::@a : !struct.type<@Reg<[]>>
+// CHECK-DAG:       function.call @Reg::@constrain(%[[VAL_11]], %[[VAL_10]]) : (!struct.type<@Reg<[]>>, !felt.type) -> ()
+// CHECK-DAG:       %[[VAL_12:.*]] = global.read @globals::@a : !struct.type<@Reg<[]>>
+// CHECK-DAG:       %[[VAL_13:.*]] = struct.readf %[[VAL_12]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:       %[[VAL_14:.*]] = struct.readf %[[VAL_13]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:       constrain.eq %[[VAL_14]], %[[VAL_10]] : !felt.type, !felt.type
+// CHECK-DAG:       %[[VAL_15:.*]] = struct.readf %[[VAL_9]][@"$temp"] : <@A<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       function.call @Component::@constrain(%[[VAL_15]]) : (!struct.type<@Component<[]>>) -> ()
 // CHECK-DAG:       return
 // CHECK-DAG:     }
 // CHECK-DAG:   }
 //
-// CHECK-LABEL: llzk.struct @B<[]> {
-// CHECK-LABEL:   func @compute() -> !llzk.struct<@B<[]>> {
-// CHECK-DAG:       %[[VAL_0:.*]] = new_struct : <@B<[]>>
-// CHECK-DAG:       %[[VAL_1:.*]] = readg @globals::@b : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       %[[VAL_2:.*]] = readf %[[VAL_1]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
-// CHECK-DAG:       %[[VAL_3:.*]] = readf %[[VAL_2]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-// CHECK-DAG:       %[[VAL_4:.*]] = call @Component::@compute() : () -> !llzk.struct<@Component<[]>>
-// CHECK-DAG:       writef %[[VAL_0]][@"$temp"] = %[[VAL_4]] : <@B<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       %[[VAL_5:.*]] = readf %[[VAL_0]][@"$temp"] : <@B<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       writef %[[VAL_0]][@"$super"] = %[[VAL_5]] : <@B<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       return %[[VAL_0]] : !llzk.struct<@B<[]>>
+// CHECK-LABEL: struct.def @B<[]> {
+// CHECK-LABEL:   function.def @compute() -> !struct.type<@B<[]>> 
+// CHECK-DAG:       %[[VAL_0:.*]] = struct.new : <@B<[]>>
+// CHECK-DAG:       %[[VAL_1:.*]] = global.read @globals::@b : !struct.type<@Reg<[]>>
+// CHECK-DAG:       %[[VAL_2:.*]] = struct.readf %[[VAL_1]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:       %[[VAL_3:.*]] = struct.readf %[[VAL_2]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:       %[[VAL_4:.*]] = function.call @Component::@compute() : () -> !struct.type<@Component<[]>>
+// CHECK-DAG:       writef %[[VAL_0]][@"$temp"] = %[[VAL_4]] : <@B<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       %[[VAL_5:.*]] = struct.readf %[[VAL_0]][@"$temp"] : <@B<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       writef %[[VAL_0]][@"$super"] = %[[VAL_5]] : <@B<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       return %[[VAL_0]] : !struct.type<@B<[]>>
 // CHECK-DAG:     }
-// CHECK-LABEL:   func @constrain
-// CHECK-SAME:    (%[[VAL_6:.*]]: !llzk.struct<@B<[]>>) {
-// CHECK-DAG:       %[[VAL_7:.*]] = constfelt  2
-// CHECK-DAG:       %[[VAL_8:.*]] = readg @globals::@b : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       %[[VAL_9:.*]] = readf %[[VAL_8]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
-// CHECK-DAG:       %[[VAL_10:.*]] = readf %[[VAL_9]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-// CHECK-DAG:       emit_eq %[[VAL_10]], %[[VAL_7]] : !llzk.felt, !llzk.felt
-// CHECK-DAG:       %[[VAL_11:.*]] = readf %[[VAL_6]][@"$temp"] : <@B<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       call @Component::@constrain(%[[VAL_11]]) : (!llzk.struct<@Component<[]>>) -> ()
+// CHECK-LABEL:   function.def @constrain
+// CHECK-SAME:    (%[[VAL_6:.*]]: !struct.type<@B<[]>>) 
+// CHECK-DAG:       %[[VAL_7:.*]] = felt.const  2
+// CHECK-DAG:       %[[VAL_8:.*]] = global.read @globals::@b : !struct.type<@Reg<[]>>
+// CHECK-DAG:       %[[VAL_9:.*]] = struct.readf %[[VAL_8]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:       %[[VAL_10:.*]] = struct.readf %[[VAL_9]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:       constrain.eq %[[VAL_10]], %[[VAL_7]] : !felt.type, !felt.type
+// CHECK-DAG:       %[[VAL_11:.*]] = struct.readf %[[VAL_6]][@"$temp"] : <@B<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       function.call @Component::@constrain(%[[VAL_11]]) : (!struct.type<@Component<[]>>) -> ()
 // CHECK-DAG:       return
 // CHECK-DAG:     }
 // CHECK-DAG:   }
 //
-// CHECK-LABEL: llzk.struct @C<[]> {
-// CHECK-LABEL:   func @compute() -> !llzk.struct<@C<[]>> {
-// CHECK-DAG:       %[[VAL_0:.*]] = new_struct : <@C<[]>>
-// CHECK-DAG:       %[[VAL_1:.*]] = readg @globals::@c : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       %[[VAL_2:.*]] = readf %[[VAL_1]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
-// CHECK-DAG:       %[[VAL_3:.*]] = readf %[[VAL_2]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-// CHECK-DAG:       %[[VAL_4:.*]] = call @Component::@compute() : () -> !llzk.struct<@Component<[]>>
-// CHECK-DAG:       writef %[[VAL_0]][@"$temp"] = %[[VAL_4]] : <@C<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       %[[VAL_5:.*]] = readf %[[VAL_0]][@"$temp"] : <@C<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       writef %[[VAL_0]][@"$super"] = %[[VAL_5]] : <@C<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       return %[[VAL_0]] : !llzk.struct<@C<[]>>
+// CHECK-LABEL: struct.def @C<[]> {
+// CHECK-LABEL:   function.def @compute() -> !struct.type<@C<[]>> 
+// CHECK-DAG:       %[[VAL_0:.*]] = struct.new : <@C<[]>>
+// CHECK-DAG:       %[[VAL_1:.*]] = global.read @globals::@c : !struct.type<@Reg<[]>>
+// CHECK-DAG:       %[[VAL_2:.*]] = struct.readf %[[VAL_1]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:       %[[VAL_3:.*]] = struct.readf %[[VAL_2]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:       %[[VAL_4:.*]] = function.call @Component::@compute() : () -> !struct.type<@Component<[]>>
+// CHECK-DAG:       writef %[[VAL_0]][@"$temp"] = %[[VAL_4]] : <@C<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       %[[VAL_5:.*]] = struct.readf %[[VAL_0]][@"$temp"] : <@C<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       writef %[[VAL_0]][@"$super"] = %[[VAL_5]] : <@C<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       return %[[VAL_0]] : !struct.type<@C<[]>>
 // CHECK-DAG:     }
-// CHECK-LABEL:   func @constrain
-// CHECK-SAME:    (%[[VAL_6:.*]]: !llzk.struct<@C<[]>>) {
-// CHECK-DAG:       %[[VAL_7:.*]] = constfelt  1
-// CHECK-DAG:       %[[VAL_8:.*]] = readg @globals::@c : !llzk.struct<@Reg<[]>>
-// CHECK-DAG:       %[[VAL_9:.*]] = readf %[[VAL_8]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
-// CHECK-DAG:       %[[VAL_10:.*]] = readf %[[VAL_9]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-// CHECK-DAG:       emit_eq %[[VAL_10]], %[[VAL_7]] : !llzk.felt, !llzk.felt
-// CHECK-DAG:       %[[VAL_11:.*]] = readf %[[VAL_6]][@"$temp"] : <@C<[]>>, !llzk.struct<@Component<[]>>
-// CHECK-DAG:       call @Component::@constrain(%[[VAL_11]]) : (!llzk.struct<@Component<[]>>) -> ()
+// CHECK-LABEL:   function.def @constrain
+// CHECK-SAME:    (%[[VAL_6:.*]]: !struct.type<@C<[]>>) 
+// CHECK-DAG:       %[[VAL_7:.*]] = felt.const  1
+// CHECK-DAG:       %[[VAL_8:.*]] = global.read @globals::@c : !struct.type<@Reg<[]>>
+// CHECK-DAG:       %[[VAL_9:.*]] = struct.readf %[[VAL_8]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK-DAG:       %[[VAL_10:.*]] = struct.readf %[[VAL_9]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK-DAG:       constrain.eq %[[VAL_10]], %[[VAL_7]] : !felt.type, !felt.type
+// CHECK-DAG:       %[[VAL_11:.*]] = struct.readf %[[VAL_6]][@"$temp"] : <@C<[]>>, !struct.type<@Component<[]>>
+// CHECK-DAG:       function.call @Component::@constrain(%[[VAL_11]]) : (!struct.type<@Component<[]>>) -> ()
 // CHECK-DAG:       return
 // CHECK-DAG:     }
 // CHECK-DAG:   }

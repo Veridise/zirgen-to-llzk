@@ -44,34 +44,6 @@
         zklangGCC = (final.zklang.override { stdenv = final.gccStdenv; }).overrideAttrs(attrs: {
           cmakeBuildType = "RelWithDebInfo";
         });
-
-        # The default shell is used for ZKLANG development.
-        # Because `nix develop` is used to set up a dev shell for a given
-        # derivation, we just need to extend the  derivation with any
-        # extra tools we need.
-        devShellBase = { pkgs, zklangEnv ? final.zklang, ... }: {
-          shell = zklangEnv.overrideAttrs (old: {
-            nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [
-              doxygen
-
-              # clang-tidy and clang-format
-              clang-tools_18
-
-              # git-clang-format
-              libclang.python
-
-            ]);
-
-            shellHook = ''
-              # needed to get accurate compile_commands.json
-              export CXXFLAGS="$NIX_CFLAGS_COMPILE"
-
-              # Add binary dir to PATH for convenience
-              export PATH="$PWD"/build/bin:"$PATH"
-
-            '';
-          });
-        };
       };
     } //
     (flake-utils.lib.eachDefaultSystem (system:
@@ -106,7 +78,7 @@
 
         devShells = flake-utils.lib.flattenTree {
           default =  pkgs.zklang.overrideAttrs (old: {
-            nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [
+            nativeBuildInputs = (with pkgs; [
               doxygen
 
               # clang-tidy and clang-format
@@ -115,7 +87,7 @@
               # git-clang-format
               libclang.python
 
-            ]);
+            ]) ++ old.nativeBuildInputs;
 
             shellHook = ''
               # needed to get accurate compile_commands.json

@@ -15,7 +15,6 @@
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
-#include <zklang/Dialect/ZHL/Typing/FrameImpl.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/InnerFrame.h>
 #include <zklang/Dialect/ZHL/Typing/Interpreter.h>
@@ -121,10 +120,12 @@ mlir::FailureOr<TypeBinding> ConstructTypingRule::
   //       Meaning, any builtin that was not overriden and that will lower to a llzk operation that
   //       is not ComputeOnly don't need to allocate a frame. This will avoid creating unnecessary
   //       fields.
-  if (operands[0].isBuiltin() && zml::isBuiltinDontNeedAlloc(operands[0].getName())) {
-    return interpretOp(op, operands[0], operands.drop_front());
+  const TypeBinding &baseOperand = operands[0];
+  if (baseOperand.isBuiltin() && zml::isBuiltinDontNeedAlloc(baseOperand.getName())) {
+    return interpretOp(op, baseOperand, operands.drop_front());
   }
-  auto component = interpretOp(op, operands[0], operands.drop_front());
+  TypeBinding component = interpretOp(op, baseOperand, operands.drop_front());
+
   scope.getCurrentFrame().allocateSlot<ComponentSlot>(getBindings(), component);
   // If we are constructing a component that needs backvariables then we need it in the caller as
   // well.
@@ -312,7 +313,7 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     return copy;
   };
 
-  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Type checking op " << op << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[DefinitionOp rule] Type checking op " << op << '\n');
   auto decl = getDeclaration(op);
   if (mlir::failed(decl)) {
     return op->emitError() << "malformed IR: Definition must have a declaration operand";
@@ -346,14 +347,14 @@ mlir::FailureOr<TypeBinding> DefineTypeRule::
     } else {
       LLVM_DEBUG(
           llvm::dbgs() << "Allocating a new slot '" << decl->getMember() << "' for type " << binding
-                       << "\n"
+                       << '\n'
       );
       auto copy = copyWithoutSlot(binding);
       auto *slot = scope.getCurrentFrame().allocateSlot<ComponentSlot>(
           getBindings(), copy, decl->getMember()
       );
       (void)slot;
-      LLVM_DEBUG(llvm::dbgs() << "Created a new slot " << slot << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Created a new slot " << slot << '\n');
       return copy;
     }
   };
@@ -410,10 +411,14 @@ mlir::FailureOr<TypeBinding> ConstrainTypeRule::
     return op.emitError() << "constraint expression expects 2 operands, but got "
                           << operands.size();
   }
-  auto &lhs = operands[0];
-  auto &rhs = operands[1];
+  const TypeBinding &lhs = operands[0];
+  const TypeBinding &rhs = operands[1];
 
-  auto leastCommon = lhs.commonSupertypeWith(rhs);
+  TypeBinding leastCommon = lhs.commonSupertypeWith(rhs);
+  if (leastCommon.isGenericParam()) {
+    return interpretOp(op, leastCommon);
+  }
+
   if (leastCommon.isArray()) {
     auto leastCommonArray = leastCommon.getConcreteArrayType();
     if (mlir::failed(leastCommonArray)) {
@@ -422,7 +427,8 @@ mlir::FailureOr<TypeBinding> ConstrainTypeRule::
     }
     return interpretOp(op, *leastCommonArray);
   }
-  auto &Val = getBindings().Get("Val");
+
+  const TypeBinding &Val = getBindings().Get("Val");
   if (succeeded(leastCommon.subtypeOf(Val))) {
     return interpretOp(op, Val);
   }
@@ -755,45 +761,46 @@ FailureOr<TypeBinding> MapTypeRule::typeCheck(
   if (regionScopes.size() != 1) {
     return op->emitError() << "was expecting to have only one region";
   }
-
-  if (!operands[0].isArray()) {
-    return op->emitOpError() << "was expecting a array as input. Got '" << operands[0].getName()
-                             << "'";
+  if (operands.size() != 1) {
+    return op->emitError() << "was expecting to have only one operand";
   }
-  auto arrayLen = operands[0].getArraySize([&] { return op->emitError(); });
+  TypeBinding operandBinding = operands[0];
+  auto arrayLen = operandBinding.getArraySize([&] { return op->emitError(); });
   if (failed(arrayLen)) {
     return failure();
   }
+  if (!(arrayLen->isConst() || arrayLen->hasConstExpr())) {
+    return op->emitError() << "was expecting a known compile-time constant array size but got '"
+                           << *arrayLen << "'";
+  }
 
-  assert(arrayLen->isConst() || arrayLen->hasConstExpr());
-
-  assert(!regionScopes.empty());
   auto super = regionScopes[0]->getSuperType();
   if (failed(super)) {
     return op->emitOpError() << "failed to deduce the super type";
   }
 
   auto binding = interpretOp(op, getBindings().Array(*super, *arrayLen, op.getLoc()));
-  if (auto slot = scope.getCurrentFrame().getParentSlot()) {
-    if (auto compSlot = dyn_cast<ComponentSlot>(slot)) {
-      LLVM_DEBUG(
-          llvm::dbgs() << "Setting binding  of slot " << compSlot << " to " << binding << "\n"
-      );
-      // Is a component slot so we change the type
-      compSlot->setBinding(binding);
-    } else {
-      LLVM_DEBUG(
-          llvm::dbgs() << "Marking binding " << binding << " with slot " << slot
-                       << " (name = " << slot->getSlotName() << ")\n"
-      );
-      // Any other slot simply gets forwarded
-      binding.markSlot(slot);
-    }
-    if (auto *arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
-      arrayFrame->setSize(*arrayLen);
-    }
+  auto slot = scope.getCurrentFrame().getParentSlot();
+  if (!slot) {
+    LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << '\n');
+    return binding;
+  }
+  if (auto compSlot = dyn_cast<ComponentSlot>(slot)) {
+    LLVM_DEBUG(
+        llvm::dbgs() << "Setting binding  of slot " << compSlot << " to " << binding << '\n'
+    );
+    // Is a component slot so we change the type
+    compSlot->setBinding(binding);
   } else {
-    LLVM_DEBUG(llvm::dbgs() << "MapOp did not mark a slot for the binding " << binding << "\n");
+    LLVM_DEBUG(
+        llvm::dbgs() << "Marking binding " << binding << " with slot " << slot
+                     << " (name = " << slot->getSlotName() << ")\n"
+    );
+    // Any other slot simply gets forwarded
+    binding.markSlot(slot);
+  }
+  if (auto *arrayFrame = mlir::dyn_cast<ArrayFrame>(slot)) {
+    arrayFrame->setSize(*arrayLen);
   }
   return binding;
 }

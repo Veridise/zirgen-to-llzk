@@ -7,9 +7,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/Expr.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 
 #include <algorithm>
 #include <cmath>
@@ -108,6 +111,19 @@ ConstExpr ConstExpr::Ctor(StringRef name, ArrayRef<ConstExpr> args) {
   return ConstExpr();
 }
 
+mlir::FailureOr<ConstExpr> ConstExpr::remap(Params params, EmitErrorFn emitError) const {
+  // If this pointer is "null" return a null pointer as well.
+  if (!expr) {
+    return ConstExpr(nullptr);
+  }
+
+  auto *replacement = expr->remap(params, emitError);
+  if (!replacement) {
+    return failure();
+  }
+  return ConstExpr(replacement);
+}
+
 //==-----------------------------------------------------------------------==//
 // Val
 //==-----------------------------------------------------------------------==//
@@ -126,6 +142,8 @@ Attribute Val::convertIntoAttribute(Builder &builder) const {
   return builder.getI64IntegerAttr(static_cast<int64_t>(value));
 }
 
+ExprBase *Val::remap(Params, EmitErrorFn) const { return clone(); }
+
 //==-----------------------------------------------------------------------==//
 // Symbol
 //==-----------------------------------------------------------------------==//
@@ -141,6 +159,18 @@ void Symbol::print(llvm::raw_ostream &os) const { os << name; }
 
 Attribute Symbol::convertIntoAttribute(Builder &builder) const {
   return SymbolRefAttr::get(builder.getStringAttr(name));
+}
+
+ExprBase *Symbol::remap(Params params, EmitErrorFn emitError) const {
+  auto *binding = params[name];
+  if (!binding) {
+    return clone();
+  }
+  if (!binding->hasConstExpr()) {
+    emitError() << "was expecting a constant expression but got '" << *binding << "'";
+    return nullptr;
+  }
+  return binding->getConstExpr()->clone();
 }
 
 //==-----------------------------------------------------------------------==//
@@ -258,6 +288,15 @@ Attribute Ctor::convertIntoAttribute(Builder &builder) const {
   return zml::ConstExprAttr::get(map, formals);
 }
 
+ExprBase *Ctor::remap(Params params, EmitErrorFn emitError) const {
+  auto replacedArgs =
+      llvm::map_to_vector(args, [&](const ExprBase &arg) { return arg.remap(params, emitError); });
+  if (llvm::any_of(replacedArgs, [](auto &arg) { return !arg; })) {
+    return nullptr;
+  }
+  return new Ctor(typeName, Arguments(std::move(replacedArgs)));
+}
+
 //==-----------------------------------------------------------------------==//
 // Ctor::Arguments
 //==-----------------------------------------------------------------------==//
@@ -275,8 +314,15 @@ template <typename List> static void cleanArgsList(List &lst) {
   lst.clearAndDispose(std::default_delete<typename List::value_type>());
 }
 
-Ctor::Arguments::Arguments(SmallVectorImpl<value_type> &&Args) {
+Ctor::Arguments::Arguments(SmallVectorImpl<value_type> &Args) {
   copyArgsList(Args, lst, [](value_type expr) -> reference { return cloneHelper(*expr); });
+}
+
+Ctor::Arguments::Arguments(SmallVectorImpl<value_type> &&Args) {
+  copyArgsList(Args, lst, [](value_type expr) -> reference {
+    assert(expr);
+    return *expr;
+  });
 }
 
 Ctor::Arguments::Arguments(const Arguments &other) { copyArgsList(other.lst, lst, cloneHelper); }

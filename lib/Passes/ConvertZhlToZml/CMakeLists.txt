@@ -1,4 +1,1 @@
-target_sources(ZIRC PRIVATE 
-  Pass.cpp 
-  Patterns.cpp
-)
+target_sources(ZklangPasses PRIVATE Pass.cpp Patterns.cpp)

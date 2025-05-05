@@ -25,6 +25,7 @@
 #include <mlir/IR/Attributes.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/Params.h>
 
 namespace llvm {
 class raw_ostream;
@@ -36,6 +37,8 @@ class Builder;
 } // namespace mlir
 
 namespace zhl::expr {
+
+using EmitErrorFn = llvm::function_ref<mlir::InFlightDiagnostic()>;
 
 class ConstExpr;
 class SimpleExprView;
@@ -72,6 +75,11 @@ public:
 
   /// Collects all the free symbols in the expression.
   virtual void collectFreeSymbols(llvm::StringSet<> &) const = 0;
+
+  /// Remaps the free symbols in the expression to other expressions and returns
+  /// the replaced expression. Matching TypeBindings must have a const expression.
+  /// if that is not the case this method returns nullptr.
+  virtual ExprBase *remap(Params, EmitErrorFn) const = 0;
 
   /// Wrap the expression into a simple view without lifetime considerations.
   operator SimpleExprView() const;
@@ -118,7 +126,6 @@ public:
   /// Convert the viewed expression into a managed expression. How this is achieved is
   /// implementation specific.
   virtual operator ConstExpr() const = 0;
-  virtual operator mlir::FailureOr<ConstExpr>() const = 0;
 
   /// Returns a pointer to the viewed expression.
   virtual const detail::ExprBase *get() const = 0;
@@ -149,9 +156,6 @@ public:
     /// If the view is valid creates a ConstExpr that shares the pointer with other ConstExpr
     /// instances. If the view is not valid returns a falsey ConstExpr.
     operator ConstExpr() const override { return ConstExpr(*this); }
-    operator mlir::FailureOr<ConstExpr>() const override {
-      return mlir::FailureOr(ConstExpr(*this));
-    }
 
   private:
     std::weak_ptr<detail::ExprBase> view;
@@ -169,7 +173,11 @@ public:
 
   /// Constructs by adopting the shared pointer the view is referencing to. If the view is invalid
   /// will construct a falsey object.
-  ConstExpr(const View &view) : expr(view.view.lock()){};
+  ConstExpr(const View &view) : expr(view.view.lock()) {}
+
+  /// Remaps the inner expression using the given parameters. If the replacement fails
+  /// returns `mlir::failure()`.
+  mlir::FailureOr<ConstExpr> remap(Params, EmitErrorFn) const;
 
   /// Returns a pointer to the underlying expression.
   const detail::ExprBase *get() const override { return expr.get(); }
@@ -190,7 +198,6 @@ public:
 
   /// Trivially copies itself.
   operator ConstExpr() const override { return *this; }
-  operator mlir::FailureOr<ConstExpr>() const override { return mlir::FailureOr(ConstExpr(*this)); }
 
 private:
   explicit ConstExpr(detail::ExprBase *ptr) : expr(ptr) {}
@@ -214,9 +221,6 @@ public:
 
   /// Clone the viewed expression and wrap it.
   operator ConstExpr() const override { return ConstExpr(*arg); }
-
-  /// Clone the viewed expression and wrap it.
-  operator mlir::FailureOr<ConstExpr>() const override { return mlir::FailureOr(ConstExpr(*arg)); }
 
 private:
   const detail::ExprBase *arg;
@@ -242,6 +246,8 @@ public:
 
   void collectFreeSymbols(llvm::StringSet<> &) const override {}
 
+  ExprBase *remap(Params, EmitErrorFn) const override;
+
   uint64_t getValue() const { return value; }
 
 private:
@@ -261,6 +267,8 @@ public:
   mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
 
   void collectFreeSymbols(llvm::StringSet<> &symbols) const override { symbols.insert(name); }
+
+  ExprBase *remap(Params, EmitErrorFn) const override;
 
   mlir::StringRef getName() const { return name; }
 
@@ -284,6 +292,10 @@ public:
     using value_type = ExprBase *;
     using reference = ArgsList::reference;
 
+    /// Clones the given expressions used as arguments.
+    Arguments(mlir::SmallVectorImpl<value_type> &);
+    /// Adopts ownership of the given expressions used as arguments. Cannot have null values in the
+    /// vector.
     Arguments(mlir::SmallVectorImpl<value_type> &&);
     Arguments(const Arguments &);
     Arguments &operator=(const Arguments &);
@@ -314,6 +326,8 @@ public:
   mlir::Attribute convertIntoAttribute(mlir::Builder &) const override;
   mlir::FailureOr<mlir::AffineExpr> convertIntoAffineExpr(mlir::Builder &) const override;
   void collectFreeSymbols(llvm::StringSet<> &) const override;
+
+  ExprBase *remap(Params, EmitErrorFn) const override;
 
   Arguments &arguments() { return args; }
   const Arguments &arguments() const { return args; }
@@ -383,9 +397,6 @@ public:
   /// Delegates the convertion to ConstExpr to the inner view. Returns a falsey ConstExpr object if
   /// the view is null.
   operator ConstExpr() const override { return view ? ConstExpr(*view) : ConstExpr(); }
-  operator mlir::FailureOr<ConstExpr>() const override {
-    return mlir::FailureOr(view ? ConstExpr(*view) : ConstExpr());
-  }
 
 private:
   const ExprView *view;
@@ -422,7 +433,6 @@ public:
 
   /// Returns a copy of the underlying ConstExpr object.
   operator ConstExpr() const override { return expr; }
-  operator mlir::FailureOr<ConstExpr>() const override { return mlir::FailureOr(ConstExpr(expr)); }
 
   const detail::ExprBase *base() const override { return expr.get(); }
 
@@ -444,155 +454,30 @@ using CtorExpr = TypedExprAdaptor<detail::Ctor>;
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::detail::ExprBase &);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::ExprView &);
 
-template <>
-struct llvm::CastInfo<zhl::expr::ValExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::ValExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::ValExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
+#define enable_expr_cast(T, F)                                                                     \
+  template <>                                                                                      \
+  struct llvm::CastInfo<T, F> : public llvm::CastIsPossible<T, std::remove_const_t<F>> {           \
+    static inline T doCast(const std::remove_const_t<F> &f) { return T(f); }                       \
+    static inline T castFailed() { return T(); }                                                   \
+    static inline T doCastIfPossible(const std::remove_const_t<F> &f) {                            \
+      if (!llvm::CastInfo<T, F>::isPossible(f)) {                                                  \
+        return castFailed();                                                                       \
+      }                                                                                            \
+      return doCast(f);                                                                            \
+    }                                                                                              \
   }
-};
 
-template <>
-struct llvm::CastInfo<zhl::expr::ValView, zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::ValView, zhl::expr::ExprView> {
-  using from = zhl::expr::ExprView;
-  using to = zhl::expr::ValView;
-  using self = llvm::CastInfo<to, from>;
+enable_expr_cast(zhl::expr::ValExpr, zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::ValExpr, const zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::ValView, zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::ValView, const zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::SymExpr, zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::SymExpr, const zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::SymbolView, zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::SymbolView, const zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::CtorExpr, zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::CtorExpr, const zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::CtorView, zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::CtorView, const zhl::expr::ExprView);
 
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::ValView, const zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::ValView, const zhl::expr::ExprView> {
-  using from = const zhl::expr::ExprView;
-  using to = zhl::expr::ValView;
-  using self = llvm::CastInfo<to, const from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::SymExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::SymExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::SymExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::SymbolView, zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::SymbolView, zhl::expr::ExprView> {
-  using from = zhl::expr::ExprView;
-  using to = zhl::expr::SymbolView;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::SymbolView, const zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::SymbolView, const zhl::expr::ExprView> {
-  using from = const zhl::expr::ExprView;
-  using to = zhl::expr::SymbolView;
-  using self = llvm::CastInfo<to, const from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::CtorExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::CtorExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::CtorExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::CtorView, zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::CtorView, zhl::expr::ExprView> {
-  using from = zhl::expr::ExprView;
-  using to = zhl::expr::CtorView;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::CtorView, const zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::CtorView, const zhl::expr::ExprView> {
-  using from = const zhl::expr::ExprView;
-  using to = zhl::expr::CtorView;
-  using self = llvm::CastInfo<to, const from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
+#undef enable_expr_cast

@@ -14,7 +14,8 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/WithColor.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llzk/Dialect/LLZK/IR/Dialect.h>
+#include <llzk/Dialect/InitDialects.h>
+#include <llzk/Dialect/Struct/IR/Dialect.h>
 #include <mlir/Bytecode/BytecodeWriter.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Debug/CLOptionsSetup.h>
@@ -111,7 +112,7 @@ struct ZirFrontendDialects {
   ZirFrontendDialects() {
     registry.insert<zml::ZMLDialect>();
     registry.insert<zirgen::Zhl::ZhlDialect>();
-    registry.insert<llzk::LLZKDialect>();
+    llzk::registerAllDialects(registry);
   }
   mlir::DialectRegistry registry;
 };
@@ -169,6 +170,13 @@ Driver::Driver(int &argc, char **&argv)
 
 void Driver::configureLoweringPipeline() {
   pm.clear();
+  if (emitAction == Action::PrintZHL) {
+    if (stripDebugInfo) {
+      pm.addPass(mlir::createStripDebugInfoPass());
+    }
+    return;
+  }
+
   if (emitAction >= Action::PrintLlzk || emitAction == Action::None) {
     pm.addPass(zklang::createInjectLlzkModAttrsPass());
   }
@@ -205,7 +213,7 @@ void Driver::configureLoweringPipeline() {
     return;
   }
   pm.addPass(zklang::createConvertZmlToLlzkPass());
-  auto &llzkStructPipeline = pm.nest<llzk::StructDefOp>();
+  auto &llzkStructPipeline = pm.nest<llzk::component::StructDefOp>();
   if (!DisableCastReconciliationFlag) {
     llzkStructPipeline.addPass(mlir::createReconcileUnrealizedCastsPass());
   }
@@ -309,11 +317,6 @@ LogicalResult Driver::run() {
     return failure();
   }
   ModuleEraseGuard guard(*mod);
-  if (emitAction == Action::PrintZHL) {
-    dst.writeModule(*mod);
-    return success();
-  }
-
   configureLoweringPipeline();
   pm.dump();
   if (failed(pm.run(*mod))) {
