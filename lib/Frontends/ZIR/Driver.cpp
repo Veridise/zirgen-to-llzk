@@ -15,9 +15,15 @@
 #include <llvm/Support/WithColor.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llzk/Dialect/Array/IR/Dialect.h>
+#include <llzk/Dialect/Bool/IR/Dialect.h>
+#include <llzk/Dialect/Cast/IR/Dialect.h>
+#include <llzk/Dialect/Constrain/IR/Dialect.h>
 #include <llzk/Dialect/Felt/IR/Dialect.h>
+#include <llzk/Dialect/Function/IR/Dialect.h>
 #include <llzk/Dialect/Global/IR/Dialect.h>
 #include <llzk/Dialect/LLZK/IR/Dialect.h>
+#include <llzk/Dialect/Polymorphic/IR/Dialect.h>
+#include <llzk/Dialect/String/IR/Dialect.h>
 #include <llzk/Dialect/Struct/IR/Dialect.h>
 #include <mlir/Bytecode/BytecodeWriter.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
@@ -120,6 +126,12 @@ struct ZirFrontendDialects {
     registry.insert<llzk::array::ArrayDialect>();
     registry.insert<llzk::component::StructDialect>();
     registry.insert<llzk::global::GlobalDialect>();
+    registry.insert<llzk::function::FunctionDialect>();
+    registry.insert<llzk::boolean::BoolDialect>();
+    registry.insert<llzk::constrain::ConstrainDialect>();
+    registry.insert<llzk::cast::CastDialect>();
+    registry.insert<llzk::polymorphic::PolymorphicDialect>();
+    registry.insert<llzk::string::StringDialect>();
   }
   mlir::DialectRegistry registry;
 };

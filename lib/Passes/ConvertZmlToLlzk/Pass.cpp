@@ -13,6 +13,14 @@
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
+#include <llzk/Dialect/Array/IR/Dialect.h>
+#include <llzk/Dialect/Bool/IR/Dialect.h>
+#include <llzk/Dialect/Cast/IR/Dialect.h>
+#include <llzk/Dialect/Constrain/IR/Dialect.h>
+#include <llzk/Dialect/Function/IR/Dialect.h>
+#include <llzk/Dialect/Global/IR/Dialect.h>
+#include <llzk/Dialect/Polymorphic/IR/Dialect.h>
+#include <llzk/Dialect/String/IR/Dialect.h>
 #include <llzk/Dialect/Struct/IR/Dialect.h>
 #include <llzk/Dialect/Struct/IR/Ops.h>
 #include <llzk/Util/SymbolHelper.h>
@@ -102,7 +110,12 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   scf::populateSCFStructuralTypeConversions(*typeConverter, patterns);
 
   mlir::ConversionTarget target(*ctx);
-  target.addLegalDialect<llzk::LLZKDialect, mlir::arith::ArithDialect, index::IndexDialect>();
+  target.addLegalDialect<
+      llzk::LLZKDialect, llzk::global::GlobalDialect, llzk::component::StructDialect,
+      llzk::function::FunctionDialect, llzk::boolean::BoolDialect, llzk::array::ArrayDialect,
+      llzk::constrain::ConstrainDialect, llzk::felt::FeltDialect, llzk::string::StringDialect,
+      llzk::polymorphic::PolymorphicDialect, llzk::cast::CastDialect, mlir::arith::ArithDialect,
+      index::IndexDialect>();
   target.addLegalOp<mlir::UnrealizedConversionCastOp, mlir::ModuleOp>();
   target.addIllegalDialect<ZMLDialect, mlir::func::FuncDialect>();
 
