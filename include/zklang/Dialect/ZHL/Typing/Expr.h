@@ -454,155 +454,30 @@ using CtorExpr = TypedExprAdaptor<detail::Ctor>;
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::detail::ExprBase &);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, const zhl::expr::ExprView &);
 
-template <>
-struct llvm::CastInfo<zhl::expr::ValExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::ValExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::ValExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
+#define enable_expr_cast(T, F)                                                                     \
+  template <>                                                                                      \
+  struct llvm::CastInfo<T, F> : public llvm::CastIsPossible<T, std::remove_const_t<F>> {           \
+    static inline T doCast(const std::remove_const_t<F> &f) { return T(f); }                       \
+    static inline T castFailed() { return T(); }                                                   \
+    static inline T doCastIfPossible(const std::remove_const_t<F> &f) {                            \
+      if (!llvm::CastInfo<T, F>::isPossible(f)) {                                                  \
+        return castFailed();                                                                       \
+      }                                                                                            \
+      return doCast(f);                                                                            \
+    }                                                                                              \
   }
-};
 
-template <>
-struct llvm::CastInfo<zhl::expr::ValView, zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::ValView, zhl::expr::ExprView> {
-  using from = zhl::expr::ExprView;
-  using to = zhl::expr::ValView;
-  using self = llvm::CastInfo<to, from>;
+enable_expr_cast(zhl::expr::ValExpr, zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::ValExpr, const zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::ValView, zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::ValView, const zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::SymExpr, zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::SymExpr, const zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::SymbolView, zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::SymbolView, const zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::CtorExpr, zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::CtorExpr, const zhl::expr::ConstExpr);
+enable_expr_cast(zhl::expr::CtorView, zhl::expr::ExprView);
+enable_expr_cast(zhl::expr::CtorView, const zhl::expr::ExprView);
 
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::ValView, const zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::ValView, const zhl::expr::ExprView> {
-  using from = const zhl::expr::ExprView;
-  using to = zhl::expr::ValView;
-  using self = llvm::CastInfo<to, const from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::SymExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::SymExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::SymExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::SymbolView, zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::SymbolView, zhl::expr::ExprView> {
-  using from = zhl::expr::ExprView;
-  using to = zhl::expr::SymbolView;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::SymbolView, const zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::SymbolView, const zhl::expr::ExprView> {
-  using from = const zhl::expr::ExprView;
-  using to = zhl::expr::SymbolView;
-  using self = llvm::CastInfo<to, const from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::CtorExpr, zhl::expr::ConstExpr>
-    : public llvm::CastIsPossible<zhl::expr::CtorExpr, zhl::expr::ConstExpr> {
-  using from = zhl::expr::ConstExpr;
-  using to = zhl::expr::CtorExpr;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::CtorView, zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::CtorView, zhl::expr::ExprView> {
-  using from = zhl::expr::ExprView;
-  using to = zhl::expr::CtorView;
-  using self = llvm::CastInfo<to, from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
-
-template <>
-struct llvm::CastInfo<zhl::expr::CtorView, const zhl::expr::ExprView>
-    : public llvm::CastIsPossible<zhl::expr::CtorView, const zhl::expr::ExprView> {
-  using from = const zhl::expr::ExprView;
-  using to = zhl::expr::CtorView;
-  using self = llvm::CastInfo<to, const from>;
-
-  static inline to doCast(const from &a) { return to(a); }
-  static inline to castFailed() { return to(); }
-  static inline to doCastIfPossible(const from &b) {
-    if (!self::isPossible(b)) {
-      return castFailed();
-    }
-    return doCast(b);
-  }
-};
+#undef enable_expr_cast

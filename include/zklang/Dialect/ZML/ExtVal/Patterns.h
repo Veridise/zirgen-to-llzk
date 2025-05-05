@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <llzk/Dialect/LLZK/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Location.h>

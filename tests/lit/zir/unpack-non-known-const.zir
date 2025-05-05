@@ -1,32 +1,32 @@
 // RUN: zklang -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
 
-// CHECK: llzk.struct @Unpack<[@N, @P, @Aff$0]> {
+// CHECK: struct.def @Unpack<[@N, @P, @Aff$0]> {
 component Unpack<N: Val, P: Val>(in: Array<Val, N/P>) {
   in[0]
 }
 
-// CHECK: llzk.struct @User1<[@N, @P]> {
+// CHECK: struct.def @User1<[@N, @P]> {
 component User1<N: Val, P: Val>() {
 
-// CHECK-LABEL: func @compute() -> !llzk.struct<@User1<[@N, @P]>> {
+// CHECK-LABEL: function.def @compute() -> !struct.type<@User1<[@N, @P]>> 
   Unpack<N,P>(0..N/P);
 
-// CHECK-DAG:     %[[D0:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
-// CHECK-DAG:     %[[D1:[0-9a-zA-Z_\.]+]] = read_const @P : !llzk.felt
-// CHECK-DAG:     %[[D2:[0-9a-zA-Z_\.]+]] = call @Div::@compute(%[[D0]], %[[D1]]) : (!llzk.felt, !llzk.felt) -> !llzk.struct<@Div<[]>>
+// CHECK-DAG:     %[[D0:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
+// CHECK-DAG:     %[[D1:[0-9a-zA-Z_\.]+]] = poly.read_const @P : !felt.type
+// CHECK-DAG:     %[[D2:[0-9a-zA-Z_\.]+]] = function.call @Div::@compute(%[[D0]], %[[D1]]) : (!felt.type, !felt.type) -> !struct.type<@Div<[]>>
 
-// CHECK-DAG:     %[[T0:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
-// CHECK-DAG:     %[[T1:[0-9a-zA-Z_\.]+]] = toindex %[[T0]]
-// CHECK-DAG:     %[[T2:[0-9a-zA-Z_\.]+]] = read_const @P : !llzk.felt
-// CHECK-DAG:     %[[T3:[0-9a-zA-Z_\.]+]] = toindex %[[T2]]
-// CHECK-DAG:     %[[T4:[0-9a-zA-Z_\.]+]] = new_array{()[%[[T1]], %[[T3]]]} : <#[[MAP:[0-9a-zA-Z_\.]+]] x !llzk.felt>
+// CHECK-DAG:     %[[T0:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
+// CHECK-DAG:     %[[T1:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T0]]
+// CHECK-DAG:     %[[T2:[0-9a-zA-Z_\.]+]] = poly.read_const @P : !felt.type
+// CHECK-DAG:     %[[T3:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T2]]
+// CHECK-DAG:     %[[T4:[0-9a-zA-Z_\.]+]] = array.new{()[%[[T1]], %[[T3]]]} : <#[[MAP:[0-9a-zA-Z_\.]+]] x !felt.type>
 // CHECK-DAG:     scf.for %{{[0-9a-zA-Z_\.]+}} = %{{[0-9a-zA-Z_\.]+}} to %{{[0-9a-zA-Z_\.]+}} step %{{[0-9a-zA-Z_\.]+}} {
 
-// CHECK-DAG:     %[[T5:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
-// CHECK-DAG:     %[[T6:[0-9a-zA-Z_\.]+]] = toindex %[[T5]]
-// CHECK-DAG:     %[[T7:[0-9a-zA-Z_\.]+]] = read_const @P : !llzk.felt
-// CHECK-DAG:     %[[T8:[0-9a-zA-Z_\.]+]] = toindex %[[T7]]
-// CHECK-DAG:     %[[T9:[0-9a-zA-Z_\.]+]] = call @Unpack::@compute(%[[T4]]) {()[%[[T6]], %[[T8]]]} : (!llzk.array<#[[MAP]] x !llzk.felt>) -> !llzk.struct<@Unpack<[@N, @P, #[[MAP]]]>>
+// CHECK-DAG:     %[[T5:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
+// CHECK-DAG:     %[[T6:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T5]]
+// CHECK-DAG:     %[[T7:[0-9a-zA-Z_\.]+]] = poly.read_const @P : !felt.type
+// CHECK-DAG:     %[[T8:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T7]]
+// CHECK-DAG:     %[[T9:[0-9a-zA-Z_\.]+]] = function.call @Unpack::@compute(%[[T4]]) {()[%[[T6]], %[[T8]]]} : (!array.type<#[[MAP]] x !felt.type>) -> !struct.type<@Unpack<[@N, @P, #[[MAP]]]>>
 
-// CHECK-LABEL: func @constrain(%{{[0-9a-zA-Z_\.]+}}: !llzk.struct<@User1<[@N, @P]>>) {
+// CHECK-LABEL: function.def @constrain(%{{[0-9a-zA-Z_\.]+}}: !struct.type<@User1<[@N, @P]>>) 
 }

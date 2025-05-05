@@ -3,113 +3,113 @@
 component Foo(x: ExtVal, y: ExtVal) {
   ExtMul(x, y)
 
-// CHECK-LABEL: llzk.struct @Foo<[]> {
-// CHECK: field @"$super" : !llzk.array<4 x !llzk.felt>
+// CHECK-LABEL: struct.def @Foo<[]> {
+// CHECK: field @"$super" : !array.type<4 x !felt.type>
 
-// CHECK-LABEL: func @compute
-// CHECK-SAME: (%[[A:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>, %[[B:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>) -> !llzk.struct<@Foo<[]>> {
+// CHECK-LABEL: function.def @compute
+// CHECK-SAME: (%[[A:[0-9a-zA-Z_\.]+]]: !array.type<4 x !felt.type>, %[[B:[0-9a-zA-Z_\.]+]]: !array.type<4 x !felt.type>) -> !struct.type<@Foo<[]>> 
 
 // CHECK-DAG: %[[C0:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C2:[0-9a-zA-Z_\.]+]] = arith.constant 2 : index
 // CHECK-DAG: %[[C3:[0-9a-zA-Z_\.]+]] = arith.constant 3 : index
-// CHECK-DAG: %[[A0:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C0]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[A1:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C1]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[A2:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C2]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[A3:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C3]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[A0:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C0]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[A1:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C1]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[A2:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C2]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[A3:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C3]]] : <4 x !felt.type>, !felt.type
 
-// CHECK-DAG: %[[B0:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C0]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[B1:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C1]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[B2:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C2]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[B3:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C3]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[B0:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C0]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[B1:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C1]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[B2:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C2]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[B3:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C3]]] : <4 x !felt.type>, !felt.type
 
-// CHECK-DAG: %[[BETA:[0-9a-zA-Z_\.]+]] = constfelt  11
-// CHECK-DAG: %[[NBETA:[0-9a-zA-Z_\.]+]] = neg %[[BETA]]
+// CHECK-DAG: %[[BETA:[0-9a-zA-Z_\.]+]] = felt.const  11
+// CHECK-DAG: %[[NBETA:[0-9a-zA-Z_\.]+]] = felt.neg %[[BETA]]
 
 // COM:         a[0] * b[0]
-// CHECK-DAG: %[[T0:[0-9a-zA-Z_\.]+]] = mul %[[A0]], %[[B0]]
+// CHECK-DAG: %[[T0:[0-9a-zA-Z_\.]+]] = felt.mul %[[A0]], %[[B0]]
 // COM:                                a[1] * b[3]
-// CHECK-DAG: %[[T1:[0-9a-zA-Z_\.]+]] = mul %[[A1]], %[[B3]]
+// CHECK-DAG: %[[T1:[0-9a-zA-Z_\.]+]] = felt.mul %[[A1]], %[[B3]]
 // COM:                                              a[2] * b[2]
-// CHECK-DAG: %[[T2:[0-9a-zA-Z_\.]+]] = mul %[[A2]], %[[B2]]
+// CHECK-DAG: %[[T2:[0-9a-zA-Z_\.]+]] = felt.mul %[[A2]], %[[B2]]
 // COM:                                                            a[3] * b[1]
-// CHECK-DAG: %[[T3:[0-9a-zA-Z_\.]+]] = mul %[[A3]], %[[B1]]
+// CHECK-DAG: %[[T3:[0-9a-zA-Z_\.]+]] = felt.mul %[[A3]], %[[B1]]
 // COM:                                a[1] * b[3] + a[2] * b[2]
-// CHECK-DAG: %[[T4:[0-9a-zA-Z_\.]+]] = add %[[T1]], %[[T2]]
+// CHECK-DAG: %[[T4:[0-9a-zA-Z_\.]+]] = felt.add %[[T1]], %[[T2]]
 // COM:                                a[1] * b[3] + a[2] * b[2] + a[3] * b[1]
-// CHECK-DAG: %[[T5:[0-9a-zA-Z_\.]+]] = add %[[T4]], %[[T3]]
+// CHECK-DAG: %[[T5:[0-9a-zA-Z_\.]+]] = felt.add %[[T4]], %[[T3]]
 // COM:                       NBETA * (a[1] * b[3] + a[2] * b[2] + a[3] * b[1])
-// CHECK-DAG: %[[T6:[0-9a-zA-Z_\.]+]] = mul %[[NBETA]], %[[T5]]
+// CHECK-DAG: %[[T6:[0-9a-zA-Z_\.]+]] = felt.mul %[[NBETA]], %[[T5]]
 // COM: out_0 = a[0] * b[0] + NBETA * (a[1] * b[3] + a[2] * b[2] + a[3] * b[1])
-// CHECK-DAG: %[[OUT0:[0-9a-zA-Z_\.]+]] = add %[[T0]], %[[T6]]
+// CHECK-DAG: %[[OUT0:[0-9a-zA-Z_\.]+]] = felt.add %[[T0]], %[[T6]]
 
 // COM:         a[0] * b[1]
-// CHECK-DAG: %[[T7:[0-9a-zA-Z_\.]+]] = mul %[[A0]], %[[B1]]
+// CHECK-DAG: %[[T7:[0-9a-zA-Z_\.]+]] = felt.mul %[[A0]], %[[B1]]
 // COM:                       a[1] * b[0]
-// CHECK-DAG: %[[T8:[0-9a-zA-Z_\.]+]] = mul %[[A1]], %[[B0]]
+// CHECK-DAG: %[[T8:[0-9a-zA-Z_\.]+]] = felt.mul %[[A1]], %[[B0]]
 // COM:                                              a[2] * b[3]
-// CHECK-DAG: %[[T9:[0-9a-zA-Z_\.]+]] = mul %[[A2]], %[[B3]]
+// CHECK-DAG: %[[T9:[0-9a-zA-Z_\.]+]] = felt.mul %[[A2]], %[[B3]]
 // COM:                                                            a[3] * b[2]
-// CHECK-DAG: %[[T10:[0-9a-zA-Z_\.]+]] = mul %[[A3]], %[[B2]]
+// CHECK-DAG: %[[T10:[0-9a-zA-Z_\.]+]] = felt.mul %[[A3]], %[[B2]]
 // COM:                                              a[2] * b[3] + a[3] * b[2]
-// CHECK-DAG: %[[T11:[0-9a-zA-Z_\.]+]] = add %[[T9]], %[[T10]]
+// CHECK-DAG: %[[T11:[0-9a-zA-Z_\.]+]] = felt.add %[[T9]], %[[T10]]
 // COM:                                     NBETA * (a[2] * b[3] + a[3] * b[2])
-// CHECK-DAG: %[[T12:[0-9a-zA-Z_\.]+]] = mul %[[NBETA]], %[[T11]]
+// CHECK-DAG: %[[T12:[0-9a-zA-Z_\.]+]] = felt.mul %[[NBETA]], %[[T11]]
 // COM:         a[0] * b[1] + a[1] * b[0]
-// CHECK-DAG: %[[T13:[0-9a-zA-Z_\.]+]] = add %[[T7]], %[[T8]]
+// CHECK-DAG: %[[T13:[0-9a-zA-Z_\.]+]] = felt.add %[[T7]], %[[T8]]
 // COM: out_1 = a[0] * b[1] + a[1] * b[0] + NBETA * (a[2] * b[3] + a[3] * b[2])
-// CHECK-DAG: %[[OUT1:[0-9a-zA-Z_\.]+]] = add %[[T13]], %[[T12]]
+// CHECK-DAG: %[[OUT1:[0-9a-zA-Z_\.]+]] = felt.add %[[T13]], %[[T12]]
 
 // COM:         a[0] * b[2]
-// CHECK-DAG: %[[T14:[0-9a-zA-Z_\.]+]] = mul %[[A0]], %[[B2]]
+// CHECK-DAG: %[[T14:[0-9a-zA-Z_\.]+]] = felt.mul %[[A0]], %[[B2]]
 // COM:                       a[1] * b[1]
-// CHECK-DAG: %[[T15:[0-9a-zA-Z_\.]+]] = mul %[[A1]], %[[B1]]
+// CHECK-DAG: %[[T15:[0-9a-zA-Z_\.]+]] = felt.mul %[[A1]], %[[B1]]
 // COM:                                     a[2] * b[0]
-// CHECK-DAG: %[[T16:[0-9a-zA-Z_\.]+]] = mul %[[A2]], %[[B0]]
+// CHECK-DAG: %[[T16:[0-9a-zA-Z_\.]+]] = felt.mul %[[A2]], %[[B0]]
 // COM:                                                            a[3] * b[3]
-// CHECK-DAG: %[[T17:[0-9a-zA-Z_\.]+]] = mul %[[A3]], %[[B3]]
+// CHECK-DAG: %[[T17:[0-9a-zA-Z_\.]+]] = felt.mul %[[A3]], %[[B3]]
 // COM:                                                   NBETA * (a[3] * b[3])
-// CHECK-DAG: %[[T18:[0-9a-zA-Z_\.]+]] = mul %[[NBETA]], %[[T17]]
+// CHECK-DAG: %[[T18:[0-9a-zA-Z_\.]+]] = felt.mul %[[NBETA]], %[[T17]]
 // COM:         a[0] * b[2] + a[1] * b[1]
-// CHECK-DAG: %[[T19:[0-9a-zA-Z_\.]+]] = add %[[T14]], %[[T15]]
+// CHECK-DAG: %[[T19:[0-9a-zA-Z_\.]+]] = felt.add %[[T14]], %[[T15]]
 // COM:         a[0] * b[2] + a[1] * b[1] + a[2] * b[0]
-// CHECK-DAG: %[[T20:[0-9a-zA-Z_\.]+]] = add %[[T19]], %[[T16]]
+// CHECK-DAG: %[[T20:[0-9a-zA-Z_\.]+]] = felt.add %[[T19]], %[[T16]]
 // COM: out_2 = a[0] * b[2] + a[1] * b[1] + a[2] * b[0] + NBETA * (a[3] * b[3])
-// CHECK-DAG: %[[OUT2:[0-9a-zA-Z_\.]+]] = add %[[T20]], %[[T18]]
+// CHECK-DAG: %[[OUT2:[0-9a-zA-Z_\.]+]] = felt.add %[[T20]], %[[T18]]
 
 // COM:         a[0] * b[3]
-// CHECK-DAG: %[[T21:[0-9a-zA-Z_\.]+]] = mul %[[A0]], %[[B3]]
+// CHECK-DAG: %[[T21:[0-9a-zA-Z_\.]+]] = felt.mul %[[A0]], %[[B3]]
 // COM:                       a[1] * b[2]
-// CHECK-DAG: %[[T22:[0-9a-zA-Z_\.]+]] = mul %[[A1]], %[[B2]]
+// CHECK-DAG: %[[T22:[0-9a-zA-Z_\.]+]] = felt.mul %[[A1]], %[[B2]]
 // COM:                                     a[2] * b[1] 
-// CHECK-DAG: %[[T23:[0-9a-zA-Z_\.]+]] = mul %[[A2]], %[[B1]]
+// CHECK-DAG: %[[T23:[0-9a-zA-Z_\.]+]] = felt.mul %[[A2]], %[[B1]]
 // COM:                                                   a[3] * b[0]
-// CHECK-DAG: %[[T24:[0-9a-zA-Z_\.]+]] = mul %[[A3]], %[[B0]]
+// CHECK-DAG: %[[T24:[0-9a-zA-Z_\.]+]] = felt.mul %[[A3]], %[[B0]]
 // COM:         a[0] * b[3] + a[1] * b[2]
-// CHECK-DAG: %[[T25:[0-9a-zA-Z_\.]+]] = add %[[T21]], %[[T22]]
+// CHECK-DAG: %[[T25:[0-9a-zA-Z_\.]+]] = felt.add %[[T21]], %[[T22]]
 // COM:         a[0] * b[3] + a[1] * b[2] + a[2] * b[1]
-// CHECK-DAG: %[[T26:[0-9a-zA-Z_\.]+]] = add %[[T25]], %[[T23]]
+// CHECK-DAG: %[[T26:[0-9a-zA-Z_\.]+]] = felt.add %[[T25]], %[[T23]]
 // COM: out_3 = a[0] * b[3] + a[1] * b[2] + a[2] * b[1] + a[3] * b[0]
-// CHECK-DAG: %[[OUT3:[0-9a-zA-Z_\.]+]] = add %[[T26]], %[[T24]]
+// CHECK-DAG: %[[OUT3:[0-9a-zA-Z_\.]+]] = felt.add %[[T26]], %[[T24]]
 
-// CHECK-DAG: %[[T27:[0-9a-zA-Z_\.]+]] = new_array %[[OUT0]], %[[OUT1]], %[[OUT2]], %[[OUT3]] : <4 x !llzk.felt>
+// CHECK-DAG: %[[T27:[0-9a-zA-Z_\.]+]] = array.new %[[OUT0]], %[[OUT1]], %[[OUT2]], %[[OUT3]] : <4 x !felt.type>
 
-// CHECK-LABEL: func @constrain(%arg0: !llzk.struct<@Foo<[]>>, 
-// CHECK-SAME: %[[A:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>, 
-// CHECK-SAME: %[[B:[0-9a-zA-Z_\.]+]]: !llzk.array<4 x !llzk.felt>) {
+// CHECK-LABEL: function.def @constrain(%arg0: !struct.type<@Foo<[]>>, 
+// CHECK-SAME: %[[A:[0-9a-zA-Z_\.]+]]: !array.type<4 x !felt.type>, 
+// CHECK-SAME: %[[B:[0-9a-zA-Z_\.]+]]: !array.type<4 x !felt.type>) 
 
 // CHECK-DAG: %[[C0:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C2:[0-9a-zA-Z_\.]+]] = arith.constant 2 : index
 // CHECK-DAG: %[[C3:[0-9a-zA-Z_\.]+]] = arith.constant 3 : index
-// CHECK-DAG: %[[A0:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C0]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[A1:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C1]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[A2:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C2]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[A3:[0-9a-zA-Z_\.]+]] = readarr %[[A]][%[[C3]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[A0:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C0]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[A1:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C1]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[A2:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C2]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[A3:[0-9a-zA-Z_\.]+]] = array.read %[[A]][%[[C3]]] : <4 x !felt.type>, !felt.type
 
-// CHECK-DAG: %[[B0:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C0]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[B1:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C1]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[B2:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C2]]] : <4 x !llzk.felt>, !llzk.felt
-// CHECK-DAG: %[[B3:[0-9a-zA-Z_\.]+]] = readarr %[[B]][%[[C3]]] : <4 x !llzk.felt>, !llzk.felt
+// CHECK-DAG: %[[B0:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C0]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[B1:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C1]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[B2:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C2]]] : <4 x !felt.type>, !felt.type
+// CHECK-DAG: %[[B3:[0-9a-zA-Z_\.]+]] = array.read %[[B]][%[[C3]]] : <4 x !felt.type>, !felt.type
 
 }
