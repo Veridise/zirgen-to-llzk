@@ -3,6 +3,11 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - README.md
+      - docs
+      - test
+      - unittests
 
 jobs:
   call-workflow-changelog-validate:
