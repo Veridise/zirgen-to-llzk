@@ -1,19 +1,19 @@
 // RUN: zklang -o - %s --print-debug-info=false | FileCheck --enable-var-scope %s
 
 component Foo() {
-// CHECK-LABEL: llzk.struct @Foo<[]> {
-// CHECK: field @x : !llzk.array<4 x !llzk.felt>
+// CHECK-LABEL: struct.def @Foo<[]> {
+// CHECK: field @x : !array.type<4 x !felt.type>
 
-// CHECK-LABEL: func @compute() -> !llzk.struct<@Foo<[]>> {
+// CHECK-LABEL: function.def @compute() -> !struct.type<@Foo<[]>> 
 
-// CHECK-DAG: %[[C0:[0-9a-zA-Z_\.]+]] = constfelt  0
-// CHECK-DAG: %[[C1:[0-9a-zA-Z_\.]+]] = constfelt  10
+// CHECK-DAG: %[[C0:[0-9a-zA-Z_\.]+]] = felt.const  0
+// CHECK-DAG: %[[C1:[0-9a-zA-Z_\.]+]] = felt.const  10
 
-// CHECK-DAG: %[[T1:[0-9a-zA-Z_\.]+]] = new_array %[[C1]], %[[C0]], %[[C0]], %[[C0]] : <4 x !llzk.felt>
-// CHECK-DAG: %[[SELF:[0-9a-zA-Z_\.]+]] = new_struct : <@Foo<[]>>
-// CHECK-DAG: writef %[[SELF]][@x] = %[[T1]] : <@Foo<[]>>, !llzk.array<4 x !llzk.felt>
+// CHECK-DAG: %[[T1:[0-9a-zA-Z_\.]+]] = array.new %[[C1]], %[[C0]], %[[C0]], %[[C0]] : <4 x !felt.type>
+// CHECK-DAG: %[[SELF:[0-9a-zA-Z_\.]+]] = struct.new : <@Foo<[]>>
+// CHECK-DAG: struct.writef %[[SELF]][@x] = %[[T1]] : <@Foo<[]>>, !array.type<4 x !felt.type>
 
-// CHECK-LABEL: func @constrain(%arg0: !llzk.struct<@Foo<[]>>) {
+// CHECK-LABEL: function.def @constrain(%arg0: !struct.type<@Foo<[]>>) 
 
   x := MakeExt(10);
 }

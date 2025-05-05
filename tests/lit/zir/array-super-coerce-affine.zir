@@ -5,18 +5,18 @@ component Foo<N: Val>(a: Array<Val, N>) {
 
 component Bar<N: Val>() {
   Foo<N>(for i: 0..N { NondetReg(i) })
-// CHECK-LABEL:    func @compute() -> !llzk.struct<@Bar<[@N]>> {
+// CHECK-LABEL:    function.def @compute() -> !struct.type<@Bar<[@N]>> 
 //       CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
 //       CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
-//       CHECK:      %[[T8:[0-9a-zA-Z_\.]+]] = read_const @N : !llzk.felt
-//       CHECK:      %[[T9:[0-9a-zA-Z_\.]+]] = toindex %[[T8]]
-//       CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = new_array  : <@N x !llzk.felt> 
+//       CHECK:      %[[T8:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
+//       CHECK:      %[[T9:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T8]]
+//       CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = array.new  : <@N x !felt.type> 
 //         COM:           I don't care where this array comes from but it has to be the same one used in the read ops below.
-//       CHECK:      %[[T4:[0-9a-zA-Z_\.]+]] = array_len %[[T2:[0-9a-zA-Z_\.]+]], %[[T1]] : <#map x !llzk.struct<@NondetReg<[]>>>
+//       CHECK:      %[[T4:[0-9a-zA-Z_\.]+]] = array.len %[[T2:[0-9a-zA-Z_\.]+]], %[[T1]] : <#map x !struct.type<@NondetReg<[]>>>
 //       CHECK:      scf.for %[[A0:[0-9a-zA-Z_\.]+]] = %[[T1]] to %[[T0]] step %[[T4]] {
-//       CHECK:        %[[T5:[0-9a-zA-Z_\.]+]] = llzk.readarr %[[T2]][%[[A0]]] : <#map x !llzk.struct<@NondetReg<[]>>>, !llzk.struct<@NondetReg<[]>>
-//       CHECK:        %[[T6:[0-9a-zA-Z_\.]+]] = llzk.readf %[[T5]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-//       CHECK:        llzk.writearr %[[T3]][%[[A0]]] = %[[T6]] : <@N x !llzk.felt>, !llzk.felt
-//       CHECK:      %[[T7:[0-9a-zA-Z_\.]+]] = call @Foo::@compute(%[[T3]]) : (!llzk.array<@N x !llzk.felt>) -> !llzk.struct<@Foo<[@N]>> 
-//       CHECK:      return %{{[0-9a-zA-Z_\.]+}} : !llzk.struct<@Bar<[@N]>>
+//       CHECK:        %[[T5:[0-9a-zA-Z_\.]+]] = array.read %[[T2]][%[[A0]]] : <#map x !struct.type<@NondetReg<[]>>>, !struct.type<@NondetReg<[]>>
+//       CHECK:        %[[T6:[0-9a-zA-Z_\.]+]] = struct.readf %[[T5]][@"$super"] : <@NondetReg<[]>>, !felt.type
+//       CHECK:        array.write %[[T3]][%[[A0]]] = %[[T6]] : <@N x !felt.type>, !felt.type
+//       CHECK:      %[[T7:[0-9a-zA-Z_\.]+]] = function.call @Foo::@compute(%[[T3]]) : (!array.type<@N x !felt.type>) -> !struct.type<@Foo<[@N]>> 
+//       CHECK:      return %{{[0-9a-zA-Z_\.]+}} : !struct.type<@Bar<[@N]>>
 }

@@ -5,32 +5,32 @@ component Top() {
   x@1 = 2;
 }
 
-// CHECK-LABEL: llzk.struct @Top<[]> {
-//       CHECK:    field @"$super" : !llzk.struct<@Component<[]>>
-//       CHECK:    field @"$temp" : !llzk.struct<@Component<[]>>
-//       CHECK:    field @x : !llzk.struct<@Reg<[]>>
-// CHECK-LABEL:    func @compute() -> !llzk.struct<@Top<[]>> {
-//       CHECK:      %[[T2:[0-9a-zA-Z_.]+]] =  constfelt  2
-//       CHECK:      %[[T0:[0-9a-zA-Z_.]+]] =  new_struct : <@Top<[]>>
-//       CHECK:      %[[T9:[0-9a-zA-Z_.]+]] =  call @Reg::@compute(%[[T2]]) : (!llzk.felt) -> !llzk.struct<@Reg<[]>> 
-//       CHECK:      writef %[[T0]][@x] = %[[T9]] : <@Top<[]>>, !llzk.struct<@Reg<[]>>
-//       CHECK:      %[[T31:[0-9a-zA-Z_.]+]] =  call @Component::@compute() : () -> !llzk.struct<@Component<[]>> 
-//       CHECK:      writef %[[T0]][@"$temp"] = %[[T31]] : <@Top<[]>>, !llzk.struct<@Component<[]>>
-//       CHECK:      %[[T32:[0-9a-zA-Z_.]+]] =  readf %[[T0]][@"$temp"] : <@Top<[]>>, !llzk.struct<@Component<[]>>
-//       CHECK:      writef %[[T0]][@"$super"] = %[[T32]] : <@Top<[]>>, !llzk.struct<@Component<[]>>
-//       CHECK:      return %[[T0]] : !llzk.struct<@Top<[]>>
+// CHECK-LABEL: struct.def @Top<[]> {
+//       CHECK:    field @"$super" : !struct.type<@Component<[]>>
+//       CHECK:    field @"$temp" : !struct.type<@Component<[]>>
+//       CHECK:    field @x : !struct.type<@Reg<[]>>
+// CHECK-LABEL:    function.def @compute() -> !struct.type<@Top<[]>> 
+//       CHECK:      %[[T2:[0-9a-zA-Z_.]+]] =  felt.const  2
+//       CHECK:      %[[T0:[0-9a-zA-Z_.]+]] =  struct.new : <@Top<[]>>
+//       CHECK:      %[[T9:[0-9a-zA-Z_.]+]] =  function.call @Reg::@compute(%[[T2]]) : (!felt.type) -> !struct.type<@Reg<[]>> 
+//       CHECK:      struct.writef %[[T0]][@x] = %[[T9]] : <@Top<[]>>, !struct.type<@Reg<[]>>
+//       CHECK:      %[[T31:[0-9a-zA-Z_.]+]] =  function.call @Component::@compute() : () -> !struct.type<@Component<[]>> 
+//       CHECK:      struct.writef %[[T0]][@"$temp"] = %[[T31]] : <@Top<[]>>, !struct.type<@Component<[]>>
+//       CHECK:      %[[T32:[0-9a-zA-Z_.]+]] =  struct.readf %[[T0]][@"$temp"] : <@Top<[]>>, !struct.type<@Component<[]>>
+//       CHECK:      struct.writef %[[T0]][@"$super"] = %[[T32]] : <@Top<[]>>, !struct.type<@Component<[]>>
+//       CHECK:      return %[[T0]] : !struct.type<@Top<[]>>
 //       CHECK:    }
-// CHECK-LABEL:    func @constrain
-//  CHECK-SAME:                   (%[[A0:[0-9a-zA-Z_.]+]]: !llzk.struct<@Top<[]>>) {
-//       CHECK:      %[[T1:[0-9a-zA-Z_.]+]] =  constfelt  2
-//       CHECK:      %[[T29:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@x] : <@Top<[]>>, !llzk.struct<@Reg<[]>>
-//       CHECK:      call @Reg::@constrain(%[[T29]], %[[T1]]) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> () 
-//       CHECK:      %[[T8:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@x] : <@Top<[]>>, !llzk.struct<@Reg<[]>> {tableOffset = -1 : index}
-//       CHECK:      %[[T15:[0-9a-zA-Z_.]+]] =  readf %[[T8]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
-//       CHECK:      %[[T16:[0-9a-zA-Z_.]+]] =  readf %[[T15]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-//       CHECK:      emit_eq %[[T16]], %[[T1]] : !llzk.felt, !llzk.felt
-//       CHECK:      %[[T18:[0-9a-zA-Z_.]+]] =  readf %[[A0]][@"$temp"] : <@Top<[]>>, !llzk.struct<@Component<[]>>
-//       CHECK:      call @Component::@constrain(%[[T18]]) : (!llzk.struct<@Component<[]>>) -> () 
+// CHECK-LABEL:    function.def @constrain
+//  CHECK-SAME:                   (%[[A0:[0-9a-zA-Z_.]+]]: !struct.type<@Top<[]>>
+//       CHECK:      %[[T1:[0-9a-zA-Z_.]+]] =  felt.const  2
+//       CHECK:      %[[T29:[0-9a-zA-Z_.]+]] =  struct.readf %[[A0]][@x] : <@Top<[]>>, !struct.type<@Reg<[]>>
+//       CHECK:      function.call @Reg::@constrain(%[[T29]], %[[T1]]) : (!struct.type<@Reg<[]>>, !felt.type) -> () 
+//       CHECK:      %[[T8:[0-9a-zA-Z_.]+]] =  struct.readf %[[A0]][@x] : <@Top<[]>>, !struct.type<@Reg<[]>> {tableOffset = -1 : index}
+//       CHECK:      %[[T15:[0-9a-zA-Z_.]+]] =  struct.readf %[[T8]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+//       CHECK:      %[[T16:[0-9a-zA-Z_.]+]] =  struct.readf %[[T15]][@"$super"] : <@NondetReg<[]>>, !felt.type
+//       CHECK:      constrain.eq %[[T16]], %[[T1]] : !felt.type, !felt.type
+//       CHECK:      %[[T18:[0-9a-zA-Z_.]+]] =  struct.readf %[[A0]][@"$temp"] : <@Top<[]>>, !struct.type<@Component<[]>>
+//       CHECK:      function.call @Component::@constrain(%[[T18]]) : (!struct.type<@Component<[]>>) -> () 
 //       CHECK:      return
 //       CHECK:    }
 //       CHECK:  }

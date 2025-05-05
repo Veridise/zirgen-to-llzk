@@ -29,52 +29,52 @@ test Globals {
 }
 
 // CHECK-LABEL: module @globals {
-// CHECK-NEXT:    llzk.global @MyGlobal : !llzk.struct<@Reg<[]>>
+// CHECK-NEXT:    global.def @MyGlobal : !struct.type<@Reg<[]>>
 // CHECK-NEXT:  }
 //
-// CHECK-LABEL: llzk.struct @SetGlobal<[]> {
-// CHECK:         field @"$super" : !llzk.struct<@Component<[]>>
-// CHECK:         field @"$temp" : !llzk.struct<@Component<[]>>
-// CHECK:         func @compute(%[[VAL_0:.*]]: !llzk.felt) -> !llzk.struct<@SetGlobal<[]>> {
-// CHECK:           %[[VAL_1:.*]] = new_struct : <@SetGlobal<[]>>
-// CHECK:           %[[VAL_2:.*]] = call @Reg::@compute(%[[VAL_0]]) : (!llzk.felt) -> !llzk.struct<@Reg<[]>>
-// CHECK:           writeg @globals::@MyGlobal = %[[VAL_2]] : !llzk.struct<@Reg<[]>>
-// CHECK:           %[[VAL_5:.*]] = call @Component::@compute() : () -> !llzk.struct<@Component<[]>>
-// CHECK:           writef %[[VAL_1]][@"$temp"] = %[[VAL_5]] : <@SetGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           %[[VAL_6:.*]] = readf %[[VAL_1]][@"$temp"] : <@SetGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           writef %[[VAL_1]][@"$super"] = %[[VAL_6]] : <@SetGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           return %[[VAL_1]] : !llzk.struct<@SetGlobal<[]>>
+// CHECK-LABEL: struct.def @SetGlobal<[]> {
+// CHECK:         field @"$super" : !struct.type<@Component<[]>>
+// CHECK:         field @"$temp" : !struct.type<@Component<[]>>
+// CHECK:         function.def @compute(%[[VAL_0:.*]]: !felt.type) -> !struct.type<@SetGlobal<[]>> 
+// CHECK:           %[[VAL_1:.*]] = struct.new : <@SetGlobal<[]>>
+// CHECK:           %[[VAL_2:.*]] = function.call @Reg::@compute(%[[VAL_0]]) : (!felt.type) -> !struct.type<@Reg<[]>>
+// CHECK:           global.write @globals::@MyGlobal = %[[VAL_2]] : !struct.type<@Reg<[]>>
+// CHECK:           %[[VAL_5:.*]] = function.call @Component::@compute() : () -> !struct.type<@Component<[]>>
+// CHECK:           struct.writef %[[VAL_1]][@"$temp"] = %[[VAL_5]] : <@SetGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           %[[VAL_6:.*]] = struct.readf %[[VAL_1]][@"$temp"] : <@SetGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           struct.writef %[[VAL_1]][@"$super"] = %[[VAL_6]] : <@SetGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           return %[[VAL_1]] : !struct.type<@SetGlobal<[]>>
 // CHECK:         }
-// CHECK:         func @constrain(%[[VAL_7:.*]]: !llzk.struct<@SetGlobal<[]>>, %[[VAL_8:.*]]: !llzk.felt) {
-// CHECK:           %[[VAL_9:.*]] = readg @globals::@MyGlobal : !llzk.struct<@Reg<[]>>
-// CHECK:           call @Reg::@constrain(%[[VAL_9]], %[[VAL_8]]) : (!llzk.struct<@Reg<[]>>, !llzk.felt) -> ()
-// CHECK:           %[[VAL_11:.*]] = readf %[[VAL_7]][@"$temp"] : <@SetGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           call @Component::@constrain(%[[VAL_11]]) : (!llzk.struct<@Component<[]>>) -> ()
+// CHECK:         function.def @constrain(%[[VAL_7:.*]]: !struct.type<@SetGlobal<[]>>, %[[VAL_8:.*]]: !felt.type) 
+// CHECK:           %[[VAL_9:.*]] = global.read @globals::@MyGlobal : !struct.type<@Reg<[]>>
+// CHECK:           function.call @Reg::@constrain(%[[VAL_9]], %[[VAL_8]]) : (!struct.type<@Reg<[]>>, !felt.type) -> ()
+// CHECK:           %[[VAL_11:.*]] = struct.readf %[[VAL_7]][@"$temp"] : <@SetGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           function.call @Component::@constrain(%[[VAL_11]]) : (!struct.type<@Component<[]>>) -> ()
 // CHECK:           return
 // CHECK:         }
 // CHECK:       }
 //
-// CHECK-LABEL: llzk.struct @CheckGlobal<[]> {
-// CHECK:         field @"$super" : !llzk.struct<@Component<[]>>
-// CHECK:         field @"$temp" : !llzk.struct<@Component<[]>>
-// CHECK:         func @compute() -> !llzk.struct<@CheckGlobal<[]>> {
-// CHECK:           %[[VAL_0:.*]] = new_struct : <@CheckGlobal<[]>>
-// CHECK:           %[[VAL_4:.*]] = call @Component::@compute() : () -> !llzk.struct<@Component<[]>>
-// CHECK:           writef %[[VAL_0]][@"$temp"] = %[[VAL_4]] : <@CheckGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           %[[VAL_5:.*]] = readf %[[VAL_0]][@"$temp"] : <@CheckGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           writef %[[VAL_0]][@"$super"] = %[[VAL_5]] : <@CheckGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           return %[[VAL_0]] : !llzk.struct<@CheckGlobal<[]>>
+// CHECK-LABEL: struct.def @CheckGlobal<[]> {
+// CHECK:         field @"$super" : !struct.type<@Component<[]>>
+// CHECK:         field @"$temp" : !struct.type<@Component<[]>>
+// CHECK:         function.def @compute() -> !struct.type<@CheckGlobal<[]>> 
+// CHECK:           %[[VAL_0:.*]] = struct.new : <@CheckGlobal<[]>>
+// CHECK:           %[[VAL_4:.*]] = function.call @Component::@compute() : () -> !struct.type<@Component<[]>>
+// CHECK:           struct.writef %[[VAL_0]][@"$temp"] = %[[VAL_4]] : <@CheckGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           %[[VAL_5:.*]] = struct.readf %[[VAL_0]][@"$temp"] : <@CheckGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           struct.writef %[[VAL_0]][@"$super"] = %[[VAL_5]] : <@CheckGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           return %[[VAL_0]] : !struct.type<@CheckGlobal<[]>>
 // CHECK:         }
-// CHECK:         func @constrain(%[[VAL_6:.*]]: !llzk.struct<@CheckGlobal<[]>>) {
-// CHECK:           %[[VAL_7:.*]] = constfelt  5
-// CHECK:           %[[VAL_8:.*]] = readg @globals::@MyGlobal : !llzk.struct<@Reg<[]>>
-// CHECK:           %[[VAL_9:.*]] = readf %[[VAL_8]][@"$super"] : <@Reg<[]>>, !llzk.struct<@NondetReg<[]>>
-// CHECK:           %[[VAL_10:.*]] = readf %[[VAL_9]][@"$super"] : <@NondetReg<[]>>, !llzk.felt
-// CHECK:           emit_eq %[[VAL_10]], %[[VAL_7]] : !llzk.felt, !llzk.felt
-// CHECK:           %[[VAL_11:.*]] = readf %[[VAL_6]][@"$temp"] : <@CheckGlobal<[]>>, !llzk.struct<@Component<[]>>
-// CHECK:           call @Component::@constrain(%[[VAL_11]]) : (!llzk.struct<@Component<[]>>) -> ()
+// CHECK:         function.def @constrain(%[[VAL_6:.*]]: !struct.type<@CheckGlobal<[]>>) 
+// CHECK:           %[[VAL_7:.*]] = felt.const  5
+// CHECK:           %[[VAL_8:.*]] = global.read @globals::@MyGlobal : !struct.type<@Reg<[]>>
+// CHECK:           %[[VAL_9:.*]] = struct.readf %[[VAL_8]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
+// CHECK:           %[[VAL_10:.*]] = struct.readf %[[VAL_9]][@"$super"] : <@NondetReg<[]>>, !felt.type
+// CHECK:           constrain.eq %[[VAL_10]], %[[VAL_7]] : !felt.type, !felt.type
+// CHECK:           %[[VAL_11:.*]] = struct.readf %[[VAL_6]][@"$temp"] : <@CheckGlobal<[]>>, !struct.type<@Component<[]>>
+// CHECK:           function.call @Component::@constrain(%[[VAL_11]]) : (!struct.type<@Component<[]>>) -> ()
 // CHECK:           return
 // CHECK:         }
 // CHECK:       }
 //
-// CHECK-LABEL: llzk.struct @Top<[]> {
+// CHECK-LABEL: struct.def @Top<[]> {

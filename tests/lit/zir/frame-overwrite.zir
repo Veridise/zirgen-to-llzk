@@ -3,22 +3,22 @@
 component Foo() {
   x := 1 + 1;
 
-// CHECK-LABEL: llzk.struct @Foo<[]> {
-//       CHECK:   field @x : !llzk.felt
+// CHECK-LABEL: struct.def @Foo<[]> {
+//       CHECK:   field @x : !felt.type
 }
 
 component Bar() {
   f := Foo();
   y := f.x;
 
-// CHECK-LABEL: llzk.struct @Bar<[]> {
-//       CHECK:   field @y : !llzk.felt
+// CHECK-LABEL: struct.def @Bar<[]> {
+//       CHECK:   field @y : !felt.type
 }
 
 component Baz() {
   f := Foo();
   f.x = 2;
 
-// CHECK-LABEL: func @compute() -> !llzk.struct<@Baz<[]>> {
-//       CHECK:   %{{[0-9a-zA-Z_\.]+}} = readf %{{[0-9a-zA-Z_\.]+}}[@x] : <@Foo<[]>>, !llzk.felt
+// CHECK-LABEL: function.def @compute() -> !struct.type<@Baz<[]>> 
+//       CHECK:   %{{[0-9a-zA-Z_\.]+}} = struct.readf %{{[0-9a-zA-Z_\.]+}}[@x] : <@Foo<[]>>, !felt.type
 }
