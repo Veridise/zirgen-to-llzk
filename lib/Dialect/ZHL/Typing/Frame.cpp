@@ -44,10 +44,10 @@ Frame &Frame::operator=(Frame &&other) {
 
 void Frame::print(llvm::raw_ostream &os) const { info->print(os); }
 
-detail::FrameInfo::SlotsList::iterator Frame::begin() { return info->begin(); }
-detail::FrameInfo::SlotsList::const_iterator Frame::begin() const { return info->begin(); }
-detail::FrameInfo::SlotsList::iterator Frame::end() { return info->end(); }
-detail::FrameInfo::SlotsList::const_iterator Frame::end() const { return info->end(); }
+Frame::iterator Frame::begin() { return info->begin(); }
+Frame::const_iterator Frame::begin() const { return info->begin(); }
+Frame::iterator Frame::end() { return info->end(); }
+Frame::const_iterator Frame::end() const { return info->end(); }
 
 void Frame::setParentSlot(FrameSlot *slot) { info->setParentSlot(slot); }
 FrameSlot *Frame::getParentSlot() const { return info->getParentSlot(); }

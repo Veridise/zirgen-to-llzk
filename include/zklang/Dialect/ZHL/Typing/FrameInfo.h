@@ -14,27 +14,39 @@
 #pragma once
 
 #include <llvm/ADT/simple_ilist.h>
-#include <llvm/Support/raw_ostream.h>
+#include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
+
+namespace llvm {
+class raw_ostream;
+}
 
 namespace zhl {
 
 class Frame;
-class FrameSlot;
 
 namespace detail {
 
 /// Inner implementation of a Frame. It is shared via a pointer by a group a Frame instances.
 class FrameInfo {
-public:
-  ~FrameInfo();
-  template <typename Slot, typename... Args> FrameSlot *allocateSlot(Args &&...args);
-
   using SlotsList = llvm::simple_ilist<FrameSlot>;
 
-  SlotsList::iterator begin();
-  SlotsList::const_iterator begin() const;
-  SlotsList::iterator end();
-  SlotsList::const_iterator end() const;
+public:
+  ~FrameInfo();
+  template <typename Slot, typename... Args> FrameSlot *allocateSlot(Args &&...args) {
+    FrameSlot *slot = new Slot(std::forward<Args>(args)...);
+    nCreatedSlots++;
+    slots.push_back(*slot);
+    slot->setParent(this);
+    return slot;
+  }
+
+  using iterator = SlotsList::iterator;
+  using const_iterator = SlotsList::const_iterator;
+
+  iterator begin();
+  const_iterator begin() const;
+  iterator end();
+  const_iterator end() const;
 
   void setParentSlot(FrameSlot *);
   FrameSlot *getParentSlot() const;
