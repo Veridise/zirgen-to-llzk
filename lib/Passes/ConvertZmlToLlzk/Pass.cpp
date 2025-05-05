@@ -98,12 +98,12 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       LowerAdd, LowerSub, LowerMul, LowerInv, LowerIsz, LowerNeg, LowerConstrainOp,
       LowerReadFieldOp, LowerInRangeOp, LowerNewArrayOp, LowerReadArrayOp, LowerAllocArrayOp,
       LowerArrayLengthOp, LowerIndexToValOp, LowerValToIndexOp, LowerWriteArrayOp,
-      WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerUnifiableCastOp, LowerSuperCoerceOp, LowerMod,
-      LowerLoadValParamOp, ComponentLowering, FieldDefOpLowering, FuncOpLowering, ReturnOpLowering,
-      ExternCallOpLowering, CallIndirectOpLoweringInCompute, RemoveConstructorRefOp,
-      RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering, AssertOpLowering,
-      LowerLitValArrayOp, LitStrOpLowering, LowerVarArgsOp, LowerGlobalDefOp, LowerSetGlobalOp,
-      LowerGetGlobalOp, LowerReadBackOp>(*typeConverter, ctx);
+      WriteFieldOpLowering, LowerConstrainCallOp, LowerNopOp, LowerUnifiableCastOp,
+      LowerSuperCoerceOp, LowerMod, LowerLoadValParamOp, ComponentLowering, FieldDefOpLowering,
+      FuncOpLowering, ReturnOpLowering, ExternCallOpLowering, CallIndirectOpLoweringInCompute,
+      RemoveConstructorRefOp, RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering,
+      AssertOpLowering, LowerLitValArrayOp, LitStrOpLowering, LowerVarArgsOp, LowerGlobalDefOp,
+      LowerSetGlobalOp, LowerGetGlobalOp, LowerReadBackOp>(*typeConverter, ctx);
 
   populateExtValToLlzkConversionPatterns(patterns, *typeConverter, ctx, *extValConverter);
 
