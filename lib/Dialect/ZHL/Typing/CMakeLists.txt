@@ -1,11 +1,8 @@
 add_library(ZHLTyping)
 
 target_link_libraries(ZHLTyping INTERFACE LLVMHeaders MLIRHeaders)
-target_link_libraries(
-  ZHLTyping
-  PRIVATE ZHLDialectHeaders ZHLDialect ZklangHeaders MLIRSupport
-          # MLIRTransformUtils LLZK::AllDialects LLZKUtil MLIRSCFTransforms
-)
+target_link_libraries(ZHLTyping PRIVATE ZHLDialectHeaders ZHLDialect
+                                        ZklangHeaders MLIRSupport)
 target_link_libraries(ZHLTyping PRIVATE zklang_options zklang_warnings)
 target_include_directories(ZHLTyping PUBLIC ${ZKLANG_INCLUDE_DIR})
 add_dependencies(ZHLTyping ZHLDialect ZklangHeaders)
@@ -28,13 +25,8 @@ target_sources(
 add_library(ZHLTypingPasses)
 
 target_link_libraries(ZHLTypingPasses INTERFACE LLVMHeaders MLIRHeaders)
-target_link_libraries(
-  ZHLTypingPasses
-  PRIVATE ZHLDialectHeaders
-          # ZHLDialect
-          ZHLTyping ZklangHeaders MLIRSupport
-  # MLIRTransformUtils LLZK::AllDialects LLZKUtil MLIRSCFTransforms
-)
+target_link_libraries(ZHLTypingPasses PRIVATE ZHLDialectHeaders ZHLTyping
+                                              ZklangHeaders MLIRSupport)
 target_link_libraries(ZHLTypingPasses PRIVATE zklang_options zklang_warnings)
 target_include_directories(ZHLTypingPasses PUBLIC ${ZKLANG_INCLUDE_DIR})
 add_dependencies(ZHLTypingPasses ZHLDialect ZklangHeaders)

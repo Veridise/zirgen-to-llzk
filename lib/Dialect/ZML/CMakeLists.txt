@@ -21,7 +21,6 @@ target_link_libraries(
           LLZK::LLZKFeltDialect
           LLZK::LLZKStringDialect
           MLIRTransformUtils
-          # LLZK::AllDialects LLZKUtil
           MLIRSCFTransforms)
 target_link_libraries(ZMLDialect PRIVATE zklang_options zklang_warnings)
 target_include_directories(ZMLDialect PUBLIC ${ZKLANG_INCLUDE_DIR})
