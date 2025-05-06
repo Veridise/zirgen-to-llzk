@@ -1,4 +1,4 @@
-set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doc")
+set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doc/doxygen")
 set(ZKLANG_MLIR_DOC_OUTPUT_DIR "${DOXYGEN_OUTPUT_DIRECTORY}/mlir")
 
 macro(zklang_setup_doc_generation DOXYGEN_DEPS)
@@ -9,25 +9,28 @@ macro(zklang_setup_doc_generation DOXYGEN_DEPS)
 
     # Fetch style document
     include(FetchContent)
-    set(DoxygenAwesomeCSS_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/deps/doxygen-awesome-css")
+    set(DoxygenAwesomeCSS_SOURCE_DIR
+        "${CMAKE_CURRENT_BINARY_DIR}/deps/doxygen-awesome-css")
     FetchContent_Declare(
       DoxygenAwesomeCSS
       GIT_REPOSITORY https://github.com/jothepro/doxygen-awesome-css.git
       GIT_TAG v2.3.4
-      SOURCE_DIR "${DoxygenAwesomeCSS_SOURCE_DIR}"
-    )
+      SOURCE_DIR "${DoxygenAwesomeCSS_SOURCE_DIR}")
     FetchContent_MakeAvailable(DoxygenAwesomeCSS)
 
-    # - doxygen awesome settings
+    # * doxygen awesome settings
     set(DOXYGEN_HTML_EXTRA_STYLESHEET
-      "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome.css"
-      "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-sidebar-only.css"
-      "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-sidebar-only-darkmode-toggle.css")
+        "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome.css"
+        "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-sidebar-only.css"
+        "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-sidebar-only-darkmode-toggle.css"
+    )
     set(DOXYGEN_HTML_EXTRA_FILES
-      "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-darkmode-toggle.js"
-      "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-paragraph-link.js")
-    set(DOXYGEN_HTML_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/doc/header.html")
-    set(DOXYGEN_HTML_FOOTER "${CMAKE_CURRENT_SOURCE_DIR}/doc/footer.html")
+        "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-darkmode-toggle.js"
+        "${DoxygenAwesomeCSS_SOURCE_DIR}/doxygen-awesome-paragraph-link.js")
+    set(DOXYGEN_HTML_HEADER
+        "${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/header.html")
+    set(DOXYGEN_HTML_FOOTER
+        "${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/footer.html")
     set(DOXYGEN_GENERATE_TREEVIEW YES)
     set(DOXYGEN_DISABLE_INDEX NO)
     set(DOXYGEN_FULL_SIDEBAR NO)
@@ -40,14 +43,15 @@ macro(zklang_setup_doc_generation DOXYGEN_DEPS)
     set(DOXYGEN_EXTRACT_ALL YES)
     set(DOXYGEN_INCLUDE_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/")
     set(DOXYGEN_EXCLUDE_PATTERNS
-      "${CMAKE_CURRENT_BINARY_DIR}/include/*/*.md"
-      # We ignore the passes because we aggregate the documentation under `zklang-opt`
-      "${ZKLANG_MLIR_DOC_OUTPUT_DIR}/passes/*.md"
-      # Same for Dialect docs
-      "${ZKLANG_MLIR_DOC_OUTPUT_DIR}/*Dialect.md"
-      )
+        "${CMAKE_CURRENT_BINARY_DIR}/include/*/*.md"
+        # We ignore the passes because we aggregate the documentation under
+        # `zklang-opt`
+        "${ZKLANG_MLIR_DOC_OUTPUT_DIR}/passes/*.md"
+        # Same for Dialect docs
+        "${ZKLANG_MLIR_DOC_OUTPUT_DIR}/*Dialect.md")
+
     set(DOXYGEN_USE_MDFILE_AS_MAINPAGE
-        ${CMAKE_CURRENT_SOURCE_DIR}/doc/index.md)
+        ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/index.md)
     set(DOXYGEN_FILE_PATTERNS
         *.cpp
         *.cpp.inc
