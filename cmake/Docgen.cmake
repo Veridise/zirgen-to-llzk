@@ -2,10 +2,10 @@ set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doc")
 set(ZKLANG_MLIR_DOC_OUTPUT_DIR "${DOXYGEN_OUTPUT_DIRECTORY}/mlir")
 
 macro(zklang_setup_doc_generation DOXYGEN_DEPS)
-  add_custom_target(doc)
   find_package(Doxygen OPTIONAL_COMPONENTS dot)
   if(Doxygen_FOUND)
     message(STATUS "Doxygen found, enabling documentation...")
+    add_custom_target(doc)
 
     # Fetch style document
     include(FetchContent)
@@ -42,7 +42,10 @@ macro(zklang_setup_doc_generation DOXYGEN_DEPS)
     set(DOXYGEN_EXCLUDE_PATTERNS
       "${CMAKE_CURRENT_BINARY_DIR}/include/*/*.md"
       # We ignore the passes because we aggregate the documentation under `zklang-opt`
-      "${ZKLANG_MLIR_DOC_OUTPUT_DIR}/passes/*.md")
+      "${ZKLANG_MLIR_DOC_OUTPUT_DIR}/passes/*.md"
+      # Same for Dialect docs
+      "${ZKLANG_MLIR_DOC_OUTPUT_DIR}/*Dialect.md"
+      )
     set(DOXYGEN_USE_MDFILE_AS_MAINPAGE
         ${CMAKE_CURRENT_SOURCE_DIR}/doc/index.md)
     set(DOXYGEN_FILE_PATTERNS
