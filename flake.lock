@@ -159,6 +159,32 @@
         "type": "github"
       }
     },
+    "release-helpers_2": {
+      "inputs": {
+        "flake-utils": [
+          "llzk-pkgs",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "llzk-pkgs",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1745292187,
+        "narHash": "sha256-emE+IXMiPw5IqKZzyJLwukQ6Cn6WOI9zjUpIgASwCZw=",
+        "owner": "Veridise",
+        "repo": "open-source-release-helpers",
+        "rev": "bed5c10dc058138a3b20d1c3340ead212836a0b0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Veridise",
+        "ref": "main",
+        "repo": "open-source-release-helpers",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-utils": [
@@ -171,7 +197,7 @@
           "llzk-pkgs",
           "nixpkgs"
         ],
-        "release-helpers": "release-helpers"
+        "release-helpers": "release-helpers_2"
       }
     }
   },

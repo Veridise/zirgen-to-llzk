@@ -20,7 +20,8 @@ target_link_libraries(
          ZHLTypingPasses
          ZklangPasses
          MLIRReconcileUnrealizedCasts
-         MLIRPass)
+         MLIRPass
+         ToolsConfig)
 target_link_libraries(zklang-opt PRIVATE zklang_options zklang_warnings)
 include_directories(SYSTEM ${MLIR_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 

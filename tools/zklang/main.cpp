@@ -8,6 +8,10 @@
 //===----------------------------------------------------------------------===//
 
 #include <mlir/Support/LogicalResult.h>
+#include <tools/config.h>
 #include <zklang/Frontends/ZIR/Driver.h>
 
-int main(int argc, char **argv) { return mlir::failed(zklang::zirDriver(argc, argv)); }
+int main(int argc, char **argv) {
+  zklang::configureTool();
+  return mlir::failed(zklang::zirDriver(argc, argv));
+}
