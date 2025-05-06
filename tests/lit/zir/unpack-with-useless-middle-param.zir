@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s --print-debug-info=false | FileCheck %s
+// RUN: zklang -o - %s --strip-debug-info | FileCheck %s
 
 // COM: This test case has a useless parameter in the middle to make sure 
 // COM: the formals and the symbols in the affine map match properly when

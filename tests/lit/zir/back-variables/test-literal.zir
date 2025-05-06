@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s  --print-debug-info=false | FileCheck %s --enable-var-scope
+// RUN: zklang -o - %s  --strip-debug-info | FileCheck %s --enable-var-scope
 
 component Top() {
   x := Reg(2);

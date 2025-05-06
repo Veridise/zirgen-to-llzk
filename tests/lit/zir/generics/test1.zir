@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s --print-debug-info=false | FileCheck %s --enable-var-scope
+// RUN: zklang -o - %s --strip-debug-info | FileCheck %s --enable-var-scope
 
 // COM: Checks that we emit the corresponding functions with the correct types of each parametric component.
 // COM: LLZK already checks that constrain functions cannot be called from compute functions and vice versa.

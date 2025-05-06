@@ -39,8 +39,11 @@
 namespace cl = llvm::cl;
 using namespace mlir;
 
+static cl::OptionCategory ZirgenDriverCategory("Zklang zirgen options");
+
 static cl::opt<std::string> inputFilename(
-    cl::Positional, cl::desc("<input zir file>"), cl::value_desc("filename"), cl::Required
+    cl::Positional, cl::desc("<input zirgen file>"), cl::value_desc("filename"), cl::Required,
+    cl::cat(ZirgenDriverCategory)
 );
 
 namespace {
@@ -65,19 +68,23 @@ static cl::opt<enum Action> emitAction(
             "Output typed medium level ZIR IR with separate compute and constrain functions"
         ),
         clEnumValN(Action::PrintLlzk, "llzk", "Output LLZK IR")
-    )
+    ),
+    cl::cat(ZirgenDriverCategory)
 );
 
-static cl::list<std::string> includeDirs("I", cl::desc("Add include path"), cl::value_desc("path"));
-static cl::opt<std::string>
-    outputFile("o", cl::desc("Where to write the result"), cl::value_desc("output"));
-static cl::opt<bool> emitBytecode("emit-bytecode", cl::desc("Emit IR in bytecode format"));
-static cl::opt<bool> stripDebugInfo(
-    "strip-debug-info", cl::desc("Toggle stripping debug information when writing the output")
+static cl::list<std::string> includeDirs(
+    "I", cl::desc("Add include path"), cl::value_desc("path"), cl::cat(ZirgenDriverCategory)
 );
-static cl::opt<bool> printDebugInfo(
-    "print-debug-info", cl::desc("Toggle printing debug information when emitting IR"),
-    cl::init(true)
+static cl::opt<std::string> outputFile(
+    "o", cl::desc("Where to write the result"), cl::value_desc("output"),
+    cl::cat(ZirgenDriverCategory)
+);
+static cl::opt<bool> emitBytecode(
+    "emit-bytecode", cl::desc("Emit IR in bytecode format"), cl::cat(ZirgenDriverCategory)
+);
+static cl::opt<bool> stripDebugInfo(
+    "strip-debug-info", cl::desc("Toggle stripping debug information when writing the output"),
+    cl::cat(ZirgenDriverCategory)
 );
 
 // Dev-oriented command line options only available in debug builds
@@ -90,18 +97,18 @@ bool DisableCastReconciliationFlag = false;
 #ifndef NDEBUG
 static cl::opt<bool, true> DisableMultiThreading(
     "disable-multithreading", cl::desc("Disable multithreading of the lowering pipeline"),
-    cl::Hidden, cl::location(DisableMultiThreadingFlag)
+    cl::Hidden, cl::location(DisableMultiThreadingFlag), cl::cat(ZirgenDriverCategory)
 );
 
 static cl::opt<bool, true> DisableCleanupPasses(
     "disable-cleanup-passes", cl::desc("Disables running cse and canonicalize in the pipeline"),
-    cl::Hidden, cl::location(DisableCleanupPassesFlag)
+    cl::Hidden, cl::location(DisableCleanupPassesFlag), cl::cat(ZirgenDriverCategory)
 );
 
 static cl::opt<bool, true> DisableCastReconciliation(
     "disable-reconciliation-passes",
     cl::desc("Disables running reconcile-unrealized-casts in the pipeline"), cl::Hidden,
-    cl::location(DisableCastReconciliationFlag)
+    cl::location(DisableCastReconciliationFlag), cl::cat(ZirgenDriverCategory)
 );
 #endif
 
@@ -119,11 +126,14 @@ struct ZirFrontendDialects {
 
 class Driver {
 public:
-  static FailureOr<std::unique_ptr<Driver>> Make(int &argc, char **&argv);
+  Driver(int &argc, char **&argv);
+  Driver(const Driver &) = delete;
+  Driver(Driver &&) = delete;
+  Driver &operator=(const Driver &) = delete;
+  Driver &operator=(Driver &&) = delete;
   LogicalResult run();
 
 private:
-  Driver(int &argc, char **&argv);
   void openMainFile(std::string);
   zirgen::dsl::ast::Module::Ptr parse();
   std::optional<mlir::ModuleOp> lowerToZhl(zirgen::dsl::ast::Module &);
@@ -137,28 +147,11 @@ private:
   mlir::PassManager pm;
 };
 
-FailureOr<std::unique_ptr<Driver>> Driver::Make(int &argc, char **&argv) {
-  // Done this way to keep the constructor private
-  std::unique_ptr<Driver> driver(new Driver(argc, argv));
-
-  applyDefaultTimingPassManagerCLOptions(driver->pm);
-  if (failed(applyPassManagerCLOptions(driver->pm))) {
-    llvm::errs() << "Pass manager does not agree with command line options.\n";
-    return failure();
-  }
-  driver->pm.enableVerifier(true);
-  return std::move(driver);
-}
-
 Driver::Driver(int &argc, char **&argv)
     : llvm(argc, argv), dialects(), context(dialects.registry), sourceManager{},
       sourceMgrHandler(sourceManager, &context), pm(&context) {
-  mlir::registerAsmPrinterCLOptions();
-  mlir::registerMLIRContextCLOptions();
-  mlir::registerPassManagerCLOptions();
-  mlir::registerDefaultTimingManagerCLOptions();
-  mlir::tracing::DebugConfig::registerCLOptions();
-  cl::ParseCommandLineOptions(argc, argv, "zklang ZIR frontend\n");
+  cl::HideUnrelatedOptions(ZirgenDriverCategory);
+  cl::ParseCommandLineOptions(argc, argv, "zirgen frontend to LLZK\n");
 
   context.loadAllAvailableDialects();
 
@@ -166,14 +159,28 @@ Driver::Driver(int &argc, char **&argv)
     llvm::errs() << "Multithreading was disabled!\n";
     context.disableMultithreading();
   }
-}
 
-void Driver::configureLoweringPipeline() {
-  pm.clear();
-  if (emitAction == Action::PrintZHL) {
+  pm.enableVerifier(true);
+}
+namespace {
+/// Helper to ensure the pipeline manager is configured properly
+class PMSetupGuard {
+  mlir::PassManager &pm;
+
+public:
+  PMSetupGuard(mlir::PassManager &PM) : pm(PM) { pm.clear(); }
+
+  ~PMSetupGuard() {
     if (stripDebugInfo) {
       pm.addPass(mlir::createStripDebugInfoPass());
     }
+  }
+};
+} // namespace
+
+void Driver::configureLoweringPipeline() {
+  PMSetupGuard guard(pm);
+  if (emitAction == Action::PrintZHL) {
     return;
   }
 
@@ -188,9 +195,6 @@ void Driver::configureLoweringPipeline() {
   }
 
   if (emitAction == Action::PrintZML) {
-    if (stripDebugInfo) {
-      pm.addPass(mlir::createStripDebugInfoPass());
-    }
     return;
   }
 
@@ -207,9 +211,6 @@ void Driver::configureLoweringPipeline() {
   }
 
   if (emitAction == Action::OptimizeZML) {
-    if (stripDebugInfo) {
-      pm.addPass(mlir::createStripDebugInfoPass());
-    }
     return;
   }
   pm.addPass(zklang::createConvertZmlToLlzkPass());
@@ -219,9 +220,6 @@ void Driver::configureLoweringPipeline() {
   }
   if (!DisableCleanupPassesFlag) {
     llzkStructPipeline.addPass(mlir::createCanonicalizerPass());
-  }
-  if (stripDebugInfo) {
-    pm.addPass(mlir::createStripDebugInfoPass());
   }
 }
 
@@ -285,7 +283,7 @@ public:
         mod->emitOpError("could not write module bytecode to file").report();
       }
     } else {
-      mod->print(*dst, OpPrintingFlags(std::nullopt).enableDebugInfo(printDebugInfo));
+      mod->print(*dst, OpPrintingFlags(std::nullopt).enableDebugInfo(!stripDebugInfo));
     }
   }
 
@@ -318,7 +316,7 @@ LogicalResult Driver::run() {
   }
   ModuleEraseGuard guard(*mod);
   configureLoweringPipeline();
-  pm.dump();
+  LLVM_DEBUG(pm.dump());
   if (failed(pm.run(*mod))) {
     DEBUG_WITH_TYPE("zir-driver-dump-on-error", llvm::errs() << "Module contents:\n";
                     mod->print(llvm::errs(), OpPrintingFlags(std::nullopt).printGenericOpForm()));
@@ -347,11 +345,8 @@ namespace zklang {
 
 LogicalResult zirDriver(int &argc, char **&argv) {
 
-  FailureOr<std::unique_ptr<Driver>> driver = Driver::Make(argc, argv);
-  if (failed(driver)) {
-    return failure();
-  }
-  return (*driver)->run();
+  Driver driver(argc, argv);
+  return driver.run();
 }
 
 } // namespace zklang

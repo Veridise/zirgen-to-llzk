@@ -38,7 +38,8 @@ Run `zklang --help` for more details.
 passes on ZHL, ZML, and LLZK IR files. You can refer to the `mlir-opt` documentation for a general
 overview of the operation of `*-opt` tooling, but note that many options and passes
 available in `mlir-opt` are not available in `zklang-opt`.
-`zklang-opt -h` will show a list of all available flags and options.
+`zklang-opt -h` will show a list of all available flags and options. This includes the standard `mlir-opt`
+options along with the passes used for lowering to LLZK.
 
 ## Zklang Pass Documentation {#passes}
 

@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s --print-debug-info=false | FileCheck  %s
+// RUN: zklang -o - %s --strip-debug-info | FileCheck  %s
 
 component Foo(x: ExtVal) {
   for i : 1..10 { x }

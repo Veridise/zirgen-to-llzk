@@ -1,5 +1,7 @@
 # zirgen-to-llzk
 
+![ci badge](https://github.com/Veridise/zirgen-to-llzk/actions/workflows/ci.yml/badge.svg)
+
 Tools and MLIR modules for transforming Zirgen to LLZK.
 
 For our full documentation, please refer to our GitHub pages site (coming soon).

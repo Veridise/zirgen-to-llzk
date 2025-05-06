@@ -16,3 +16,5 @@ See the [LLZK site][llzk-site] for more information on using LLZK IR.
 | \ref mainpage | \ref setup |
 </div>
 
+[llzk-site]: https://veridise.github.io/llzk-lib/
+[zirgen-repo]: https://github.com/risc0/zirgen
