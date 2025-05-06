@@ -9,20 +9,27 @@ circuit languages.
 ## Site Overview
 
 This site contains both user documentation and internal developer documentation
-for the [Zirgen](https://github.com/risc0/zirgen) frontend for [LLZK](https://github.com/Veridise/llzk-lib).
+for the [Zirgen][ziregen-repo] frontend for [LLZK][llzk-site].
 
 User Documentation:
 - \ref setup "Setup and Development Tips"
-- \ref tools "Tool Guides"
+- \ref tools
 
 Advanced Documentation:
-- \ref build/doc/mlir/Dialect.md "ZML Dialect Language Reference"
+- \ref dialects "ZHL and ZML Dialect Language Reference"
 
 How to Contribute:
 - First, read our \ref code-of-conduct "Code of Conduct".
-- Then, read our \ref contribution-guide "Contribution Guide".
+- Then, read our \ref contribution-guide.
 
 \subpage license "View the Zklang License."
 
 [llzk-site]: https://veridise.github.io/llzk-lib
 [zirgen-repo]: https://github.com/risc0/zirgen
+
+<div class="section_buttons">
+| Previous          |                              Next |
+|:------------------|----------------------------------:|
+|  | \ref overview |
+</div>
+

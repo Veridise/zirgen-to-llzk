@@ -7,3 +7,9 @@
 a few issues, one being that the TOC looked too messy, and the other being that
 <tt> tags were being displayed there (for operation names) verbatim, which is ugly. -->
 \tableofcontents{HTML:2}
+
+<div class="section_buttons">
+| Previous          |                              Next |
+|:------------------|----------------------------------:|
+| \ref contribution-guide |  |
+</div>

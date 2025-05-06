@@ -1,7 +1,5 @@
 # Tool Guides {#tools}
 
-\tableofcontents
-
 # zklang {#zklang}
 
 `zklang` is the primary tool provided by this project.
@@ -17,30 +15,36 @@ but `zklang` can optionally emit any of the above intermediate representations f
 
 ## zklang Options
 
-`zklang` inherits options
+`zklang` inherits some options from `mlir` utilites, but provides the following unique settings:
 
 ```
-
+-I <path>           - Add include path
+--emit=<value>      - The kind of output desired
+  =ast              -   Output the AST
+  =zhl              -   Output untyped high level ZIR IR
+  =zml              -   Output typed medium level ZIR IR
+  =zmlopt           -   Output typed medium level ZIR IR with separate compute and constrain functions
+  =llzk             -   Output LLZK IR
+--emit-bytecode     - Emit IR in bytecode format
+--print-debug-info  - Toggle printing debug information when emitting IR
+--strip-debug-info  - Toggle stripping debug information when writing the output
 ```
+
+Run `zklang --help` for more details.
 
 # zklang-opt {#zklang-opt}
 
-`zklang-opt` is a version of the [`mlir-opt` tool]() that supports
+`zklang-opt` is a version of the [`mlir-opt` tool][mlir-opt-docs] that supports
 passes on ZHL, ZML, and LLZK IR files. You can refer to the `mlir-opt` documentation for a general
 overview of the operation of `*-opt` tooling, but note that many options and passes
 available in `mlir-opt` are not available in `zklang-opt`.
 `zklang-opt -h` will show a list of all available flags and options.
 
-##### Custom zklang-opt Options
-
-These options are specific to `zklang-opt` and are not present in `mlir-opt`.
-Refer to the `mlir-opt` documentation
-
-```
--I <directory> : Directory of include files
-```
-
 ## Zklang Pass Documentation {#passes}
+
+The primary addition of `zklang-opt` over `mlir-opt` is the set of passes available
+that perform dialect conversion between ZHL, ZML, and LLZK.
+We document the added passes below.
 
 ### Lowering Passes
 
@@ -53,6 +57,8 @@ Refer to the `mlir-opt` documentation
 ### ZML Transformation Passes
 
 \include{doc,raise=1} build/doc/mlir/passes/ZmlTransformationPasses.md
+
+\tableofcontents{HTML:3}
 
 
 <div class="section_buttons">

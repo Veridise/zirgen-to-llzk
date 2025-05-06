@@ -50,8 +50,9 @@ def SplitComponentBody : Pass<"split-component-body", "mlir::ModuleOp"> {
 class RemoveIllegalOps<string func>
     : Pass<"remove-illegal-"#!tolower(func)#"-ops", "mlir::func::FuncOp"> {
 
+  // "@" must be escaped for proper markdown creation
   let summary =
-      "Removes from the @"#!tolower(func)#" function of a component any ops "
+      "Removes from the \\@"# !tolower(func) #" function of a component any ops "
                                           "that are not allowed";
   let constructor = "zml::createRemoveIllegal"#func#"OpsPass()";
 

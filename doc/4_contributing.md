@@ -88,5 +88,5 @@ Once your PR is merged, your contributions will be publicly available in the [Zk
 <div class="section_buttons">
 | Previous          |                              Next |
 |:------------------|----------------------------------:|
-| \ref tools | [Dialect Documentation](build/doc/mlir/Dialect.md) |
+| \ref tools | \ref dialects |
 </div>

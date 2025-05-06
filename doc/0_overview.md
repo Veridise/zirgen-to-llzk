@@ -1,4 +1,4 @@
-# Project Overview {#overview}
+# Repository Organization {#overview}
 
 The Zklang repo consists of two main components:
 
