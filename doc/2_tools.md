@@ -13,21 +13,34 @@ MLIR dialects. The end-to-end workflow of `zklang` is to perform the following t
 Generally, users will use `zklang` to translate zirgen circuits to LLZK bytecode (which is more efficient for downstream tooling to operate on),
 but `zklang` can optionally emit any of the above intermediate representations for inspection or debugging purproses.
 
-## zklang Options
 
-`zklang` inherits some options from `mlir` utilites, but provides the following unique settings:
+## Usage 
 
 ```
--I <path>           - Add include path
---emit=<value>      - The kind of output desired
-  =ast              -   Output the AST
-  =zhl              -   Output untyped high level ZIR IR
-  =zml              -   Output typed medium level ZIR IR
-  =zmlopt           -   Output typed medium level ZIR IR with separate compute and constrain functions
-  =llzk             -   Output LLZK IR
---emit-bytecode     - Emit IR in bytecode format
---print-debug-info  - Toggle printing debug information when emitting IR
---strip-debug-info  - Toggle stripping debug information when writing the output
+zklang [options] <input zirgen file>
+```
+
+## General `zklang` options
+
+```
+--help             - Display available options
+--version          - Display the version of this program
+-I <path>          - Add include path
+-o <output>        - Where to write the result
+--emit-bytecode    - Emit IR in bytecode format
+--strip-debug-info - Toggle stripping debug information when writing the output
+```
+
+## Emission `zklang` options 
+
+The `--emit=<value>` flag is used to control the output `zklang` produces. Only one kind of output can be selected among the following options.
+
+```
+--emit=ast    -   Output the AST
+--emit=zhl    -   Output untyped high level ZIR IR
+--emit=zml    -   Output typed medium level ZIR IR
+--emit=zmlopt -   Output typed medium level ZIR IR with separate compute and constrain functions
+--emit=llzk   -   Output LLZK IR
 ```
 
 Run `zklang --help` for more details.
@@ -68,6 +81,5 @@ We document the added passes below.
 | \ref setup | \ref contribution-guide |
 </div>
 
-<!-- TODO: Change this link to the github pages site -->
-[llzk-site]: https://github.com/Veridise/llzk-lib
+[llzk-site]: https://veridise.github.io/llzk-lib/
 [mlir-opt-docs]: https://mlir.llvm.org/docs/Tutorials/MlirOpt/
