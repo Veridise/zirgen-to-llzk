@@ -351,10 +351,9 @@ LogicalResult LowerLoadValParamOp::matchAndRewrite(
 /// IntegerAttr. Any other kind of Attribute is considered malformed IR and will abort.
 static Value materializeParam(Attribute attr, OpBuilder &builder, Location loc) {
   if (auto symAttr = mlir::dyn_cast<SymbolRefAttr>(attr)) {
-    auto param = builder.create<llzk::polymorphic::ConstReadOp>(
-        loc, llzk::felt::FeltType::get(builder.getContext()), symAttr.getRootReference()
+    return builder.create<llzk::polymorphic::ConstReadOp>(
+        loc, builder.getIndexType(), symAttr.getRootReference()
     );
-    return builder.create<llzk::cast::FeltToIndexOp>(loc, builder.getIndexType(), param);
   }
   if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
     return builder.create<arith::ConstantIndexOp>(loc, llzk::fromAPInt(intAttr.getValue()));
