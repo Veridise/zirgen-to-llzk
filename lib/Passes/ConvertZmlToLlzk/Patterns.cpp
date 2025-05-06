@@ -697,9 +697,15 @@ mlir::LogicalResult LowerValToIndexOp::matchAndRewrite(
     rewriter.replaceAllUsesWith(op, adaptor.getVal());
     rewriter.eraseOp(op);
   } else {
-    rewriter.replaceOpWithNewOp<llzk::cast::FeltToIndexOp>(
-        op, rewriter.getIndexType(), adaptor.getVal()
-    );
+    mlir::Value operand = adaptor.getVal();
+    if (auto constRead = llvm::dyn_cast<llzk::polymorphic::ConstReadOp>(operand.getDefiningOp())) {
+      // If the operand comes from a ConstReadOp, just directly read as an 'index' rather than cast.
+      rewriter.replaceOpWithNewOp<llzk::polymorphic::ConstReadOp>(
+          op, rewriter.getIndexType(), constRead.getConstNameAttr()
+      );
+    } else {
+      rewriter.replaceOpWithNewOp<llzk::cast::FeltToIndexOp>(op, rewriter.getIndexType(), operand);
+    }
   }
 
   return mlir::success();
