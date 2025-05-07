@@ -6,7 +6,7 @@ on:
 
 jobs:
   docs:
-    runs-on: ubuntu-24.04 
+    runs-on: ubuntu-24.04
     name: "Test docs generation"
     steps:
       - name: Checkout
@@ -38,7 +38,8 @@ jobs:
         env:
           CI_BOT_PAT: "${{ secrets.CI_BUILD_TOKEN }}"
       - name: Set reusable strings
-        # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
+        # Turn repeated input strings (such as the build output directory) into step outputs.
+        # These step outputs can be used throughout the workflow file.
         id: strings
         shell: bash
         run: |
@@ -47,13 +48,13 @@ jobs:
         run: >
           cmake -B ${{ steps.strings.outputs.build-output-dir }}
           -DCMAKE_BUILD_TYPE=Release
-          -GNinja 
+          -GNinja
           -S ${{ github.workspace }}
       - name: Build docs
         run: >
-          cmake 
-          --build ${{ steps.strings.outputs.build-output-dir }} 
-          --config Release 
+          cmake
+          --build ${{ steps.strings.outputs.build-output-dir }}
+          --config Release
           --target doc
       - name: Clear Git credentials
         if: "${{ always() }}"
