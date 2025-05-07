@@ -28,8 +28,8 @@ If a related issue doesn't exist, you can open a new issue using a relevant [iss
 Scan through our [existing issues][issues-page] to find one that interests you.
 You can narrow down the search using `labels` as filters.
 See ["Label reference"][git-labels] for more information.
-As a general rule, we don’t assign issues to anyone.
-If you find an issue to work on, you are welcome to open a PR with a fix.
+We don’t usually assign issues to anyone.
+If you find an unassigned issue to work on, you are welcome to open a PR with a fix.
 
 ### Make Changes
 
@@ -41,7 +41,7 @@ If you find an issue to work on, you are welcome to open a PR with a fix.
 - Using the command line:
   - [Fork the repo][git-fork] so that you can make your changes without affecting the original project until you're ready to merge them.
 
-2. Install or update LLZK development dependencies. For more information, see \ref setup "The Development Guide".
+2. Install or update LLZK development dependencies. For more information, see \ref setup "the development guide".
 
 3. Create a working branch and start with your changes!
 
