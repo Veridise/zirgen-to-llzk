@@ -1,34 +1,12 @@
-name: CI
+name: Docs CI
 on:
   push:
     branches: [ $default-branch ]
   pull_request:
 
 jobs:
-  build:
-    name: "Build"
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    strategy:
-      matrix:
-        os: [ ubuntu-24.04 ]
-        build_type: [ Debug ]
-        generator: [ Ninja ]
-        c_compiler: [ gcc, clang ]
-        sanitizers: [ yes, no ]
-        include:
-          - c_compiler: gcc 
-            cpp_compiler: g++
-          - c_compiler: clang 
-            cpp_compiler: clang++
-          - sanitizers: yes 
-            extra_cmake_flags: |
-              -DZKLANG_ENABLE_SANITIZER_ADDRESS=YES \
-              -DZKLANG_ENABLE_SANITIZER_UNDEFINED=YES 
-          - sanitizers: no 
-            extra_cmake_flags: |
-              -DZKLANG_ENABLE_SANITIZER_ADDRESS=NO \
-              -DZKLANG_ENABLE_SANITIZER_UNDEFINED=NO 
+  docs:
+    name: "Test docs generation"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,23 +45,15 @@ jobs:
       - name: Configure CMake
         run: >
           cmake -B ${{ steps.strings.outputs.build-output-dir }}
-          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          -DZKLANG_WARNINGS_AS_ERRORS=ON 
-          -G ${{ matrix.generator }}
+          -DCMAKE_BUILD_TYPE=Release
+          -GNinja 
           -S ${{ github.workspace }}
-          ${{ matrix.extra_cmake_flags }}
-        # Keep the extra cmake flags at the end to avoid a line break!
-      - name: Build zklang
-        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target zklang
-      - name: Build zklang-opt
-        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target zklang-opt
-      - name: Run unit tests
-        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target check-unit
-      - name: Run lit tests
-        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --target check-lit
-
+      - name: Build docs
+        run: >
+          cmake 
+          --build ${{ steps.strings.outputs.build-output-dir }} 
+          --config Release 
+          --target doc
       - name: Clear Git credentials
         if: "${{ always() }}"
         run: rm -rf "~/.git-askpass"
