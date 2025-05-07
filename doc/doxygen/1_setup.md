@@ -54,11 +54,10 @@ Zklang requires the following to be installed:
 * Z3
 * LLZK library
 
-> ![WARNING]
-> The below instructions assume you have LLZK installed system-wide. To
-> reference a local installation, you will need to add the installation path
-> to the `CMAKE_MODULE_PATH` so that `find_package(LLZK)` in CMake will locate
-> the LLZK installation.
+@warning The below instructions assume you have LLZK installed system-wide. To
+reference a local installation, you will need to add the installation path
+to the `CMAKE_MODULE_PATH` so that `find_package(LLZK)` in CMake will locate
+the LLZK installation.
 
 Zklang also requires access to Veridise's fork of the Zirgen source code (located
 in [this repo][veridise-zirgen]).
@@ -150,10 +149,10 @@ you can run the following commands:
 * Run install target (requires `CMAKE_INSTALL_PREFIX` to be set):
   `cmake --build . --target install`
 * Run clang-format on C++ files:
-  `clang-format -i $(find include -name '*.h' -type f) $(find lib tools -name '*.cpp' -type f)`
+  ``clang-format -i $(find include -name '*.h' -type f) $(find lib tools -name '*.cpp' -type f)``
 * Run clang-format (version 19.1 or later) on tablegen files:
-  `clang-format-19 -i $(find include -name '*.td' -type f)`
-* Run clang-tidy: `clang-tidy -p build/compile_commands.json $(find lib -name '*.cpp' -type f)`
+  ``clang-format-19 -i $(find include -name '*.td' -type f)``
+* Run clang-tidy: ``clang-tidy -p build/compile_commands.json $(find lib -name '*.cpp' -type f)``
   * Note that due to bugs in clang-tidy, this may segfault if running on all files.
 
 The build configuration will automatically export `compile_commands.json`, so
