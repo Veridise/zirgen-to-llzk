@@ -1,0 +1,26 @@
+var classzml_1_1_global_def_op =
+[
+    [ "Adaptor", "classzml_1_1_global_def_op.html#a8a0f26302182a8e00a33fff6cbb4d737", null ],
+    [ "FoldAdaptor", "classzml_1_1_global_def_op.html#aba82a6194992e7518a8d295005675895", null ],
+    [ "GenericAdaptor", "classzml_1_1_global_def_op.html#a62ee34fe2e34cfd66afb7374b42753ee", null ],
+    [ "Properties", "classzml_1_1_global_def_op.html#adc9c68f9b061ebed7fb0786f83470b4c", null ],
+    [ "getAttributeNames", "classzml_1_1_global_def_op.html#a912373f51d92b2cf739a88e97198d2ee", null ],
+    [ "getODSOperandIndexAndLength", "classzml_1_1_global_def_op.html#ae4bc19a936b5398ecbf6dd2a343dcc99", null ],
+    [ "getODSOperands", "classzml_1_1_global_def_op.html#a2b59454b0bd8eee59b3e3928560f7f60", null ],
+    [ "getODSResultIndexAndLength", "classzml_1_1_global_def_op.html#aae9981b7d51b3159badce7586da9ec13", null ],
+    [ "getODSResults", "classzml_1_1_global_def_op.html#adfd161b9cbd0d1d7c658807d1597846d", null ],
+    [ "getSymName", "classzml_1_1_global_def_op.html#a74b086f69b11f2c30408b41a516a86ac", null ],
+    [ "getSymNameAttr", "classzml_1_1_global_def_op.html#acec4929c1eb72e10bfd4e5e5b7a587f6", null ],
+    [ "getSymNameAttrName", "classzml_1_1_global_def_op.html#af5af22df2177b985f796c703430f4688", null ],
+    [ "getType", "classzml_1_1_global_def_op.html#a9ebd00e43a7fa0d830b75abbb6f8cffc", null ],
+    [ "getTypeAttr", "classzml_1_1_global_def_op.html#a7e231d5ec14ee014c8a27758511fc8df", null ],
+    [ "getTypeAttrName", "classzml_1_1_global_def_op.html#ae282a0cac532a30b1764834f58436851", null ],
+    [ "print", "classzml_1_1_global_def_op.html#ae8890a6997dc9a6a143736137c42ffc4", null ],
+    [ "setSymName", "classzml_1_1_global_def_op.html#aa64241e9140ecefb09a01db64ac2d23a", null ],
+    [ "setSymNameAttr", "classzml_1_1_global_def_op.html#a433d1fabb9cd3eee8359c7964d5abaf2", null ],
+    [ "setType", "classzml_1_1_global_def_op.html#aeb006324227abc88fa0f114724ce1259", null ],
+    [ "setTypeAttr", "classzml_1_1_global_def_op.html#a79404363cfe7da5d9a0c1f262821e310", null ],
+    [ "verifyInvariants", "classzml_1_1_global_def_op.html#ab0b92dc866f86a7ab351d43cf8ef090c", null ],
+    [ "verifyInvariantsImpl", "classzml_1_1_global_def_op.html#a9a2d6a6977561771f29e85713977b7bf", null ],
+    [ "writeProperties", "classzml_1_1_global_def_op.html#a019b583aeaa2cb73e3a0026d64dbcf3c", null ]
+];

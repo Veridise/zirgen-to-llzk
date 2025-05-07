@@ -1,0 +1,11 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" href="$structzml_1_1detail_1_1_defines_constrain_func_interface_traits_1_1_concept.html" title=" " alt="" coords="5,93,197,134"/>
+<area shape="rect" id="Node000001" href="$classzml_1_1detail_1_1_defines_constrain_func_interface_traits_1_1_fallback_model.html" title=" " alt="" coords="245,5,471,61"/>
+<area shape="poly" id="edge225_Node000000_Node000001" title=" " alt="" coords="182,85,266,59,267,64,184,90"/>
+<area shape="rect" id="Node000003" href="$classzml_1_1detail_1_1_defines_constrain_func_interface_traits_1_1_fallback_model.html" title=" " alt="" coords="245,85,471,141"/>
+<area shape="poly" id="edge227_Node000000_Node000003" title=" " alt="" coords="212,110,244,110,244,116,212,116"/>
+<area shape="rect" id="Node000004" href="$classzml_1_1detail_1_1_defines_constrain_func_interface_traits_1_1_model.html" title=" " alt="" coords="263,165,453,221"/>
+<area shape="poly" id="edge228_Node000000_Node000004" title=" " alt="" coords="184,136,267,162,266,167,182,141"/>
+<area shape="rect" id="Node000002" href="$classzml_1_1detail_1_1_defines_constrain_func_interface_traits_1_1_external_model.html" title=" " alt="" coords="519,5,744,61"/>
+<area shape="poly" id="edge226_Node000001_Node000002" title=" " alt="" coords="487,30,519,30,519,36,487,36"/>
+</map>

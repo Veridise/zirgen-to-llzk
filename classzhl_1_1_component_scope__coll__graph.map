@@ -1,0 +1,7 @@
+<map id="zhl::ComponentScope" name="zhl::ComponentScope">
+<area shape="rect" id="Node000001" title=" " alt="" coords="41,79,192,105"/>
+<area shape="rect" id="Node000002" href="$classzhl_1_1_scope.html" title=" " alt="" coords="5,5,89,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="71,40,107,77,103,80,67,44"/>
+<area shape="rect" id="Node000003" href="$classzhl_1_1_lexical_scope_impl.html" title="Mixin that implements the logic for defining members." alt="" coords="112,5,262,31"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="167,44,130,80,126,77,163,40"/>
+</map>

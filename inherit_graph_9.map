@@ -1,0 +1,15 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" title=" " alt="" coords="5,71,132,111"/>
+<area shape="rect" id="Node000001" href="$structzml_1_1detail_1_1_component_interface_trait.html" title=" " alt="" coords="180,5,387,46"/>
+<area shape="poly" id="edge77_Node000000_Node000001" title=" " alt="" coords="145,65,213,44,215,49,147,70"/>
+<area shape="rect" id="Node000003" href="$structzml_1_1detail_1_1_defines_body_func_trait.html" title=" " alt="" coords="198,71,368,111"/>
+<area shape="poly" id="edge79_Node000000_Node000003" title=" " alt="" coords="147,88,198,88,198,94,147,94"/>
+<area shape="rect" id="Node000005" href="$structzml_1_1detail_1_1_defines_constrain_func_trait.html" title=" " alt="" coords="188,136,378,177"/>
+<area shape="poly" id="edge81_Node000000_Node000005" title=" " alt="" coords="147,112,215,133,213,138,145,117"/>
+<area shape="rect" id="Node000002" href="$structzml_1_1_component_interface_1_1_trait.html" title=" " alt="" coords="441,5,609,46"/>
+<area shape="poly" id="edge78_Node000001_Node000002" title=" " alt="" coords="403,23,441,23,441,28,403,28"/>
+<area shape="rect" id="Node000004" href="$structzml_1_1_defines_body_func_1_1_trait.html" title=" " alt="" coords="448,71,602,111"/>
+<area shape="poly" id="edge80_Node000003_Node000004" title=" " alt="" coords="384,88,447,88,447,94,384,94"/>
+<area shape="rect" id="Node000006" href="$structzml_1_1_defines_constrain_func_1_1_trait.html" title=" " alt="" coords="435,136,615,177"/>
+<area shape="poly" id="edge82_Node000005_Node000006" title=" " alt="" coords="394,154,434,154,434,159,394,159"/>
+</map>

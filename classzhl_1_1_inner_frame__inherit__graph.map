@@ -1,0 +1,9 @@
+<map id="zhl::InnerFrame" name="zhl::InnerFrame">
+<area shape="rect" id="Node000001" title="Represents a Frame inside another." alt="" coords="37,256,149,282"/>
+<area shape="rect" id="Node000002" href="$classzhl_1_1_component_slot.html" title=" " alt="" coords="25,183,161,208"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="96,224,96,256,90,256,90,224"/>
+<area shape="rect" id="Node000003" href="$classzhl_1_1_frame_slot.html" title="Base class for anything that can be allocated in a frame." alt="" coords="40,109,146,135"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="96,150,96,182,90,182,90,150"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="5,5,181,61"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="96,76,96,108,90,108,90,76"/>
+</map>

@@ -1,0 +1,9 @@
+<map id="zml::SetGlobalOpAdaptor" name="zml::SetGlobalOpAdaptor">
+<area shape="rect" id="Node000001" title=" " alt="" coords="28,289,197,315"/>
+<area shape="rect" id="Node000002" href="$classzml_1_1_set_global_op_generic_adaptor.html" title=" " alt="" coords="5,199,220,240"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="115,255,115,289,110,289,110,255"/>
+<area shape="rect" id="Node000003" href="$classzml_1_1detail_1_1_set_global_op_generic_adaptor_base.html" title=" " alt="" coords="31,109,194,150"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="115,165,115,199,110,199,110,165"/>
+<area shape="rect" id="Node000004" href="$structzml_1_1detail_1_1_set_global_op_generic_adaptor_base_1_1_properties.html" title=" " alt="" coords="8,5,217,46"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="115,62,115,109,110,109,110,62"/>
+</map>

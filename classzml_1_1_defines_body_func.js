@@ -1,0 +1,27 @@
+var classzml_1_1_defines_body_func =
+[
+    [ "Trait", "structzml_1_1_defines_body_func_1_1_trait.html", null ],
+    [ "Visibility", "classzml_1_1_defines_body_func.html#a71193beb4940ad766cdcb356846f5901", null ],
+    [ "canDiscardOnUseEmpty", "classzml_1_1_defines_body_func.html#a7747be351bfac696bd8dce12e5e31c56", null ],
+    [ "getBodyFunc", "classzml_1_1_defines_body_func.html#a0eb30418fa24859f18e2b2b2a5754d7e", null ],
+    [ "getBodyFuncName", "classzml_1_1_defines_body_func.html#a8ebebbcaa7015f6ddb4a6c21e6777218", null ],
+    [ "getBodySym", "classzml_1_1_defines_body_func.html#ae28b85dc7afaa1373273d8b06679d1e2", null ],
+    [ "getName", "classzml_1_1_defines_body_func.html#af1e28a81b8bf1dea27723057a707fe93", null ],
+    [ "getNameAttr", "classzml_1_1_defines_body_func.html#a2b4e58164be86a061dfc9baeb2c4a2ef", null ],
+    [ "getSymbolUses", "classzml_1_1_defines_body_func.html#ae68092ff7a833b7d9889b3f92c1511de", null ],
+    [ "getVisibility", "classzml_1_1_defines_body_func.html#a74fdedeeeeca2bb782b7c66ef3100f70", null ],
+    [ "isDeclaration", "classzml_1_1_defines_body_func.html#a47a0741e10e47ffc8c944adee586f57f", null ],
+    [ "isNested", "classzml_1_1_defines_body_func.html#ac59e66ab1b9d02630f0c9e052f1c1c42", null ],
+    [ "isOptionalSymbol", "classzml_1_1_defines_body_func.html#af9fa5e1d88288ff49dc6b225813faea6", null ],
+    [ "isPrivate", "classzml_1_1_defines_body_func.html#a2bcd61fe20e95f118f68f52502062cb0", null ],
+    [ "isPublic", "classzml_1_1_defines_body_func.html#abf251630414d04d8366920566f24e47a", null ],
+    [ "operator::mlir::SymbolOpInterface", "classzml_1_1_defines_body_func.html#aa691ab6aea6904f803a5518d91d8bead", null ],
+    [ "replaceAllSymbolUses", "classzml_1_1_defines_body_func.html#afbdab2bb77713cbdd24833c5edec3355", null ],
+    [ "setName", "classzml_1_1_defines_body_func.html#a4eb58989dd81184320b01a8a1336dc0d", null ],
+    [ "setName", "classzml_1_1_defines_body_func.html#a4ed257cd864cceec279a518df4161f82", null ],
+    [ "setNested", "classzml_1_1_defines_body_func.html#a73cbd2e2cb600bb9d9937c9ffa4505a0", null ],
+    [ "setPrivate", "classzml_1_1_defines_body_func.html#a9d3667e22ce436b45e8f193c7d1048b8", null ],
+    [ "setPublic", "classzml_1_1_defines_body_func.html#a9d95ca860362626958a538c0ea51fea2", null ],
+    [ "setVisibility", "classzml_1_1_defines_body_func.html#a8e387b13d1a3ec83d0232c0b2166111e", null ],
+    [ "symbolKnownUseEmpty", "classzml_1_1_defines_body_func.html#a5f01481f8d3f5691d69817b65983a9c8", null ]
+];

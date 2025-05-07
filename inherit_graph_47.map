@@ -1,0 +1,11 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" href="$structzml_1_1detail_1_1_component_interface_interface_traits_1_1_concept.html" title=" " alt="" coords="5,93,213,134"/>
+<area shape="rect" id="Node000001" href="$classzml_1_1detail_1_1_component_interface_interface_traits_1_1_fallback_model.html" title=" " alt="" coords="278,5,486,61"/>
+<area shape="poly" id="edge201_Node000000_Node000001" title=" " alt="" coords="195,85,284,59,285,64,196,91"/>
+<area shape="rect" id="Node000003" href="$classzml_1_1detail_1_1_component_interface_interface_traits_1_1_fallback_model.html" title=" " alt="" coords="278,85,486,141"/>
+<area shape="poly" id="edge203_Node000000_Node000003" title=" " alt="" coords="228,110,278,110,278,116,228,116"/>
+<area shape="rect" id="Node000004" href="$classzml_1_1detail_1_1_component_interface_interface_traits_1_1_model.html" title=" " alt="" coords="261,165,503,206"/>
+<area shape="poly" id="edge204_Node000000_Node000004" title=" " alt="" coords="204,135,302,162,301,167,203,141"/>
+<area shape="rect" id="Node000002" href="$classzml_1_1detail_1_1_component_interface_interface_traits_1_1_external_model.html" title=" " alt="" coords="551,5,762,61"/>
+<area shape="poly" id="edge202_Node000001_Node000002" title=" " alt="" coords="501,30,550,30,550,36,501,36"/>
+</map>
