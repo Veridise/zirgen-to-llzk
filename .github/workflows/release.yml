@@ -1,0 +1,13 @@
+name: Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+jobs:
+  call-workflow-release:
+    uses: Veridise/open-source-release-helpers/.github/workflows/release.yml@main
+    secrets: inherit

@@ -1,4 +1,4 @@
-// RUN: zklang -o - %s --print-debug-info=false | FileCheck --enable-var-scope %s
+// RUN: zklang -o - %s --strip-debug-info | FileCheck --enable-var-scope %s
 
 component Foo(x: ExtVal, y: ExtVal) {
 // CHECK-LABEL: struct.def @Foo<[]> {

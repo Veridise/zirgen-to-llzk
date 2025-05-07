@@ -145,11 +145,37 @@
         ]
       },
       "locked": {
-        "lastModified": 1745285208,
-        "narHash": "sha256-e3egycUQrYO/lfmiqTGV11iv2/iLP0koPoHFZI0LP3s=",
+        "lastModified": 1745292187,
+        "narHash": "sha256-emE+IXMiPw5IqKZzyJLwukQ6Cn6WOI9zjUpIgASwCZw=",
         "owner": "Veridise",
         "repo": "open-source-release-helpers",
-        "rev": "6eb64656f26ee534ecae22bf02f8aa8d8eb23e97",
+        "rev": "bed5c10dc058138a3b20d1c3340ead212836a0b0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Veridise",
+        "ref": "main",
+        "repo": "open-source-release-helpers",
+        "type": "github"
+      }
+    },
+    "release-helpers_2": {
+      "inputs": {
+        "flake-utils": [
+          "llzk-pkgs",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "llzk-pkgs",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1745292187,
+        "narHash": "sha256-emE+IXMiPw5IqKZzyJLwukQ6Cn6WOI9zjUpIgASwCZw=",
+        "owner": "Veridise",
+        "repo": "open-source-release-helpers",
+        "rev": "bed5c10dc058138a3b20d1c3340ead212836a0b0",
         "type": "github"
       },
       "original": {
@@ -170,7 +196,8 @@
         "nixpkgs": [
           "llzk-pkgs",
           "nixpkgs"
-        ]
+        ],
+        "release-helpers": "release-helpers_2"
       }
     }
   },

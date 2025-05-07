@@ -17,18 +17,18 @@ jobs:
         c_compiler: [ gcc, clang ]
         sanitizers: [ yes, no ]
         include:
-          - c_compiler: gcc 
+          - c_compiler: gcc
             cpp_compiler: g++
-          - c_compiler: clang 
+          - c_compiler: clang
             cpp_compiler: clang++
-          - sanitizers: yes 
+          - sanitizers: yes
             extra_cmake_flags: |
               -DZKLANG_ENABLE_SANITIZER_ADDRESS=YES \
-              -DZKLANG_ENABLE_SANITIZER_UNDEFINED=YES 
-          - sanitizers: no 
+              -DZKLANG_ENABLE_SANITIZER_UNDEFINED=YES
+          - sanitizers: no
             extra_cmake_flags: |
               -DZKLANG_ENABLE_SANITIZER_ADDRESS=NO \
-              -DZKLANG_ENABLE_SANITIZER_UNDEFINED=NO 
+              -DZKLANG_ENABLE_SANITIZER_UNDEFINED=NO
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,7 +70,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          -DZKLANG_WARNINGS_AS_ERRORS=ON 
+          -DZKLANG_WARNINGS_AS_ERRORS=ON
           -G ${{ matrix.generator }}
           -S ${{ github.workspace }}
           ${{ matrix.extra_cmake_flags }}

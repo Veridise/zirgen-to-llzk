@@ -1,0 +1,61 @@
+name: Docs CI
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    name: "Test docs generation"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+      # v37.1.0
+      - uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.23.3/install
+          github_access_token: "${{ secrets.CI_BUILD_TOKEN }}"
+      - name: Set Git credentials
+        run: |
+          git config --global 'url.https://api@github.com/'.insteadOf 'https://github.com/'
+          git config --global 'url.https://ssh@github.com/'.insteadOf 'ssh://git@github.com/'
+          git config --global 'url.https://git@github.com/'.insteadOf 'git@github.com:'
+          echo 'echo "$CI_BOT_PAT"' > ~/.git-askpass
+          chmod 500 ~/.git-askpass
+          git config --global core.askPass "$HOME"/.git-askpass
+      # v16
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad
+        with:
+          name: veridise-public
+          authToken: '${{ secrets.CACHIX_PUBLIC_TOKEN }}'
+          pushFilter: '(-source$)'
+      - name: Set nix environment
+        uses: nicknovitski/nix-develop@v1
+        env:
+          CI_BOT_PAT: "${{ secrets.CI_BUILD_TOKEN }}"
+      - name: Set reusable strings
+        # Turn repeated input strings (such as the build output directory) into step outputs.
+        # These step outputs can be used throughout the workflow file.
+        id: strings
+        shell: bash
+        run: |
+          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+      - name: Configure CMake
+        run: >
+          cmake -B ${{ steps.strings.outputs.build-output-dir }}
+          -DCMAKE_BUILD_TYPE=Release
+          -GNinja
+          -S ${{ github.workspace }}
+      - name: Build docs
+        run: >
+          cmake
+          --build ${{ steps.strings.outputs.build-output-dir }}
+          --config Release
+          --target doc
+      - name: Clear Git credentials
+        if: "${{ always() }}"
+        run: rm -rf "~/.git-askpass"

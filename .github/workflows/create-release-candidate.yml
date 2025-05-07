@@ -1,0 +1,10 @@
+name: Create release candidate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call-workflow-create-release-candidate:
+    uses: Veridise/open-source-release-helpers/.github/workflows/create-release-candidate.yml@main
+    secrets: inherit
+

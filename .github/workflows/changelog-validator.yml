@@ -1,0 +1,15 @@
+name: Changelog validator
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - README.md
+      - docs
+      - test
+      - unittests
+
+jobs:
+  call-workflow-changelog-validate:
+    uses: Veridise/open-source-release-helpers/.github/workflows/changelog-validator.yml@main
+    secrets: inherit

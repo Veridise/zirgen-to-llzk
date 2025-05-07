@@ -13,6 +13,14 @@
       follows = "llzk-pkgs/flake-utils";
     };
 
+    release-helpers = {
+      url = "github:Veridise/open-source-release-helpers?ref=main";
+      inputs = {
+        nixpkgs.follows = "llzk-pkgs/nixpkgs";
+        flake-utils.follows = "llzk-pkgs/flake-utils";
+      };
+    };
+
     llzk = {
       url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
       inputs.nixpkgs.follows = "llzk-pkgs/nixpkgs";
@@ -22,7 +30,7 @@
   # Custom colored bash prompt
   nixConfig.bash-prompt = ''\[\e[0;32m\][LLZK]\[\e[m\] \[\e[38;5;244m\]\w\[\e[m\] % '';
 
-  outputs = { self, nixpkgs, flake-utils, llzk-pkgs, llzk }:
+  outputs = { self, nixpkgs, flake-utils, llzk-pkgs, release-helpers, llzk }:
     {
       # First, we define the packages used in this repository/flake
       overlays.default = final: prev: {
@@ -46,6 +54,7 @@
           overlays = [
             self.overlays.default
             llzk-pkgs.overlays.default
+            release-helpers.overlays.default
             llzk.overlays.default
           ];
         };
@@ -86,6 +95,9 @@
 
               # Add binary dir to PATH for convenience
               export PATH="$PWD"/build/bin:"$PATH"
+
+              # Add release helpers to the PATH for convenience
+              export PATH="${pkgs.changelogCreator.out}/bin":"$PATH"
 
               # For using mlir-tblgen inside the dev environment
               export LD_LIBRARY_PATH=${pkgs.z3.lib}/lib:$LD_LIBRARY_PATH

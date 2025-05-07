@@ -19,14 +19,17 @@ include "mlir/Pass/PassBase.td"
 include "mlir/Rewrite/PassUtil.td"
 
 def InjectBuiltIns : Pass<"inject-builtins", "mlir::ModuleOp"> {
-  let summary = "Add to the root module the ZIR language builtins";
+  let summary = "Add to the root module the zirgen language builtins";
   let constructor = "zml::createInjectBuiltInsPass()";
 
-  let dependentDialects = ["::zml::ZMLDialect", "::mlir::func::FuncDialect", ];
+  let dependentDialects = [
+    "::zml::ZMLDialect",
+    "::mlir::func::FuncDialect",
+  ];
 }
 
 def LowerBuiltIns : Pass<"lower-builtins", "mlir::func::FuncOp"> {
-  let summary = "transforms calls to builtin components to 'native' ops";
+  let summary = "transforms calls to builtin components to operations";
   let constructor = "zml::createLowerBuiltInsPass()";
 
   let dependentDialects = ["::zml::ZMLDialect", "::mlir::func::FuncDialect"];
@@ -48,12 +51,11 @@ def SplitComponentBody : Pass<"split-component-body", "mlir::ModuleOp"> {
 }
 
 class RemoveIllegalOps<string func>
-    : Pass<"remove-illegal-"#!tolower(func)#"-ops", "mlir::func::FuncOp"> {
+    : Pass<"remove-illegal-" #!tolower(func) #"-ops", "mlir::func::FuncOp"> {
 
-  let summary =
-      "Removes from the @"#!tolower(func)#" function of a component any ops "
-                                          "that are not allowed";
-  let constructor = "zml::createRemoveIllegal"#func#"OpsPass()";
+  let summary = "Removes any ops that not allowed in the_ `@" #!tolower(
+      func) #"` _function";
+  let constructor = "zml::createRemoveIllegal" #func #"OpsPass()";
 
   let dependentDialects = ["zml::ZMLDialect", "::mlir::func::FuncDialect"];
 }

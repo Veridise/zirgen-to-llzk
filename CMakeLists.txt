@@ -1,10 +1,18 @@
 cmake_minimum_required(VERSION 3.23)
 
+if (NOT DEFINED ZKLANG_VERSION_OVERRIDE)
+  include(cmake/GitVersion.cmake)
+  get_git_version(ZKLANG_VERSION "0.1.0") # default version
+else()
+  message(STATUS "ZKLANG_VERSION_OVERRIDE specified, setting version to ${ZKLANG_VERSION_OVERRIDE}")
+  set(ZKLANG_VERSION "${ZKLANG_VERSION_OVERRIDE}")
+endif()
+
 project(
   Zklang
   DESCRIPTION
     "Veridise's Zirgen frontend for LLZK"
-  VERSION 0.1.0
+  VERSION "${ZKLANG_VERSION}"
   HOMEPAGE_URL https://github.com/Veridise/zirgen-to-llzk)
 
 if(NOT DEFINED CMAKE_CXX_STANDARD)
@@ -27,15 +35,17 @@ zklang_setup_dependencies(${ZKLANG_EXPORT_TARGETS})
 
 zklang_local_options()
 
+include(cmake/Docgen.cmake)
+
 # Project files
 add_subdirectory(third-party)
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
 
-include(cmake/Docgen.cmake)
-list(APPEND DOXYGEN_DEPS ZklangHeaders LLZKDialectHeaders mlir-doc)
-zklang_setup_doc_generation(${DOXYGEN_DEPS})
+# Docs and doc targets setup
+list(APPEND DOXYGEN_DEPS ZklangHeaders mlir-doc)
+zklang_setup_doc_generation("${DOXYGEN_DEPS}")
 
 include(cmake/Tests.cmake)
 zklang_setup_testing()
