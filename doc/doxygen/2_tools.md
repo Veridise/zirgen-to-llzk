@@ -6,8 +6,8 @@
 `zklang` is the frontend compiler that converts Zirgen source code into different
 MLIR dialects. The end-to-end workflow of `zklang` is to perform the following translations:
 1. zirgen source code to zirgen AST
-2. zirgen AST to ZHL, an MLIR dialect designed by Risc0 to represent zirgen programs (see \ref ZHLDialect "the ZHL dialect documentation").
-3. ZHL to ZML, an MLIR dialect designed by Veridise as an intermediary dialect between ZHL and LLZK (see \ref ZMLDialect "the ZML dialect documentation").
+2. zirgen AST to ZHL, an MLIR dialect designed by Risc0 to represent zirgen programs (see \ref mlir/ZHLDialect.md "the ZHL dialect documentation").
+3. ZHL to ZML, an MLIR dialect designed by Veridise as an intermediary dialect between ZHL and LLZK (see \ref mlir/ZMLDialect.md "the ZML dialect documentation").
 4. ZML to LLZK, Veridise's ZK circuit IR (see [the LLZK project site][llzk-site] for more information about the LLZK dialect).
 
 Generally, users will use `zklang` to translate zirgen circuits to LLZK bytecode (which is more efficient for downstream tooling to operate on),
@@ -20,7 +20,7 @@ but `zklang` can optionally emit any of the above intermediate representations f
 zklang [options] <input zirgen file>
 ```
 
-## General `zklang` options
+## General options
 
 ```
 --help             - Display available options
@@ -31,7 +31,7 @@ zklang [options] <input zirgen file>
 --strip-debug-info - Toggle stripping debug information when writing the output
 ```
 
-## Emission `zklang` options 
+## Emission options 
 
 The `--emit=<value>` flag is used to control the output `zklang` produces. Only one kind of output can be selected among the following options.
 
@@ -62,15 +62,15 @@ We document the added passes below.
 
 ### Lowering Passes
 
-\include{doc,raise=1} build/doc/mlir/passes/Passes.md
+\include{doc,raise=1} mlir/passes/Passes.md
 
 ### ZHL Typing Passes
 
-\include{doc,raise=1} build/doc/mlir/passes/ZhlTypingPasses.md
+\include{doc,raise=1} mlir/passes/ZhlTypingPasses.md
 
 ### ZML Transformation Passes
 
-\include{doc,raise=1} build/doc/mlir/passes/ZmlTransformationPasses.md
+\include{doc,raise=1} mlir/passes/ZmlTransformationPasses.md
 
 \tableofcontents{HTML:3}
 

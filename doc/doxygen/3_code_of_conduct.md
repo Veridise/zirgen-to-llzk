@@ -132,3 +132,8 @@ For answers to common questions about this code of conduct, see the FAQ at
 [FAQ]: https://www.contributor-covenant.org/faq
 [translations]: https://www.contributor-covenant.org/translations
 
+<div class="section_buttons">
+| Previous          |                              Next |
+|:------------------|----------------------------------:|
+| \ref tools | \ref contribution-guide |
+</div>
