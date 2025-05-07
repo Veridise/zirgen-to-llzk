@@ -284,19 +284,16 @@ public:
   explicit Ctor(mlir::StringRef, mlir::ArrayRef<ConstExpr>);
 
   class Arguments {
-    using ArgsList = llvm::simple_ilist<ExprBase>;
+    using ArgsList = llvm::SmallVector<ConstExpr>;
 
   public:
     using iterator = ArgsList::iterator;
     using const_iterator = ArgsList::const_iterator;
-    using value_type = ExprBase *;
     using reference = ArgsList::reference;
 
-    /// Clones the given expressions used as arguments.
-    Arguments(mlir::SmallVectorImpl<value_type> &);
-    /// Adopts ownership of the given expressions used as arguments. Cannot have null values in the
-    /// vector.
-    Arguments(mlir::SmallVectorImpl<value_type> &&);
+    /// Copies the ConstExprs used as arguments into its own list, but the ConstExprs
+    /// themselves are just smart pointer wrappers, so the underlying data is not copied.
+    Arguments(mlir::ArrayRef<ConstExpr>);
     Arguments(const Arguments &);
     Arguments &operator=(const Arguments &);
     ~Arguments();
@@ -310,8 +307,7 @@ public:
 
     bool operator==(const Arguments &) const;
 
-    ExprBase &operator[](size_t);
-    const ExprBase &operator[](size_t) const;
+    const ConstExpr &operator[](size_t) const;
 
   private:
     ArgsList lst;
