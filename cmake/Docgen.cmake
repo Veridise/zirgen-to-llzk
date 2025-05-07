@@ -40,7 +40,6 @@ macro(zklang_setup_doc_generation DOXYGEN_DEPS)
     set(DOXYGEN_DOT_TRANSPARENT YES)
     set(DOXYGEN_TREEVIEW_WIDTH 700)
     set(DOXYGEN_FULL_PATH_NAMES YES)
-    # set(DOXYGEN_STRIP_FROM_PATH "build")
 
     # Remaining doxygen setup
     set(DOXYGEN_EXTRACT_ALL YES)

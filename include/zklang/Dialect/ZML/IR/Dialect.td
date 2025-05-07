@@ -21,7 +21,7 @@ def ZMLDialect : Dialect {
   let cppNamespace = "::zml";
   let summary = "Zirgen medium-level dialect";
   let description = [{
-    This dialect
+    This dialect serves as a stepping stone for lowering from ZHL to LLZK.
   }];
 
   let useDefaultTypePrinterParser = 1;
