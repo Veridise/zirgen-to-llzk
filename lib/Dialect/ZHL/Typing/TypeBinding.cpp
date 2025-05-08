@@ -199,7 +199,7 @@ bool TypeBinding::isGenericParam() const {
   if (superType == nullptr) {
     return false;
   }
-  return genericParamName.has_value() &&
+  return flags.isGenericParamName() &&
          (superType->isTypeMarker() || superType->isVal() || superType->isTransitivelyVal());
 }
 
@@ -393,7 +393,7 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
       printType();
     }
   } else if (isGenericParam()) {
-    os << *genericParamName;
+    os << name;
     if (fullPrintout) {
       os << " : ";
       printType();
@@ -424,8 +424,8 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     if (hasConstValue(constExpr)) {
       os << "const(" << getConstValue(constExpr) << ") ";
     }
-    if (genericParamName.has_value()) {
-      os << "genericParam(" << *genericParamName << ") ";
+    if (flags.isGenericParamName()) {
+      os << "genericParam(" << name << ") ";
     }
     os << "constExpr(";
     if (constExpr) {
@@ -474,8 +474,8 @@ bool TypeBinding::operator==(const TypeBinding &other) const {
   }
 
   return superTypeIsEqual && flags == other.flags && name == other.name &&
-         constExpr == other.constExpr && genericParamName == other.genericParamName &&
-         members == other.members && getGenericParamsMapping() == other.getGenericParamsMapping() &&
+         constExpr == other.constExpr && members == other.members &&
+         getGenericParamsMapping() == other.getGenericParamsMapping() &&
          getConstructorParams() == other.getConstructorParams();
 }
 
