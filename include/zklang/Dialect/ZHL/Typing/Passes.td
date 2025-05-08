@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file includes a pass that prints all the deduced types during type 
+// This file includes a pass that prints all the deduced types during type
 // analysis.
 //
 //===----------------------------------------------------------------------===//

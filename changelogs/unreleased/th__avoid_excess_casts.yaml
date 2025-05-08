@@ -1,0 +1,2 @@
+changed:
+    - Simplify code previously generated as read_const+toindex

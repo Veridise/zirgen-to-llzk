@@ -8,8 +8,7 @@ component Bar<N: Val>() {
 // CHECK-LABEL:    function.def @compute() -> !struct.type<@Bar<[@N]>> 
 //       CHECK:      %[[T1:[0-9a-zA-Z_\.]+]] = arith.constant 0 : index
 //       CHECK:      %[[T0:[0-9a-zA-Z_\.]+]] = arith.constant 1 : index
-//       CHECK:      %[[T8:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
-//       CHECK:      %[[T9:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T8]]
+//       CHECK:      %[[T9:[0-9a-zA-Z_\.]+]] = poly.read_const @N : index
 //       CHECK:      %[[T3:[0-9a-zA-Z_\.]+]] = array.new  : <@N x !felt.type> 
 //         COM:           I don't care where this array comes from but it has to be the same one used in the read ops below.
 //       CHECK:      %[[T4:[0-9a-zA-Z_\.]+]] = array.len %[[T2:[0-9a-zA-Z_\.]+]], %[[T1]] : <#map x !struct.type<@NondetReg<[]>>>
