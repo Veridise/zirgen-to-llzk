@@ -278,13 +278,13 @@ def SetGlobalOp
 def ReadBackOp : ZMLOp<"read_back"> {
   let summary = "reads a back variable";
 
-  let arguments = (ins Component:$comp, AnyAttrOf<[SymbolRefAttr, Builtin_IntegerAttr, ConstExpr]>:$distance,
+  let arguments = (ins Component:$comp,
+      AnyAttrOf<[SymbolRefAttr, Builtin_IntegerAttr, ConstExpr]>:$distance,
       SymbolNameAttr:$field);
   let results = (outs TypeVarOr<Component>:$result);
 
-  let assemblyFormat =
-      "$comp `[` $field `]` `:` type($comp) `,` "
-      "type($result) attr-dict";
+  let assemblyFormat = "$comp `[` $field `]` `:` type($comp) `,` "
+                       "type($result) attr-dict";
 }
 
 def ConstrainCallOp : ZMLOp<"constrain_call"> {
