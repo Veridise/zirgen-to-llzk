@@ -29,35 +29,32 @@ def ConvertZhlToZml : Pass<"lower-zhl", "mlir::ModuleOp"> {
   let summary = "Converts ZHL operations to ZML operations";
   let constructor = "zklang::createConvertZhlToZmlPass()";
 
-  let dependentDialects = [
-    "zirgen::Zhl::ZhlDialect", "zml::ZMLDialect", "mlir::func::FuncDialect",
-    "mlir::scf::SCFDialect", "mlir::index::IndexDialect"
-  ];
+  let dependentDialects = ["zirgen::Zhl::ZhlDialect", "zml::ZMLDialect",
+                           "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
+                           "mlir::index::IndexDialect"];
 }
 
 def ConvertZmlToLlzk : Pass<"zml-to-llzk", "mlir::ModuleOp"> {
   let summary = "Converts ZML operations into LLZK operations";
   let constructor = "zklang::createConvertZmlToLlzkPass()";
 
-  let dependentDialects = [
-    "llzk::LLZKDialect", "zml::ZMLDialect", "mlir::func::FuncDialect",
-    "mlir::scf::SCFDialect", "mlir::index::IndexDialect"
-  ];
+  let dependentDialects = ["llzk::LLZKDialect", "zml::ZMLDialect",
+                           "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
+                           "mlir::index::IndexDialect"];
 
-  let options =
-      [Option<"selectedExtValField", "extval-field", "std::string",
-              /*default=*/"\"babybear\"",
-              "The field ExtVal types operate on (default: babybear)">];
+  let options = [Option<
+      "selectedExtValField", "extval-field", "std::string",
+      /*default=*/"\"babybear\"",
+      "The field ExtVal types operate on (default: babybear)">];
 }
 
 def InjectLlzkModAttrs : Pass<"inject-llzk-mod-attrs", "mlir::ModuleOp"> {
   let summary = "Adds to a module the required attributes for LLZK";
   let constructor = "zklang::createInjectLlzkModAttrsPass()";
 
-  let dependentDialects = [
-    "llzk::LLZKDialect", "zml::ZMLDialect", "mlir::func::FuncDialect",
-    "mlir::scf::SCFDialect", "mlir::index::IndexDialect"
-  ];
+  let dependentDialects = ["llzk::LLZKDialect", "zml::ZMLDialect",
+                           "mlir::func::FuncDialect", "mlir::scf::SCFDialect",
+                           "mlir::index::IndexDialect"];
 }
 
 #endif

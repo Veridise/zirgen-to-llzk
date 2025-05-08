@@ -22,10 +22,7 @@ def InjectBuiltIns : Pass<"inject-builtins", "mlir::ModuleOp"> {
   let summary = "Add to the root module the zirgen language builtins";
   let constructor = "zml::createInjectBuiltInsPass()";
 
-  let dependentDialects = [
-    "::zml::ZMLDialect",
-    "::mlir::func::FuncDialect",
-  ];
+  let dependentDialects = ["::zml::ZMLDialect", "::mlir::func::FuncDialect", ];
 }
 
 def LowerBuiltIns : Pass<"lower-builtins", "mlir::func::FuncOp"> {
@@ -51,11 +48,11 @@ def SplitComponentBody : Pass<"split-component-body", "mlir::ModuleOp"> {
 }
 
 class RemoveIllegalOps<string func>
-    : Pass<"remove-illegal-" #!tolower(func) #"-ops", "mlir::func::FuncOp"> {
+    : Pass<"remove-illegal-"#!tolower(func)#"-ops", "mlir::func::FuncOp"> {
 
-  let summary = "Removes any ops that not allowed in the_ `@" #!tolower(
-      func) #"` _function";
-  let constructor = "zml::createRemoveIllegal" #func #"OpsPass()";
+  let summary = "Removes any ops that not allowed in the_ `@"#!tolower(
+      func)#"` _function";
+  let constructor = "zml::createRemoveIllegal"#func#"OpsPass()";
 
   let dependentDialects = ["zml::ZMLDialect", "::mlir::func::FuncDialect"];
 }
