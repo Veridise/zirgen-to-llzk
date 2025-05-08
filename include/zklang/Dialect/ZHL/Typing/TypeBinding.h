@@ -140,6 +140,8 @@ public:
       Extern,
       /// Marks the type binding as needing back-variable support.
       NeedsBackVariables,
+      /// Marks the type binding as a generic parameter name.
+      GenericParamName,
 
       Flags_End
     };
@@ -222,6 +224,14 @@ public:
     /// Sets the Extern flag.
     constexpr Flags &setBackVariablesNeed(bool B = true) {
       set(NeedsBackVariables, B);
+      return *this;
+    }
+
+    /// Return true if the type binding is a generic parameter name.
+    constexpr bool isGenericParamName() const { return flags[GenericParamName]; }
+    /// Sets the GenericParamName flag.
+    constexpr Flags &setGenericParamName(bool B = true) {
+      set(GenericParamName, B);
       return *this;
     }
   };
@@ -360,7 +370,7 @@ public:
   /// If the type binding is not this method aborts.
   mlir::StringRef getGenericParamName() const {
     assert(isGenericParam());
-    return *genericParamName;
+    return name;
   }
 
   /// Locates a generic parameter by name and sets its type binding to a copy of the given one.
@@ -480,7 +490,7 @@ public:
   /// Returns a copy of the type binding that has the variadic property set to true.
   static TypeBinding WrapVariadic(const TypeBinding &t) {
     TypeBinding copy = t;
-    copy.flags.setVariadic(true);
+    copy.flags.setVariadic();
     return copy;
   }
 
@@ -488,7 +498,7 @@ public:
   /// type binding.
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name) {
     TypeBinding copy(name, t.loc, t);
-    copy.genericParamName = name;
+    copy.flags.setGenericParamName();
     return copy;
   }
 
@@ -566,7 +576,6 @@ private:
   Name name;
   mlir::Location loc;
   expr::ConstExpr constExpr;
-  std::optional<std::string> genericParamName;
   const TypeBinding *superType;
   MembersMap members;
   ParamsStoragePtr genericParams;
