@@ -17,6 +17,8 @@
 #include <llvm/Support/Debug.h>
 #include <mlir/IR/Operation.h>
 #include <mlir/IR/Value.h>
+#include <mlir/Support/LLVM.h>
+#include <zklang/Dialect/ZHL/Typing/Analysis.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
@@ -116,6 +118,9 @@ protected:
 
 class ZhlOpBindings : public OpBindings {
 public:
+  using expr_iterator = zhl::ZIRTypeAnalysis::expr_iterator;
+  using stmt_iterator = zhl::ZIRTypeAnalysis::stmt_iterator;
+
   mlir::FailureOr<TypeBinding> addValue(mlir::Value v, mlir::FailureOr<TypeBinding> type);
 
   mlir::FailureOr<TypeBinding> add(mlir::Operation *op, mlir::FailureOr<TypeBinding> type) final;
@@ -132,11 +137,15 @@ public:
 
   mlir::SmallVector<TypeBinding *> getClosures();
 
+  expr_iterator exprs() const { return mlir::iterator_range(values.begin(), values.end()); }
+
+  stmt_iterator stmts() const { return mlir::iterator_range(statements.begin(), statements.end()); }
+
 private:
   bool opIsValue(mlir::Operation *op) const;
 
   ValueBindings values;
-  StmtBindings stmts;
+  StmtBindings statements;
 };
 
 } // namespace zhl

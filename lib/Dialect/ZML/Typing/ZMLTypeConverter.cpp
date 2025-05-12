@@ -39,10 +39,10 @@ ZMLTypeConverter::ZMLTypeConverter() {
   addTargetMaterialization(
       [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
          mlir::Location loc) -> std::optional<mlir::Value> {
-    if (!mlir::isa<zml::ComponentType>(type)) {
+    if (!mlir::isa<zml::ComponentLike>(type)) {
       return std::nullopt;
     }
-    if (auto compTyp = mlir::dyn_cast<zml::ComponentType>(inputs[0].getType())) {
+    if (auto compTyp = mlir::dyn_cast<zml::ComponentLike>(inputs[0].getType())) {
       if (compTyp.getName().getValue() != "Component") {
         return builder.create<zml::SuperCoerceOp>(loc, type, inputs[0]);
       }

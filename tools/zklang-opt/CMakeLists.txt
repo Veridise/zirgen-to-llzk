@@ -16,6 +16,7 @@ target_link_libraries(
          LLZK::AllDialects
          LLZKUtil
          ZIRParser
+         ZMLDialectTransforms
          ZMLDialect
          ZHLTypingPasses
          ZklangPasses

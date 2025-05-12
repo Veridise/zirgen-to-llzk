@@ -182,17 +182,20 @@ template <typename CompOp> mlir::Type getSuperType(CompOp &op) {
 }
 
 template <typename CompOp> mlir::Type getType(CompOp &op) {
-  if (op.isRoot()) {
-    return ComponentType::Component(op.getContext());
-  }
-  if (op.getParams().has_value()) {
-    auto params = *op.getParams();
-    return ComponentType::get(
-        op.getContext(), op.getSymName(), getSuperType(op), params.getValue(), op.getBuiltin()
-    );
-  } else {
-    return ComponentType::get(op.getContext(), op.getSymName(), getSuperType(op), op.getBuiltin());
-  }
+  assert(false && "TODO");
+  return nullptr;
+  // if (op.isRoot()) {
+  //   return ComponentType::Component(op.getContext());
+  // }
+  // if (op.getParams().has_value()) {
+  //   auto params = *op.getParams();
+  //   return ComponentType::get(
+  //       op.getContext(), op.getSymName(), getSuperType(op), params.getValue(), op.getBuiltin()
+  //   );
+  // } else {
+  //   return ComponentType::get(op.getContext(), op.getSymName(), getSuperType(op),
+  //   op.getBuiltin());
+  // }
 }
 
 mlir::Type ComponentOp::getType() { return ::zml::getType(*this); }
@@ -200,7 +203,7 @@ mlir::Type SplitComponentOp::getType() { return ::zml::getType(*this); }
 
 template <typename CompOp> mlir::FailureOr<mlir::Type> getSuperTypeCommon(CompOp &op) {
   if (op.isRoot()) {
-    if (auto comp = mlir::dyn_cast<zml::ComponentType>(op.getType())) {
+    if (auto comp = mlir::dyn_cast<zml::ComponentLike>(op.getType())) {
       return comp;
     } else {
       return mlir::failure();
@@ -360,7 +363,7 @@ mlir::OpFoldResult ValToIndexOp::fold(ValToIndexOp::FoldAdaptor adaptor) {
 }
 
 OpFoldResult GetArrayLenOp::fold(GetArrayLenOp::FoldAdaptor) {
-  if (auto compType = dyn_cast<ComponentType>(getArray().getType())) {
+  if (auto compType = dyn_cast<ComponentLike>(getArray().getType())) {
     auto arrSize = compType.getArraySize();
     if (failed(arrSize)) {
       return nullptr;
@@ -400,7 +403,7 @@ LogicalResult NopOp::canonicalize(NopOp op, PatternRewriter &rewriter) {
 static bool isTypeVar(Type t) { return mlir::isa<TypeVarType>(t); }
 
 LogicalResult SuperCoerceOp::verify() {
-  ComponentType inputType = getComponent().getType();
+  ComponentLike inputType = getComponent().getType();
   Type outputType = getVal().getType();
 
   if (isTypeVar(outputType)) {

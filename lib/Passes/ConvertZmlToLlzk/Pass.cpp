@@ -39,6 +39,7 @@
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <unordered_set>
+#include <zklang/Dialect/LLZK/LLZKTypeConverter.h>
 #include <zklang/Dialect/ZML/ExtVal/BabyBear.h>
 #include <zklang/Dialect/ZML/ExtVal/Conversion.h>
 #include <zklang/Dialect/ZML/ExtVal/Patterns.h>
@@ -47,7 +48,6 @@
 #include <zklang/Dialect/ZML/Utils/Patterns.h>
 #include <zklang/FiniteFields/BabyBear.h>
 #include <zklang/FiniteFields/Field.h>
-#include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
 #include <zklang/Passes/ConvertZmlToLlzk/Pass.h>
 #include <zklang/Passes/ConvertZmlToLlzk/Patterns.h>
 

@@ -202,7 +202,7 @@ static std::unordered_set<std::string_view> builtinsConvertibleToOps{
     "Mod", "InRange", "ExtVal", "ExtAdd", "ExtSub", "ExtInv", "ExtMul", "MakeExt"
 };
 
-static bool wasConvertedToPrimitiveType(ComponentType t) {
+static bool wasConvertedToPrimitiveType(ComponentLike t) {
   return t.getBuiltin() &&
          (builtinsConvertibleToOps.find(t.getName().getValue()) != builtinsConvertibleToOps.end());
 }
@@ -225,15 +225,15 @@ static void writeArray(Value dst, Value iv, Value val, OpBuilder &builder, Locat
 }
 
 static Value readSuperFields(
-    ComponentType type, Value chain, Type target, const TypeConverter &tc, Location loc,
+    ComponentLike type, Value chain, Type target, const TypeConverter &tc, Location loc,
     OpBuilder &builder
 );
 
 static Value copyArraySuperFields(
-    ComponentType innerType, Value chain, Type target, const TypeConverter &tc, Location loc,
+    ComponentLike innerType, Value chain, Type target, const TypeConverter &tc, Location loc,
     OpBuilder &builder
 ) {
-  auto targetInner = mlir::cast<ComponentType>(target).getArrayInnerType();
+  auto targetInner = mlir::cast<ComponentLike>(target).getArrayInnerType();
   auto targetArrayType = mlir::cast<llzk::array::ArrayType>(tc.convertType(target));
 
   auto array = builder.create<llzk::array::CreateArrayOp>(loc, targetArrayType);
@@ -258,10 +258,10 @@ static Value copyArraySuperFields(
 }
 
 static Value handleArraySpecialCases(
-    ComponentType type, Value chain, Type target, const TypeConverter &tc, Location loc,
+    ComponentLike type, Value chain, Type target, const TypeConverter &tc, Location loc,
     OpBuilder &builder
 ) {
-  auto targetAsComp = mlir::dyn_cast_if_present<ComponentType>(target);
+  auto targetAsComp = mlir::dyn_cast_if_present<ComponentLike>(target);
   if (!targetAsComp || !targetAsComp.isConcreteArray()) {
     return chain;
   }
@@ -276,16 +276,16 @@ static Value handleArraySpecialCases(
   // If the target is an array component then read the super fields of the inner elements and
   // returns a new array with those values.
   return copyArraySuperFields(
-      mlir::cast<ComponentType>(*type.getArrayInnerType()), chain, target, tc, loc, builder
+      mlir::cast<ComponentLike>(*type.getArrayInnerType()), chain, target, tc, loc, builder
   );
 }
 
 static Value readSuperFields(
-    ComponentType type, Value chain, Type target, const TypeConverter &tc, Location loc,
+    ComponentLike type, Value chain, Type target, const TypeConverter &tc, Location loc,
     OpBuilder &builder
 ) {
 
-  auto superComp = mlir::dyn_cast_if_present<ComponentType>(type.getSuperType());
+  auto superComp = mlir::dyn_cast_if_present<ComponentLike>(type.getSuperType());
   // Stop if we reached a builtin that transforms to a primitive llzk type, we are done, or we
   // cannot continue extracting
   if (type == target || wasConvertedToPrimitiveType(type) || !superComp ||
@@ -305,7 +305,7 @@ static Value readSuperFields(
 LogicalResult LowerSuperCoerceOp::matchAndRewrite(
     SuperCoerceOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
-  auto t = mlir::dyn_cast<ComponentType>(op.getOperand().getType());
+  auto t = mlir::dyn_cast<ComponentLike>(op.getOperand().getType());
   assert(t);
   auto tc = getTypeConverter();
   assert(tc);
@@ -321,7 +321,7 @@ LogicalResult LowerConstrainCallOp::matchAndRewrite(
     ConstrainCallOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
   auto compType = op.getSelf().getType();
-  auto comp = mlir::dyn_cast<ComponentType>(compType);
+  auto comp = mlir::dyn_cast<ComponentLike>(compType);
   if (!comp) {
     return op->emitOpError() << "was expecting a component type but got " << compType;
   }
@@ -420,7 +420,7 @@ mlir::LogicalResult CallIndirectOpLoweringInCompute::matchAndRewrite(
   }
 
   Params params{
-      .callee = mlir::cast<ComponentType>(op.getResult(0).getType()).getParams(),
+      .callee = mlir::cast<ComponentLike>(op.getResult(0).getType()).getParams(),
       .caller = op->getParentOfType<llzk::component::StructDefOp>()
                     .getConstParams()
                     .value_or(rewriter.getArrayAttr({}))
@@ -635,7 +635,7 @@ mlir::LogicalResult LowerAllocArrayOp::matchAndRewrite(
 
   ArrayAttr compParams = op->getParentOfType<llzk::component::StructDefOp>().getType().getParams();
   SmallVector<ConstExprAttr> affineArrayParams;
-  ComponentType cType = op.getResult().getType();
+  ComponentLike cType = op.getResult().getType();
   for (Attribute attr : cType.getParams()) {
     if (auto param = mlir::dyn_cast<ConstExprAttr>(attr)) {
       affineArrayParams.push_back(param);

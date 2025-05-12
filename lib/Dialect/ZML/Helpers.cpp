@@ -18,11 +18,11 @@
 #include <mlir/IR/Operation.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
+#include <zklang/Dialect/LLZK/Builder.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Params.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZML/IR/Attrs.h>
-#include <zklang/Dialect/ZML/IR/Builder.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
@@ -234,13 +234,14 @@ FailureOr<Value> constructPODComponent(
 }
 
 void createPODComponent(
-    zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::SymbolTable &st
+    zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::SymbolTable &st,
+    const mlir::TypeConverter &TC
 ) {
   SmallVector<Type> argTypes;
   SmallVector<StringRef> fieldNames;
   SmallVector<bool> columns;
 
-  ComponentBuilder cb;
+  llzk::ComponentBuilder cb;
   auto loc = binding.getLocation();
   cb.name(binding.getName()).isClosure().location(loc);
 
@@ -260,14 +261,14 @@ void createPODComponent(
   if (!binding.getGenericParamNames().empty()) {
     cb.forceGeneric().typeParams(binding.getGenericParamNames());
   }
-  cb.defer([&](ComponentOp compOp) {
+  cb.defer([&](auto compOp) {
     auto actualName = st.insert(compOp);
     binding.setName(actualName.getValue());
 
     // Now that we know the final name of the component we can configure the rest
     cb.fillBody(
         argTypes, {materializeTypeBinding(builder.getContext(), binding)},
-        [&](mlir::ValueRange args, mlir::OpBuilder &B) {
+        [&](mlir::ValueRange args, mlir::OpBuilder &B, const auto &) {
       auto componentType = materializeTypeBinding(B.getContext(), binding);
       // Reference to self
       auto self = B.create<SelfOp>(loc, componentType);
@@ -280,7 +281,7 @@ void createPODComponent(
     }
     );
   });
-  auto compOp = cb.build(builder);
+  auto compOp = cb.build(builder, TC);
   assert(compOp);
 }
 
@@ -360,9 +361,9 @@ CtorCallBuilder::CtorCallBuilder(
   assert(self);
 }
 
-mlir::FailureOr<Value> coerceToArray(TypedValue<ComponentType> v, OpBuilder &builder) {
+mlir::FailureOr<Value> coerceToArray(TypedValue<ComponentLike> v, OpBuilder &builder) {
   auto arraySuper = v.getType().getFirstMatchingSuperType([](Type t) {
-    if (auto ct = mlir::dyn_cast_if_present<ComponentType>(t)) {
+    if (auto ct = mlir::dyn_cast_if_present<ComponentLike>(t)) {
       return ct.isConcreteArray();
     }
     return false;

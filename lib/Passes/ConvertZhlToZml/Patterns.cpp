@@ -31,6 +31,7 @@
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <vector>
+#include <zklang/Dialect/LLZK/Builder.h>
 #include <zklang/Dialect/ZHL/Typing/ArrayFrame.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
@@ -38,7 +39,6 @@
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
-#include <zklang/Dialect/ZML/IR/Builder.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
@@ -146,7 +146,7 @@ mlir::Value ConstructorLowering<Op>::prepareArgument(
     Operation::operand_range castInputs = argCast.getInputs();
     if (castInputs.size() == 1) {
       Value singleInput = castInputs[0];
-      if (auto inpCompType = mlir::dyn_cast<ComponentType>(singleInput.getType())) {
+      if (auto inpCompType = mlir::dyn_cast<ComponentLike>(singleInput.getType())) {
         if (inpCompType.subtypeOf(expectedType)) {
           return rewriter.create<SuperCoerceOp>(loc, expectedType, singleInput);
         }
@@ -366,8 +366,9 @@ mlir::LogicalResult ZhlGenericRemoval::matchAndRewrite(
   auto type = materializeTypeBinding(getContext(), *binding);
   if (binding->isGenericParam() && binding->getSuperType().isVal()) {
     rewriter.replaceOpWithNewOp<LoadValParamOp>(
-        op, ComponentType::Val(getContext()), op.getNameAttr()
+        op, /*ComponentType::Val(getContext())*/ Type(nullptr), op.getNameAttr()
     );
+    assert(false && "TODO");
   } else {
     rewriter.replaceOpWithNewOp<NopOp>(op, mlir::TypeRange({type}), mlir::ValueRange());
   }
@@ -399,8 +400,9 @@ mlir::LogicalResult ZhlDeclarationRemoval::matchAndRewrite(
     zirgen::Zhl::DeclarationOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
 ) const {
   rewriter.replaceOpWithNewOp<NopOp>(
-      op, mlir::TypeRange({ComponentType::Component(rewriter.getContext())}), mlir::ValueRange()
+      op, mlir::TypeRange({/*ComponentType::Component(rewriter.getContext())*/}), mlir::ValueRange()
   );
+  assert(false && "TODO");
   return mlir::success();
 }
 
@@ -583,7 +585,7 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
              llvm::dbgs() << '\n');
   auto materializedType = materializeTypeBinding(getContext(), *originalComp);
   LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << '\n');
-  auto compType = mlir::dyn_cast<ComponentType>(materializedType);
+  auto compType = mlir::dyn_cast<ComponentLike>(materializedType);
   if (!compType) {
     return op->emitError() << "type mismatch, cannot access a member for a non-component type "
                            << materializedType;
@@ -612,7 +614,7 @@ mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
       LLVM_DEBUG(llvm::dbgs() << "  Failed to get the super type\n");
       return op->emitError() << "member " << adaptor.getMember() << " was not found";
     }
-    compType = mlir::dyn_cast<ComponentType>(superType);
+    compType = mlir::dyn_cast<ComponentLike>(superType);
     if (!compType) {
       LLVM_DEBUG(llvm::dbgs() << "  Super type is not a component\n");
       return op->emitError() << "type mismatch, cannot access a member for a non-component type "
@@ -672,7 +674,9 @@ mlir::LogicalResult ZhlSubscriptLowering::matchAndRewrite(
 
   Type concreteArrayType = zml::materializeTypeBinding(getContext(), *concreteArrayTypeBinding);
   auto arrayVal = getCastedValue(adaptor.getArray(), *arrayBinding, rewriter, concreteArrayType);
-  auto Val = ComponentType::Val(getContext());
+  // auto Val = ComponentType::Val(getContext());
+  Type Val = nullptr;
+  assert(false && "TODO");
   auto elementVal = getCastedValue(adaptor.getElement(), *elementBinding, rewriter, Val);
 
   rewriter.replaceOpWithNewOp<zml::ReadArrayOp>(
@@ -740,7 +744,8 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     return op->emitOpError() << "could not be lowered because its type could not be infered";
   }
 
-  ComponentBuilder builder;
+  assert(false && "TODO");
+  llzk::ComponentBuilder builder;
   auto genericNames = name->getGenericParamNames();
   auto paramLocations = name->getConstructorParamLocations();
   auto ctorType = materializeTypeBindingConstructor(rewriter, *name, getTypeBindings());
@@ -766,7 +771,9 @@ mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
     rewriter.eraseOp(maybeBuiltin);
     builtinOverriden(op.getName());
   }
-  auto comp = builder.build(rewriter);
+  auto tc = getTypeConverter();
+  assert(tc);
+  auto comp = builder.build(rewriter, *tc);
 
   rewriter.replaceOp(op.getOperation(), comp.getOperation());
 
@@ -810,18 +817,23 @@ mlir::LogicalResult ZhlRangeOpLowering::matchAndRewrite(
       values.push_back(static_cast<int64_t>(I));
     }
     DenseI64ArrayAttr litArr = rewriter.getDenseI64ArrayAttr(values);
-    rewriter.replaceOpWithNewOp<LitValArrayOp>(
-        op, ComponentType::Array(getContext(), ComponentType::Val(getContext()), values.size()),
-        litArr
-    );
+    // rewriter.replaceOpWithNewOp<LitValArrayOp>(
+    //     op, ComponentType::Array(getContext(), ComponentType::Val(getContext()), values.size()),
+    // litArr
+    // );
+    assert(false && "TODO");
     return success();
   }
   auto innerType = materializeTypeBinding(getContext(), *innerBinding);
-  Value startVal =
-      getCastedValue(adaptor.getStart(), *startBinding, rewriter, ComponentType::Val(getContext()));
+  Value startVal = getCastedValue(
+      adaptor.getStart(), *startBinding, rewriter, /* ComponentType::Val(getContext())*/ nullptr
+  );
+  assert(false && "TODO");
 
-  Value endVal =
-      getCastedValue(adaptor.getEnd(), *endBinding, rewriter, ComponentType::Val(getContext()));
+  Value endVal = getCastedValue(
+      adaptor.getEnd(), *endBinding, rewriter, /*ComponentLike::Val(getContext())*/ nullptr
+  );
+  assert(false && "TODO");
 
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), type);
 
@@ -877,7 +889,7 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   auto arrValue = getCastedValue(adaptor.getArray(), rewriter);
   assert(succeeded(arrValue) && "this binding was validated above");
   auto concreteArrValue =
-      coerceToArray(mlir::dyn_cast<TypedValue<ComponentType>>(*arrValue), rewriter);
+      coerceToArray(mlir::dyn_cast<TypedValue<ComponentLike>>(*arrValue), rewriter);
   assert(succeeded(concreteArrValue));
 
   auto arrAlloc = rewriter.create<AllocArrayOp>(op.getLoc(), outputType);
@@ -1127,7 +1139,7 @@ static LogicalResult prepareLoopValues(
   loopValues.init = *initResult;
 
   auto arrayResult = coerceToArray(
-      mlir::cast<TypedValue<ComponentType>>(
+      mlir::cast<TypedValue<ComponentLike>>(
           pat.getCastedValue(adaptor.getArray(), *bindings.input, builder)
       ),
       builder
@@ -1192,7 +1204,9 @@ LogicalResult ZhlReduceLowering::matchAndRewrite(
 }
 
 Value createNthCond(unsigned int idx, Value selector, OpBuilder &rewriter) {
-  auto val = ComponentType::Val(rewriter.getContext());
+  // auto val = ComponentType::Val(rewriter.getContext());
+  Type val = nullptr;
+  assert(false && "TODO");
   // Load the selector value from the array
   auto nth = rewriter.create<LitValOp>(selector.getLoc(), val, idx);
   auto item = rewriter.create<ReadArrayOp>(selector.getLoc(), val, selector, ValueRange(nth));
@@ -1242,8 +1256,11 @@ LogicalResult ZhlSwitchLowering::matchAndRewrite(
   if (failed(binding)) {
     return op->emitOpError() << "failed to type check";
   }
-  auto arrType =
-      ComponentType::Array(getContext(), ComponentType::Val(getContext()), op.getNumRegions());
+  // auto arrType =
+  //     ComponennnntType::Array(getContext(), ComponentType::Val(getContext()),
+  //     op.getNumRegions());
+  Type arrType = nullptr;
+  assert(false && "TODO");
   auto selector = getCastedValue(adaptor.getSelector(), rewriter, arrType);
   if (failed(selector)) {
     return op->emitOpError() << "failed to type check selector";

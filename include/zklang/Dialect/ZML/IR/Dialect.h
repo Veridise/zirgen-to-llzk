@@ -19,3 +19,14 @@
 #include <mlir/IR/Dialect.h>
 
 #include <zklang/Dialect/ZML/IR/Dialect.h.inc>
+
+namespace mlir {
+class MLIRContext;
+}
+
+namespace zml {
+
+/// Loads extensions that enable interactions between ZML and LLZK.
+void loadLLZKDialectExtensions(mlir::MLIRContext &);
+
+} // namespace zml

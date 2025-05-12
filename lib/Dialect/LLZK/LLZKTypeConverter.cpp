@@ -7,6 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <zklang/Dialect/LLZK/LLZKTypeConverter.h>
+
 #include <algorithm>
 #include <iterator>
 #include <llvm/ADT/SmallVector.h>
@@ -34,7 +36,6 @@
 #include <optional>
 #include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
-#include <zklang/Passes/ConvertZmlToLlzk/LLZKTypeConverter.h>
 
 #define DEBUG_TYPE "llzk-type-converter"
 
@@ -106,21 +107,21 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
 
   // Conversions from ZML to LLZK
 
-  addConversion([&](zml::ComponentType t) -> Type {
+  addConversion([&](zml::ComponentLike t) -> Type {
     auto convertedAttrs = convertParamAttrs(t.getParams(), *this);
     return llzk::component::StructType::get(
         t.getName(), ArrayAttr::get(t.getContext(), convertedAttrs)
     );
   });
 
-  addConversion([&](zml::ComponentType t) -> std::optional<Type> {
+  addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
     if (extValBuiltins.find(t.getName().getValue()) != extValBuiltins.end() && t.getBuiltin()) {
       return createArrayRepr(t.getContext());
     }
     return std::nullopt;
   });
 
-  addConversion([&](zml::ComponentType t) -> std::optional<Type> {
+  addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
     if (t.getName().getValue() != "Array") {
       return std::nullopt;
     }
@@ -140,14 +141,14 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
     return ArrayType::get(inner, dims);
   });
 
-  addConversion([](zml::ComponentType t) -> std::optional<Type> {
+  addConversion([](zml::ComponentLike t) -> std::optional<Type> {
     if (t.getName().getValue() == "String") {
       return llzk::string::StringType::get(t.getContext());
     }
     return std::nullopt;
   });
 
-  addConversion([&](zml::ComponentType t) -> std::optional<Type> {
+  addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
     if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
         t.getBuiltin()) {
       return FeltType::get(t.getContext());

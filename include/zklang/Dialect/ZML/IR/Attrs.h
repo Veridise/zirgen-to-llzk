@@ -16,6 +16,11 @@
 
 #include <mlir/IR/DialectImplementation.h>
 
+namespace zhl {
+class TypeBinding;
+class TypeBindings;
+} // namespace zhl
+
 // Include TableGen'd declarations
 #define GET_ATTRDEF_CLASSES
 #include <zklang/Dialect/ZML/IR/Attrs.h.inc>

@@ -15,13 +15,21 @@
 
 #include <mlir/IR/Value.h>
 #include <mlir/Pass/AnalysisManager.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 namespace zhl {
 
 class ZIRTypeAnalysis {
+  template <typename K>
+  using _iterator = mlir::iterator_range<
+      typename mlir::DenseMap<K, mlir::FailureOr<TypeBinding>>::const_iterator>;
+
 public:
+  using expr_iterator = _iterator<mlir::Value>;
+  using stmt_iterator = _iterator<mlir::Operation *>;
+
   ZIRTypeAnalysis(mlir::Operation *op, mlir::AnalysisManager &am);
   ~ZIRTypeAnalysis();
 
@@ -44,6 +52,10 @@ public:
   operator mlir::LogicalResult() const;
 
   void emitRemarks() const;
+
+  expr_iterator exprs() const;
+
+  stmt_iterator stmts() const;
 
   class Impl;
 

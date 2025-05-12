@@ -18,6 +18,13 @@
 include "mlir/Pass/PassBase.td"
 include "mlir/Rewrite/PassUtil.td"
 
+def TypecheckZhl : Pass<"typecheck-zhl", "mlir::ModuleOp"> {
+  let summary = "Checks that the input is well typed";
+  let constructor = "zklang::createTypecheckZhlPass()";
+
+  let dependentDialects = ["zirgen::Zhl::ZhlDialect", "zml::ZMLDialect"];
+}
+
 def StripTests : Pass<"strip-tests", "mlir::ModuleOp"> {
   let summary = "Remove tests from the input program";
   let constructor = "zklang::createStripTestsPass()";

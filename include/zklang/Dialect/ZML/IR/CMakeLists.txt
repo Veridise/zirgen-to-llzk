@@ -8,6 +8,10 @@ set(LLVM_TARGET_DEFINITIONS "Attrs.td")
 mlir_tablegen(Attrs.h.inc -gen-attrdef-decls -attrdefs-dialect=zml)
 mlir_tablegen(Attrs.cpp.inc -gen-attrdef-defs -attrdefs-dialect=zml)
 
+set(LLVM_TARGET_DEFINITIONS "TypeInterfaces.td")
+mlir_tablegen(TypeInterfaces.h.inc -gen-type-interface-decls)
+mlir_tablegen(TypeInterfaces.cpp.inc -gen-type-interface-defs)
+
 set(LLVM_TARGET_DEFINITIONS "Types.td")
 mlir_tablegen(Types.h.inc -gen-typedef-decls -typedefs-dialect=zml)
 mlir_tablegen(Types.cpp.inc -gen-typedef-defs -typedefs-dialect=zml)

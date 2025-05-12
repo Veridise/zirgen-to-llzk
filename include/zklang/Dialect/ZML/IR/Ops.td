@@ -29,15 +29,15 @@ class ZMLOp<string mnemonic, list<Trait> traits = []>
 
 class ComponentOpBase<string prefix, string bodyFuncName,
                       string constrainFuncName>
-    : ZMLOp<prefix#"component", [HasParent<"::mlir::ModuleOp">, Symbol,
-                                 SymbolTable, IsolatedFromAbove,
-                                 GraphRegionNoTerminator, OpAsmOpInterface,
-                                 ComponentInterface]> {
-  let summary = prefix#"component declaration";
+    : ZMLOp<prefix #"component", [
+      HasParent<"::mlir::ModuleOp">, Symbol, SymbolTable, IsolatedFromAbove,
+      GraphRegionNoTerminator, OpAsmOpInterface, ComponentInterface
+    ]> {
+  let summary = prefix #"component declaration";
   let arguments = (ins SymbolNameAttr:$sym_name, UnitAttr:$function,
       UnitAttr:$generic, UnitAttr:$builtin, UnitAttr:$usesBackVariables,
       OptionalAttr<FlatSymbolRefArrayAttr>:$params);
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region SizedRegion<1> : $body);
 
   let builders = [OpBuilder<(ins "::mlir::StringRef":$name,
                       "::mlir::ArrayRef<mlir::NamedAttribute>":$attrs,
@@ -82,7 +82,7 @@ def SelfOp : ZMLOp<"self", [NoTerminator]> {
   let summary = "current component scope";
   let description = "Returns the current component after executing its content";
 
-  let results = (outs Component);
+  let results = (outs ComponentLike);
   let regions = (region MaxSizedRegion<1>:$body);
 
   let assemblyFormat = [{
@@ -129,16 +129,23 @@ def ConstructorRefOp : ZMLOp<"constructor", [Pure]> {
   let builders =
       [OpBuilder<(ins "ComponentInterface":$comp, "uint64_t":$liftedParams,
            "mlir::FunctionType":$fn)>,
-       OpBuilder<(ins "ComponentInterface":$comp, "mlir::FunctionType":$fn)>,
-       OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
-           "uint64_t":$liftedParams, "mlir::FunctionType":$fn,
-           "bool":$isBuiltin)>,
-       OpBuilder<(ins "mlir::FlatSymbolRefAttr":$compSym,
-           "mlir::FunctionType":$fn, "bool":$isBuiltin)>,
+       OpBuilder<(ins "ComponentInterface":$comp, " mlir::FunctionType ":$fn)>,
+      OpBuilder<(ins "mlir::FlatSymbolRefAttr"
+                 : $compSym, "uint64_t"
+                 : $liftedParams, "mlir::FunctionType"
+                 : $fn, "bool"
+                 : $isBuiltin)>,
+      OpBuilder<(ins "mlir::FlatSymbolRefAttr"
+                 : $compSym, "mlir::FunctionType"
+                 : $fn, "bool"
+                 : $isBuiltin)>,
 
-       OpBuilder<(ins "mlir::StringRef":$compSym, "uint64_t":$liftedParams,
-                     "mlir::FunctionType":$fn, "bool":$isBuiltin),
-                 [{
+      OpBuilder < (ins "mlir::StringRef"
+                   : $compSym, "uint64_t"
+                   : $liftedParams, "mlir::FunctionType"
+                   : $fn, "bool"
+                   : $isBuiltin),
+      [{
         build($_builder, $_state, mlir::SymbolRefAttr::get($_builder.getStringAttr(compSym)), liftedParams, fn, isBuiltin);
        }]>,
        OpBuilder<(ins "mlir::StringRef":$compSym, "mlir::FunctionType":$fn,
@@ -170,7 +177,7 @@ def FieldDefOp : ZMLOp<"field", [HasParent<"::zml::ComponentOp, "
                                  Symbol]> {
   let summary = "component field definition";
   let arguments = (ins SymbolNameAttr:$sym_name,
-      TypeAttrOf<TypeVarOr<Component>>:$type, UnitAttr:$column);
+      TypeAttrOf<TypeVarOr<ComponentLike>>:$type, UnitAttr:$column);
 
   let assemblyFormat = [{
     $sym_name `:` $type attr-dict
@@ -184,9 +191,9 @@ def ReadFieldOp
     Reads the value of a field in a component.
   }];
 
-  let arguments = (ins TypeVarOr<Component>:$component,
+  let arguments = (ins TypeVarOr<ComponentLike>:$component,
       FlatSymbolRefAttr:$field_name);
-  let results = (outs TypeVarOr<Component>:$val);
+  let results = (outs TypeVarOr<ComponentLike>:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` attr-dict `:` type($component) `,` type($val) 
@@ -200,8 +207,8 @@ def WriteFieldOp
     Writes a value into a field in a component.
   }];
 
-  let arguments = (ins TypeVarOr<Component>:$component,
-      FlatSymbolRefAttr:$field_name, TypeVarOr<Component>:$val);
+  let arguments = (ins TypeVarOr<ComponentLike>:$component,
+      FlatSymbolRefAttr:$field_name, TypeVarOr<ComponentLike>:$val);
 
   let assemblyFormat = [{
     $component `[` $field_name `]` `=` $val attr-dict `:` type($component) `,` type($val) 
@@ -212,8 +219,8 @@ def SuperCoerceOp : ZMLOp<"super_coerce"> {
   let summary =
       "transitively reads the super field until the target type is reached";
 
-  let arguments = (ins Component:$component);
-  let results = (outs TypeVarOr<Component>:$val);
+  let arguments = (ins ComponentLike:$component);
+  let results = (outs TypeVarOr<ComponentLike>:$val);
 
   let assemblyFormat =
       "$component attr-dict `:` type($component) `->` type($val)";
@@ -257,7 +264,7 @@ def GetGlobalOp
   let summary = "gets value of a global variable";
 
   let arguments = (ins SymbolRefAttr:$name_ref);
-  let results = (outs TypeVarOr<Component>:$result);
+  let results = (outs TypeVarOr<ComponentLike>:$result);
 
   let assemblyFormat = [{
     $name_ref `:` type($result) attr-dict
@@ -268,7 +275,7 @@ def SetGlobalOp
     : ZMLOp<"set_global", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let summary = "sets value of a global variable";
 
-  let arguments = (ins SymbolRefAttr:$name_ref, TypeVarOr<Component>:$val);
+  let arguments = (ins SymbolRefAttr:$name_ref, TypeVarOr<ComponentLike>:$val);
 
   let assemblyFormat = [{
     $name_ref `=` $val `:` type($val) attr-dict
@@ -278,9 +285,9 @@ def SetGlobalOp
 def ReadBackOp : ZMLOp<"read_back"> {
   let summary = "reads a back variable";
 
-  let arguments = (ins Component:$comp, AnyAttrOf<[SymbolRefAttr, Builtin_IntegerAttr, ConstExpr]>:$distance,
+  let arguments = (ins ComponentLike:$comp, AnyAttrOf<[SymbolRefAttr, Builtin_IntegerAttr, ConstExpr]>:$distance,
       SymbolNameAttr:$field);
-  let results = (outs TypeVarOr<Component>:$result);
+  let results = (outs TypeVarOr<ComponentLike>:$result);
 
   let assemblyFormat =
       "$comp `[` $field `]` `:` type($comp) `,` "
@@ -290,7 +297,7 @@ def ReadBackOp : ZMLOp<"read_back"> {
 def ConstrainCallOp : ZMLOp<"constrain_call"> {
   let summary = "calls the constrain function";
 
-  let arguments = (ins TypeVarOr<Component>:$self, Variadic<AnyType>:$args);
+  let arguments = (ins TypeVarOr<ComponentLike>:$self, Variadic<AnyType>:$args);
   let assemblyFormat = [{
     $self `(` $args `)` `:`  type($self) (`,` type($args)^ )?  attr-dict
   }];
@@ -299,7 +306,7 @@ def ConstrainCallOp : ZMLOp<"constrain_call"> {
 def ConstrainOp : ZMLOp<"constrain"> {
   let summary = "emits a constraint";
 
-  let arguments = (ins TypeVarOr<Component>:$lhs, TypeVarOr<Component>:$rhs);
+  let arguments = (ins TypeVarOr<ComponentLike>:$lhs, TypeVarOr<ComponentLike>:$rhs);
 
   let assemblyFormat = [{
   $lhs `=` $rhs attr-dict `:` type($lhs) `,` type($rhs)
@@ -310,7 +317,7 @@ def NewArrayOp : ZMLOp<"new_array", [Pure, SameTypeOperands]> {
   let summary = "creates a new array with data";
 
   let arguments = (ins Variadic<AnyZMLType>:$elements);
-  let results = (outs TypeVarOr<Component>:$result);
+  let results = (outs TypeVarOr<ComponentLike>:$result);
 
   let assemblyFormat =
       "$elements attr-dict `:` `[` type($elements) `]` `,` type($result)";
@@ -320,7 +327,7 @@ def LitValArrayOp : ZMLOp<"litval_array", [Pure, ConstantLike]> {
   let summary = "literal array definition";
 
   let arguments = (ins DenseI64ArrayAttr:$elements);
-  let results = (outs Component:$result);
+  let results = (outs ComponentLike:$result);
 
   let assemblyFormat = "$elements attr-dict `:` type($result)";
 
@@ -341,10 +348,10 @@ def VarArgsTypeCheckPred : TypesMatchWith<"inner type matches input operands",
 }]>;
 
 def VarArgsOp : ZMLOp<"vargs", [SameTypeOperands, VarArgsTypeCheckPred]> {
-  let summary = "groups variable arguments";
+    let summary = "groups variable arguments";
 
-  let arguments = (ins Variadic<AnyZMLType>:$elements);
-  let results = (outs VarArgs:$result);
+  let arguments = (ins Variadic<AnyZMLType> : $elements);
+  let results = (outs VarArgs : $result);
 
   let assemblyFormat = "$elements attr-dict `:` type($result)";
 }
@@ -352,7 +359,7 @@ def VarArgsOp : ZMLOp<"vargs", [SameTypeOperands, VarArgsTypeCheckPred]> {
 def AllocArrayOp : ZMLOp<"alloc_array"> {
   let summary = "creates a new empty array";
 
-  let results = (outs Component:$result);
+  let results = (outs ComponentLike : $result);
 
   let assemblyFormat = "attr-dict `:` type($result)";
 }
@@ -360,9 +367,9 @@ def AllocArrayOp : ZMLOp<"alloc_array"> {
 def ReadArrayOp : ZMLOp<"read_array"> {
   let summary = "read data from an array";
 
-  let arguments = (ins TypeVarOr<Component>:$lvalue,
+  let arguments = (ins TypeVarOr<ComponentLike>:$lvalue,
       Variadic<AnyType>:$indices);
-  let results = (outs TypeVarOr<Component>:$result);
+  let results = (outs TypeVarOr<ComponentLike> : $result);
 
   let assemblyFormat = [{
     $lvalue `[` $indices `]` attr-dict `:` type($lvalue) `[` type($indices) `]` `,` type($result)
@@ -372,7 +379,7 @@ def ReadArrayOp : ZMLOp<"read_array"> {
 def WriteArrayOp : ZMLOp<"write_array"> {
   let summary = "write data into an array";
 
-  let arguments = (ins TypeVarOr<Component>:$array, Variadic<AnyType>:$indices,
+  let arguments = (ins TypeVarOr<ComponentLike>:$array, Variadic<AnyType>:$indices,
       AnyZMLType:$value, UnitAttr:$computeOnly);
   let assemblyFormat = [{
     $array `[` $indices `]` `=` $value attr-dict `:` type($array) `[` type($indices) `]` `,` type($value)
@@ -382,7 +389,7 @@ def WriteArrayOp : ZMLOp<"write_array"> {
 def GetArrayLenOp : ZMLOp<"array_len", [Pure]> {
   let summary = "returns the length of an array";
 
-  let arguments = (ins TypeVarOr<Component>:$array);
+  let arguments = (ins TypeVarOr<ComponentLike>:$array);
   let results = (outs Index:$length);
 
   let assemblyFormat = "$array attr-dict `:` type($array)";
@@ -393,7 +400,7 @@ def GetArrayLenOp : ZMLOp<"array_len", [Pure]> {
 def ValToIndexOp : ZMLOp<"toindex", [Pure]> {
   let summary = "convert val to index";
 
-  let arguments = (ins TypeVarOr<Component>:$val);
+  let arguments = (ins TypeVarOr<ComponentLike>:$val);
   let results = (outs Index:$result);
 
   let assemblyFormat = "$val `:` type($val) attr-dict";
@@ -404,7 +411,7 @@ def ValToIndexOp : ZMLOp<"toindex", [Pure]> {
 def ValToI1Op : ZMLOp<"tobool", [Pure]> {
   let summary = "convert val to i1";
 
-  let arguments = (ins TypeVarOr<Component>:$val);
+  let arguments = (ins TypeVarOr<ComponentLike>:$val);
   let results = (outs I1:$result);
   let assemblyFormat = "$val `:` type($val) attr-dict";
 }
@@ -413,14 +420,14 @@ def IndexToValOp : ZMLOp<"fromindex", [Pure]> {
   let summary = "convert index to val";
 
   let arguments = (ins Index:$index);
-  let results = (outs Component:$result);
+  let results = (outs ComponentLike:$result);
   let assemblyFormat = "$index `:` type($result) attr-dict";
 }
 
 def LitValOp : ZMLOp<"literal", [Pure, ConstantLike]> {
   let summary = "a literal value";
   let arguments = (ins I64Attr:$value);
-  let results = (outs Component:$val);
+  let results = (outs ComponentLike:$val);
 
   let assemblyFormat = [{
     $value `:` type($val) attr-dict
@@ -432,7 +439,7 @@ def LitValOp : ZMLOp<"literal", [Pure, ConstantLike]> {
 def LitStrOp : ZMLOp<"string", [Pure]> {
   let summary = "a literal value";
   let arguments = (ins StrAttr:$value);
-  let results = (outs Component:$val);
+  let results = (outs ComponentLike:$val);
 
   let assemblyFormat = [{
     $value `:` type($val) attr-dict
@@ -452,7 +459,7 @@ def AssertOp : ZMLOp<"assert"> {
 def LoadValParamOp : ZMLOp<"load_param", [Pure]> {
   let summary = "loads val from parameter";
   let arguments = (ins SymbolNameAttr:$param);
-  let results = (outs Component:$val);
+  let results = (outs ComponentLike:$val);
 
   let assemblyFormat = "$param `:` type($val) attr-dict";
 }
@@ -461,22 +468,22 @@ def LoadValParamOp : ZMLOp<"load_param", [Pure]> {
 
 def InRangeOp : ZMLOp<"in_range", [Pure]> {
   let summary = "checks if value is within range";
-  let arguments = (ins Component:$low, Component:$mid, Component:$high);
-  let results = (outs Component:$out);
+  let arguments = (ins ComponentLike:$low, ComponentLike:$mid, ComponentLike:$high);
+  let results = (outs ComponentLike:$out);
   let assemblyFormat =
       [{ $low ` ` `<` `=` $mid ` ` `<` ` ` $high `:` `(` type($low) `,` type($mid) `,` type($high) `)` `->` type($out) attr-dict }];
 }
 
 def EqzExtOp : ZMLOp<"eqzext"> {
   let summary = "checks if ext value is zero";
-  let arguments = (ins Component:$extval);
+  let arguments = (ins ComponentLike:$extval);
   let assemblyFormat = [{ $extval `:` type($extval) attr-dict }];
 }
 
 class UnaryOp<string mnemonic, list<Trait> traits = []>
     : ZMLOp<mnemonic, !listconcat([Pure], traits)> {
-  let arguments = (ins Component:$in);
-  let results = (outs Component:$out);
+  let arguments = (ins ComponentLike:$in);
+  let results = (outs ComponentLike:$out);
   let assemblyFormat = [{ $in `:` type($in) `->` type($out) attr-dict }];
 }
 
@@ -488,8 +495,8 @@ def MakeExtOp : UnaryOp<"mkext"> {}
 
 class BinaryOp<string mnemonic, list<Trait> traits = []>
     : ZMLOp<mnemonic, !listconcat([Pure], traits)> {
-  let arguments = (ins Component:$lhs, Component:$rhs);
-  let results = (outs Component:$out);
+  let arguments = (ins ComponentLike:$lhs, ComponentLike:$rhs);
+  let results = (outs ComponentLike:$out);
   let assemblyFormat =
       [{ $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `->` type($out) attr-dict }];
 }

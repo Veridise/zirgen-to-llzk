@@ -92,28 +92,28 @@ FailureOr<TypeBinding> ZhlOpBindings::addValue(Value v, FailureOr<TypeBinding> t
 }
 
 FailureOr<TypeBinding> ZhlOpBindings::add(Operation *op, FailureOr<TypeBinding> type) {
-  return (opIsValue(op)) ? values.add(op, type) : stmts.add(op, type);
+  return (opIsValue(op)) ? values.add(op, type) : statements.add(op, type);
 }
 
 const FailureOr<TypeBinding> &ZhlOpBindings::getValue(Value v) const { return values.getType(v); }
 
 const FailureOr<TypeBinding> &ZhlOpBindings::get(Operation *op) const {
-  return opIsValue(op) ? values.get(op) : stmts.get(op);
+  return opIsValue(op) ? values.get(op) : statements.get(op);
 }
 
 bool ZhlOpBindings::contains(Operation *op) const {
-  return (opIsValue(op) && values.contains(op)) || stmts.contains(op);
+  return (opIsValue(op) && values.contains(op)) || statements.contains(op);
 }
 
 bool ZhlOpBindings::containsValue(Value v) const { return values.containsKey(v); }
 
 void ZhlOpBindings::print(raw_ostream &os) const {
   values.print(os);
-  stmts.print(os);
+  statements.print(os);
 }
 
 bool ZhlOpBindings::missingBindings() const {
-  return values.missingBindings() || stmts.missingBindings();
+  return values.missingBindings() || statements.missingBindings();
 }
 
 bool ZhlOpBindings::opIsValue(Operation *op) const { return op->getNumResults() == 1; }
@@ -129,14 +129,14 @@ mlir::SmallVector<TypeBinding *> ZhlOpBindings::getClosures() {
     }
   };
   forEach(values.bindings);
-  forEach(stmts.bindings);
+  forEach(statements.bindings);
 
   return closures;
 }
 
 void ZhlOpBindings::emitRemarks() const {
   values.emitRemarks();
-  stmts.emitRemarks();
+  statements.emitRemarks();
 }
 
 } // namespace zhl

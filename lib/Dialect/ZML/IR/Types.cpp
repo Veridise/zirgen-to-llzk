@@ -7,6 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <functional>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 
 #include <algorithm>
@@ -20,24 +22,25 @@
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/IR/TypeInterfaces.h>
 
 using namespace mlir;
 
 namespace zml {
 
 bool isValidZMLType(mlir::Type type) {
-  return llvm::isa<TypeVarType>(type) || llvm::isa<ComponentType>(type) ||
+  return llvm::isa<TypeVarType>(type) || llvm::isa<ComponentLike>(type) ||
          (llvm::isa<VarArgsType>(type) && isValidZMLType(llvm::cast<VarArgsType>(type).getInner()));
 }
 
-inline mlir::LogicalResult
-checkValidZmirType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Type type) {
-  if (!isValidZMLType(type)) {
-    return emitError() << "expected " << "a valid ZML type" << " but found " << type;
-  } else {
-    return mlir::success();
-  }
-}
+// inline mlir::LogicalResult
+// checkValidZMLType(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Type type) {
+//   if (!isValidZMLType(type)) {
+//     return emitError() << "expected " << "a valid ZML type" << " but found " << type;
+//   } else {
+//     return mlir::success();
+//   }
+// }
 
 mlir::LogicalResult
 checkValidParam(llvm::function_ref<mlir::InFlightDiagnostic()> emitError, mlir::Attribute attr) {
@@ -61,87 +64,53 @@ mlir::LogicalResult checkValidTypeParam(
   }
 }
 
-mlir::LogicalResult ComponentType::verify(
+mlir::LogicalResult ComplexComponentType::verify(
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError, ::mlir::FlatSymbolRefAttr compName,
-    mlir::Type superType, ::llvm::ArrayRef<::mlir::Attribute> params, bool
+    zml::ComponentLike superType, ::llvm::ArrayRef<::mlir::Attribute> params, bool
 ) {
-  if (!superType && compName.getValue() != "Component") {
+  if (!superType) {
     return emitError() << "malformed IR: super type for " << compName << " cannot be null";
   }
-  // TODO: Maybe add a check that ensures that only known builtins can have the flag set to true?
-  if (superType) {
-    if (!mlir::isa<ComponentType, TypeVarType>(superType)) {
-      return emitError() << "unexpected type " << superType;
-    }
-  }
-  std::vector<mlir::LogicalResult> results;
-  std::transform(
-      params.begin(), params.end(), std::back_inserter(results),
-      [&](mlir::Attribute attr) { return checkValidParam(emitError, attr); }
-  );
 
-  if (results.empty()) {
-    return mlir::success();
-  }
-  return mlir::success(std::all_of(results.begin(), results.end(), mlir::succeeded));
+  return mlir::failure(llvm::any_of(
+      llvm::map_to_vector(params, std::bind_front(checkValidParam, emitError)), mlir::failed
+  ));
 }
 
-ComponentInterface
-ComponentType::getDefinition(::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op) {
+ComponentInterface ComplexComponentType::getDefinition(
+    ::mlir::SymbolTableCollection &symbolTable, ::mlir::Operation *op
+) {
   return mlir::dyn_cast_if_present<ComponentInterface>(
       symbolTable.lookupNearestSymbolFrom(op, getName())
   );
 }
 
-FailureOr<Type> ComponentType::getFirstMatchingSuperType(llvm::function_ref<bool(Type)> pred
-) const {
-  if (pred(*this)) {
-    return *this;
-  }
-  if (auto super = getSuperType()) {
-    if (auto superComp = mlir::dyn_cast<ComponentType>(super)) {
-      return superComp.getFirstMatchingSuperType(pred);
-    } else if (pred(super)) {
-      return super;
-    }
-  }
-  return failure();
+// FailureOr<Type> ComplexComponentType::getFirstMatchingSuperType(llvm::function_ref<bool(Type)>
+// pred ) const {
+//   if (pred(*this)) {
+//     return *this;
+//   }
+//   if (auto super = getSuperType()) {
+//     if (auto superComp = mlir::dyn_cast<ComplexComponentType>(super)) {
+//       return superComp.getFirstMatchingSuperType(pred);
+//     } else if (pred(super)) {
+//       return super;
+//     }
+//   }
+//   return failure();
+// }
+
+FailureOr<Attribute> ComplexComponentType::getArraySize() const {
+  return getSuperType().getArraySize();
 }
 
-static FailureOr<Attribute> getArrayProperty(ComponentType t, size_t idx) {
-  if (!t.isArray()) {
-    return failure();
-  }
-  if (t.isConcreteArray()) {
-    assert(t.getParams().size() == 2 && "Arrays must have only two params by definition");
-    return t.getParams()[idx];
-  }
-  if (!t.getSuperTypeAsComp()) {
-    return failure();
-  }
-  return getArrayProperty(t.getSuperTypeAsComp(), idx);
-}
-
-FailureOr<Attribute> ComponentType::getArraySize() const { return getArrayProperty(*this, 1); }
-
-FailureOr<Type> ComponentType::getArrayInnerType() const {
-  if (auto typeAttr =
-          mlir::dyn_cast_if_present<TypeAttr>(getArrayProperty(*this, 0).value_or(nullptr))) {
-    return typeAttr.getValue();
-  }
-  return failure();
-}
-
-ComponentType ComponentType::getSuperTypeAsComp() const {
-  if (auto comp = mlir::dyn_cast_if_present<ComponentType>(getSuperType())) {
-    return comp;
-  }
-  return nullptr;
+FailureOr<Type> ComplexComponentType::getArrayInnerType() const {
+  return getSuperType().getArrayInnerType();
 }
 
 static bool equivalentTypeAttr(TypeAttr lhsType, TypeAttr rhsType) {
-  auto lhsComp = mlir::dyn_cast_if_present<ComponentType>(lhsType.getValue());
-  auto rhsComp = mlir::dyn_cast_if_present<ComponentType>(rhsType.getValue());
+  auto lhsComp = mlir::dyn_cast_if_present<ComponentLike>(lhsType.getValue());
+  auto rhsComp = mlir::dyn_cast_if_present<ComponentLike>(rhsType.getValue());
 
   return lhsComp && rhsComp && lhsComp.subtypeOf(rhsComp);
 }
@@ -189,7 +158,7 @@ static bool equivalentParam(Attribute lhs, Attribute rhs) {
 
 /// A type T may be a subtype of a type T' if for all parameters that are types p_0 and p_0', p_0 is
 /// a subtype of p_0' and T and T' have the same name.
-static bool subtypeViaParams(const ComponentType &lhs, ComponentType rhs) {
+static bool subtypeViaParams(const ComponentLike &lhs, ComponentLike rhs) {
   // If they have the same name and number of parameters
   bool sameName = lhs.getName() == rhs.getName();
   bool sameNParams = lhs.getParams().size() == rhs.getParams().size();
@@ -206,21 +175,29 @@ static bool subtypeViaParams(const ComponentType &lhs, ComponentType rhs) {
   return true;
 }
 
-static bool subtypeViaParams(const ComponentType &lhs, Type rhs) {
-  if (auto rhsAsComp = mlir::dyn_cast_if_present<ComponentType>(rhs)) {
+static bool subtypeViaParams(const ComponentLike &lhs, Type rhs) {
+  if (auto rhsAsComp = mlir::dyn_cast_if_present<ComponentLike>(rhs)) {
     return subtypeViaParams(lhs, rhsAsComp);
   }
   return false;
 }
 
-bool ComponentType::subtypeOf(Type other) const {
+bool ComplexComponentType::subtypeOf(Type other) const {
   if (*this == other || subtypeViaParams(*this, other)) {
     return true;
   }
-  if (auto super = getSuperTypeAsComp()) {
-    return super.subtypeOf(other);
+  return getSuperType().subtypeOf(other);
+}
+
+FailureOr<ComponentLike>
+ComponentLike::getFirstMatchingSuperType(llvm::function_ref<bool(ComponentLike)> pred) const {
+  if (pred(*this)) {
+    return *this;
   }
-  return false;
+  if (auto super = getSuperType()) {
+    return super.getFirstMatchingSuperType(pred);
+  }
+  return failure();
 }
 
 } // namespace zml

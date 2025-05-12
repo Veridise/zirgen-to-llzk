@@ -18,13 +18,41 @@
 #include <string_view>
 #include <unordered_set>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZML/IR/TypeInterfaces.h>
+
+namespace mlir {
+class MLIRContext;
+class TypeConverter;
+} // namespace mlir
 
 namespace zml {
 
 void addBuiltinBindings(zhl::TypeBindings &, const std::unordered_set<std::string_view> &);
 // Add builtin components using the given builder
-void addBuiltins(mlir::OpBuilder &, const std::unordered_set<std::string_view> &);
+void addBuiltins(mlir::OpBuilder &, const std::unordered_set<std::string_view> &, const mlir::TypeConverter &);
 mlir::Operation *getBuiltInOp(mlir::StringRef);
+
+namespace builtins {
+
+ComponentLike Component(mlir::MLIRContext *);
+
+inline ComponentLike Component(mlir::OpBuilder &builder) { return Component(builder.getContext()); }
+
+ComponentLike Val(mlir::MLIRContext *);
+
+inline ComponentLike Val(mlir::OpBuilder &builder) { return Val(builder.getContext()); }
+
+ComponentLike String(mlir::MLIRContext *);
+
+inline ComponentLike String(mlir::OpBuilder &builder) { return String(builder.getContext()); }
+
+ComponentLike ExtVal(mlir::MLIRContext *);
+
+inline ComponentLike ExtVal(mlir::OpBuilder &builder) { return ExtVal(builder.getContext()); }
+
+ComponentLike Array(ComponentLike, mlir::Attribute, const mlir::TypeConverter &);
+
+} // namespace builtins
 
 static const std::unordered_set<std::string> BuiltInComponentNames = {
     "BitAnd", "Add", "Sub",     "Mul",    "Inv",    "Isz",    "Neg",    "Val",     "String",

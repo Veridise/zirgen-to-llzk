@@ -8,6 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include <cassert>
+#include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
@@ -71,6 +73,13 @@ const TypeBinding &Params::getParam(size_t i) const {
 }
 
 ArrayRef<ParamName> Params::getNames() const { return data()->names; }
+
+SmallVector<bool> Params::getInjectedStatus() const {
+  return llvm::map_to_vector(
+      llvm::index_range(0, data()->injected.size()),
+      [this](unsigned int Idx) -> bool { return data()->injected[Idx]; }
+  );
+}
 
 StringRef Params::getName(size_t i) const {
   assert(i < data()->names.size());

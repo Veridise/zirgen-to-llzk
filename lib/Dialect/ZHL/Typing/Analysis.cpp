@@ -20,6 +20,9 @@
 
 using namespace mlir;
 
+using expr_iterator = zhl::ZIRTypeAnalysis::expr_iterator;
+using stmt_iterator = zhl::ZIRTypeAnalysis::stmt_iterator;
+
 namespace zhl {
 
 class zhl::ZIRTypeAnalysis::Impl {
@@ -34,6 +37,8 @@ public:
   virtual operator mlir::LogicalResult() const = 0;
   virtual mlir::ArrayRef<TypeBinding *> getClosures() = 0;
   virtual void emitRemarks() const = 0;
+  virtual expr_iterator exprs() const = 0;
+  virtual stmt_iterator stmts() const = 0;
 };
 
 namespace {
@@ -67,6 +72,10 @@ public:
   mlir::ArrayRef<TypeBinding *> getClosures() final { return delegate->getClosures(); }
 
   void emitRemarks() const final { delegate->emitRemarks(); }
+
+  expr_iterator exprs() const final { return delegate->exprs(); }
+
+  stmt_iterator stmts() const final { return delegate->stmts(); }
 
 private:
   ZIRTypeAnalysis *const delegate;
@@ -141,6 +150,10 @@ public:
 
   void emitRemarks() const final { opBindings->emitRemarks(); }
 
+  expr_iterator exprs() const final { return opBindings->exprs(); }
+
+  stmt_iterator stmts() const final { return opBindings->stmts(); }
+
 private:
   TypeBindings typeBindings;
   bool typeCheckingFailed = false;
@@ -196,5 +209,9 @@ ZIRTypeAnalysis::operator mlir::LogicalResult() const {
 mlir::ArrayRef<TypeBinding *> ZIRTypeAnalysis::getClosures() { return impl->getClosures(); }
 
 void ZIRTypeAnalysis::emitRemarks() const { impl->emitRemarks(); }
+
+expr_iterator ZIRTypeAnalysis::exprs() const { return impl->exprs(); }
+
+stmt_iterator ZIRTypeAnalysis::stmts() const { return impl->stmts(); }
 
 } // namespace zhl

@@ -26,7 +26,7 @@ def ZMLDialect : Dialect {
 
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
-  let hasConstantMaterializer = 1;
+  // let hasConstantMaterializer = 1;
 
   let dependentDialects = ["::mlir::index::IndexDialect",
                            "::mlir::func::FuncDialect",

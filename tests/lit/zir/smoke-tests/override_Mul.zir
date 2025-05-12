@@ -1,0 +1,5 @@
+// RUN: zklang -o - %s 
+
+component Mul(x: Val, y: Val) {
+  reduce for i : 0..y { x } init 0 with Add
+}

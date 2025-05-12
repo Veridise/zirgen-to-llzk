@@ -51,6 +51,7 @@ enum class Action {
   None = 0,
   PrintAST,
   PrintZHL,
+  PrintZHLT,
   PrintZML,
   OptimizeZML,
   PrintLlzk,
@@ -62,6 +63,7 @@ static cl::opt<enum Action> emitAction(
     cl::values(
         clEnumValN(Action::PrintAST, "ast", "Output the AST"),
         clEnumValN(Action::PrintZHL, "zhl", "Output untyped high level ZIR IR"),
+        clEnumValN(Action::PrintZHLT, "zhlt", "Output typed high level ZIR IR"),
         clEnumValN(Action::PrintZML, "zml", "Output typed medium level ZIR IR"),
         clEnumValN(
             Action::OptimizeZML, "zmlopt",
@@ -150,11 +152,14 @@ private:
 Driver::Driver(int &argc, char **&argv)
     : llvm(argc, argv), dialects(), context(dialects.registry), sourceManager{},
       sourceMgrHandler(sourceManager, &context), pm(&context) {
+#ifdef NDEBUG
   cl::HideUnrelatedOptions(ZirgenDriverCategory);
+#endif
   cl::ParseCommandLineOptions(argc, argv, "zirgen frontend to LLZK\n");
 
   context.loadAllAvailableDialects();
 
+  zml::loadLLZKDialectExtensions(context);
   if (DisableMultiThreadingFlag) {
     llvm::errs() << "Multithreading was disabled!\n";
     context.disableMultithreading();
@@ -188,6 +193,10 @@ void Driver::configureLoweringPipeline() {
     pm.addPass(zklang::createInjectLlzkModAttrsPass());
   }
   pm.addPass(zklang::createStripTestsPass());
+  pm.addPass(zklang::createTypecheckZhlPass());
+  if (emitAction == Action::PrintZHLT) {
+    return;
+  }
   pm.addPass(zml::createInjectBuiltInsPass());
   pm.addPass(zklang::createConvertZhlToZmlPass());
   if (!DisableCastReconciliationFlag) {

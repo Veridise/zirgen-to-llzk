@@ -17,6 +17,7 @@ target_link_libraries(
          LLZKUtil
          ZIRParser
          ZklangPasses
+         ZMLDialectTransforms
          ZMLDialect
          MLIRReconcileUnrealizedCasts
          MLIRDebug

@@ -73,6 +73,9 @@ public:
   /// Returns an array of the type binding of the parameters.
   mlir::ArrayRef<TypeBinding> getParams() const;
 
+  /// Returns an array of bits that declare what parameters have been injected.
+  mlir::SmallVector<bool> getInjectedStatus() const;
+
   /// Returns a vector of type bindings of the parameters that were declared in the source language.
   ParamsList getDeclaredParams() const;
 
@@ -102,6 +105,9 @@ public:
   bool operator==(const Params &) const;
 
   const ParamsStorage *data() const { return sto; }
+
+  /// Returns all the data related to each parameter in a zip sequence.
+  auto zipped() const { return llvm::zip_equal(getParams(), getNames(), getInjectedStatus()); }
 
 private:
   const ParamsStorage *sto;

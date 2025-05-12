@@ -19,6 +19,7 @@
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/Specialization.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
+#include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 #include <zklang/Dialect/ZML/IR/Attrs.h>
 #include <zklang/Dialect/ZML/IR/Types.h>
 #include <zklang/Dialect/ZML/Typing/Materialize.h>
@@ -30,12 +31,17 @@ using namespace zhl;
 using namespace zml;
 
 static void assertValidSuperType(Type superType) {
-  auto validSuperType = mlir::isa<ComponentType, TypeVarType>(superType);
+  auto validSuperType = mlir::isa<ComponentLike, TypeVarType>(superType);
   (void)validSuperType;
   assert(validSuperType && "supertype is not a component type or a type variable");
 }
 
 namespace {
+
+static std::unordered_set<std::string_view> feltEquivalentTypes(
+    {"Val", "Add", "Sub", "Mul", "BitAnd", "Inv", "Isz", "InRange", "Neg", "Mod"}
+),
+    extValBuiltins({"ExtVal", "ExtAdd", "ExtSub", "ExtMul", "ExtInv", "MakeExt"});
 
 class Materializer {
 public:
@@ -110,22 +116,28 @@ private:
   Type materializeGenericType(const TypeBinding &binding, Type superType) {
     if (!binding.isSpecialized()) {
       auto params = materializeGenericParamNames(binding);
-      return ComponentType::get(context, binding.getName(), superType, params, binding.isBuiltin());
+      return ComplexComponentType::get(
+          context, binding.getName(), mlir::cast<ComponentLike>(superType), params,
+          binding.isBuiltin()
+      );
     }
 
     auto paramBindings = binding.getGenericParams();
     SmallVector<Attribute, 2> params =
         map_to_vector(paramBindings, std::bind_front(&Materializer::materializeAttribute, this));
 
-    return ComponentType::get(context, binding.getName(), superType, params, binding.isBuiltin());
+    return ComplexComponentType::get(
+        context, binding.getName(), mlir::cast<ComponentLike>(superType), params,
+        binding.isBuiltin()
+    );
   }
 
   Type materializeBaseType(const TypeBinding &binding) {
     if (!binding.hasSuperType() || binding.isTypeMarker()) {
-      return ComponentType::Component(context);
+      return builtins::Component(context);
     }
     if (binding.isConst()) {
-      return ComponentType::Val(context);
+      return builtins::Val(context);
     }
 
     if (binding.isGenericParam()) {
@@ -137,7 +149,7 @@ private:
       }
       if (binding.getSuperType().isVal() || binding.getSuperType().isTransitivelyVal()) {
         LLVM_DEBUG(llvm::dbgs() << "<== Materializing " << binding << " to Val\n");
-        return ComponentType::Val(context);
+        return builtins::Val(context);
       }
 
       assert(false && "Generic param that is neither Val or Type");
@@ -148,7 +160,21 @@ private:
     if (binding.isGeneric()) {
       return materializeGenericType(binding, superType);
     }
-    return ComponentType::get(context, binding.getName(), superType, binding.isBuiltin());
+
+    // Convert Val and ExtVal and other builtins into llzk types here.
+    if (feltEquivalentTypes.contains(binding.getName())) {
+      return builtins::Val(context);
+    }
+    if (extValBuiltins.contains(binding.getName())) {
+      return builtins::ExtVal(context);
+    }
+    if (binding.getName() == "String") {
+      return builtins::String(context);
+    }
+
+    return ComplexComponentType::get(
+        context, binding.getName(), mlir::cast<ComponentLike>(superType), binding.isBuiltin()
+    );
   }
 
   void checkCycle(const TypeBinding &binding) {
@@ -210,7 +236,7 @@ static llvm::raw_ostream &indent(size_t count = 1) {
 #endif
 
 FunctionType zml::materializeTypeBindingConstructor(
-    OpBuilder &builder, const TypeBinding &binding, const TypeBindings &bindings
+    Builder &builder, const TypeBinding &binding, const TypeBindings &bindings
 ) {
   auto genericParams = binding.getGenericParamsMapping();
   LLVM_DEBUG(llvm::dbgs() << "Materializing constructor type for " << binding << "\n");

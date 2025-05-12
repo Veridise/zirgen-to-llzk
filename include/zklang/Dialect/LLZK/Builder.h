@@ -1,4 +1,4 @@
-//===- Builder.h - ZML Component builder ------------------------*- C++ -*-===//
+//===- Builder.h - LLZK Component builder ------------------------*- C++ -*-===//
 //
 // Part of the LLZK Project, under the Apache License v2.0.
 // See LICENSE.txt for license information.
@@ -7,15 +7,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file includes a builder class for creating instances for ComponentOp
+// This file includes a builder class for creating instances for struct.def
 // operations.
 //
 //===----------------------------------------------------------------------===//
 
 #pragma once
 
-#include <algorithm>
 #include <cassert>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <memory>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinAttributes.h>
@@ -23,14 +23,23 @@
 #include <mlir/IR/Region.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
-#include <vector>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 
-namespace zml {
+namespace mlir {
+class TypeConverter;
+}
+
+namespace llzk {
 
 using Identifier = mlir::SmallString<10>;
 
 class ComponentBuilder {
+public:
+  using FillFn =
+      std::function<void(mlir::ValueRange, mlir::OpBuilder &, const mlir::TypeConverter &)>;
+
+  using type = component::StructDefOp;
+
 private:
   struct Field {
     Identifier name;
@@ -43,7 +52,8 @@ private:
   class BodySrc {
   public:
     virtual ~BodySrc();
-    virtual void set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const = 0;
+    virtual void
+    set(type op, Ctx &ctx, mlir::OpBuilder &builder, const mlir::TypeConverter &) const = 0;
   };
 
   struct Ctx {
@@ -53,9 +63,10 @@ private:
     mlir::SmallVector<mlir::NamedAttribute> compAttrs;
     mlir::SmallVector<Identifier> typeParams;
     mlir::FunctionType constructorType = nullptr;
-    mlir::SmallVector<mlir::Location> argLocs;
+    mlir::FunctionType constrainFnType = nullptr;
+    std::optional<mlir::SmallVector<mlir::Location>> argLocs;
     std::unique_ptr<BodySrc> body;
-    std::function<void(ComponentOp)> deferCb = nullptr;
+    std::function<void(type)> deferCb = nullptr;
     bool isBuiltin = false;
     bool isClosure = false;
     bool forceSetGeneric = false;
@@ -63,14 +74,14 @@ private:
 
     bool isGeneric();
     // Builds a bare component op
-    ComponentOp buildBare(mlir::OpBuilder &builder);
+    type buildBare(mlir::OpBuilder &builder);
 
     void checkRequirements();
     void checkBareRequirements();
 
     void addFields(mlir::OpBuilder &builder);
 
-    void addBody(ComponentOp op, mlir::OpBuilder &builder);
+    void addBody(type op, mlir::OpBuilder &builder, const mlir::TypeConverter &);
 
     mlir::SmallVector<mlir::NamedAttribute> funcBodyAttrs(mlir::OpBuilder &builder);
 
@@ -81,7 +92,8 @@ private:
   public:
     explicit TakeRegion(mlir::Region *body);
 
-    void set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const override;
+    void
+    set(type op, Ctx &ctx, mlir::OpBuilder &builder, const mlir::TypeConverter &) const override;
 
   private:
     mlir::Region *body = nullptr;
@@ -90,15 +102,16 @@ private:
   class FillBody : public BodySrc {
   public:
     FillBody(
-        mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results,
-        std::function<void(mlir::ValueRange, mlir::OpBuilder &)> delegate
+        mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results, FillFn compute,
+        FillFn constrain = nullptr
     );
 
-    void set(ComponentOp op, Ctx &ctx, mlir::OpBuilder &builder) const override;
+    void
+    set(type op, Ctx &ctx, mlir::OpBuilder &builder, const mlir::TypeConverter &) const override;
 
   private:
     mlir::SmallVector<mlir::Type, 1> argTypes, results;
-    std::function<void(mlir::ValueRange, mlir::OpBuilder &)> delegate;
+    FillFn fillCompute, fillConstrain;
   };
 
   Ctx ctx;
@@ -115,8 +128,8 @@ public:
   ComponentBuilder &takeRegion(mlir::Region *region);
 
   ComponentBuilder &fillBody(
-      mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results,
-      std::function<void(mlir::ValueRange, mlir::OpBuilder &)> fn
+      mlir::ArrayRef<mlir::Type> argTypes, mlir::ArrayRef<mlir::Type> results, FillFn compute,
+      FillFn constrain = nullptr
   );
 
   ComponentBuilder &
@@ -141,9 +154,9 @@ public:
   /// filled with the rest of the configuration. Allows configuring the builder with information
   /// that depends on the ComponentOp operation having already been created, such as inserting the
   /// op in a symbol table and getting potentially renamed.
-  ComponentBuilder &defer(std::function<void(ComponentOp)>);
+  ComponentBuilder &defer(std::function<void(type)>);
 
-  ComponentOp build(mlir::OpBuilder &builder);
+  type build(mlir::OpBuilder &builder, const mlir::TypeConverter &tc);
 };
 
-} // namespace zml
+} // namespace llzk

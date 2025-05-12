@@ -20,6 +20,7 @@
 #include <mlir/Interfaces/DataLayoutInterfaces.h>
 #include <mlir/Interfaces/MemorySlotInterfaces.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
+#include <zklang/Dialect/ZML/IR/TypeInterfaces.h>
 
 namespace zml {
 

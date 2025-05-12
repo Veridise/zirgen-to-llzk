@@ -61,7 +61,7 @@ void storeSlot(
 
 /// Given a Value of type ComponentType it returns a value of type Array<T,N> where
 /// said array is one of the super types of the input's type.
-mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentType> v, mlir::OpBuilder &);
+mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentLike> v, mlir::OpBuilder &);
 
 /// Calls the constructor of the POD component associated with the binding using the provided super
 /// type value. The rest of the fields of the POD component are read from the actual component using
@@ -75,7 +75,7 @@ constructPODComponent(mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBu
 
 /// Creates a component used to represent a closure. This component will have a constructor that
 /// takes as input the values for all fields including the super type's value.
-void createPODComponent(zhl::TypeBinding &, mlir::OpBuilder &, mlir::SymbolTable &);
+void createPODComponent(zhl::TypeBinding &, mlir::OpBuilder &, mlir::SymbolTable &, const mlir::TypeConverter &);
 
 /// Helper for constructing global variables in a common global module.
 class GlobalBuilder {

@@ -1,1 +1,1 @@
-target_sources(ZklangPasses PRIVATE LLZKTypeConverter.cpp Pass.cpp Patterns.cpp)
+target_sources(ZklangPasses PRIVATE Pass.cpp Patterns.cpp)

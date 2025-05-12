@@ -29,6 +29,7 @@ namespace zklang {
 template <typename Op> using OpPass = std::unique_ptr<mlir::OperationPass<Op>>;
 
 OpPass<mlir::ModuleOp> createStripTestsPass();
+OpPass<mlir::ModuleOp> createTypecheckZhlPass();
 OpPass<mlir::ModuleOp> createConvertZhlToZmlPass();
 OpPass<mlir::ModuleOp> createConvertZmlToLlzkPass();
 OpPass<mlir::ModuleOp> createInjectLlzkModAttrsPass();

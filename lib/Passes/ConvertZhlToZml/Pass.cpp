@@ -22,12 +22,14 @@
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
+#include <zklang/Dialect/LLZK/LLZKTypeConverter.h>
 #include <zklang/Dialect/ZHL/Typing/Analysis.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
 #include <zklang/Dialect/ZML/Typing/ZMLTypeConverter.h>
 #include <zklang/Dialect/ZML/Utils/Helpers.h>
+#include <zklang/FiniteFields/BabyBear.h>
 #include <zklang/Passes/ConvertZhlToZml/Pass.h>
 #include <zklang/Passes/ConvertZhlToZml/Patterns.h>
 
@@ -46,13 +48,14 @@ namespace zml {
 namespace {
 
 void createPODComponentsFromClosures(
-    zhl::ZIRTypeAnalysis &typeAnalysis, OpBuilder &builder, SymbolTable &st, Block *insertionPoint
+    zhl::ZIRTypeAnalysis &typeAnalysis, OpBuilder &builder, SymbolTable &st, Block *insertionPoint,
+    const mlir::TypeConverter &tc
 ) {
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToEnd(insertionPoint);
   for (auto *clo : typeAnalysis.getClosures()) {
     assert(clo && clo->hasClosure());
-    createPODComponent(*clo, builder, st);
+    createPODComponent(*clo, builder, st, tc);
   }
 }
 
@@ -72,7 +75,10 @@ void ConvertZhlToZmlPass::runOnOperation() {
   SymbolTable st(module);
   mlir::ModuleOp globalsModule = mlir::ModuleOp::create(builder.getUnknownLoc(), "globals");
   st.insert(globalsModule, module.begin());
-  createPODComponentsFromClosures(typeAnalysis, builder, st, &module.getRegion().front());
+  // TODO: Add option to configure this field
+  ff::babybear::Field BabyBear;
+  llzk::LLZKTypeConverter llzkTC(BabyBear);
+  createPODComponentsFromClosures(typeAnalysis, builder, st, &module.getRegion().front(), llzkTC);
 
   ZMLTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);

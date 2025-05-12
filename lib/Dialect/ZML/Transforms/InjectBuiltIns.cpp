@@ -17,6 +17,7 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/SymbolTable.h>
+#include <mlir/Transforms/DialectConversion.h>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
@@ -38,7 +39,9 @@ class InjectBuiltInsPass : public InjectBuiltInsBase<InjectBuiltInsPass> {
     }
     assert(mod->hasTrait<OpTrait::SymbolTable>());
     OpBuilder builder(mod.getRegion());
-    addBuiltins(builder, definedNames);
+    // TODO: Replace for a LLZKTypeConverter and add an option to setup the field.
+    TypeConverter tc;
+    addBuiltins(builder, definedNames, tc);
   }
 };
 
