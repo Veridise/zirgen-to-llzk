@@ -15,17 +15,13 @@ component User1<N: Val, P: Val>() {
 // CHECK-DAG:     %[[D1:[0-9a-zA-Z_\.]+]] = poly.read_const @P : !felt.type
 // CHECK-DAG:     %[[D2:[0-9a-zA-Z_\.]+]] = function.call @Div::@compute(%[[D0]], %[[D1]]) : (!felt.type, !felt.type) -> !struct.type<@Div<[]>>
 
-// CHECK-DAG:     %[[T0:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
-// CHECK-DAG:     %[[T1:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T0]]
-// CHECK-DAG:     %[[T2:[0-9a-zA-Z_\.]+]] = poly.read_const @P : !felt.type
-// CHECK-DAG:     %[[T3:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T2]]
+// CHECK-DAG:     %[[T1:[0-9a-zA-Z_\.]+]] = poly.read_const @N : index
+// CHECK-DAG:     %[[T3:[0-9a-zA-Z_\.]+]] = poly.read_const @P : index
 // CHECK-DAG:     %[[T4:[0-9a-zA-Z_\.]+]] = array.new{()[%[[T1]], %[[T3]]]} : <#[[MAP:[0-9a-zA-Z_\.]+]] x !felt.type>
 // CHECK-DAG:     scf.for %{{[0-9a-zA-Z_\.]+}} = %{{[0-9a-zA-Z_\.]+}} to %{{[0-9a-zA-Z_\.]+}} step %{{[0-9a-zA-Z_\.]+}} {
 
-// CHECK-DAG:     %[[T5:[0-9a-zA-Z_\.]+]] = poly.read_const @N : !felt.type
-// CHECK-DAG:     %[[T6:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T5]]
-// CHECK-DAG:     %[[T7:[0-9a-zA-Z_\.]+]] = poly.read_const @P : !felt.type
-// CHECK-DAG:     %[[T8:[0-9a-zA-Z_\.]+]] = cast.toindex %[[T7]]
+// CHECK-DAG:     %[[T6:[0-9a-zA-Z_\.]+]] = poly.read_const @N : index
+// CHECK-DAG:     %[[T8:[0-9a-zA-Z_\.]+]] = poly.read_const @P : index
 // CHECK-DAG:     %[[T9:[0-9a-zA-Z_\.]+]] = function.call @Unpack::@compute(%[[T4]]) {()[%[[T6]], %[[T8]]]} : (!array.type<#[[MAP]] x !felt.type>) -> !struct.type<@Unpack<[@N, @P, #[[MAP]]]>>
 
 // CHECK-LABEL: function.def @constrain(%{{[0-9a-zA-Z_\.]+}}: !struct.type<@User1<[@N, @P]>>) 

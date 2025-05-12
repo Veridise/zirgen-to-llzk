@@ -26,11 +26,9 @@ component Foo<N: Val, P: Val>() {
 //       CHECK:      %[[T1:[0-9a-zA-Z_.]+]] =  felt.const  2
 //       CHECK:      %[[T29:[0-9a-zA-Z_.]+]] =  struct.readf %[[A0]][@x] : <@Foo<[@N, @P]>>, !struct.type<@Reg<[]>>
 //       CHECK:      function.call @Reg::@constrain(%[[T29]], %[[T1]]) : (!struct.type<@Reg<[]>>, !felt.type) -> () 
-//       CHECK:      %[[T6:[0-9a-zA-Z_.]+]] = poly.read_const @N : !felt.type
-//       CHECK:      %[[T7:[0-9a-zA-Z_.]+]] = cast.toindex %[[T6]]
-//       CHECK:      %[[T6_1:[0-9a-zA-Z_.]+]] = poly.read_const @P : !felt.type
-//       CHECK:      %[[T7_1:[0-9a-zA-Z_.]+]] = cast.toindex %[[T6_1]]
-//       CHECK:      %[[T8:[0-9a-zA-Z_.]+]] =  struct.readf %[[A0]][@x] {()[%[[T7]], %[[T7_1]]]} : <@Foo<[@N, @P]>>, !struct.type<@Reg<[]>> {tableOffset = #map}
+//       CHECK:      %[[T6:[0-9a-zA-Z_.]+]] = poly.read_const @N : index
+//       CHECK:      %[[T7:[0-9a-zA-Z_.]+]] = poly.read_const @P : index
+//       CHECK:      %[[T8:[0-9a-zA-Z_.]+]] =  struct.readf %[[A0]][@x] {()[%[[T6]], %[[T7]]]} : <@Foo<[@N, @P]>>, !struct.type<@Reg<[]>> {tableOffset = #map}
 //       CHECK:      %[[T15:[0-9a-zA-Z_.]+]] =  struct.readf %[[T8]][@"$super"] : <@Reg<[]>>, !struct.type<@NondetReg<[]>>
 //       CHECK:      %[[T16:[0-9a-zA-Z_.]+]] =  struct.readf %[[T15]][@"$super"] : <@NondetReg<[]>>, !felt.type
 //       CHECK:      constrain.eq %[[T16]], %[[T1]] : !felt.type, !felt.type
