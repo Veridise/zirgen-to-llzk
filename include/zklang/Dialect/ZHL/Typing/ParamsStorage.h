@@ -93,6 +93,12 @@ struct ParamsStorage {
   ParamsStorage(const ParamsMap &Map, size_t Size, const TypeBinding &Default)
       : ParamsStorage(Map, Size, std::make_optional(Default)) {}
 
+  static std::shared_ptr<ParamsStorage> Shared() { return std::make_shared<ParamsStorage>(); }
+
+  template <typename... Args> static std::shared_ptr<ParamsStorage> Shared(Args &&...args) {
+    return std::make_shared<ParamsStorage>(std::forward<Args>(args)...);
+  }
+
 private:
   ParamsStorage(
       const ParamsMap &Map, size_t Size, std::optional<TypeBinding> Default = std::nullopt

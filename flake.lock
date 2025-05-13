@@ -1,5 +1,36 @@
 {
   "nodes": {
+    "advisory-db": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1732530460,
+        "narHash": "sha256-1SceEHyFdHnoWE/AnoDZRu/9+Ift3Oc1+iQzmbP7OBU=",
+        "owner": "rustsec",
+        "repo": "advisory-db",
+        "rev": "4676c5529dd5319b9962e42bf984797f0dd57f5b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rustsec",
+        "repo": "advisory-db",
+        "type": "github"
+      }
+    },
+    "crane": {
+      "locked": {
+        "lastModified": 1732407143,
+        "narHash": "sha256-qJOGDT6PACoX+GbNH2PPx2ievlmtT1NVeTB80EkRLys=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "f2b4b472983817021d9ffb60838b2b36b9376b20",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "locked": {
         "lastModified": 1652776076,
@@ -197,7 +228,58 @@
           "llzk-pkgs",
           "nixpkgs"
         ],
-        "release-helpers": "release-helpers_2"
+        "release-helpers": "release-helpers_2",
+        "samply": "samply"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "samply",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1732588352,
+        "narHash": "sha256-J2/hxOO1VtBA/u+a+9E+3iJpWT3xsBdghgYAVfoGCJo=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "414e748aae5c9e6ca63c5aafffda03e5dad57ceb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "samply": {
+      "inputs": {
+        "advisory-db": "advisory-db",
+        "crane": "crane",
+        "flake-utils": [
+          "llzk-pkgs",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "llzk-pkgs",
+          "nixpkgs"
+        ],
+        "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1738394308,
+        "narHash": "sha256-bGOWcsTHbMiFanzofDwsKJAbdZKFpDXikv52YxQZFwM=",
+        "owner": "mstange",
+        "repo": "samply",
+        "rev": "da75c28f367454c621e690eeb4e44ec2ebb29a78",
+        "type": "github"
+      },
+      "original": {
+        "owner": "mstange",
+        "ref": "samply-v0.13.1",
+        "repo": "samply",
+        "type": "github"
       }
     }
   },

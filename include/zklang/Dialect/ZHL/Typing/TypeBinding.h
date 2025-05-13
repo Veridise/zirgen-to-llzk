@@ -30,7 +30,7 @@
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Params.h>
-#include <zklang/Support/CopyablePointer.h>
+#include <zklang/Support/COW.h>
 
 namespace llvm {
 class raw_ostream;
@@ -61,16 +61,16 @@ class TypeBinding {
 private:
   struct ParamsStorageFactory {
     /// Initializes empty storage
-    static ParamsStorage *init();
+    static std::shared_ptr<ParamsStorage> init();
   };
 
-  struct ParamsStoragePtr : public zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory> {
-    using zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>::CopyablePointer;
+  struct ParamsStoragePtr : public zklang::COW<ParamsStorage, ParamsStorageFactory> {
+    using zklang::COW<ParamsStorage, ParamsStorageFactory>::COW;
 
     ParamsStoragePtr(const ParamsMap &);
 
-    operator Params() const { return Params(this->operator*()); }
-    operator MutableParams() { return MutableParams(this->operator*()); }
+    operator Params() const { return Params(get()); }
+    operator MutableParams() { return MutableParams(get()); }
 
     ParamsStoragePtr &operator=(const ParamsMap &);
     ParamsStoragePtr &operator=(ParamsMap &&);
