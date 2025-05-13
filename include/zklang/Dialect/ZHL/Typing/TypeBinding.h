@@ -30,7 +30,7 @@
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Params.h>
-#include <zklang/Support/CopyablePointer.h>
+#include <zklang/Support/COW.h>
 
 namespace llvm {
 class raw_ostream;
@@ -61,19 +61,29 @@ class TypeBinding {
 private:
   struct ParamsStorageFactory {
     /// Initializes empty storage
-    static ParamsStorage *init();
+    static std::shared_ptr<ParamsStorage> init();
   };
 
-  struct ParamsStoragePtr : public zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory> {
-    using zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>::CopyablePointer;
+  struct ParamsStoragePtr : public zklang::COW<ParamsStorage, ParamsStorageFactory> {
+    using zklang::COW<ParamsStorage, ParamsStorageFactory>::COW;
 
-    ParamsStoragePtr(const ParamsMap &);
-
-    operator Params() const { return Params(this->operator*()); }
-    operator MutableParams() { return MutableParams(this->operator*()); }
+    operator Params() const { return Params(get()); }
+    operator MutableParams() { return MutableParams(get()); }
 
     ParamsStoragePtr &operator=(const ParamsMap &);
     ParamsStoragePtr &operator=(ParamsMap &&);
+  };
+
+  struct MembersMapFactory {
+    /// Initializes empty storage
+    static std::shared_ptr<MembersMap> init();
+  };
+
+  struct MembersMapPtr : public zklang::COW<MembersMap, MembersMapFactory> {
+    using zklang::COW<MembersMap, MembersMapFactory>::COW;
+
+    MembersMapPtr &operator=(const MembersMap &);
+    MembersMapPtr &operator=(MembersMap &&);
   };
 
 public:
@@ -140,6 +150,8 @@ public:
       Extern,
       /// Marks the type binding as needing back-variable support.
       NeedsBackVariables,
+      /// Marks the type binding as a generic parameter name.
+      GenericParamName,
 
       Flags_End
     };
@@ -222,6 +234,14 @@ public:
     /// Sets the Extern flag.
     constexpr Flags &setBackVariablesNeed(bool B = true) {
       set(NeedsBackVariables, B);
+      return *this;
+    }
+
+    /// Return true if the type binding is a generic parameter name.
+    constexpr bool isGenericParamName() const { return flags[GenericParamName]; }
+    /// Sets the GenericParamName flag.
+    constexpr Flags &setGenericParamName(bool B = true) {
+      set(GenericParamName, B);
       return *this;
     }
   };
@@ -360,7 +380,7 @@ public:
   /// If the type binding is not this method aborts.
   mlir::StringRef getGenericParamName() const {
     assert(isGenericParam());
-    return *genericParamName;
+    return name;
   }
 
   /// Locates a generic parameter by name and sets its type binding to a copy of the given one.
@@ -392,10 +412,10 @@ public:
   //==---------------------------------------------------------------------==//
 
   /// Returns a constant reference to the members defined in the type binding.
-  const MembersMap &getMembers() const { return members; }
+  const MembersMap &getMembers() const { return *members; }
 
   /// Returns a reference to the members defined in the type binding.
-  MembersMap &getMembers() { return members; }
+  MembersMap &getMembersMut() { return *members; }
 
   /// Attempts to find an accesible member of the type binding by name. Returns failure if the
   /// member is not public or it doesn't exist.
@@ -480,7 +500,7 @@ public:
   /// Returns a copy of the type binding that has the variadic property set to true.
   static TypeBinding WrapVariadic(const TypeBinding &t) {
     TypeBinding copy = t;
-    copy.flags.setVariadic(true);
+    copy.flags.setVariadic();
     return copy;
   }
 
@@ -488,7 +508,7 @@ public:
   /// type binding.
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name) {
     TypeBinding copy(name, t.loc, t);
-    copy.genericParamName = name;
+    copy.flags.setGenericParamName();
     return copy;
   }
 
@@ -566,9 +586,8 @@ private:
   Name name;
   mlir::Location loc;
   expr::ConstExpr constExpr;
-  std::optional<std::string> genericParamName;
   const TypeBinding *superType;
-  MembersMap members;
+  MembersMapPtr members;
   ParamsStoragePtr genericParams;
   ParamsStoragePtr constructorParams;
   Frame frame;

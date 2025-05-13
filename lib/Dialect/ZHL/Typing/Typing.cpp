@@ -147,7 +147,7 @@ private:
     const auto *b = &binding;
     while (b) {
       b = [&]() -> const TypeBinding * {
-        for (auto &member : b->getMembers()) {
+        for (const auto &member : b->getMembers()) {
           if (member.getValue().has_value() && validSubtype(*member.getValue())) {
             markColumn(binding);
             return nullptr;

@@ -50,7 +50,7 @@ class Params {
 public:
   using iterator = mlir::ArrayRef<TypeBinding>::const_iterator;
 
-  Params(const ParamsStorage &params) : sto(&params) {}
+  Params(const std::shared_ptr<ParamsStorage> params) : sto(std::move(params)) {}
 
   /// Returns the number of parameters.
   size_t size() const;
@@ -101,17 +101,17 @@ public:
 
   bool operator==(const Params &) const;
 
-  const ParamsStorage *data() const { return sto; }
+  const ParamsStorage *data() const { return sto.get(); }
 
 private:
-  const ParamsStorage *sto;
+  const std::shared_ptr<ParamsStorage> sto;
 };
 
 class MutableParams : public Params {
 public:
   using iterator = mlir::MutableArrayRef<TypeBinding>::iterator;
 
-  MutableParams(ParamsStorage &params) : Params(params) {}
+  MutableParams(std::shared_ptr<ParamsStorage> params) : Params(params) {}
 
   /// If there is a parameter with the same given name assigns the given binding to it.
   void replaceParam(mlir::StringRef name, const TypeBinding &binding);

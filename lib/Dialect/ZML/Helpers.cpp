@@ -168,7 +168,7 @@ void materializeFieldTypes(
   SmallVector<StringRef> fieldsToSort;
   fieldsToSort.reserve(binding.getMembers().size());
 
-  for (auto &[memberName, memberBinding] : binding.getMembers()) {
+  for (const auto &[memberName, memberBinding] : binding.getMembers()) {
     assert(memberBinding.has_value());
     auto memberType = materializeTypeBinding(ctx, *memberBinding);
     bool isColumn = false;

@@ -178,9 +178,7 @@ ExprBase *Symbol::remap(Params params, EmitErrorFn emitError) const {
 //==-----------------------------------------------------------------------==//
 
 Ctor::Ctor(StringRef Name, ArrayRef<ConstExpr> Args)
-    : ExprBase(Ex_Ctor),
-      args(llvm::map_to_vector(Args, [](auto &expr) -> ExprBase * { return expr->clone(); })),
-      typeName(Name) {}
+    : ExprBase(Ex_Ctor), args(Args), typeName(Name) {}
 
 bool Ctor::operator==(const ExprBase &other) const {
   if (auto *otherCtor = mlir::dyn_cast<Ctor>(&other)) {
@@ -227,15 +225,15 @@ static void printSide(llvm::raw_ostream &os, const ExprBase &expr) {
 
 void Ctor::print(llvm::raw_ostream &os) const {
   if (isInfixExpr(*this)) {
-    printSide(os, args[0]);
+    printSide(os, args[0].ref());
     os << " " << getInfixSymbol(typeName) << " ";
-    printSide(os, args[1]);
+    printSide(os, args[1].ref());
   } else if (getTypeName() == "Neg") {
     os << "-";
-    printSide(os, args[0]);
+    printSide(os, args[0].ref());
   } else {
     os << typeName << "(";
-    llvm::interleaveComma(args, os, [&](auto &e) { e.print(os); });
+    llvm::interleaveComma(args, os, [&](auto &e) { e.ref().print(os); });
     os << ")";
   }
 }
@@ -289,11 +287,15 @@ Attribute Ctor::convertIntoAttribute(Builder &builder) const {
 }
 
 ExprBase *Ctor::remap(Params params, EmitErrorFn emitError) const {
-  auto replacedArgs =
-      llvm::map_to_vector(args, [&](const ExprBase &arg) { return arg.remap(params, emitError); });
-  if (llvm::any_of(replacedArgs, [](auto &arg) { return !arg; })) {
+  auto replacedArgsOrFailures =
+      llvm::map_to_vector(args, [&](const ConstExpr &arg) { return arg.remap(params, emitError); });
+  if (llvm::any_of(replacedArgsOrFailures, [](auto &arg) { return failed(arg); })) {
     return nullptr;
   }
+  auto replacedArgs =
+      llvm::map_to_vector(replacedArgsOrFailures, [&](const mlir::FailureOr<ConstExpr> &arg) {
+    return arg.value();
+  });
   return new Ctor(typeName, Arguments(std::move(replacedArgs)));
 }
 
@@ -301,39 +303,16 @@ ExprBase *Ctor::remap(Params params, EmitErrorFn emitError) const {
 // Ctor::Arguments
 //==-----------------------------------------------------------------------==//
 
-static ExprBase &cloneHelper(const ExprBase &expr) { return *expr.clone(); }
+Ctor::Arguments::Arguments(mlir::ArrayRef<ConstExpr> Args) : lst(Args) {}
 
-template <typename In, typename Out, typename Fn>
-static void copyArgsList(const In &in, Out &out, Fn f) {
-  for (auto &arg : in) {
-    out.push_back(f(arg));
-  }
-}
-
-template <typename List> static void cleanArgsList(List &lst) {
-  lst.clearAndDispose(std::default_delete<typename List::value_type>());
-}
-
-Ctor::Arguments::Arguments(SmallVectorImpl<value_type> &Args) {
-  copyArgsList(Args, lst, [](value_type expr) -> reference { return cloneHelper(*expr); });
-}
-
-Ctor::Arguments::Arguments(SmallVectorImpl<value_type> &&Args) {
-  copyArgsList(Args, lst, [](value_type expr) -> reference {
-    assert(expr);
-    return *expr;
-  });
-}
-
-Ctor::Arguments::Arguments(const Arguments &other) { copyArgsList(other.lst, lst, cloneHelper); }
+Ctor::Arguments::Arguments(const Arguments &other) : lst(other.lst) {}
 
 Ctor::Arguments &Ctor::Arguments::operator=(const Arguments &other) {
-  cleanArgsList(lst);
-  copyArgsList(other.lst, lst, cloneHelper);
+  lst = other.lst;
   return *this;
 }
 
-Ctor::Arguments::~Arguments() { cleanArgsList(lst); }
+Ctor::Arguments::~Arguments() {}
 
 bool Ctor::Arguments::operator==(const Arguments &other) const {
   if (lst.size() != other.lst.size()) {
@@ -348,16 +327,9 @@ bool Ctor::Arguments::operator==(const Arguments &other) const {
   return true;
 }
 
-ExprBase &Ctor::Arguments::operator[](size_t offset) {
+const ConstExpr &Ctor::Arguments::operator[](size_t offset) const {
   assert(offset < lst.size());
-  assert(offset <= std::numeric_limits<ptrdiff_t>::max());
-  return *std::next(lst.begin(), static_cast<ptrdiff_t>(offset));
-}
-
-const ExprBase &Ctor::Arguments::operator[](size_t offset) const {
-  assert(offset < lst.size());
-  assert(offset <= std::numeric_limits<ptrdiff_t>::max());
-  return *std::next(lst.begin(), static_cast<ptrdiff_t>(offset));
+  return lst[offset];
 }
 
 //==-----------------------------------------------------------------------==//
