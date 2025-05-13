@@ -67,8 +67,6 @@ private:
   struct ParamsStoragePtr : public zklang::COW<ParamsStorage, ParamsStorageFactory> {
     using zklang::COW<ParamsStorage, ParamsStorageFactory>::COW;
 
-    ParamsStoragePtr(const ParamsMap &);
-
     operator Params() const { return Params(get()); }
     operator MutableParams() { return MutableParams(get()); }
 
@@ -405,7 +403,7 @@ public:
   const MembersMap &getMembers() const { return members; }
 
   /// Returns a reference to the members defined in the type binding.
-  MembersMap &getMembers() { return members; }
+  MembersMap &getMembersMut() { return members; }
 
   /// Attempts to find an accesible member of the type binding by name. Returns failure if the
   /// member is not public or it doesn't exist.

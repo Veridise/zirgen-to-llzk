@@ -507,9 +507,6 @@ TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMa
   return *this;
 }
 
-TypeBinding::ParamsStoragePtr::ParamsStoragePtr(const ParamsMap &map)
-    : zklang::COW<ParamsStorage, ParamsStorageFactory>(ParamsStorage(map)) {}
-
 //==-----------------------------------------------------------------------==//
 // operator<< overloads
 //==-----------------------------------------------------------------------==//

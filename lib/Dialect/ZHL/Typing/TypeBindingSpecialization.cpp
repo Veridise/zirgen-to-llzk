@@ -218,8 +218,7 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
     }
   }
   // Specialize the types of the members
-  auto &members = dst->getMembers();
-  for (auto &member : members) {
+  for (auto &member : dst->getMembersMut()) {
     auto name = member.getKey();
     auto &type = member.getValue();
     if (type.has_value()) {
@@ -492,8 +491,7 @@ static LogicalResult propagateConstants(
     }
   }
   // Specialize the types of the members
-  auto &members = dst->getMembers();
-  for (auto &member : members) {
+  for (auto &member : dst->getMembersMut()) {
     auto name = member.getKey();
     auto &type = member.getValue();
     if (type.has_value()) {
