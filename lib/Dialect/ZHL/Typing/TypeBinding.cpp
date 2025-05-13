@@ -140,13 +140,13 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
     // If they are the same size the common super type is another array
     // whose element is the least common type of the two element types
     if (other.name == "Array") {
-      auto &arrElt = getGenericParamsMapping().getParam(0);
+      auto arrElt = getGenericParamsMapping().getParam(0);
       LLVM_DEBUG(arrElt.print(logLine(1) << "This array element:  ", true); nl());
-      auto &otherArrElt = other.getGenericParamsMapping().getParam(0);
+      auto otherArrElt = other.getGenericParamsMapping().getParam(0);
       LLVM_DEBUG(otherArrElt.print(logLine(1) << "Other array element: ", true); nl());
-      auto &arrSize = getGenericParamsMapping().getParam(1);
+      auto arrSize = getGenericParamsMapping().getParam(1);
       LLVM_DEBUG(arrSize.print(logLine(1) << "This array size:     ", true); nl());
-      auto &otherArrSize = other.getGenericParamsMapping().getParam(1);
+      auto otherArrSize = other.getGenericParamsMapping().getParam(1);
       LLVM_DEBUG(otherArrSize.print(logLine(1) << "Other array size:    ", true); nl());
       if (arrSize == otherArrSize) {
         auto commonInner = arrElt.commonSupertypeWith(otherArrElt);
