@@ -26,6 +26,11 @@ def InjectBuiltIns : Pass<"inject-builtins", "mlir::ModuleOp"> {
     "::zml::ZMLDialect",
     "::mlir::func::FuncDialect",
   ];
+
+  let options =
+      [Option<"selectedExtValField", "extval-field", "std::string",
+              /*default=*/"\"babybear\"",
+              "The field ExtVal types operate on (default: babybear)">];
 }
 
 def LowerBuiltIns : Pass<"lower-builtins", "mlir::func::FuncOp"> {

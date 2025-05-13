@@ -135,6 +135,8 @@ public:
   ComponentBuilder &
   constructor(mlir::FunctionType constructorType, mlir::ArrayRef<mlir::Location> argLocs);
 
+  ComponentBuilder &constructorLocs(mlir::ArrayRef<mlir::Location> argLocs);
+
   ComponentBuilder &location(mlir::Location loc);
 
   ComponentBuilder &name(mlir::StringRef name);

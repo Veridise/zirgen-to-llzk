@@ -80,12 +80,10 @@ void ConvertZmlToLlzkPass::runOnOperation() {
   ModuleOp op = getOperation();
 
   mlir::MLIRContext *ctx = &getContext();
-  LLZKTypeConverterPtr typeConverter;
-  ConverterPtr extValConverter;
+  auto conversion =
+      extval::loadConversionByFieldName(selectedExtValField, [&op] { return op->emitError(); });
   // Only BabyBear is supported for now. More to come (LLZK-180)
-  if (failed(configureField(selectedExtValField, typeConverter, extValConverter, [&op] {
-    return op->emitError();
-  }))) {
+  if (failed(conversion)) {
     llvm::errs() << "Failed to configure field\n";
     signalPassFailure();
     return;
@@ -103,11 +101,13 @@ void ConvertZmlToLlzkPass::runOnOperation() {
       FuncOpLowering, ReturnOpLowering, ExternCallOpLowering, CallIndirectOpLoweringInCompute,
       RemoveConstructorRefOp, RemoveExternFnRefOp, UpdateScfExecuteRegionOpTypes, ValToI1OpLowering,
       AssertOpLowering, LowerLitValArrayOp, LitStrOpLowering, LowerVarArgsOp, LowerGlobalDefOp,
-      LowerSetGlobalOp, LowerGetGlobalOp, LowerReadBackOp>(*typeConverter, ctx);
+      LowerSetGlobalOp, LowerGetGlobalOp, LowerReadBackOp>(*conversion->typeConverter, ctx);
 
-  populateExtValToLlzkConversionPatterns(patterns, *typeConverter, ctx, *extValConverter);
+  populateExtValToLlzkConversionPatterns(
+      patterns, *conversion->typeConverter, ctx, *conversion->converter
+  );
 
-  scf::populateSCFStructuralTypeConversions(*typeConverter, patterns);
+  scf::populateSCFStructuralTypeConversions(*conversion->typeConverter, patterns);
 
   mlir::ConversionTarget target(*ctx);
   target.addLegalDialect<
@@ -125,16 +125,20 @@ void ConvertZmlToLlzkPass::runOnOperation() {
     if (!isa<scf::ExecuteRegionOp, scf::ForOp, scf::IfOp, scf::WhileOp>(yieldOp->getParentOp())) {
       return true;
     }
-    return typeConverter->isLegal(yieldOp.getOperandTypes());
+    return conversion->typeConverter->isLegal(yieldOp.getOperandTypes());
   });
 
   target.addDynamicallyLegalOp<scf::ExecuteRegionOp, scf::ForOp, scf::IfOp>(
-      [&typeConverter](Operation *scfOp) { return typeConverter->isLegal(scfOp->getResultTypes()); }
+      [&typeConverter = conversion->typeConverter](Operation *scfOp) {
+    return typeConverter->isLegal(scfOp->getResultTypes());
+  }
   );
 
-  target.addDynamicallyLegalOp<scf::WhileOp, scf::ConditionOp>([&typeConverter](Operation *scfOp) {
+  target.addDynamicallyLegalOp<scf::WhileOp, scf::ConditionOp>(
+      [&typeConverter = conversion->typeConverter](Operation *scfOp) {
     return typeConverter->isLegal(scfOp);
-  });
+  }
+  );
 
   if (mlir::failed(mlir::applyFullConversion(op, target, std::move(patterns)))) {
     signalPassFailure();

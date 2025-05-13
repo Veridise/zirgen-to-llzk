@@ -50,7 +50,7 @@ ComponentLike ExtVal(mlir::MLIRContext *);
 
 inline ComponentLike ExtVal(mlir::OpBuilder &builder) { return ExtVal(builder.getContext()); }
 
-ComponentLike Array(ComponentLike, mlir::Attribute, const mlir::TypeConverter &);
+ComponentLike Array(mlir::Type, mlir::Attribute, const mlir::TypeConverter &);
 
 } // namespace builtins
 

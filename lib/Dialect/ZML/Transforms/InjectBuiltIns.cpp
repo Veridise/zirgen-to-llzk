@@ -21,6 +21,7 @@
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
+#include <zklang/Dialect/ZML/ExtVal/Conversion.h>
 #include <zklang/Dialect/ZML/Transforms/PassDetail.h>
 
 using namespace mlir;
@@ -33,15 +34,21 @@ class InjectBuiltInsPass : public InjectBuiltInsBase<InjectBuiltInsPass> {
 
   void runOnOperation() override {
     ModuleOp mod = getOperation();
+    auto conversion =
+        extval::loadConversionByFieldName(selectedExtValField, [&mod] { return mod->emitError(); });
+    // Only BabyBear is supported for now. More to come (LLZK-180)
+    if (failed(conversion)) {
+      llvm::errs() << "Failed to configure field\n";
+      signalPassFailure();
+      return;
+    }
     std::unordered_set<std::string_view> definedNames;
     for (auto op : mod.getOps<zirgen::Zhl::ComponentOp>()) {
       definedNames.insert(op.getName());
     }
     assert(mod->hasTrait<OpTrait::SymbolTable>());
     OpBuilder builder(mod.getRegion());
-    // TODO: Replace for a LLZKTypeConverter and add an option to setup the field.
-    TypeConverter tc;
-    addBuiltins(builder, definedNames, tc);
+    addBuiltins(builder, definedNames, *conversion->typeConverter);
   }
 };
 

@@ -70,7 +70,7 @@ public:
   /// named bindings table.
   template <typename... Args>
   const TypeBinding &CreateAnon(mlir::StringRef name, mlir::Location loc, Args &&...args) {
-    return Manage(TypeBinding(name, loc, std::forward<Args>(args)...));
+    return Manage(TypeBinding(nameUniquer.getName(name), loc, std::forward<Args>(args)...));
   }
 
   template <typename... Args> const TypeBinding &CreateAnon(mlir::StringRef name, Args &&...args) {
@@ -103,6 +103,16 @@ private:
     return makeBuiltin(name, unk, std::forward<Args>(args)...);
   }
 
+  /// Keeps track of how many anonymous type names have been created
+  /// and returns an unique name every time.
+  class NameUniquer {
+    llvm::StringSet<> seen;
+
+  public:
+    std::string getName(llvm::StringRef originalName);
+  };
+
+  NameUniquer nameUniquer;
   mlir::Location unk;
   llvm::StringMap<TypeBinding> bindings;
   /// This deque is used as an allocator to hold pointers to type bindings that other type bindings

@@ -7,9 +7,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <functional>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/SmallVectorExtras.h>
 #include <llvm/Support/Debug.h>
+#include <llzk/Dialect/Function/IR/Ops.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
@@ -18,6 +21,7 @@
 #include <mlir/IR/Operation.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Transforms/DialectConversion.h>
 #include <zklang/Dialect/LLZK/Builder.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
 #include <zklang/Dialect/ZHL/Typing/Params.h>
@@ -160,7 +164,7 @@ void storeSlot(
 
 #undef DEBUG_TYPE
 
-void materializeFieldTypes(
+static void materializeFieldTypes(
     zhl::TypeBinding &binding, MLIRContext *ctx, SmallVectorImpl<Type> &types,
     SmallVectorImpl<StringRef> &fields, SmallVectorImpl<bool> *columns = nullptr
 ) {
@@ -245,7 +249,8 @@ void createPODComponent(
   auto loc = binding.getLocation();
   cb.name(binding.getName()).isClosure().location(loc);
 
-  auto superType = materializeTypeBinding(builder.getContext(), binding.getSuperType());
+  auto superType =
+      TC.convertType(materializeTypeBinding(builder.getContext(), binding.getSuperType()));
   argTypes = {superType};
   fieldNames = {"$super"};
   columns = {false};
@@ -255,7 +260,7 @@ void createPODComponent(
 
   materializeFieldTypes(binding, builder.getContext(), argTypes, fieldNames, &columns);
   for (auto [memberName, memberType, isColumn] : llvm::zip_equal(fieldNames, argTypes, columns)) {
-    cb.field(memberName, memberType, isColumn);
+    cb.field(memberName, TC.convertType(memberType), isColumn);
   }
 
   if (!binding.getGenericParamNames().empty()) {
@@ -267,17 +272,18 @@ void createPODComponent(
 
     // Now that we know the final name of the component we can configure the rest
     cb.fillBody(
-        argTypes, {materializeTypeBinding(builder.getContext(), binding)},
-        [&](mlir::ValueRange args, mlir::OpBuilder &B, const auto &) {
-      auto componentType = materializeTypeBinding(B.getContext(), binding);
+        llvm::map_to_vector(argTypes, [&TC](Type t) { return TC.convertType(t); }),
+        {TC.convertType(materializeTypeBinding(builder.getContext(), binding))},
+        [&](mlir::ValueRange args, mlir::OpBuilder &B, const TypeConverter &tc) {
+      auto componentType = tc.convertType(materializeTypeBinding(B.getContext(), binding));
       // Reference to self
-      auto self = B.create<SelfOp>(loc, componentType);
+      auto self = B.create<llzk::component::CreateStructOp>(loc, componentType);
       // Store the fields
       for (auto [fieldName, arg] : llvm::zip_equal(fieldNames, args)) {
-        B.create<WriteFieldOp>(loc, self, fieldName, arg);
+        B.create<llzk::component::FieldWriteOp>(loc, self, fieldName, arg);
       }
       // Return self
-      B.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
+      B.create<llzk::function::ReturnOp>(loc, mlir::ValueRange({self}));
     }
     );
   });

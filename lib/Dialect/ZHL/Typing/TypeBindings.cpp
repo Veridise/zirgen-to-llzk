@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <cassert>
+#include <llvm/ADT/SmallString.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
@@ -123,4 +124,36 @@ const TypeBinding &TypeBindings::insert(StringRef name, TypeBinding &&binding) {
   assert(bindings.find(name) == bindings.end() && "double binding write");
   bindings.try_emplace(name, binding);
   return bindings.at(name);
+}
+
+std::string TypeBindings::NameUniquer::getName(llvm::StringRef originalName) {
+  // If the name is new add it to the set and return it
+  if (!seen.contains(originalName)) {
+    seen.insert(originalName);
+    return originalName.str();
+  }
+
+  // If it isn't new then try names until a new one is found.
+  using S = llvm::SmallString<20>;
+  S newName(originalName);
+  // Format the new name by simply overwriting the addition made to the original name.
+  // Since we are using a small string, for the majority of the cases these overwrites
+  // should happen all the time in the stack.
+  // If that's the case then only two copies should happen, when we add to the seen set
+  // and when we allocate the returned string.
+  auto format = [originalNameSize = originalName.size(), &newName](auto n) {
+    auto name = "$_" + llvm::Twine(n);
+    // Remove the last number (if any)
+    if (newName.size() > originalNameSize) {
+      newName.truncate(originalNameSize);
+    }
+    // Add the new number
+    name.toVector(newName);
+  };
+  unsigned int n = 1;
+  format(n);
+  for (; seen.contains(newName); n++, format(n)) {
+  }
+  seen.insert(newName);
+  return newName.str().str();
 }

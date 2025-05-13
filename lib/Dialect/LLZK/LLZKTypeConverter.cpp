@@ -107,25 +107,33 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
 
   // Conversions from ZML to LLZK
 
-  addConversion([&](zml::ComponentLike t) -> Type {
+  addConversion([&](zml::ComplexComponentType t) -> Type {
     auto convertedAttrs = convertParamAttrs(t.getParams(), *this);
     return llzk::component::StructType::get(
         t.getName(), ArrayAttr::get(t.getContext(), convertedAttrs)
     );
   });
 
-  addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
-    if (extValBuiltins.find(t.getName().getValue()) != extValBuiltins.end() && t.getBuiltin()) {
-      return createArrayRepr(t.getContext());
-    }
-    return std::nullopt;
+  // addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
+  //   if (extValBuiltins.find(t.getName().getValue()) != extValBuiltins.end() && t.getBuiltin()) {
+  //     return createArrayRepr(t.getContext());
+  //   }
+  //   return std::nullopt;
+  // });
+
+  addConversion([&](zml::ExtValType t) { return createArrayRepr(t.getContext()); });
+
+  addConversion([&](zml::RootType t) {
+    Builder builder(t.getContext());
+    return llzk::component::StructType::get(t.getName(), builder.getArrayAttr({}));
   });
 
-  addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
+  addConversion([&](zml::ComplexComponentType t) -> std::optional<Type> {
     if (t.getName().getValue() != "Array") {
       return std::nullopt;
     }
     LLVM_DEBUG(llvm::dbgs() << "addConversion: " << t << "\n");
+    llvm::dbgs() << "addConversion: " << t << "\n";
     assert(t.getParams().size() == 2);
     auto typeAttr = t.getParams()[0];
     auto sizeAttr = t.getParams()[1];
@@ -141,20 +149,20 @@ llzk::LLZKTypeConverter::LLZKTypeConverter(const ff::FieldData &Field)
     return ArrayType::get(inner, dims);
   });
 
-  addConversion([](zml::ComponentLike t) -> std::optional<Type> {
-    if (t.getName().getValue() == "String") {
-      return llzk::string::StringType::get(t.getContext());
-    }
-    return std::nullopt;
-  });
+  // addConversion([](zml::ComponentLike t) -> std::optional<Type> {
+  //   if (t.getName().getValue() == "String") {
+  //     return llzk::string::StringType::get(t.getContext());
+  //   }
+  //   return std::nullopt;
+  // });
 
-  addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
-    if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
-        t.getBuiltin()) {
-      return FeltType::get(t.getContext());
-    }
-    return std::nullopt;
-  });
+  // addConversion([&](zml::ComponentLike t) -> std::optional<Type> {
+  //   if (feltEquivalentTypes.find(t.getName().getValue()) != feltEquivalentTypes.end() &&
+  //       t.getBuiltin()) {
+  //     return FeltType::get(t.getContext());
+  //   }
+  //   return std::nullopt;
+  // });
 
   addConversion([&](zml::VarArgsType t) {
     std::vector<int64_t> shape = {ShapedType::kDynamic};

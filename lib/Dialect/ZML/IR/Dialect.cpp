@@ -28,11 +28,11 @@
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h> // IWYU pragma: keep
+#include <zklang/Dialect/ZML/IR/TypeInterfaces.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
 
 // TableGen'd implementation files
 #include <zklang/Dialect/ZML/IR/Dialect.cpp.inc>
-#include <zklang/Dialect/ZML/IR/TypeInterfaces.h>
-#include <zklang/Dialect/ZML/Typing/Materialize.h>
 
 // Need a complete declaration of storage classes
 #define GET_TYPEDEF_CLASSES
@@ -40,7 +40,10 @@
 #define GET_ATTRDEF_CLASSES
 #include <zklang/Dialect/ZML/IR/Attrs.cpp.inc>
 
-auto zml::ZMLDialect::initialize() -> void {
+using namespace zml;
+using namespace mlir;
+
+auto ZMLDialect::initialize() -> void {
   // clang-format off
   addOperations<
     #define GET_OP_LIST
@@ -58,8 +61,6 @@ auto zml::ZMLDialect::initialize() -> void {
   >();
   // clang-format on
 
-  llvm::outs() << "About to declare the things that implement interfaces!\n";
-
   declarePromisedInterface<llzk::component::StructDefOp, DefinesBodyFunc>();
   declarePromisedInterface<llzk::component::StructDefOp, DefinesConstrainFunc>();
   declarePromisedInterface<llzk::component::StructDefOp, ComponentInterface>();
@@ -69,9 +70,9 @@ auto zml::ZMLDialect::initialize() -> void {
   declarePromisedInterface<llzk::polymorphic::TypeVarType, ComponentLike>();
 }
 
-using namespace mlir;
-
-namespace zml {
+//===----------------------------------------------------------------------===//
+// FixedTypeBindingAttr
+//===----------------------------------------------------------------------===//
 
 FixedTypeBindingAttr FixedTypeBindingAttr::get(
     MLIRContext *ctx, const zhl::TypeBinding &binding, const zhl::TypeBindings &bindings
@@ -114,27 +115,12 @@ FixedTypeBindingAttr FixedTypeBindingAttr::get(
 
   return Base::get(
       ctx, Type, Name, GenericParams, Members, CtorType, ParamLocs, SuperType, ConstExpr,
-      binding.isBuiltin()
+      binding.isBuiltin(), binding.isExtern()
   );
 }
 
-// Operation *
-// ZMLDialect::materializeConstant(OpBuilder &builder, Attribute attr, Type type, Location loc) {
-// if (auto intAttr = mlir::dyn_cast<IntegerAttr>(attr)) {
-//   if (isa<ComponentType>(type)) {
-//     return builder.create<LitValOp>(loc, ComponentType::Val(builder.getContext()), intAttr);
-//   }
-//
-//   if (isa<IndexType>(type)) {
-//     return builder.create<arith::ConstantIndexOp>(loc, intAttr.getInt());
-//   }
-// }
-// if (auto arrayAttr = mlir::dyn_cast<DenseI64ArrayAttr>(attr)) {
-//   return builder.create<LitValArrayOp>(loc, type, arrayAttr);
-// }
-
-//   assert(false && "TODO");
-//   return nullptr;
-// }
-
-} // namespace zml
+SmallVector<StringRef> FixedTypeBindingAttr::getGenericParamNames() const {
+  return llvm::map_to_vector(getGenericParams(), [](auto param) {
+    return param.getName().getValue();
+  });
+}

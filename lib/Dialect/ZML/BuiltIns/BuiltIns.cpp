@@ -12,13 +12,16 @@
 #include <llvm/ADT/TypeSwitch.h>
 #include <llzk/Dialect/Array/IR/Types.h>
 #include <llzk/Dialect/Felt/IR/Types.h>
+#include <llzk/Dialect/Function/IR/Ops.h>
 #include <llzk/Dialect/Polymorphic/IR/Types.h>
 #include <llzk/Dialect/String/IR/Types.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <llzk/Dialect/Struct/IR/Types.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/Types.h>
 #include <mlir/IR/ValueRange.h>
@@ -50,7 +53,7 @@ ComponentLike zml::builtins::ExtVal(mlir::MLIRContext *ctx) { return ExtValType:
 ComponentLike zml::builtins::Component(mlir::MLIRContext *ctx) { return RootType::get(ctx); }
 
 ComponentLike
-zml::builtins::Array(ComponentLike inner, mlir::Attribute size, const mlir::TypeConverter &tc) {
+zml::builtins::Array(mlir::Type inner, mlir::Attribute size, const mlir::TypeConverter &tc) {
   // If the inner type is another array we need to combine them
   if (auto innerArr = mlir::dyn_cast<llzk::array::ArrayType>(inner)) {
     auto actualInner = innerArr.getElementType();
@@ -64,7 +67,7 @@ zml::builtins::Array(ComponentLike inner, mlir::Attribute size, const mlir::Type
   return mlir::cast<ComponentLike>(llzk::array::ArrayType::get(dest, {size}));
 }
 
-static mlir::Location getLocationForBuiltin(mlir::OpBuilder &builder, mlir::StringRef name) {
+static mlir::Location getLocationForBuiltin(mlir::Builder &builder, mlir::StringRef name) {
   mlir::Twine filename = "<builtin " + name + ">";
   return mlir::Location(
       mlir::FileLineColLoc::get(builder.getContext(), builder.getStringAttr(filename), 0, 0)
@@ -73,29 +76,23 @@ static mlir::Location getLocationForBuiltin(mlir::OpBuilder &builder, mlir::Stri
 
 ComponentBuilder &builtinCommon(ComponentBuilder &builder) { return builder.isBuiltin(); }
 
-ComponentBuilder &selfConstructs(ComponentBuilder &builder, mlir::Type type, mlir::StringRef name) {
-  return builder.fillBody(
-      {type}, {type},
-      [type, name](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
+ComponentBuilder &selfConstructs(
+    ComponentBuilder &builder, mlir::Type type, mlir::Type structType, mlir::StringRef name
+) {
+  mlir::Builder mlirBuilder(type.getContext());
+  return builder.location(getLocationForBuiltin(mlirBuilder, name))
+      .fillBody(
+          {type}, {structType},
+          [structType,
+           name](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
     mlir::Location loc = getLocationForBuiltin(bldr, name);
     // Reference to self
-    auto self = bldr.create<SelfOp>(loc, type);
-    // Construct Component superType
-    mlir::FunctionType constructor =
-        bldr.getFunctionType({}, nullptr /*ComponentType::Component(bldr.getContext())*/);
-    auto ref = bldr.create<ConstructorRefOp>(
-        loc, mlir::SymbolRefAttr::get(bldr.getStringAttr("Component")), constructor,
-        /*isBuiltin=*/true
-    );
-    auto comp = bldr.create<mlir::func::CallIndirectOp>(loc, ref);
-    // Store the result
-    bldr.create<WriteFieldOp>(loc, self, "$super", comp.getResult(0));
-    auto super = bldr.create<ReadFieldOp>(loc, comp.getResultTypes().front(), self, "$super");
-    bldr.create<ConstrainCallOp>(loc, super, mlir::ValueRange());
+    auto self = bldr.create<component::CreateStructOp>(loc, structType);
+    bldr.create<component::FieldWriteOp>(loc, self, "$super", args[0]);
     // Return self
-    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({args[0]}));
+    bldr.create<function::ReturnOp>(loc, mlir::ValueRange({self}));
   }
-  );
+      );
 }
 
 template <typename OpTy>
@@ -105,15 +102,16 @@ void addBinOpCommon(
 ) {
   auto componentType = ComplexComponentType::get(builder.getContext(), name, superType, true);
 
+  mlir::Location loc = getLocationForBuiltin(builder, name);
   builtinCommon(
       ComponentBuilder()
           .name(name)
           .field("$super", superType)
+          .location(loc)
           .fillBody(
               {superType, superType}, {componentType},
               [&superType, &componentType,
-               name](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
-    mlir::Location loc = getLocationForBuiltin(bldr, name);
+               &loc](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
@@ -143,15 +141,16 @@ void addUnaryOpCommon(
 ) {
   auto componentType = ComplexComponentType::get(builder.getContext(), name, superType, true);
 
+  mlir::Location loc = getLocationForBuiltin(builder, name);
   builtinCommon(
       ComponentBuilder()
           .name(name)
           .field("$super", superType)
+          .location(loc)
           .fillBody(
               {superType}, {componentType},
               [&superType, &componentType,
-               name](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
-    mlir::Location loc = getLocationForBuiltin(bldr, name);
+               &loc](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
@@ -178,15 +177,16 @@ void addExtUnaryOp(mlir::OpBuilder &builder, const mlir::TypeConverter &TC, mlir
 void addInRange(mlir::OpBuilder &builder, const mlir::TypeConverter &TC) {
   auto superType = Val(builder);
   auto componentType = ComplexComponentType::get(builder.getContext(), "InRange", superType, true);
+  mlir::Location loc = getLocationForBuiltin(builder, componentType.getName().getValue());
   builtinCommon(
       ComponentBuilder()
           .name(componentType.getName().getValue())
+          .location(loc)
           .field("$super", superType)
           .fillBody(
               {superType, superType, superType}, {componentType},
-              [&superType,
-               &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
-    mlir::Location loc = getLocationForBuiltin(bldr, componentType.getName().getValue());
+              [&superType, &componentType,
+               &loc](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     // Do the computation
@@ -202,20 +202,26 @@ void addInRange(mlir::OpBuilder &builder, const mlir::TypeConverter &TC) {
 
 void addComponent(mlir::OpBuilder &builder, const mlir::TypeConverter &TC) {
   auto componentType = Component(builder);
-  mlir::SmallVector<mlir::Type> args;
+  auto convertedComponentType = TC.convertType(componentType);
 
-  builtinCommon(
-      ComponentBuilder()
-          .name(componentType.getName().getValue())
-          .fillBody(
-              args, {componentType},
-              [&componentType](mlir::ValueRange, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
-    mlir::Location loc = getLocationForBuiltin(bldr, componentType.getName().getValue());
-    auto op = bldr.create<SelfOp>(loc, componentType);
-    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({op}));
+  llvm::dbgs() << "convertedComponentType = " << convertedComponentType << "\n";
+  mlir::Location loc = getLocationForBuiltin(builder, componentType.getName().getValue());
+  auto c =
+      builtinCommon(
+          ComponentBuilder()
+              .name(componentType.getName().getValue())
+              .location(loc)
+              .fillBody(
+                  {}, {convertedComponentType},
+                  [&convertedComponentType,
+                   &loc](mlir::ValueRange, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
+    auto op = bldr.create<component::CreateStructOp>(loc, convertedComponentType);
+    bldr.create<function::ReturnOp>(loc, mlir::ValueRange({op}));
   }
-          )
-  ).build(builder, TC);
+              )
+      ).build(builder, TC);
+  llvm::dbgs() << "component = " << c << "\n";
+  llvm::dbgs() << "component.getType() = " << c.getType() << "\n";
 }
 
 void addNondetRegCommon(
@@ -223,23 +229,27 @@ void addNondetRegCommon(
     ComponentLike superType
 ) {
   auto componentType = ComplexComponentType::get(builder.getContext(), name, superType, true);
+  auto convertedSuperType = TC.convertType(superType);
+  auto convertedComponentType = TC.convertType(componentType);
+  mlir::Location loc = getLocationForBuiltin(builder, name);
   builtinCommon(
       ComponentBuilder()
           .name(name)
-          .field("$super", superType)
-          .field("reg", superType, true)
+          .field("$super", convertedSuperType)
+          .field("reg", convertedSuperType, /*isColumn=*/true)
+          .location(loc)
+          .constructorLocs({loc})
           .fillBody(
-              {superType}, {componentType},
-              [&componentType,
-               name](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
-    mlir::Location loc = getLocationForBuiltin(bldr, name);
+              {convertedSuperType}, {convertedComponentType},
+              [&convertedComponentType,
+               &loc](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
     // Reference to self
-    auto self = bldr.create<SelfOp>(loc, componentType);
-    bldr.create<WriteFieldOp>(loc, self, "reg", args[0]);
+    auto self = bldr.create<component::CreateStructOp>(loc, convertedComponentType);
+    bldr.create<component::FieldWriteOp>(loc, self, "reg", args[0]);
     // Store the result
-    bldr.create<WriteFieldOp>(loc, self, "$super", args[0]);
+    bldr.create<component::FieldWriteOp>(loc, self, "$super", args[0]);
     // Return self
-    bldr.create<mlir::func::ReturnOp>(loc, mlir::ValueRange({self}));
+    bldr.create<function::ReturnOp>(loc, mlir::ValueRange(self));
   }
           )
   ).build(builder, TC);
@@ -257,15 +267,16 @@ void addMakeExt(mlir::OpBuilder &builder, const mlir::TypeConverter &TC) {
   auto superType = ExtVal(builder);
   auto valType = Val(builder);
   auto componentType = ComplexComponentType::get(builder.getContext(), "MakeExt", superType, true);
+  mlir::Location loc = getLocationForBuiltin(builder, componentType.getName().getValue());
   builtinCommon(
       ComponentBuilder()
           .name(componentType.getName().getValue())
           .field("$super", superType)
+          .location(loc)
           .fillBody(
               {valType}, {componentType},
-              [&superType,
-               &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
-    mlir::Location loc = getLocationForBuiltin(bldr, componentType.getName().getValue());
+              [&superType, &componentType,
+               &loc](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     auto ext = bldr.create<MakeExtOp>(loc, superType, args[0]);
@@ -283,15 +294,16 @@ void addEqzExt(mlir::OpBuilder &builder, const mlir::TypeConverter &TC) {
   auto valType = ExtVal(builder);
 
   auto componentType = ComplexComponentType::get(builder.getContext(), "EqzExt", superType, true);
+  mlir::Location loc = getLocationForBuiltin(builder, componentType.getName().getValue());
   builtinCommon(
       ComponentBuilder()
           .name(componentType.getName().getValue())
           .field("$super", superType)
+          .location(loc)
           .fillBody(
               {valType}, {componentType},
-              [&superType,
-               &componentType](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
-    mlir::Location loc = getLocationForBuiltin(bldr, componentType.getName().getValue());
+              [&superType, &componentType,
+               &loc](mlir::ValueRange args, mlir::OpBuilder &bldr, const mlir::TypeConverter &) {
     // Reference to self
     auto self = bldr.create<SelfOp>(loc, componentType);
     bldr.create<EqzExtOp>(loc, args[0]);
@@ -311,12 +323,12 @@ void addEqzExt(mlir::OpBuilder &builder, const mlir::TypeConverter &TC) {
 void addTrivial(
     mlir::OpBuilder &builder, const mlir::TypeConverter &TC, ComponentLike componentType
 ) {
-  auto superType = Component(builder.getContext());
   selfConstructs(
-      builtinCommon(
-          ComponentBuilder().name(componentType.getName().getValue()).field("$super", superType)
-      ),
-      componentType, componentType.getName().getValue()
+      builtinCommon(ComponentBuilder()
+                        .name(componentType.getName().getValue())
+                        .field("$super", TC.convertType(componentType))),
+      TC.convertType(componentType), component::StructType::get(componentType.getName()),
+      componentType.getName().getValue()
   )
       .build(builder, TC);
 }
@@ -325,12 +337,10 @@ constexpr mlir::StringRef ARRAY_TYPE_PARAM = "T";
 constexpr mlir::StringRef ARRAY_SIZE_PARAM = "N";
 
 void addArrayComponent(mlir::OpBuilder &builder, const mlir::TypeConverter &tc) {
-  auto innerType = mlir::cast<ComponentLike>(llzk::polymorphic::TypeVarType::get(
-      mlir::FlatSymbolRefAttr::get(builder.getStringAttr(ARRAY_TYPE_PARAM))
-  ));
+  auto typeParam = mlir::FlatSymbolRefAttr::get(builder.getStringAttr(ARRAY_TYPE_PARAM));
+  auto innerType = llzk::polymorphic::TypeVarType::get(typeParam);
   auto sizeAttr = mlir::FlatSymbolRefAttr::get(builder.getStringAttr(ARRAY_SIZE_PARAM));
   auto componentType = Array(innerType, sizeAttr, tc);
-  auto superType = Component(builder.getContext());
 
   selfConstructs(
       builtinCommon(ComponentBuilder()
@@ -338,8 +348,12 @@ void addArrayComponent(mlir::OpBuilder &builder, const mlir::TypeConverter &tc) 
                         .forceGeneric()
                         .typeParam(ARRAY_TYPE_PARAM)
                         .typeParam(ARRAY_SIZE_PARAM)
-                        .field("$super", superType)),
-      componentType, componentType.getName().getValue()
+                        .field("$super", componentType)),
+      componentType,
+      component::StructType::get(
+          componentType.getName(), builder.getArrayAttr({typeParam, sizeAttr})
+      ),
+      componentType.getName().getValue()
   )
       .build(builder, tc);
 }
@@ -462,26 +476,26 @@ void zml::addBuiltins(
   assert(definedNames.find("ExtVal") == definedNames.end() && "Can't redefine ExtVal type");
   assert(definedNames.find("String") == definedNames.end() && "Can't redefine String type");
   assert(definedNames.find("Array") == definedNames.end() && "Can't redefine Array type");
-  addTrivial(builder, tc, Val(builder));
-  addTrivial(builder, tc, ExtVal(builder));
-  addTrivial(builder, tc, String(builder));
-  addArrayComponent(builder, tc);
+  // addTrivial(builder, tc, Val(builder));
+  // addTrivial(builder, tc, ExtVal(builder));
+  // addTrivial(builder, tc, String(builder));
+  // addArrayComponent(builder, tc);
 
   MAYBE("NondetReg") { addNondetReg(builder, tc); }
   MAYBE("NondetExtReg") { addNondetExtReg(builder, tc); }
-  MAYBE("MakeExt") { addMakeExt(builder, tc); }
-  MAYBE("EqzExt") { addEqzExt(builder, tc); }
-  MAYBE("InRange") { addInRange(builder, tc); }
-  MAYBE("BitAnd") { addBinOp<BitAndOp>(builder, tc, "BitAnd"); }
-  MAYBE("Add") { addBinOp<AddOp>(builder, tc, "Add"); }
-  MAYBE("Sub") { addBinOp<SubOp>(builder, tc, "Sub"); }
-  MAYBE("Mul") { addBinOp<MulOp>(builder, tc, "Mul"); }
-  MAYBE("ExtAdd") { addExtBinOp<ExtAddOp>(builder, tc, "ExtAdd"); }
-  MAYBE("ExtSub") { addExtBinOp<ExtSubOp>(builder, tc, "ExtSub"); }
-  MAYBE("ExtMul") { addExtBinOp<ExtMulOp>(builder, tc, "ExtMul"); }
-  MAYBE("Mod") { addBinOp<ModOp>(builder, tc, "Mod"); }
-  MAYBE("Inv") { addUnaryOp<InvOp>(builder, tc, "Inv"); }
-  MAYBE("ExtInv") { addExtUnaryOp<ExtInvOp>(builder, tc, "ExtInv"); }
-  MAYBE("Isz") { addUnaryOp<IsZeroOp>(builder, tc, "Isz"); }
-  MAYBE("Neg") { addUnaryOp<NegOp>(builder, tc, "Neg"); }
+  // MAYBE("MakeExt") { addMakeExt(builder, tc); }
+  // MAYBE("EqzExt") { addEqzExt(builder, tc); }
+  // MAYBE("InRange") { addInRange(builder, tc); }
+  // MAYBE("BitAnd") { addBinOp<BitAndOp>(builder, tc, "BitAnd"); }
+  // MAYBE("Add") { addBinOp<AddOp>(builder, tc, "Add"); }
+  // MAYBE("Sub") { addBinOp<SubOp>(builder, tc, "Sub"); }
+  // MAYBE("Mul") { addBinOp<MulOp>(builder, tc, "Mul"); }
+  // MAYBE("ExtAdd") { addExtBinOp<ExtAddOp>(builder, tc, "ExtAdd"); }
+  // MAYBE("ExtSub") { addExtBinOp<ExtSubOp>(builder, tc, "ExtSub"); }
+  // MAYBE("ExtMul") { addExtBinOp<ExtMulOp>(builder, tc, "ExtMul"); }
+  // MAYBE("Mod") { addBinOp<ModOp>(builder, tc, "Mod"); }
+  // MAYBE("Inv") { addUnaryOp<InvOp>(builder, tc, "Inv"); }
+  // MAYBE("ExtInv") { addExtUnaryOp<ExtInvOp>(builder, tc, "ExtInv"); }
+  // MAYBE("Isz") { addUnaryOp<IsZeroOp>(builder, tc, "Isz"); }
+  // MAYBE("Neg") { addUnaryOp<NegOp>(builder, tc, "Neg"); }
 }

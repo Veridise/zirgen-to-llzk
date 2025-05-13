@@ -112,7 +112,8 @@ def FixedTypeBinding : ZMLAttr<"FixedTypeBinding", "binding", [TypedAttrInterfac
   ArrayRefParameter<"mlir::LocationAttr">:$paramLocs,
   OptionalParameter<"zml::FixedTypeBindingAttr">:$superType,
   OptionalParameter<"mlir::Attribute">:$constExpr,
-    "bool":$builtin
+    "bool":$builtin,
+  "bool":$externComponent
   );
 
   let assemblyFormat = "`<` struct(params) `>`";
@@ -120,4 +121,9 @@ def FixedTypeBinding : ZMLAttr<"FixedTypeBinding", "binding", [TypedAttrInterfac
   let builders = [
     AttrBuilder<(ins "const zhl::TypeBinding &":$typeBinding, "const zhl::TypeBindings &":$bindings)>
   ];
+
+  let extraClassDeclaration = [{
+    mlir::SmallVector<mlir::StringRef> getGenericParamNames() const;
+
+  }];
 }

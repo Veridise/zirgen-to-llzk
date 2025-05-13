@@ -14,13 +14,31 @@
 
 #pragma once
 
+#include <memory>
 #include <mlir/IR/Builders.h>
+#include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/FiniteFields/Field.h>
 
 namespace zml {
 
 namespace extval {
+
+class BaseConverter;
+
+struct LoadedConverter {
+  std::unique_ptr<ff::FieldData> field;
+  std::unique_ptr<BaseConverter> converter;
+  std::unique_ptr<mlir::TypeConverter> typeConverter;
+};
+
+/// Setups instances of a TypeConverter and a BaseConverter based on the given field by name.
+/// If the field name is not valid returns failure().
+/// Additionally uses emitError to emit an error.
+mlir::FailureOr<LoadedConverter> loadConversionByFieldName(
+    mlir::StringRef name, llvm::function_ref<mlir::InFlightDiagnostic()> emitError
+);
 
 /// This interface exposes the logic for representing extending finite field elements for a
 /// particular field.

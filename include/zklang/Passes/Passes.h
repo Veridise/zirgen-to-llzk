@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <llzk/Dialect/Function/IR/Dialect.h>
 #include <llzk/Dialect/LLZK/IR/Dialect.h>
 #include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -29,10 +30,12 @@ namespace zklang {
 template <typename Op> using OpPass = std::unique_ptr<mlir::OperationPass<Op>>;
 
 OpPass<mlir::ModuleOp> createStripTestsPass();
-OpPass<mlir::ModuleOp> createTypecheckZhlPass();
+OpPass<mlir::ModuleOp> createAnnotateTypecheckZhlPass();
+OpPass<mlir::ModuleOp> createConvertZhlToLlzkStructPass();
 OpPass<mlir::ModuleOp> createConvertZhlToZmlPass();
 OpPass<mlir::ModuleOp> createConvertZmlToLlzkPass();
 OpPass<mlir::ModuleOp> createInjectLlzkModAttrsPass();
+OpPass<mlir::ModuleOp> createInstantiatePODBlocksPass();
 
 // Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

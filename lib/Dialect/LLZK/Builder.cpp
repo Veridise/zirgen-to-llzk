@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/Builders.h>
@@ -63,11 +64,7 @@ ComponentBuilder &ComponentBuilder::typeParam(StringRef param) {
 }
 
 ComponentBuilder &ComponentBuilder::attrs(ArrayRef<NamedAttribute> attrs) {
-  ctx.compAttrs = llvm::map_to_vector(attrs, [](NamedAttribute attr) {
-    auto *ctx = attr.getName().getContext();
-    attr.setName(StringAttr::get(ctx, "zml." + attr.getName().getValue()));
-    return attr;
-  });
+  ctx.compAttrs = SmallVector<NamedAttribute>(attrs);
   return *this;
 }
 
@@ -94,6 +91,10 @@ ComponentBuilder &ComponentBuilder::location(Location loc) {
 ComponentBuilder &
 ComponentBuilder::constructor(FunctionType constructorType, ArrayRef<Location> argLocs) {
   ctx.constructorType = constructorType;
+  return constructorLocs(argLocs);
+}
+
+ComponentBuilder &ComponentBuilder::constructorLocs(ArrayRef<Location> argLocs) {
   ctx.argLocs = SmallVector<Location>(argLocs);
   return *this;
 }
@@ -199,7 +200,7 @@ ComponentBuilder::type ComponentBuilder::Ctx::buildBare(OpBuilder &builder) {
 
   auto params = builder.getArrayAttr(llvm::map_to_vector(
       isGeneric() ? typeParams : ArrayRef<Identifier>(),
-      [&builder](auto &s) -> Attribute { return builder.getStringAttr(s); }
+      [&builder](auto &s) -> Attribute { return FlatSymbolRefAttr::get(builder.getStringAttr(s)); }
   )
 
   );
@@ -256,7 +257,10 @@ static void fillFunc(
   OpBuilder::InsertionGuard insertionGuard(builder);
   auto *entryBlock = func.addEntryBlock();
   builder.setInsertionPointToStart(entryBlock);
-  entryBlock->addArguments(type.getInputs(), argLocs);
+  for (auto [n, argLoc] : llvm::enumerate(argLocs)) {
+    assert(n <= std::numeric_limits<unsigned int>::max());
+    entryBlock->getArgument(static_cast<unsigned int>(n)).setLoc(argLoc);
+  }
 
   fill(func.getArguments(), builder, tc);
 }
@@ -327,19 +331,25 @@ void ComponentBuilder::TakeRegion::set(
     type op, Ctx &buildCtx, OpBuilder &builder, const TypeConverter &tc
 ) const {
 
+  llvm::dbgs() << "Before\n";
   auto comp = cast<zml::ComponentInterface>(op.getOperation());
+  llvm::dbgs() << "After\n";
   assert(buildCtx.constructorType);
   assert(body);
+  llvm::dbgs() << "Preparing fn types\n";
   prepareFnTypes(buildCtx.constructorType, buildCtx.constructorType, buildCtx.constrainFnType, tc);
 
   Region constrainBody;
   IRMapping mapper;
+  llvm::dbgs() << "Cloning region\n";
   // Create a copy of the body to give to the constrain function.
   // Necessary since the we move the region.
   body->cloneInto(&constrainBody, mapper);
 
   auto loc = buildCtx.loc.value_or(op.getLoc());
+  llvm::dbgs() << "extracting the component's type\n";
   auto zmlType = comp.getType();
+  llvm::dbgs() << "zmlType = " << zmlType << "\n";
   auto llzkType = tc.convertType(zmlType);
   auto attrs = buildCtx.funcBodyAttrs(builder);
 
@@ -347,20 +357,28 @@ void ComponentBuilder::TakeRegion::set(
   SmallVector<Location> ctorLocs, constrainLocs;
   prepareArgLocs(builder, ctorArgsCount, buildCtx.argLocs, loc, ctorLocs, constrainLocs);
 
-  auto filler = [location = loc, zmlType,
-                 llzkType](Region *region, ValueRange, OpBuilder &B, const TypeConverter &) {
+  auto filler =
+      [location = loc, zmlType,
+       llzkType](Region *region, bool returnStruct, ValueRange, OpBuilder &B, const TypeConverter &) {
     auto zmlSelf = B.create<zml::SelfOp>(location, zmlType, *region);
-    auto llzkSelf = B.create<UnrealizedConversionCastOp>(location, llzkType, zmlSelf.getResult());
-    B.create<function::ReturnOp>(location, ValueRange({llzkSelf.getResult(0)}));
+    if (returnStruct) {
+      auto llzkSelf = B.create<UnrealizedConversionCastOp>(location, llzkType, zmlSelf.getResult());
+      B.create<function::ReturnOp>(location, ValueRange(llzkSelf.getResults()));
+    } else {
+
+      B.create<function::ReturnOp>(location, ValueRange());
+    }
   };
 
+  llvm::dbgs() << "Filling compute for " << comp.getName() << "\n";
   fillFunc(
       builder, tc, loc, comp.getBodyFuncName(), buildCtx.constructorType, attrs, ctorLocs,
-      std::bind_front(filler, body)
+      std::bind_front(filler, body, true)
   );
 
+  llvm::dbgs() << "Filling constrain for " << comp.getName() << "\n";
   fillFunc(
       builder, tc, loc, comp.getConstrainFuncName(), buildCtx.constrainFnType, attrs, constrainLocs,
-      std::bind_front(filler, &constrainBody)
+      std::bind_front(filler, &constrainBody, false)
   );
 }

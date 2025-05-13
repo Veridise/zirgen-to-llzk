@@ -189,15 +189,16 @@ void Driver::configureLoweringPipeline() {
     return;
   }
 
-  if (emitAction >= Action::PrintLlzk || emitAction == Action::None) {
-    pm.addPass(zklang::createInjectLlzkModAttrsPass());
-  }
+  pm.addPass(zklang::createInjectLlzkModAttrsPass());
   pm.addPass(zklang::createStripTestsPass());
-  pm.addPass(zklang::createTypecheckZhlPass());
+  pm.addPass(zml::createInjectBuiltInsPass());
+  // pm.addPass(zklang::createInstantiatePODBlocksPass());
+  pm.addPass(zklang::createAnnotateTypecheckZhlPass());
+  // TODO: Move this pass past Action::PrintZHLT
+  pm.addPass(zklang::createConvertZhlToLlzkStructPass());
   if (emitAction == Action::PrintZHLT) {
     return;
   }
-  pm.addPass(zml::createInjectBuiltInsPass());
   pm.addPass(zklang::createConvertZhlToZmlPass());
   if (!DisableCastReconciliationFlag) {
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());

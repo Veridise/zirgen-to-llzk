@@ -19,6 +19,9 @@
 #include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/Support/LogicalResult.h>
+#include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
+#include <zklang/Dialect/ZML/BuiltIns/BuiltIns.h>
 #include <zklang/Dialect/ZML/IR/Dialect.h>
 #include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/TypeInterfaces.h>
@@ -46,13 +49,12 @@ struct StructDefDefinesConstrainFuncInterfaceImpl
 
 struct StructDefComponentInterfaceImpl
     : public ComponentInterface::ExternalModel<StructDefComponentInterfaceImpl, StructDefOp> {
-  Type getType(Operation *) const {
-    assert(false && "TODO");
-    return nullptr;
-  }
-  FailureOr<Type> getSuperType(Operation *) const {
-    assert(false && "TODO");
-    return failure();
+
+  /// Returns the type this struct defines. Needs to return a ComponentLike compatible type.
+  Type getType(Operation *op) const { return getTypeImpl(llvm::cast<StructDefOp>(op)); }
+
+  FailureOr<Type> getSuperType(Operation *op) const {
+    return getSuperTypeImpl(llvm::cast<StructDefOp>(op));
   }
   FailureOr<Type> lookupFieldType(Operation *, FlatSymbolRefAttr) const {
     assert(false && "TODO");
@@ -75,13 +77,67 @@ struct StructDefComponentInterfaceImpl
     assert(false && "TODO");
     return false;
   }
-  FlatSymbolRefAttr getSuperFieldName(Operation *) const {
-    assert(false && "TODO");
-    return nullptr;
+  FlatSymbolRefAttr getSuperFieldName(Operation *op) const {
+    return FlatSymbolRefAttr::get(getSuperFieldNameImpl(mlir::cast<StructDefOp>(op)));
   }
 
 private:
+  Type getTypeImpl(StructDefOp op) const {
+    llvm::dbgs() << "getTypeImpl for " << op.getName() << "\n";
+    if (isRootImpl(op)) {
+      llvm::dbgs() << "is the root component\n";
+      return zml::builtins::Component(op.getContext());
+    }
+
+    Builder builder(op.getContext());
+    auto superType = getSuperTypeImpl(op);
+    if (failed(superType)) {
+      llvm::dbgs() << "super type extraction failed!!!!\n";
+    }
+    llvm::dbgs() << "creating component\n";
+    auto name = FlatSymbolRefAttr::get(builder.getStringAttr(op.getName()));
+    llvm::dbgs() << "  with name = " << name << "\n";
+    auto super = mlir::cast<ComponentLike>(*superType);
+    llvm::dbgs() << "  with super = " << super << "\n";
+    auto params = op.getConstParams().value_or(builder.getArrayAttr({}));
+    llvm::dbgs() << "  with params = " << params << "\n";
+    return ComplexComponentType::get(
+        name, super, params.getValue(), op->getAttr("zml.builtin") != nullptr
+    );
+  }
+
+  FailureOr<Type> getSuperTypeImpl(StructDefOp op) const {
+    auto name = getSuperFieldNameImpl(op);
+    auto field = op.getFieldDef(name);
+    if (!field) {
+      return op->emitError() << "field '" << name << "' not found in struct '" << op.getName()
+                             << "'";
+    }
+
+    if (mlir::isa<ComponentLike>(field.getType())) {
+      return field.getType();
+    }
+
+    if (auto structType = mlir::dyn_cast<StructType>(field.getType())) {
+      auto mod = op.getParentOp();
+      SymbolTableCollection st;
+      auto def = structType.getDefinition(st, mod);
+      if (failed(def)) {
+        return field.emitError() << "definition of field type " << structType << " not found";
+      }
+
+      return getTypeImpl(**def);
+    }
+    return field.emitError() << "field type " << field.getType()
+                             << " is not supported by the ComponentInterface interface";
+  }
+
   bool isRootImpl(StructDefOp op) const { return op.getName() == "Component"; }
+
+  StringAttr getSuperFieldNameImpl(StructDefOp op) const {
+    Builder builder(op.getContext());
+    return builder.getStringAttr("$super");
+  }
 };
 
 struct FeltComponentLikeImpl
@@ -138,12 +194,18 @@ struct ArrayComponentLikeImpl
   FlatSymbolRefAttr getName(Type type) const {
     return FlatSymbolRefAttr::get(StringAttr::get(type.getContext(), "Array"));
   }
-  // Type getSuperType(Type type) const { return RootType::get(type.getContext()); }
+
   ArrayRef<Attribute> getParams(Type t) const {
     auto arr = mlir::cast<ArrayType>(t);
     // Since zirgen arrays are different from llzk arrays we need to do a bit of different logic.
-    assert(false && "TODO");
-    return {};
+    Type inner;
+    if (arr.getDimensionSizes().size() == 1) {
+      inner = arr.getElementType();
+    } else {
+      inner = ArrayType::get(arr.getElementType(), arr.getDimensionSizes().drop_front());
+    }
+    Builder builder(t.getContext());
+    return builder.getArrayAttr({TypeAttr::get(inner), arr.getDimensionSizes().front()});
   }
   bool getBuiltin(Type) const { return true; }
 
