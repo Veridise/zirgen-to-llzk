@@ -435,9 +435,9 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     }
     os << ") ";
     os << "}";
-    if (!members.empty()) {
+    if (!getMembers().empty()) {
       os << " members { ";
-      llvm::interleaveComma(members, os, [&](auto &member) {
+      llvm::interleaveComma(getMembers(), os, [&](auto &member) {
         os << member.getKey() << ": ";
         auto &type = member.getValue();
         if (type.has_value()) {
@@ -474,14 +474,15 @@ bool TypeBinding::operator==(const TypeBinding &other) const {
   }
 
   return superTypeIsEqual && flags == other.flags && name == other.name &&
-         constExpr == other.constExpr && members == other.members &&
+         constExpr == other.constExpr && getMembers() == other.getMembers() &&
          getGenericParamsMapping() == other.getGenericParamsMapping() &&
          getConstructorParams() == other.getConstructorParams();
 }
 
 FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef memberName) const {
-  auto it = members.find(memberName);
-  if (it != members.end()) {
+  const auto &membersMap = getMembers();
+  auto it = membersMap.find(memberName);
+  if (it != membersMap.end()) {
     return it->second;
   }
   if (superType != nullptr) {
@@ -504,6 +505,23 @@ TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(const Pa
 }
 TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMap &&map) {
   set(ParamsStorage(map));
+  return *this;
+}
+
+//==-----------------------------------------------------------------------==//
+// TypeBinding::MembersMapFactory
+//==-----------------------------------------------------------------------==//
+
+std::shared_ptr<MembersMap> TypeBinding::MembersMapFactory::init() {
+  return std::make_shared<MembersMap>();
+}
+
+TypeBinding::MembersMapPtr &TypeBinding::MembersMapPtr::operator=(const MembersMap &map) {
+  set(map);
+  return *this;
+}
+TypeBinding::MembersMapPtr &TypeBinding::MembersMapPtr::operator=(MembersMap &&map) {
+  set(map);
   return *this;
 }
 

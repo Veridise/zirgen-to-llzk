@@ -74,6 +74,18 @@ private:
     ParamsStoragePtr &operator=(ParamsMap &&);
   };
 
+  struct MembersMapFactory {
+    /// Initializes empty storage
+    static std::shared_ptr<MembersMap> init();
+  };
+
+  struct MembersMapPtr : public zklang::COW<MembersMap, MembersMapFactory> {
+    using zklang::COW<MembersMap, MembersMapFactory>::COW;
+
+    MembersMapPtr &operator=(const MembersMap &);
+    MembersMapPtr &operator=(MembersMap &&);
+  };
+
 public:
   //==---------------------------------------------------------------------==//
   // Type binding name
@@ -400,10 +412,10 @@ public:
   //==---------------------------------------------------------------------==//
 
   /// Returns a constant reference to the members defined in the type binding.
-  const MembersMap &getMembers() const { return members; }
+  const MembersMap &getMembers() const { return *members; }
 
   /// Returns a reference to the members defined in the type binding.
-  MembersMap &getMembersMut() { return members; }
+  MembersMap &getMembersMut() { return *members; }
 
   /// Attempts to find an accesible member of the type binding by name. Returns failure if the
   /// member is not public or it doesn't exist.
@@ -575,7 +587,7 @@ private:
   mlir::Location loc;
   expr::ConstExpr constExpr;
   const TypeBinding *superType;
-  MembersMap members;
+  MembersMapPtr members;
   ParamsStoragePtr genericParams;
   ParamsStoragePtr constructorParams;
   Frame frame;
