@@ -105,6 +105,8 @@ public:
   inline bool operator==(const self &other) const { return ptr == other.ptr; }
 
 private:
+  /// @brief Duplicate the `other` pointer if it is not nullptr. Otherwise,
+  /// use the factory initializer for the default value.
   static inline pointer safeCopy(const pointer other) {
     return other ? std::make_shared<type>(*other) : Factory::init();
   }
