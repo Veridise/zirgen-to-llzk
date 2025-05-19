@@ -127,6 +127,23 @@ public:
 void zklang::populateZhlToLlzkStructConversionPatterns(
     const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns
 ) {
+  populateZhlComponentToLlzkStructConversionPatterns(tc, patterns);
+}
+
+void zklang::populateZhlToLlzkStructConversionTarget(mlir::ConversionTarget &target) {
+  populateZhlComponentToLlzkStructConversionTarget(target);
+}
+
+void zklang::populateZhlToLlzkStructConversionPatternsAndLegality(
+    const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns, mlir::ConversionTarget &target
+) {
+  populateZhlToLlzkStructConversionPatterns(tc, patterns);
+  populateZhlToLlzkStructConversionTarget(target);
+}
+
+void zklang::populateZhlComponentToLlzkStructConversionPatterns(
+    const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns
+) {
   patterns.add<
       // clang-format off
       LowerComponentToLlzkStruct, 
@@ -135,15 +152,15 @@ void zklang::populateZhlToLlzkStructConversionPatterns(
       >(tc, patterns.getContext());
 }
 
-void zklang::populateZhlToLlzkStructConversionTarget(mlir::ConversionTarget &target) {
+void zklang::populateZhlComponentToLlzkStructConversionTarget(mlir::ConversionTarget &target) {
   target.addLegalDialect<ZhlDialect, StructDialect, FunctionDialect, zml::ZMLDialect>();
   target.addIllegalOp<ComponentOp>();
   target.addLegalDialect<BuiltinDialect>();
 }
 
-void zklang::populateZhlToLlzkStructConversionPatternsAndLegality(
+void zklang::populateZhlComponentToLlzkStructConversionPatternsAndLegality(
     const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns, mlir::ConversionTarget &target
 ) {
-  populateZhlToLlzkStructConversionPatterns(tc, patterns);
-  populateZhlToLlzkStructConversionTarget(target);
+  populateZhlComponentToLlzkStructConversionPatterns(tc, patterns);
+  populateZhlComponentToLlzkStructConversionTarget(target);
 }

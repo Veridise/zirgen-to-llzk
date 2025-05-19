@@ -194,8 +194,10 @@ void Driver::configureLoweringPipeline() {
   pm.addPass(zml::createInjectBuiltInsPass());
   // pm.addPass(zklang::createInstantiatePODBlocksPass());
   pm.addPass(zklang::createAnnotateTypecheckZhlPass());
-  // TODO: Move this pass past Action::PrintZHLT
+  // TODO: Move these passes past Action::PrintZHLT
   pm.addPass(zklang::createConvertZhlToLlzkStructPass());
+  auto &structPm = pm.nest<llzk::component::StructDefOp>();
+  structPm.addPass(zklang::createConvertZhlToLlzkFeltPass());
   if (emitAction == Action::PrintZHLT) {
     return;
   }

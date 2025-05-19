@@ -61,6 +61,22 @@ def ConvertZhlToLlzkStruct
               "The field ExtVal types operate on (default: babybear)">];
 }
 
+def ConvertZhlToLlzkFelt
+    : Pass<"convert-zhl-to-llzk-felt", "llzk::component::StructDefOp"> {
+  let summary = "Converts ZHL operations into LLZK felt dialect operations.";
+  let constructor = "zklang::createConvertZhlToLlzkFeltPass()";
+
+  let dependentDialects = [
+    "zirgen::Zhl::ZhlDialect", "zml::ZMLDialect",
+    "llzk::component::StructDialect", "llzk::felt::FeltDialect"
+  ];
+
+  let options =
+      [Option<"selectedExtValField", "extval-field", "std::string",
+              /*default=*/"\"babybear\"",
+              "The field ExtVal types operate on (default: babybear)">];
+}
+
 def ConvertZhlToZml : Pass<"lower-zhl", "mlir::ModuleOp"> {
   let summary = "Converts ZHL operations to ZML operations";
   let constructor = "zklang::createConvertZhlToZmlPass()";

@@ -22,3 +22,4 @@ target_sources(ZklangPasses PRIVATE StripTests.cpp AnnotateTypecheckZhl.cpp Inst
 add_subdirectory(ConvertZhlToZml)
 add_subdirectory(ConvertZmlToLlzk)
 add_subdirectory(ConvertZhlToLlzkStruct)
+add_subdirectory(ConvertZhlToLlzkFelt)

@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <llzk/Dialect/Felt/IR/Dialect.h>
 #include <llzk/Dialect/Function/IR/Dialect.h>
 #include <llzk/Dialect/LLZK/IR/Dialect.h>
 #include <llzk/Dialect/Struct/IR/Ops.h>
@@ -32,6 +33,7 @@ template <typename Op> using OpPass = std::unique_ptr<mlir::OperationPass<Op>>;
 OpPass<mlir::ModuleOp> createStripTestsPass();
 OpPass<mlir::ModuleOp> createAnnotateTypecheckZhlPass();
 OpPass<mlir::ModuleOp> createConvertZhlToLlzkStructPass();
+OpPass<llzk::component::StructDefOp> createConvertZhlToLlzkFeltPass();
 OpPass<mlir::ModuleOp> createConvertZhlToZmlPass();
 OpPass<mlir::ModuleOp> createConvertZmlToLlzkPass();
 OpPass<mlir::ModuleOp> createInjectLlzkModAttrsPass();

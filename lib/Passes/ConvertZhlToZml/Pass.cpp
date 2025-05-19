@@ -93,9 +93,9 @@ void ConvertZhlToZmlPass::runOnOperation() {
   patterns.add<ZhlConstructGlobalLowering, ZhlGetGlobalLowering>(
       globalsModule, typeAnalysis, typeConverter, ctx
   );
-  patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
-    builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
-  }, typeAnalysis, typeConverter, ctx);
+  // patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
+  //   builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
+  // }, typeAnalysis, typeConverter, ctx);
 
   mlir::ConversionTarget target(*ctx);
   target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();

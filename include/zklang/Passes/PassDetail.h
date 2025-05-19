@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <llzk/Dialect/Felt/IR/Dialect.h>
 #include <llzk/Dialect/Function/IR/Dialect.h>
 #include <llzk/Dialect/LLZK/IR/Dialect.h>  // IWYU pragma: keep
 #include <llzk/Dialect/Struct/IR/Ops.h>    // IWYU pragma: keep
