@@ -68,7 +68,7 @@ public:
   /// REQUIRES that the operation has one result only.
   mlir::FailureOr<mlir::Value> getCastedValue(
       mlir::Operation *op, mlir::OpBuilder &builder,
-      mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
+      mlir::SmallVectorImpl<mlir::Operation *> &generatedOps, mlir::Type super = nullptr
   ) const {
     assert(
         op->getNumResults() == 1 && "casting helper can only work with operations with 1 result"
@@ -168,7 +168,7 @@ protected:
 
   mlir::LogicalResult makeCtorCall(
       Op, mlir::Value, mlir::ValueRange newArgs, mlir::ConversionPatternRewriter &,
-      GlobalBuilder::AndName globalBuilder = std::nullopt
+      const mlir::TypeConverter &, GlobalBuilder::AndName globalBuilder = std::nullopt
   ) const;
 
 public:
@@ -215,7 +215,7 @@ public:
   mlir::LogicalResult matchAndRewrite(
       zirgen::Zhl::ConstructOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
   ) const override {
-    return makeCtorCall(op, op, adaptor.getArgs(), rewriter);
+    return makeCtorCall(op, op, adaptor.getArgs(), rewriter, *getTypeConverter());
   }
 };
 

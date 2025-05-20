@@ -412,7 +412,9 @@ static Params getConstantParams(const TypeBinding &binding, ParamsStorage &stora
       constants.declare(name, param, pos);
     }
   }
-  storage = ParamsStorage(constants, params.size(), TypeBinding(binding.getLocation()));
+  storage = ParamsStorage(
+      constants, params.size(), TypeBinding(binding.getContext(), binding.getLocation())
+  );
   return Params(storage);
 }
 

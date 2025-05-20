@@ -62,4 +62,6 @@ private:
   std::shared_ptr<detail::FrameInfo> info;
 };
 
+llvm::hash_code hash_value(const Frame &);
+
 } // namespace zhl

@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <llvm/ADT/Hashing.h>
 #include <zklang/Dialect/ZHL/Typing/Frame.h>
 
 #include <memory>
@@ -22,7 +23,12 @@
 
 #define DEBUG_TYPE "zhl-frame"
 
-namespace zhl {
+using namespace zhl;
+using namespace zhl::detail;
+
+//===----------------------------------------------------------------------===//
+// Frame
+//===----------------------------------------------------------------------===//
 
 Frame::Frame() : info(std::make_shared<detail::FrameInfo>()) {}
 
@@ -52,7 +58,14 @@ Frame::const_iterator Frame::end() const { return info->end(); }
 void Frame::setParentSlot(FrameSlot *slot) { info->setParentSlot(slot); }
 FrameSlot *Frame::getParentSlot() const { return info->getParentSlot(); }
 
+llvm::hash_code zhl::hash_value(const Frame &frame) {
+  auto slotHashes = llvm::hash_combine_range(frame.begin(), frame.end());
+  return llvm::hash_combine("Frame", "[", slotHashes, "]");
+}
+
+//===----------------------------------------------------------------------===//
 // FrameSlot
+//===----------------------------------------------------------------------===//
 
 FrameSlot::FrameSlot(FrameSlotKind slotKind) : FrameSlot(slotKind, "") {}
 
@@ -101,6 +114,12 @@ void FrameSlot::print(llvm::raw_ostream &os) const {
   os << "slot { parent = " << parentFrame << ", name = " << name << " }";
 }
 
+llvm::hash_code FrameSlot::hash() const { return llvm::hash_combine("FrameSlot", name); }
+
+//===----------------------------------------------------------------------===//
+// InnerFrame
+//===----------------------------------------------------------------------===//
+
 InnerFrame::InnerFrame(const TypeBindings &bindings)
     : ComponentSlot(FS_Frame, bindings, bindings.Component()), innerFrame{} {
   innerFrame.setParentSlot(this);
@@ -118,6 +137,14 @@ void InnerFrame::print(llvm::raw_ostream &os) const {
   innerFrame.print(os);
   os << " }";
 }
+
+llvm::hash_code InnerFrame::hash() const {
+  return llvm::hash_combine("InnerFrame", ComponentSlot::hash(), innerFrame);
+}
+
+//===----------------------------------------------------------------------===//
+// ArrayFrame
+//===----------------------------------------------------------------------===//
 
 ArrayFrame::ArrayFrame(const TypeBindings &bindings)
     : ComponentSlot(FS_Array, bindings, bindings.Component()), iv(nullptr), innerFrame{},
@@ -145,7 +172,13 @@ void ArrayFrame::print(llvm::raw_ostream &os) const {
   os << " }";
 }
 
-namespace detail {
+llvm::hash_code ArrayFrame::hash() const {
+  return llvm::hash_combine("ArrayFrame", ComponentSlot::hash(), size, innerFrame);
+}
+
+//===----------------------------------------------------------------------===//
+// FrameInfo
+//===----------------------------------------------------------------------===//
 
 FrameInfo::~FrameInfo() {
   assert(slots.size() == nCreatedSlots);
@@ -169,7 +202,9 @@ void FrameInfo::print(llvm::raw_ostream &os) const {
   os << "]";
 }
 
-} // namespace detail
+//===----------------------------------------------------------------------===//
+// ComponentSlot
+//===----------------------------------------------------------------------===//
 
 ComponentSlot::ComponentSlot(const TypeBindings &Bindings, TypeBinding &Type)
     : FrameSlot(FS_Component), binding(Type), bindingsCtx(&Bindings) {
@@ -259,4 +294,6 @@ void ComponentSlot::editInnerBinding(llvm::function_ref<void(TypeBinding &)> edi
   edit(binding);
 }
 
-} // namespace zhl
+llvm::hash_code ComponentSlot::hash() const {
+  return llvm::hash_combine("ComponentSlot", FrameSlot::hash(), markedColumn, binding);
+}

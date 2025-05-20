@@ -27,8 +27,8 @@ static void annotateOp(
     Operation *op, StringAttr key, const TypeBinding &binding, MLIRContext *ctx,
     const TypeBindings &bindings
 ) {
-  auto attr = FixedTypeBindingAttr::get(ctx, binding, bindings);
-  op->setDiscardableAttr(key, attr);
+  auto attr = TypeBindingAttr::get(ctx, binding);
+  attr.bind(op, key);
 }
 
 static StringAttr defaultKey(Builder &builder) { return builder.getStringAttr("zml.binding"); }

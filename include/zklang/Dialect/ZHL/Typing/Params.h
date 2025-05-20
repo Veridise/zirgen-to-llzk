@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cassert>
+#include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
@@ -139,5 +140,7 @@ public:
 
   ParamsStorage *data() const { return const_cast<ParamsStorage *>(Params::data()); }
 };
+
+llvm::hash_code hash_value(const Params &);
 
 } // namespace zhl

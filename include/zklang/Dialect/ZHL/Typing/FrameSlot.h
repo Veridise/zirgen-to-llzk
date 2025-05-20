@@ -55,6 +55,9 @@ public:
 
   virtual void print(llvm::raw_ostream &) const;
 
+  /// Returns an llvm compatible hash value.
+  virtual llvm::hash_code hash() const;
+
 protected:
   FrameSlot(FrameSlotKind);
   FrameSlot(FrameSlotKind, mlir::StringRef);
@@ -68,5 +71,7 @@ private:
   llvm::SmallString<10> name;
   const detail::FrameInfo *parentFrame;
 };
+
+inline llvm::hash_code hash_value(const FrameSlot &slot) { return slot.hash(); }
 
 } // namespace zhl

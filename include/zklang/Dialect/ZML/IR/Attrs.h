@@ -15,6 +15,11 @@
 #pragma once
 
 #include <mlir/IR/DialectImplementation.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindingRef.h>
+
+namespace mlir {
+class TypeConverter;
+}
 
 namespace zhl {
 class TypeBinding;

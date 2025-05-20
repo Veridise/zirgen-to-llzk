@@ -59,7 +59,7 @@ public:
 
   template <typename... Args>
   const TypeBinding &Create(mlir::StringRef name, mlir::Location loc, Args &&...args) {
-    return insert(name, TypeBinding(name, loc, std::forward<Args>(args)...));
+    return insert(name, TypeBinding(*this, name, loc, std::forward<Args>(args)...));
   }
 
   template <typename... Args> const TypeBinding &Create(mlir::StringRef name, Args &&...args) {
@@ -70,7 +70,7 @@ public:
   /// named bindings table.
   template <typename... Args>
   const TypeBinding &CreateAnon(mlir::StringRef name, mlir::Location loc, Args &&...args) {
-    return Manage(TypeBinding(nameUniquer.getName(name), loc, std::forward<Args>(args)...));
+    return Manage(TypeBinding(*this, nameUniquer.getName(name), loc, std::forward<Args>(args)...));
   }
 
   template <typename... Args> const TypeBinding &CreateAnon(mlir::StringRef name, Args &&...args) {
@@ -79,7 +79,7 @@ public:
 
   template <typename... Args>
   const TypeBinding &CreateBuiltin(mlir::StringRef name, mlir::Location loc, Args &&...args) {
-    return insert(name, TypeBinding(name, loc, std::forward<Args>(args)..., Frame(), true));
+    return insert(name, TypeBinding(*this, name, loc, std::forward<Args>(args)..., Frame(), true));
   }
 
   template <typename... Args>
@@ -96,7 +96,7 @@ private:
 
   template <typename... Args>
   TypeBinding makeBuiltin(mlir::StringRef name, mlir::Location loc, Args &&...args) {
-    return TypeBinding(name, loc, std::forward<Args>(args)..., Frame(), true);
+    return TypeBinding(*this, name, loc, std::forward<Args>(args)..., Frame(), true);
   }
 
   template <typename... Args> TypeBinding makeBuiltin(mlir::StringRef name, Args &&...args) {

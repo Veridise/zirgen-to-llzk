@@ -70,60 +70,51 @@ let parameters = (ins "::mlir::FlatSymbolRefAttr" : $symbol, ConstExpr : $expr);
   let assemblyFormat = "`<` $symbol `:` $expr `>`";
 }
 
-def GenericParam : ZMLAttr<"GenericParam", "generic"> {
-  let summary = "generic parameter";
-  let description = [{
-    A type binding for a generic parameter. Has an associated name 
-    and inner type binding. It can also be marked as injected for 
-    parameters that have been created as part of the type checking process.
+def TypeBindingParam : AttrParameter<"zhl::TypeBindingRef", "Zirgen type binding"> {
+  let allocator = [{
+    // If the allocator does not have this object in its arena copy it.
+    if (!$_allocator.allocated($_self.ptr())) {
+      auto *t = $_allocator.allocate<zhl::TypeBinding>();
+      new(t) zhl::TypeBinding(*$_self);
+      $_dst = *t;
+    } else {
+      $_dst = $_self;
+    }
   }];
-
-  let parameters = (ins "mlir::StringAttr":$name, "zml::FixedTypeBindingAttr":$type, "bool":$injected);
-
-  let assemblyFormat = "`<` struct(params) `>`";
+  let cppStorageType = "zhl::TypeBinding";
 }
 
-def ComponentMember : ZMLAttr<"ComponentMember", "member"> {
-  let summary = "component member";
-  let description = [{
-    Holds information of a member of a component; name, type, and visibility.
-  }];
-
-  let parameters = (ins "mlir::StringAttr":$name, "zml::FixedTypeBindingAttr":$type, "bool":$isPublic);
-
-  let assemblyFormat = "`<` struct(params) `>`";
-}
-
-def FixedTypeBinding : ZMLAttr<"FixedTypeBinding", "binding", [TypedAttrInterface]> {
+def TypeBinding : ZMLAttr<"TypeBinding", "binding", []> {
   let summary = "type binding";
   let description = [{
-    The solidified result of type checking a ZHL operation.
+    The result of type checking a ZHL operation.
     The `typecheck-zhl` pass will inject this attribute into the ZHL operations
     defined in the circuit. The subsequent passes depend on this information to 
     know what final LLZK type the operation is going to have.
   }];
 
   let parameters = (ins 
-    AttributeSelfTypeParameter<"">:$type,
-  "mlir::StringAttr":$name,
-  ArrayRefParameter<"zml::GenericParamAttr">:$genericParams,
-  ArrayRefParameter<"zml::ComponentMemberAttr">:$members,
-  "mlir::FunctionType":$ctorType,
-  ArrayRefParameter<"mlir::LocationAttr">:$paramLocs,
-  OptionalParameter<"zml::FixedTypeBindingAttr">:$superType,
-  OptionalParameter<"mlir::Attribute">:$constExpr,
-    "bool":$builtin,
-  "bool":$externComponent
+    TypeBindingParam:$typeBinding
   );
 
-  let assemblyFormat = "`<` struct(params) `>`";
-
   let builders = [
-    AttrBuilder<(ins "const zhl::TypeBinding &":$typeBinding, "const zhl::TypeBindings &":$bindings)>
+    AttrBuilderWithInferredContext<(ins "mlir::Operation *":$op, CArg<"mlir::StringRef", "\"zml.binding\"">:$name)>,
+    AttrBuilderWithInferredContext<(ins "mlir::Value":$value)>
   ];
 
-  let extraClassDeclaration = [{
-    mlir::SmallVector<mlir::StringRef> getGenericParamNames() const;
+  let assemblyFormat = "`<` $typeBinding `>`";
 
+  let extraClassDeclaration = [{
+    const zhl::TypeBinding &operator*() const { return getTypeBinding().ref(); }
+    const zhl::TypeBinding *operator->() const { return getTypeBinding().ptr(); }
+
+    mlir::Type materializeType() const;
+    mlir::Type materializeType(const mlir::TypeConverter *) const;
+    mlir::Type materializeType(const mlir::TypeConverter &) const;
+    mlir::FunctionType materializeCtorType() const;
+    zml::TypeBindingAttr getSuperTypeAttr() const;
+    void bind(mlir::Operation *op, mlir::StringRef key = "zml.binding", bool overwrite = false) const;
+    void bind(mlir::Operation *op,  bool overwrite = false) const { bind(op, "zml.binding", overwrite); }
+    void bind(mlir::Value val, bool overwrite = false) const;
   }];
 }

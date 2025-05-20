@@ -42,6 +42,8 @@ public:
 
   void print(llvm::raw_ostream &) const override;
 
+  llvm::hash_code hash() const override;
+
 protected:
   mlir::StringRef defaultNameForTemporaries() const override;
 

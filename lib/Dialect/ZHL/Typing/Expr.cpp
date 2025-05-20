@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <mlir/Support/LogicalResult.h>
@@ -41,6 +42,8 @@ using namespace zhl::expr::detail;
 //==-----------------------------------------------------------------------==//
 
 ExprBase::operator SimpleExprView() const { return SimpleExprView(*this); }
+
+llvm::hash_code zhl::expr::detail::hash_value(const ExprBase &expr) { return expr.hash(); }
 
 //==-----------------------------------------------------------------------==//
 // ExprView
@@ -124,6 +127,14 @@ mlir::FailureOr<ConstExpr> ConstExpr::remap(Params params, EmitErrorFn emitError
   return ConstExpr(replacement);
 }
 
+llvm::hash_code zhl::expr::hash_value(const ConstExpr &expr) {
+  if (expr) {
+    return expr->hash();
+  } else {
+    return llvm::hash_combine("ConstExpr", 0);
+  }
+}
+
 //==-----------------------------------------------------------------------==//
 // Val
 //==-----------------------------------------------------------------------==//
@@ -143,6 +154,8 @@ Attribute Val::convertIntoAttribute(Builder &builder) const {
 }
 
 ExprBase *Val::remap(Params, EmitErrorFn) const { return clone(); }
+
+llvm::hash_code Val::hash() const { return llvm::hash_combine("Val", value); }
 
 //==-----------------------------------------------------------------------==//
 // Symbol
@@ -172,6 +185,8 @@ ExprBase *Symbol::remap(Params params, EmitErrorFn emitError) const {
   }
   return binding->getConstExpr()->clone();
 }
+
+llvm::hash_code Symbol::hash() const { return llvm::hash_combine("Symbol", name); }
 
 //==-----------------------------------------------------------------------==//
 // Ctor
@@ -295,6 +310,11 @@ ExprBase *Ctor::remap(Params params, EmitErrorFn emitError) const {
     return nullptr;
   }
   return new Ctor(typeName, Arguments(std::move(replacedArgs)));
+}
+
+llvm::hash_code Ctor::hash() const {
+  auto argsHash = llvm::hash_combine_range(args.begin(), args.end());
+  return llvm::hash_combine("Ctor", typeName, args.size(), argsHash);
 }
 
 //==-----------------------------------------------------------------------==//

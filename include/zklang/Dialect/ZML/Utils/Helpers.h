@@ -15,14 +15,78 @@
 #pragma once
 
 #include <cstdint>
+#include <llzk/Dialect/Function/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <vector>
 #include <zirgen/Dialect/ZHL/IR/ZHL.h>
 #include <zklang/Dialect/ZHL/Typing/Analysis.h>
 #include <zklang/Dialect/ZHL/Typing/ComponentSlot.h>
+#include <zklang/Dialect/ZML/IR/Attrs.h>
+#include <zklang/Dialect/ZML/IR/OpInterfaces.h>
 #include <zklang/Dialect/ZML/IR/Ops.h>
+#include <zklang/Dialect/ZML/Typing/Materialize.h>
 
 namespace zml {
+
+namespace CastHelper {
+
+/// Extracts the binding from the input value/operation and creates a
+/// cast of the value into the type materialized from the binding.
+/// If the super type is specified generates an additional SuperCoerceOp
+/// from the binding's type to the super type.
+/// REQUIRES that the operation has one result only.
+mlir::FailureOr<mlir::Value> getCastedValue(
+    mlir::Operation *op, mlir::OpBuilder &builder,
+    mlir::SmallVectorImpl<mlir::Operation *> &generatedOps, mlir::Type super = nullptr
+);
+
+mlir::FailureOr<mlir::Value>
+getCastedValue(mlir::Operation *op, mlir::OpBuilder &builder, mlir::Type super = nullptr);
+
+// template <typename Op>
+// mlir::FailureOr<mlir::Value> getCastedValue(
+//     Op op, mlir::OpBuilder &builder, mlir::SmallVector<mlir::Operation *, 2> &generatedOps,
+//     mlir::Type super = nullptr
+// ) {
+//   return getCastedValue(op.getOperation(), builder, super);
+// }
+//
+// template <typename Op>
+// mlir::FailureOr<mlir::Value>
+// getCastedValue(Op op, mlir::OpBuilder &builder, mlir::Type super = nullptr) {
+//   mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+//   return getCastedValue(op.getOperation(), builder, generatedOps, super);
+// }
+
+mlir::FailureOr<mlir::Value> getCastedValue(
+    mlir::Value value, mlir::OpBuilder &builder,
+    mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super = nullptr
+);
+
+mlir::FailureOr<mlir::Value>
+getCastedValue(mlir::Value value, mlir::OpBuilder &builder, mlir::Type super = nullptr);
+
+/// A non-failing version that takes a binding as additional parameter
+mlir::Value getCastedValue(
+    mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+    mlir::SmallVectorImpl<mlir::Operation *> &generatedOps, mlir::Type super = nullptr
+);
+
+mlir::Value getCastedValue(
+    mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+    mlir::Type super = nullptr
+);
+
+} // namespace CastHelper
+
+/// Returns true if the operation is inside a function with the given name.
+inline bool opIsInFunc(mlir::StringRef name, mlir::Operation *op) {
+  auto f = op->getParentOfType<llzk::function::FuncDefOp>();
+  return f && f.getSymName() == name;
+}
 
 /// Finds the definition of the callee component. If the
 /// component was defined before the current operation w.r.t. the physical order of
@@ -35,10 +99,8 @@ mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root);
 bool calleeIsBuiltin(mlir::Operation *op);
 
 /// Creates a slot for storing a result inside a component's body.
-mlir::FlatSymbolRefAttr createSlot(
-    zhl::ComponentSlot *slot, mlir::OpBuilder &builder, ComponentInterface component,
-    mlir::Location loc
-);
+mlir::FlatSymbolRefAttr
+createSlot(zhl::ComponentSlot *slot, mlir::OpBuilder &builder, llzk::component::StructDefOp component, mlir::Location loc, const mlir::TypeConverter &);
 
 /// Stores a value into the field defined by the slotName symbol and immediately reads it back.
 /// Returns the value read from the field.
@@ -59,6 +121,41 @@ void storeSlot(
     mlir::Type slotType, mlir::Location loc, mlir::OpBuilder &builder, mlir::Value
 );
 
+/// Creates a slot in the given struct.def op and stores the given value into it.
+inline void createAndStoreSlot(
+    zhl::ComponentSlot &slot, mlir::Type slotType, mlir::Value value,
+    llzk::component::StructDefOp component, mlir::Location loc, mlir::Value self,
+    mlir::OpBuilder &builder, const mlir::TypeConverter &tc
+) {
+  auto name = createSlot(&slot, builder, component, loc, tc);
+  storeSlot(slot, value, name, slotType, loc, builder, self);
+}
+
+/// Convenience overload for the common pattern of extracting the struct.def and zml.self parent ops
+/// and the slot from the binding associated to the given op.
+inline void createAndStoreSlot(
+    mlir::Operation *op, mlir::Value value, mlir::OpBuilder &builder, const mlir::TypeConverter &tc,
+    zhl::ComponentSlot *slot = nullptr
+) {
+
+  auto structDef = op->getParentOfType<llzk::component::StructDefOp>();
+  assert(structDef);
+  auto selfOp = op->getParentOfType<zml::SelfOp>();
+  assert(selfOp);
+  if (!slot) {
+    auto type = zml::TypeBindingAttr::get(op);
+    assert(type);
+    slot = mlir::dyn_cast_if_present<zhl::ComponentSlot>(type->getSlot());
+  }
+  assert(slot);
+  auto binding = slot->getBinding();
+
+  createAndStoreSlot(
+      *slot, zml::materializeTypeBinding(op->getContext(), binding), value, structDef, op->getLoc(),
+      selfOp, builder, tc
+  );
+}
+
 /// Given a Value of type ComponentType it returns a value of type Array<T,N> where
 /// said array is one of the super types of the input's type.
 mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentLike> v, mlir::OpBuilder &);
@@ -71,7 +168,7 @@ mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentLike> v, ml
 /// knowns it will succeed. This makes safe to create operations and other conversion modifications
 /// for obtaining the value of the super type.
 mlir::FailureOr<mlir::Value>
-constructPODComponent(mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self, llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &);
+constructPODComponent(mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self, llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &, const mlir::TypeConverter &);
 
 /// Creates a component used to represent a closure. This component will have a constructor that
 /// takes as input the values for all fields including the super type's value.
@@ -150,14 +247,14 @@ public:
   ///   - a global read retrieving the constructed value from the new global
   mlir::Value build(
       mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args,
-      GlobalBuilder::AndName globalBuilder = std::nullopt
+      const mlir::TypeConverter &tc, GlobalBuilder::AndName globalBuilder = std::nullopt
   );
   mlir::FunctionType getCtorType() const;
   const zhl::TypeBinding &getBinding() const;
 
 private:
   CtorCallBuilder(
-      mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
+      mlir::FunctionType type, const zhl::TypeBinding &binding, llzk::component::StructDefOp caller,
       mlir::Value self, bool builtin
   );
 
@@ -167,7 +264,7 @@ private:
   mlir::FunctionType ctorType;
   const zhl::TypeBinding compBinding;
   bool isBuiltin;
-  ComponentInterface callerComponentOp;
+  llzk::component::StructDefOp callerComponentOp;
   mlir::Value self;
 };
 

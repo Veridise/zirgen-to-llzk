@@ -26,7 +26,7 @@ using namespace mlir;
 
 const TypeBinding &TypeBindings::Component() {
   if (!Exists("Component")) {
-    bindings.insert({"Component", TypeBinding(unk)});
+    bindings.insert({"Component", TypeBinding(*this, unk)});
   }
   return bindings.at("Component");
 }
@@ -44,7 +44,7 @@ TypeBinding TypeBindings::Const(uint64_t value, Location loc) const {
 TypeBinding TypeBindings::UnkConst() const { return UnkConst(unk); }
 
 TypeBinding TypeBindings::UnkConst(Location loc) const {
-  return TypeBinding(CONST, loc, Get("Val"));
+  return TypeBinding(*this, CONST, loc, Get("Val"));
 }
 
 TypeBinding TypeBindings::Array(TypeBinding type, uint64_t size) const {
@@ -66,7 +66,7 @@ TypeBinding TypeBindings::Array(TypeBinding type, TypeBinding size, Location loc
   arrayGenericParams.declare("N", size);
   TypeBinding::Flags flags;
   flags.setSpecialized().setBuiltin();
-  TypeBinding array("Array", loc, Component(), arrayGenericParams, flags, Frame());
+  TypeBinding array(*this, "Array", loc, Component(), arrayGenericParams, flags, Frame());
   array.selfConstructs();
   return array;
 }
@@ -99,7 +99,7 @@ static TypeBinding &&selfConstructs(TypeBinding &&t) {
 }
 
 TypeBindings::TypeBindings(Location defaultLoc)
-    : unk(defaultLoc), bottom(TypeBinding(BOTTOM, unk, Component())) {
+    : unk(defaultLoc), bottom(TypeBinding(*this, BOTTOM, unk, Component())) {
   auto trivial = [this](StringRef name) -> const TypeBinding & {
     return insert(name, selfConstructs(makeBuiltin(name, Component())));
   };

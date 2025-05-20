@@ -83,9 +83,10 @@ void ConvertZhlToZmlPass::runOnOperation() {
   ZMLTypeConverter typeConverter;
   mlir::RewritePatternSet patterns(ctx);
   patterns.add<
-      ZhlGlobalRemoval, ZhlDefineLowering, ZhlParameterLowering, ZhlConstructLowering,
-      ZhlExternLowering, ZhlLiteralLowering, ZhlDeclarationRemoval, ZhlSuperLoweringInFunc,
-      ZhlConstrainLowering, ZhlLookupLowering, ZhlArrayLowering, ZhlSubscriptLowering,
+      ZhlGlobalRemoval, /*ZhlDefineLowering,*/ /*ZhlParameterLowering,*/ ZhlConstructLowering,
+      /*ZhlExternLowering,*/ /*ZhlLiteralLowering,*/
+      ZhlDeclarationRemoval, /*ZhlSuperLoweringInFunc,*/
+      ZhlConstrainLowering, /*ZhlLookupLowering,*/ ZhlArrayLowering, ZhlSubscriptLowering,
       ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
       ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
       ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval,
@@ -93,9 +94,6 @@ void ConvertZhlToZmlPass::runOnOperation() {
   patterns.add<ZhlConstructGlobalLowering, ZhlGetGlobalLowering>(
       globalsModule, typeAnalysis, typeConverter, ctx
   );
-  // patterns.add<ZhlCompToZmirCompPattern>([&](mlir::StringRef name) {
-  //   builtinOverrideSet.push_back(mlir::StringAttr::get(ctx, name));
-  // }, typeAnalysis, typeConverter, ctx);
 
   mlir::ConversionTarget target(*ctx);
   target.addIllegalDialect<zirgen::Zhl::ZhlDialect>();

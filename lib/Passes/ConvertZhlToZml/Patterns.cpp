@@ -16,6 +16,7 @@
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/CommandLine.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Index/IR/IndexAttrs.h>
 #include <mlir/Dialect/Index/IR/IndexOps.h>
@@ -184,7 +185,7 @@ ConstructorLowering<Op>::makeCtorCallBuilder(Operation *op, Value value, OpBuild
 template <typename Op>
 LogicalResult ConstructorLowering<Op>::makeCtorCall(
     Op op, Value value, ValueRange newArgs, ConversionPatternRewriter &rewriter,
-    GlobalBuilder::AndName globalBuilder
+    const mlir::TypeConverter &tc, GlobalBuilder::AndName globalBuilder
 ) const {
   FailureOr<CtorCallBuilder> ctor = makeCtorCallBuilder(op, value, rewriter);
   if (failed(ctor)) {
@@ -208,7 +209,7 @@ LogicalResult ConstructorLowering<Op>::makeCtorCall(
 
   std::vector<Value> preparedArguments;
   prepareArguments(newArgs, constructorType.getInputs(), op->getLoc(), rewriter, preparedArguments);
-  Value result = ctor->build(rewriter, op->getLoc(), preparedArguments, globalBuilder);
+  Value result = ctor->build(rewriter, op->getLoc(), preparedArguments, tc, globalBuilder);
   if (globalBuilder) {
     // In this case, cannot replace the old op uses with 'result' because the old op has 0 results.
     assert(op->getNumResults() == 0);
@@ -226,18 +227,18 @@ template class zml::ConstructorLowering<zirgen::Zhl::ConstructGlobalOp>;
 /// ZhlLiteralLowering
 ///////////////////////////////////////////////////////////
 
-mlir::LogicalResult ZhlLiteralLowering::matchAndRewrite(
-    Zhl::LiteralOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op->emitOpError() << "failed to type check";
-  }
-
-  auto val = materializeTypeBinding(getContext(), *binding);
-  rewriter.replaceOpWithNewOp<LitValOp>(op, val, adaptor.getValue());
-  return mlir::success();
-}
+// mlir::LogicalResult ZhlLiteralLowering::matchAndRewrite(
+//     Zhl::LiteralOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+// ) const {
+//   auto binding = getType(op);
+//   if (mlir::failed(binding)) {
+//     return op->emitOpError() << "failed to type check";
+//   }
+//
+//   auto val = materializeTypeBinding(getContext(), *binding);
+//   rewriter.replaceOpWithNewOp<LitValOp>(op, val, adaptor.getValue());
+//   return mlir::success();
+// }
 
 ///////////////////////////////////////////////////////////
 /// ZhlLiteralStrLowering
@@ -410,83 +411,86 @@ mlir::LogicalResult ZhlDeclarationRemoval::matchAndRewrite(
 /// ZhlDefinitionLowering
 ///////////////////////////////////////////////////////////
 
-mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
-    zirgen::Zhl::DefinitionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op->emitError() << "failed to type check";
-  }
-  auto declrBinding = getType(op.getDeclaration());
-  if (failed(declrBinding)) {
-    return op->emitError() << "failed to type check declaration expression";
-  }
-  auto exprBinding = getType(op.getDefinition());
-  if (failed(exprBinding)) {
-    return op->emitError() << "failed to type check definition expression";
-  }
-  ComponentSlot *slot = nullptr;
-  if (binding->getSlot()) {
-    if (auto *thisSlot = dyn_cast<ComponentSlot>(binding->getSlot())) {
-      slot = thisSlot;
-    }
-  } else if (declrBinding->getSlot()) {
-    if (auto *declrSlot = dyn_cast<ComponentSlot>(declrBinding->getSlot())) {
-      slot = declrSlot;
-    }
-  }
-
-  auto comp = op->getParentOfType<ComponentInterface>();
-  assert(comp);
-  auto self = op->getParentOfType<SelfOp>().getSelfValue();
-
-  mlir::Value value = adaptor.getDefinition();
-
-  // If the binding of this op has a slot then it is responsible of creating it.
-  // Otherwise, check if the declaration's binding has a slot. If it does create it here.
-  // Wrap the value around a SuperCoerceOp.
-  // If a slot is created here that means that the value we are storing in the field does not need
-  // memory according to the type checker and thus we don't need to introduce the use-def cut since
-  // that value is safe to use in @constrain functions.
-
-  if (slot) {
-    auto slotName = createSlot(slot, rewriter, comp, op.getLoc());
-    mlir::Type slotType = materializeTypeBinding(getContext(), slot->getBinding());
-    SmallVector<Operation *, 2> castOps;
-    Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
-    storeSlot(*slot, result, slotName, slotType, op.getLoc(), rewriter, self);
-  }
-
-  rewriter.eraseOp(op);
-  return mlir::success();
-}
-
+// mlir::LogicalResult ZhlDefineLowering::matchAndRewrite(
+//     zirgen::Zhl::DefinitionOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+// ) const {
+//   auto binding = getType(op);
+//   if (mlir::failed(binding)) {
+//     return op->emitError() << "failed to type check";
+//   }
+//   auto declrBinding = getType(op.getDeclaration());
+//   if (failed(declrBinding)) {
+//     return op->emitError() << "failed to type check declaration expression";
+//   }
+//   auto exprBinding = getType(op.getDefinition());
+//   if (failed(exprBinding)) {
+//     return op->emitError() << "failed to type check definition expression";
+//   }
+//   ComponentSlot *slot = nullptr;
+//   if (binding->getSlot()) {
+//     if (auto *thisSlot = dyn_cast<ComponentSlot>(binding->getSlot())) {
+//       slot = thisSlot;
+//     }
+//   } else if (declrBinding->getSlot()) {
+//     if (auto *declrSlot = dyn_cast<ComponentSlot>(declrBinding->getSlot())) {
+//       slot = declrSlot;
+//     }
+//   }
+//
+//   auto comp = op->getParentOfType<llzk::component::StructDefOp>();
+//   assert(comp);
+//   auto self = op->getParentOfType<SelfOp>().getSelfValue();
+//
+//   mlir::Value value = adaptor.getDefinition();
+//
+//   // If the binding of this op has a slot then it is responsible of creating it.
+//   // Otherwise, check if the declaration's binding has a slot. If it does create it here.
+//   // Wrap the value around a SuperCoerceOp.
+//   // If a slot is created here that means that the value we are storing in the field does not
+//   need
+//   // memory according to the type checker and thus we don't need to introduce the use-def cut
+//   since
+//   // that value is safe to use in @constrain functions.
+//
+//   if (slot) {
+//     auto slotName = createSlot(slot, rewriter, comp, op.getLoc(), *getTypeConverter());
+//     mlir::Type slotType = materializeTypeBinding(getContext(), slot->getBinding());
+//     SmallVector<Operation *, 2> castOps;
+//     Value result = getCastedValue(value, *exprBinding, rewriter, castOps);
+//     storeSlot(*slot, result, slotName, slotType, op.getLoc(), rewriter, self);
+//   }
+//
+//   rewriter.eraseOp(op);
+//   return mlir::success();
+// }
+//
 ///////////////////////////////////////////////////////////
 /// ZhlSuperLowering
 ///////////////////////////////////////////////////////////
 
-mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
-    zirgen::Zhl::SuperOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op->emitOpError() << "failed to type check";
-  }
-  if (!mlir::isa<SelfOp>(op->getParentOp())) {
-    return failure();
-  }
-  auto comp = op->getParentOfType<ComponentInterface>();
-  assert(comp);
-  auto self = op->getParentOfType<SelfOp>().getSelfValue();
-  mlir::Type target = materializeTypeBinding(getContext(), *binding);
-  auto value = getCastedValue(adaptor.getValue(), rewriter, target);
-  if (mlir::failed(value)) {
-    return mlir::failure();
-  }
-
-  rewriter.replaceOpWithNewOp<WriteFieldOp>(op, self, "$super", *value);
-  return mlir::success();
-}
+// TODO: Refactor to zhl->llzk.struct
+// mlir::LogicalResult ZhlSuperLoweringInFunc::matchAndRewrite(
+//     zirgen::Zhl::SuperOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+// ) const {
+//   auto binding = getType(op);
+//   if (mlir::failed(binding)) {
+//     return op->emitOpError() << "failed to type check";
+//   }
+//   if (!mlir::isa<SelfOp>(op->getParentOp())) {
+//     return failure();
+//   }
+//   auto comp = op->getParentOfType<ComponentInterface>();
+//   assert(comp);
+//   auto self = op->getParentOfType<SelfOp>().getSelfValue();
+//   mlir::Type target = materializeTypeBinding(getContext(), *binding);
+//   auto value = getCastedValue(adaptor.getValue(), rewriter, target);
+//   if (mlir::failed(value)) {
+//     return mlir::failure();
+//   }
+//
+//   rewriter.replaceOpWithNewOp<WriteFieldOp>(op, self, "$super", *value);
+//   return mlir::success();
+// }
 
 ///////////////////////////////////////////////////////////
 /// ZhlExternLowering
@@ -512,141 +516,146 @@ mlir::FailureOr<mlir::func::FuncOp> createExternFunc(
   return rewriter.create<mlir::func::FuncOp>(loc, name.toStringRef(nameMem), type, attrs);
 }
 
-mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
-    Zhl::ExternOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op->emitOpError() << "failed to type check";
-  }
-  auto comp = op->getParentOfType<ComponentOp>();
-  if (!comp) {
-    return mlir::failure();
-  }
-
-  std::vector<mlir::Type> argBindings;
-  for (auto arg : op.getArgs()) {
-    auto argBinding = getType(arg);
-    if (mlir::failed(argBinding)) {
-      return op->emitOpError() << "failed to type check argument #" << argBindings.size();
-    }
-    argBindings.push_back(materializeTypeBinding(getContext(), *argBinding));
-  }
-
-  auto retType = materializeTypeBinding(getContext(), *binding);
-
-  // Extern ops are wrapped around a component by the AST->ZHL step and have the same inputs as the
-  // component.
-  auto funcType =
-      rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
-  Twine externName = op.getName() + "$$extern";
-  auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
-  if (failed(externDeclrResult)) {
-    return failure();
-  }
-  auto externNameSymRef = SymbolRefAttr::get(rewriter.getStringAttr(externName));
-
-  auto externFnRef = rewriter.create<ExternFnRefOp>(op.getLoc(), funcType, externNameSymRef);
-  std::vector<mlir::Value> args;
-  std::transform(
-      adaptor.getArgs().begin(), adaptor.getArgs().end(), argBindings.begin(),
-      std::back_inserter(args),
-      [&](mlir::Value adaptorValue, mlir::Type argType) {
-    if (adaptorValue.getType() == argType) {
-      return adaptorValue;
-    }
-
-    auto cast =
-        rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), argType, adaptorValue);
-    return cast.getResult(0);
-  }
-  );
-
-  rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, externFnRef, mlir::ValueRange(args));
-
-  return mlir::success();
-}
+// Should not happen again!
+// mlir::LogicalResult ZhlExternLowering::matchAndRewrite(
+//     Zhl::ExternOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+// ) const {
+//   auto binding = getType(op);
+//   if (mlir::failed(binding)) {
+//     return op->emitOpError() << "failed to type check";
+//   }
+//   auto comp = op->getParentOfType<ComponentOp>();
+//   if (!comp) {
+//     return mlir::failure();
+//   }
+//
+//   std::vector<mlir::Type> argBindings;
+//   for (auto arg : op.getArgs()) {
+//     auto argBinding = getType(arg);
+//     if (mlir::failed(argBinding)) {
+//       return op->emitOpError() << "failed to type check argument #" << argBindings.size();
+//     }
+//     argBindings.push_back(materializeTypeBinding(getContext(), *argBinding));
+//   }
+//
+//   auto retType = materializeTypeBinding(getContext(), *binding);
+//
+//   // Extern ops are wrapped around a component by the AST->ZHL step and have the same inputs as
+//   the
+//   // component.
+//   auto funcType =
+//       rewriter.getFunctionType(comp.getBodyFunc().getFunctionType().getInputs(), {retType});
+//   Twine externName = op.getName() + "$$extern";
+//   auto externDeclrResult = createExternFunc(comp, externName, funcType, rewriter, op.getLoc());
+//   if (failed(externDeclrResult)) {
+//     return failure();
+//   }
+//   auto externNameSymRef = SymbolRefAttr::get(rewriter.getStringAttr(externName));
+//
+//   auto externFnRef = rewriter.create<ExternFnRefOp>(op.getLoc(), funcType, externNameSymRef);
+//   std::vector<mlir::Value> args;
+//   std::transform(
+//       adaptor.getArgs().begin(), adaptor.getArgs().end(), argBindings.begin(),
+//       std::back_inserter(args),
+//       [&](mlir::Value adaptorValue, mlir::Type argType) {
+//     if (adaptorValue.getType() == argType) {
+//       return adaptorValue;
+//     }
+//
+//     auto cast =
+//         rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), argType, adaptorValue);
+//     return cast.getResult(0);
+//   }
+//   );
+//
+//   rewriter.replaceOpWithNewOp<mlir::func::CallIndirectOp>(op, externFnRef,
+//   mlir::ValueRange(args));
+//
+//   return mlir::success();
+// }
 
 ///////////////////////////////////////////////////////////
 /// ZhlLookupLowering
 ///////////////////////////////////////////////////////////
 
-mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
-    Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto comp = adaptor.getComponent();
-  LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << '\n');
-  auto originalComp = getType(op.getComponent());
-  if (mlir::failed(originalComp)) {
-    return op->emitOpError() << "failed to type check component reference";
-  }
-  LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << '\n';
-             llvm::dbgs() << "Full printout: \n"; originalComp->print(llvm::dbgs(), true);
-             llvm::dbgs() << '\n');
-  auto materializedType = materializeTypeBinding(getContext(), *originalComp);
-  LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << '\n');
-  auto compType = mlir::dyn_cast<ComponentLike>(materializedType);
-  if (!compType) {
-    return op->emitError() << "type mismatch, cannot access a member for a non-component type "
-                           << materializedType;
-  }
-  if (comp.getType() != compType) {
-    LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << '\n');
-    auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
-    comp = cast.getResult(0);
-  }
-  mlir::SymbolTableCollection st;
-  auto mod = op->getParentOfType<mlir::ModuleOp>();
-  auto compDef = compType.getDefinition(st, mod);
-  assert(compDef && "Component type without a definition!");
-
-  LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << '\n');
-
-  LLVM_DEBUG(
-      llvm::dbgs() << "Starting search for member " << adaptor.getMember() << " starting with type "
-                   << compType << '\n'
-  );
-  auto nameSym = mlir::SymbolRefAttr::get(adaptor.getMemberAttr());
-  while (mlir::failed(compDef.lookupFieldType(nameSym))) {
-    LLVM_DEBUG(llvm::dbgs() << "  Failed! Trying with the super type\n");
-    auto superType = compType.getSuperType();
-    if (!superType) {
-      LLVM_DEBUG(llvm::dbgs() << "  Failed to get the super type\n");
-      return op->emitError() << "member " << adaptor.getMember() << " was not found";
-    }
-    compType = mlir::dyn_cast<ComponentLike>(superType);
-    if (!compType) {
-      LLVM_DEBUG(llvm::dbgs() << "  Super type is not a component\n");
-      return op->emitError() << "type mismatch, cannot access a member for a non-component type "
-                             << superType;
-    }
-
-    compDef = compType.getDefinition(st, mod);
-    LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << '\n');
-  }
-
-  auto field = originalComp->getMember(nameSym.getValue(), [&op] { return op->emitError(); });
-  assert(succeeded(field));
-  auto fieldType = materializeTypeBinding(getContext(), *field);
-  assert(fieldType);
-
-  auto binding = getType(op);
-  if (mlir::failed(binding)) {
-    return op->emitOpError() << "failed to type check";
-  }
-  auto bindingType = materializeTypeBinding(getContext(), *binding);
-  if (fieldType != bindingType) {
-    return op->emitError() << "type mismatch, was expecting " << bindingType << " but field "
-                           << adaptor.getMember() << " is of type " << fieldType;
-  }
-
-  // Coerce to the type in the chain that defines the accessed member
-  comp = rewriter.create<SuperCoerceOp>(op.getLoc(), compType, comp);
-
-  rewriter.replaceOpWithNewOp<ReadFieldOp>(op, bindingType, comp, adaptor.getMember());
-  return mlir::success();
-}
-
+// TODO: Refactor this one in zhl->llzk.struct
+// mlir::LogicalResult ZhlLookupLowering::matchAndRewrite(
+//     Zhl::LookupOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter
+// ) const {
+//   auto comp = adaptor.getComponent();
+//   LLVM_DEBUG(llvm::dbgs() << "comp value: " << comp << '\n');
+//   auto originalComp = getType(op.getComponent());
+//   if (mlir::failed(originalComp)) {
+//     return op->emitOpError() << "failed to type check component reference";
+//   }
+//   LLVM_DEBUG(llvm::dbgs() << "type binding for the component: " << *originalComp << '\n';
+//              llvm::dbgs() << "Full printout: \n"; originalComp->print(llvm::dbgs(), true);
+//              llvm::dbgs() << '\n');
+//   auto materializedType = materializeTypeBinding(getContext(), *originalComp);
+//   LLVM_DEBUG(llvm::dbgs() << "     which materializes to " << materializedType << '\n');
+//   auto compType = mlir::dyn_cast<ComponentLike>(materializedType);
+//   if (!compType) {
+//     return op->emitError() << "type mismatch, cannot access a member for a non-component type "
+//                            << materializedType;
+//   }
+//   if (comp.getType() != compType) {
+//     LLVM_DEBUG(llvm::dbgs() << "Casting " << comp.getType() << " to " << compType << '\n');
+//     auto cast = rewriter.create<mlir::UnrealizedConversionCastOp>(op.getLoc(), compType, comp);
+//     comp = cast.getResult(0);
+//   }
+//   mlir::SymbolTableCollection st;
+//   auto mod = op->getParentOfType<mlir::ModuleOp>();
+//   auto compDef = compType.getDefinition(st, mod);
+//   assert(compDef && "Component type without a definition!");
+//
+//   LLVM_DEBUG(llvm::dbgs() << "Component's code:\n" << compDef << '\n');
+//
+//   LLVM_DEBUG(
+//       llvm::dbgs() << "Starting search for member " << adaptor.getMember() << " starting with
+//       type "
+//                    << compType << '\n'
+//   );
+//   auto nameSym = mlir::SymbolRefAttr::get(adaptor.getMemberAttr());
+//   while (mlir::failed(compDef.lookupFieldType(nameSym))) {
+//     LLVM_DEBUG(llvm::dbgs() << "  Failed! Trying with the super type\n");
+//     auto superType = compType.getSuperType();
+//     if (!superType) {
+//       LLVM_DEBUG(llvm::dbgs() << "  Failed to get the super type\n");
+//       return op->emitError() << "member " << adaptor.getMember() << " was not found";
+//     }
+//     compType = mlir::dyn_cast<ComponentLike>(superType);
+//     if (!compType) {
+//       LLVM_DEBUG(llvm::dbgs() << "  Super type is not a component\n");
+//       return op->emitError() << "type mismatch, cannot access a member for a non-component type "
+//                              << superType;
+//     }
+//
+//     compDef = compType.getDefinition(st, mod);
+//     LLVM_DEBUG(llvm::dbgs() << "Trying again with super type " << compType << '\n');
+//   }
+//
+//   auto field = originalComp->getMember(nameSym.getValue(), [&op] { return op->emitError(); });
+//   assert(succeeded(field));
+//   auto fieldType = materializeTypeBinding(getContext(), *field);
+//   assert(fieldType);
+//
+//   auto binding = getType(op);
+//   if (mlir::failed(binding)) {
+//     return op->emitOpError() << "failed to type check";
+//   }
+//   auto bindingType = materializeTypeBinding(getContext(), *binding);
+//   if (fieldType != bindingType) {
+//     return op->emitError() << "type mismatch, was expecting " << bindingType << " but field "
+//                            << adaptor.getMember() << " is of type " << fieldType;
+//   }
+//
+//   // Coerce to the type in the chain that defines the accessed member
+//   comp = rewriter.create<SuperCoerceOp>(op.getLoc(), compType, comp);
+//
+//   rewriter.replaceOpWithNewOp<ReadFieldOp>(op, bindingType, comp, adaptor.getMember());
+//   return mlir::success();
+// }
+//
 ///////////////////////////////////////////////////////////
 /// ZhlSubscriptLowering
 ///////////////////////////////////////////////////////////
@@ -729,54 +738,6 @@ mlir::LogicalResult ZhlArrayLowering::matchAndRewrite(
   }
   );
   rewriter.replaceOpWithNewOp<NewArrayOp>(op, arrayType, args);
-  return mlir::success();
-}
-
-///////////////////////////////////////////////////////////
-/// ZhlCompToZmirCompPattern
-///////////////////////////////////////////////////////////
-
-mlir::LogicalResult ZhlCompToZmirCompPattern::matchAndRewrite(
-    zirgen::Zhl::ComponentOp op, OpAdaptor, mlir::ConversionPatternRewriter &rewriter
-) const {
-  auto name = getType(op.getName());
-  if (mlir::failed(name)) {
-    return op->emitOpError() << "could not be lowered because its type could not be infered";
-  }
-
-  assert(false && "TODO");
-  llzk::ComponentBuilder builder;
-  auto genericNames = name->getGenericParamNames();
-  auto paramLocations = name->getConstructorParamLocations();
-  auto ctorType = materializeTypeBindingConstructor(rewriter, *name, getTypeBindings());
-
-  builder.name(name->getName())
-      .location(op->getLoc())
-      .attrs(op->getAttrs())
-      .typeParams(genericNames)
-      .constructor(ctorType, paramLocations)
-      .takeRegion(&op.getRegion());
-  for (auto &[fieldName, binding] : name->getMembers()) {
-    if (!binding.has_value()) {
-      return op->emitOpError() << "failed to type check component member '" << fieldName << "'";
-    }
-  }
-  auto &super = name->getSuperType();
-  builder.field("$super", materializeTypeBinding(getContext(), super));
-  auto maybeBuiltin = mlir::SymbolTable::lookupSymbolIn(
-      op->getParentOfType<mlir::ModuleOp>().getOperation(), op.getName()
-  );
-
-  if (maybeBuiltin) {
-    rewriter.eraseOp(maybeBuiltin);
-    builtinOverriden(op.getName());
-  }
-  auto tc = getTypeConverter();
-  assert(tc);
-  auto comp = builder.build(rewriter, *tc);
-
-  rewriter.replaceOp(op.getOperation(), comp.getOperation());
-
   return mlir::success();
 }
 
@@ -916,9 +877,9 @@ mlir::LogicalResult ZhlMapLowering::matchAndRewrite(
   );
   if (auto compSlot = dyn_cast_if_present<ComponentSlot>(binding->getSlot())) {
     auto self = op->getParentOfType<SelfOp>().getSelfValue();
-    ComponentInterface comp = op->getParentOfType<ComponentInterface>();
+    auto comp = op->getParentOfType<llzk::component::StructDefOp>();
     assert(comp);
-    auto name = createSlot(compSlot, rewriter, comp, op.getLoc());
+    auto name = createSlot(compSlot, rewriter, comp, op.getLoc(), *getTypeConverter());
     auto slotType = materializeTypeBinding(getContext(), compSlot->getBinding());
     auto val = storeAndLoadSlot(*compSlot, arrAlloc, name, slotType, op.getLoc(), rewriter, self);
     rewriter.replaceOp(op, val);
@@ -998,7 +959,7 @@ mlir::LogicalResult ZhlSuperLoweringInBlock::matchAndRewrite(
           adaptor.getValue(), *valueBinding, rewriter,
           materializeTypeBinding(getContext(), binding->getSuperType())
       );
-    }, getTypeBindings());
+    }, getTypeBindings(), *getTypeConverter());
     if (failed(pod)) {
       return failure();
     }
@@ -1109,6 +1070,7 @@ static FailureOr<CtorCallBuilder> initializeCtorCallBuilder(
 ) {
   // Allocate a component slot for the output of the accumulator.
   auto self = op->getParentOfType<SelfOp>().getSelfValue();
+  assert(false && "TODO: Move the line below to the type checking process!");
   slot<ArrayFrame>(bindings.op).getFrame().allocateSlot<ComponentSlot>(typeBindings, *bindings.acc);
 
   auto ctorBuilder = CtorCallBuilder::Make(op, *bindings.acc, builder, self, typeBindings);
@@ -1191,7 +1153,8 @@ LogicalResult ZhlReduceLowering::matchAndRewrite(
     );
 
     mlir::Value lhs = superCoerce(args[0], constructorType.getInput(0), builder);
-    auto accResult = ctorBuilder->build(builder, adaptor.getType().getLoc(), {lhs, rhs});
+    auto accResult =
+        ctorBuilder->build(builder, adaptor.getType().getLoc(), {lhs, rhs}, *getTypeConverter());
 
     builder.create<mlir::scf::YieldOp>(loc, superCoerce(accResult, outputType, builder));
   }
@@ -1321,7 +1284,8 @@ LogicalResult ZhlConstructGlobalLowering::matchAndRewrite(
     zirgen::Zhl::ConstructGlobalOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter
 ) const {
   return this->makeCtorCall(
-      op, op.getConstructType(), adaptor.getArgs(), rewriter, forName(op.getNameAttr())
+      op, op.getConstructType(), adaptor.getArgs(), rewriter, *getTypeConverter(),
+      forName(op.getNameAttr())
   );
 }
 

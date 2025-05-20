@@ -13,6 +13,7 @@
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <llvm/Support/Debug.h>
 #include <llzk/Dialect/Function/IR/Ops.h>
+#include <llzk/Dialect/Struct/IR/Ops.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
@@ -34,64 +35,136 @@
 
 using namespace mlir;
 using namespace zhl;
+using namespace zml;
 
-namespace zml {
+/// Extracts the binding from the input value/operation and creates a
+/// cast of the value into the type materialized from the binding.
+/// If the super type is specified generates an additional SuperCoerceOp
+/// from the binding's type to the super type.
+/// REQUIRES that the operation has one result only.
+mlir::FailureOr<mlir::Value> zml::CastHelper::getCastedValue(
+    mlir::Operation *op, mlir::OpBuilder &builder, mlir::SmallVectorImpl<mlir::Operation *> &,
+    mlir::Type super
+) {
+  assert(op->getNumResults() == 1 && "casting helper can only work with operations with 1 result");
+  return getCastedValue(op->getResult(0), builder, super);
+}
 
-mlir::Operation *findCallee(mlir::StringRef name, mlir::ModuleOp root) {
-  auto calleeComp = root.lookupSymbol<ComponentInterface>(name);
+mlir::FailureOr<mlir::Value>
+zml::CastHelper::getCastedValue(mlir::Operation *op, mlir::OpBuilder &builder, mlir::Type super) {
+  mlir::SmallVector<mlir::Operation *, 2> genOps;
+  return getCastedValue(op, builder, genOps, super);
+}
+
+mlir::FailureOr<mlir::Value> zml::CastHelper::getCastedValue(
+    mlir::Value value, mlir::OpBuilder &builder,
+    mlir::SmallVector<mlir::Operation *, 2> &generatedOps, mlir::Type super
+) {
+  auto binding = zml::TypeBindingAttr::get(value);
+  if (!binding) {
+    return mlir::failure();
+  }
+  return getCastedValue(value, *binding, builder, generatedOps, super);
+}
+
+mlir::FailureOr<mlir::Value>
+zml::CastHelper::getCastedValue(mlir::Value value, mlir::OpBuilder &builder, mlir::Type super) {
+  auto binding = zml::TypeBindingAttr::get(value);
+  if (!binding) {
+    return mlir::failure();
+  }
+  mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+  return getCastedValue(value, *binding, builder, generatedOps, super);
+}
+
+/// A non-failing version that takes a binding as additional parameter
+mlir::Value zml::CastHelper::getCastedValue(
+    mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder,
+    mlir::SmallVectorImpl<mlir::Operation *> &generatedOps, mlir::Type super
+) {
+  auto materialized = materializeTypeBinding(builder.getContext(), binding);
+  assert(materialized);
+  if (value.getType() == materialized) {
+    return value;
+  }
+  auto cast = builder.create<mlir::UnrealizedConversionCastOp>(
+      value.getLoc(), mlir::TypeRange(materialized), mlir::ValueRange(value)
+  );
+  generatedOps.push_back(cast.getOperation());
+
+  mlir::Value result = cast.getResult(0);
+  if (super && super != materialized) {
+    auto coerce = builder.create<zml::SuperCoerceOp>(value.getLoc(), super, result);
+    generatedOps.push_back(coerce.getOperation());
+    result = coerce;
+  }
+  return result;
+}
+
+mlir::Value zml::CastHelper::getCastedValue(
+    mlir::Value value, const zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Type super
+) {
+  mlir::SmallVector<mlir::Operation *, 2> generatedOps;
+  return getCastedValue(value, binding, builder, generatedOps, super);
+}
+
+mlir::Operation *zml::findCallee(mlir::StringRef name, mlir::ModuleOp root) {
+  auto calleeComp = root.lookupSymbol<llzk::component::StructDefOp>(name);
   if (calleeComp) {
     return calleeComp;
   }
 
   // Zhl Component ops don't declare their symbols in the symbol table
-  for (auto zhlOp : root.getOps<zirgen::Zhl::ComponentOp>()) {
-    if (zhlOp.getName() == name) {
-      return zhlOp;
-    }
-  }
+  // for (auto zhlOp : root.getOps<zirgen::Zhl::ComponentOp>()) {
+  //   if (zhlOp.getName() == name) {
+  //     return zhlOp;
+  //   }
+  // }
   return nullptr;
 }
 
 template <typename T, typename Fn> T queryComp(mlir::Operation *op, Fn query, T Default = T()) {
-  if (auto zmlOp = mlir::dyn_cast<ComponentInterface>(op)) {
+  if (auto zmlOp = mlir::dyn_cast<zml::ComponentInterface>(op)) {
     return query(zmlOp);
   }
   return Default;
 }
 
-bool calleeIsBuiltin(mlir::Operation *op) {
+bool zml::calleeIsBuiltin(mlir::Operation *op) {
   return queryComp<bool>(op, [](auto zmlOp) { return zmlOp.getBuiltin(); });
 }
 
 #define DEBUG_TYPE "zml-slot-helpers"
 
-FlatSymbolRefAttr createSlot(
-    zhl::ComponentSlot *slot, OpBuilder &builder, ComponentInterface component, Location loc
+FlatSymbolRefAttr zml::createSlot(
+    zhl::ComponentSlot *slot, OpBuilder &builder, llzk::component::StructDefOp component,
+    Location loc, const TypeConverter &tc
 ) {
   mlir::SymbolTable st(component);
 
-  auto desiredName = mlir::StringAttr::get(component.getContext(), slot->getSlotName());
   LLVM_DEBUG(
       llvm::dbgs() << "Creating a slot in " << component.getName()
-                   << "\nDesired name: " << desiredName << "\n"
+                   << "\nDesired name: " << slot->getSlotName() << "\n"
   );
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(&component.getRegion().front().front());
-  auto type = materializeTypeBinding(builder.getContext(), slot->getBinding());
-  auto fieldDef = builder.create<FieldDefOp>(
-      loc, desiredName, TypeAttr::get(type), slot->isColumn() ? builder.getUnitAttr() : nullptr
-  );
+  auto type = tc.convertType(materializeTypeBinding(builder.getContext(), slot->getBinding()));
+  auto fieldDef =
+      builder.create<llzk::component::FieldDefOp>(loc, slot->getSlotName(), type, slot->isColumn());
 
   LLVM_DEBUG(llvm::dbgs() << "Field op: " << fieldDef << "\n");
   // Insert the FieldDefOp into the symbol table to make sure it has an unique name within the
   // component
   auto name = st.insert(fieldDef);
+  assert(name == slot->getSlotName() && "slot names should be uniqued during type checking");
   LLVM_DEBUG(llvm::dbgs() << "Name created by the symbol table: " << name << "\n");
-  slot->rename(name.getValue());
+  if (slot->getSlotName() != name) {
+    slot->rename(name.getValue());
+  }
   return mlir::FlatSymbolRefAttr::get(component.getContext(), name);
 }
 
-TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
+static TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
   if (count == 0) {
     return type;
   }
@@ -101,7 +174,7 @@ TypeBinding unwrapArrayNTimes(const TypeBinding &type, size_t count) {
   return unwrapArrayNTimes(*inner, count - 1);
 }
 
-Value storeAndLoadSlot(
+Value zml::storeAndLoadSlot(
     ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
     OpBuilder &builder, Value self
 ) {
@@ -109,7 +182,7 @@ Value storeAndLoadSlot(
   return loadSlot(slot, value.getType(), slotName, slotType, loc, builder, self);
 }
 
-Value loadSlot(
+Value zml::loadSlot(
     ComponentSlot &slot, Type valueType, FlatSymbolRefAttr slotName, Type slotType, Location loc,
     OpBuilder &builder, Value self
 ) {
@@ -128,7 +201,7 @@ Value loadSlot(
   }
 }
 
-void storeSlot(
+void zml::storeSlot(
     ComponentSlot &slot, Value value, FlatSymbolRefAttr slotName, Type slotType, Location loc,
     OpBuilder &builder, Value self
 ) {
@@ -193,7 +266,7 @@ static void materializeFieldTypes(
   fields.insert(fields.end(), fieldsToSort.begin(), fieldsToSort.end());
 }
 
-void constructFieldReads(
+static void constructFieldReads(
     TypeRange types, ArrayRef<StringRef> fieldNames, SmallVectorImpl<Value> &results,
     OpBuilder &builder, Value self, Location loc, zhl::TypeBinding &binding
 ) {
@@ -208,9 +281,10 @@ void constructFieldReads(
   }
 }
 
-FailureOr<Value> constructPODComponent(
+FailureOr<Value> zml::constructPODComponent(
     Operation *op, zhl::TypeBinding &binding, OpBuilder &builder, Value self,
-    llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &bindings
+    llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &bindings,
+    const TypeConverter &tc
 ) {
   auto ctor = CtorCallBuilder::Make(op, binding, builder, self, bindings);
   if (failed(ctor)) {
@@ -234,10 +308,10 @@ FailureOr<Value> constructPODComponent(
       binding
   );
 
-  return ctor->build(builder, loc, args);
+  return ctor->build(builder, loc, args, tc);
 }
 
-void createPODComponent(
+void zml::createPODComponent(
     zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::SymbolTable &st,
     const mlir::TypeConverter &TC
 ) {
@@ -315,13 +389,13 @@ mlir::FailureOr<CtorCallBuilder> CtorCallBuilder::Make(
   auto constructorType = materializeTypeBindingConstructor(builder, binding, bindings);
 
   return CtorCallBuilder(
-      constructorType, binding, op->getParentOfType<ComponentInterface>(), self,
+      constructorType, binding, op->getParentOfType<llzk::component::StructDefOp>(), self,
       calleeIsBuiltin(calleeComp)
   );
 }
 
 mlir::Value CtorCallBuilder::build(
-    mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args,
+    mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange args, const TypeConverter &tc,
     GlobalBuilder::AndName globalBuilder
 ) {
   auto genericParams = compBinding.getGenericParamsMapping();
@@ -339,7 +413,7 @@ mlir::Value CtorCallBuilder::build(
     TypeBinding compSlotBinding = compSlot->getBinding();
 
     // Create the field
-    FlatSymbolRefAttr name = createSlot(compSlot, builder, callerComponentOp, loc);
+    FlatSymbolRefAttr name = createSlot(compSlot, builder, callerComponentOp, loc, tc);
     Type slotType = materializeTypeBinding(builder.getContext(), compSlotBinding);
 
     compValue = storeAndLoadSlot(*compSlot, compValue, name, slotType, loc, builder, self);
@@ -358,7 +432,7 @@ mlir::FunctionType CtorCallBuilder::getCtorType() const { return ctorType; }
 const zhl::TypeBinding &CtorCallBuilder::getBinding() const { return compBinding; }
 
 CtorCallBuilder::CtorCallBuilder(
-    mlir::FunctionType type, const zhl::TypeBinding &binding, ComponentInterface caller,
+    mlir::FunctionType type, const zhl::TypeBinding &binding, llzk::component::StructDefOp caller,
     mlir::Value selfValue, bool builtin
 )
     : ctorType(type), compBinding(binding), isBuiltin(builtin), callerComponentOp(caller),
@@ -367,7 +441,7 @@ CtorCallBuilder::CtorCallBuilder(
   assert(self);
 }
 
-mlir::FailureOr<Value> coerceToArray(TypedValue<ComponentLike> v, OpBuilder &builder) {
+mlir::FailureOr<Value> zml::coerceToArray(TypedValue<ComponentLike> v, OpBuilder &builder) {
   auto arraySuper = v.getType().getFirstMatchingSuperType([](Type t) {
     if (auto ct = mlir::dyn_cast_if_present<ComponentLike>(t)) {
       return ct.isConcreteArray();
@@ -381,5 +455,3 @@ mlir::FailureOr<Value> coerceToArray(TypedValue<ComponentLike> v, OpBuilder &bui
 
   return builder.create<SuperCoerceOp>(v.getLoc(), *arraySuper, v).getResult();
 }
-
-} // namespace zml

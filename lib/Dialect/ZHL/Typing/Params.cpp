@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <cassert>
+#include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVectorExtras.h>
 #include <mlir/IR/Types.h>
@@ -158,6 +159,24 @@ bool Params::empty() const { return data()->names.empty(); }
 
 bool Params::operator==(const Params &other) const {
   return data()->params == other.data()->params && data()->names == other.data()->names;
+}
+
+llvm::hash_code zhl::hash_value(const Params &params) {
+  auto paramsHash =
+      llvm::hash_combine_range(params.data()->params.begin(), params.data()->params.end());
+  auto namesHash =
+      llvm::hash_combine_range(params.data()->names.begin(), params.data()->names.end());
+  // llvm::BitVector does not implement an iterator of bools over the whole set.
+  SmallVector<bool> bits;
+  auto &bitsSrc = params.data()->injected;
+  auto size = bitsSrc.size();
+  bits.reserve(size);
+  for (unsigned i = 0; i < size; i++) {
+    bits.push_back(bitsSrc[i]);
+  }
+  auto injectedHash = llvm::hash_combine_range(bits.begin(), bits.end());
+
+  return llvm::hash_combine("Params", paramsHash, "names", namesHash, "injected", injectedHash);
 }
 
 //==-----------------------------------------------------------------------==//

@@ -23,6 +23,7 @@
 #include <memory>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Diagnostics.h>
+#include <mlir/IR/DialectImplementation.h>
 #include <mlir/IR/Location.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
@@ -157,6 +158,8 @@ public:
     }
 
   public:
+    friend llvm::hash_code hash_value(const Flags &);
+
     constexpr Flags() {}
     constexpr Flags(std::initializer_list<unsigned> Init) : flags(Init) {}
 
@@ -401,6 +404,11 @@ public:
   /// member is not public or it doesn't exist.
   mlir::FailureOr<TypeBinding> getMember(mlir::StringRef, EmitErrorFn) const;
 
+  /// Returns wether the type binding defines a member with the given name.
+  /// If recurse is set to true checks in the super type if the member was not found on this type
+  /// binding. If it's set to false it will look only on this type binding.
+  bool definesMember(mlir::StringRef memberName, bool recurse = true) const;
+
   //==---------------------------------------------------------------------==//
   // Array helper methods
   //==---------------------------------------------------------------------==//
@@ -427,28 +435,33 @@ public:
   TypeBinding &operator=(TypeBinding &&) = default;
 
   /// Constructs a type binding of type Component.
-  TypeBinding(mlir::Location);
+  TypeBinding(const TypeBindings &Bindings, mlir::Location);
 
   TypeBinding(
-      mlir::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType, Frame = Frame(),
-      bool IsBuiltin = false
-  );
-  TypeBinding(mlir::StringRef, mlir::Location, const TypeBinding &, Flags, Frame = Frame());
-  TypeBinding(
-      mlir::StringRef Name, mlir::Location Loc, const TypeBinding &SuperType,
-      ParamsMap GenericParams, Frame = Frame(), bool IsBuiltin = false
+      const TypeBindings &Bindings, mlir::StringRef Name, mlir::Location Loc,
+      const TypeBinding &SuperType, Frame = Frame(), bool IsBuiltin = false
   );
   TypeBinding(
-      mlir::StringRef, mlir::Location, const TypeBinding &SuperType, ParamsMap GenericParams, Flags,
+      const TypeBindings &Bindings, mlir::StringRef, mlir::Location, const TypeBinding &, Flags,
       Frame = Frame()
   );
   TypeBinding(
-      mlir::StringRef, mlir::Location, const TypeBinding &SuperType, ParamsMap GenericParams,
-      ParamsMap ConstructorParams, MembersMap Members, Frame = Frame(), bool IsBuiltin = false
+      const TypeBindings &Bindings, mlir::StringRef Name, mlir::Location Loc,
+      const TypeBinding &SuperType, ParamsMap GenericParams, Frame = Frame(), bool IsBuiltin = false
   );
   TypeBinding(
-      mlir::StringRef, mlir::Location Loc, const TypeBinding &SuperType, ParamsMap GenericParams,
-      ParamsMap ConstructorParams, MembersMap Members, Flags, Frame = Frame()
+      const TypeBindings &Bindings, mlir::StringRef, mlir::Location, const TypeBinding &SuperType,
+      ParamsMap GenericParams, Flags, Frame = Frame()
+  );
+  TypeBinding(
+      const TypeBindings &Bindings, mlir::StringRef, mlir::Location, const TypeBinding &SuperType,
+      ParamsMap GenericParams, ParamsMap ConstructorParams, MembersMap Members, Frame = Frame(),
+      bool IsBuiltin = false
+  );
+  TypeBinding(
+      const TypeBindings &Bindings, mlir::StringRef, mlir::Location Loc,
+      const TypeBinding &SuperType, ParamsMap GenericParams, ParamsMap ConstructorParams,
+      MembersMap Members, Flags, Frame = Frame()
   );
 
   /// Constructs a type binding with a constant Val associated.
@@ -464,22 +477,19 @@ public:
   //==---------------------------------------------------------------------==//
 
   /// Returns a copy of the type binding with the location replaced.
-  static TypeBinding WithUpdatedLocation(const TypeBinding &t, mlir::Location loc) {
-    TypeBinding copy = t;
+  static TypeBinding WithUpdatedLocation(TypeBinding copy, mlir::Location loc) {
     copy.loc = loc;
     return copy;
   }
 
   /// Returns a copy of the type binding with the frame replaced.
-  static TypeBinding ReplaceFrame(const TypeBinding &t, Frame frame) {
-    auto copy = t;
+  static TypeBinding ReplaceFrame(TypeBinding copy, Frame frame) {
     copy.frame = frame;
     return copy;
   }
 
   /// Returns a copy of the type binding that has the variadic property set to true.
-  static TypeBinding WrapVariadic(const TypeBinding &t) {
-    TypeBinding copy = t;
+  static TypeBinding WrapVariadic(TypeBinding copy) {
     copy.flags.setVariadic(true);
     return copy;
   }
@@ -487,21 +497,19 @@ public:
   /// Returns a new type binding that represents a generic parameter whose super type is the given
   /// type binding.
   static TypeBinding MakeGenericParam(const TypeBinding &t, llvm::StringRef name) {
-    TypeBinding copy(name, t.loc, t);
+    TypeBinding copy(t.getContext(), name, t.loc, t);
     copy.genericParamName = name;
     return copy;
   }
 
   /// Returns a copy of the type binding with the given constant expression associated.
-  static TypeBinding WithExpr(const TypeBinding &b, expr::ConstExpr constExpr) {
-    auto copy = b;
+  static TypeBinding WithExpr(TypeBinding copy, expr::ConstExpr constExpr) {
     copy.constExpr = constExpr;
     return copy;
   }
 
   /// Returns a copy of the type binding with any constant expression it may have removed.
-  static TypeBinding NoExpr(const TypeBinding &b) {
-    auto copy = b;
+  static TypeBinding NoExpr(TypeBinding copy) {
     copy.constExpr = expr::ConstExpr();
     return copy;
   }
@@ -516,15 +524,13 @@ public:
   }
 
   /// Returns a copy of the type binding with the closure property set to true.
-  static TypeBinding WithClosure(const TypeBinding &binding) {
-    auto copy = binding;
+  static TypeBinding WithClosure(TypeBinding copy) {
     copy.flags.setClosure(true);
     return copy;
   }
 
   /// Returns a copy of the type binding with the closure property set to false.
-  static TypeBinding WithoutClosure(const TypeBinding &binding) {
-    auto copy = binding;
+  static TypeBinding WithoutClosure(TypeBinding copy) {
     copy.flags.setClosure(false);
     return copy;
   }
@@ -547,6 +553,9 @@ public:
     flags.setSpecialized(true);
   }
 
+  /// Returns a reference to the context this type binding belongs to.
+  const TypeBindings &getContext() const;
+
   /// Attempts to create an specialized version of the type using the provided parameters. Returns
   /// failure if the specialization fails.
   mlir::FailureOr<TypeBinding>
@@ -555,6 +564,7 @@ public:
   bool operator==(const TypeBinding &) const;
 
   friend TypeBindings;
+  friend llvm::hash_code hash_value(const TypeBinding &);
 
 private:
   /// Locates the member in the inheritance chain. A component lower in the chain will shadow
@@ -573,16 +583,20 @@ private:
   ParamsStoragePtr constructorParams;
   Frame frame;
   FrameSlot *slot = nullptr;
+  const TypeBindings *ctx;
 };
 
 mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding &b);
 mlir::Diagnostic &operator<<(mlir::Diagnostic &diag, const TypeBinding::Name &name);
+llvm::hash_code hash_value(const TypeBinding::Flags &);
+llvm::hash_code hash_value(const TypeBinding &);
+llvm::hash_code hash_value(const MembersMap &);
 
 } // namespace zhl
 
 namespace llvm {
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding &b);
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const zhl::TypeBinding::Name &name);
+raw_ostream &operator<<(raw_ostream &os, const zhl::TypeBinding &b);
+raw_ostream &operator<<(raw_ostream &os, const zhl::TypeBinding::Name &name);
 
 } // namespace llvm

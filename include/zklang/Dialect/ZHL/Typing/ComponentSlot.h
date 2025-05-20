@@ -17,6 +17,10 @@
 #include <zklang/Dialect/ZHL/Typing/FrameSlot.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
+namespace llvm {
+class hash_code;
+}
+
 namespace zhl {
 
 class ComponentSlot : public FrameSlot {
@@ -51,6 +55,8 @@ public:
   void editInnerBinding(llvm::function_ref<void(TypeBinding &)>);
 
   void print(llvm::raw_ostream &) const override;
+
+  llvm::hash_code hash() const override;
 
 protected:
   ComponentSlot(FrameSlotKind, const TypeBindings &bindings, const TypeBinding &binding);

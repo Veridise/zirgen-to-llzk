@@ -21,7 +21,9 @@
 #include <mlir/IR/DialectImplementation.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/IR/Value.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Transforms/DialectConversion.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
 #include <zklang/Dialect/ZML/IR/Attrs.h> // IWYU pragma: keep
@@ -33,6 +35,10 @@
 
 // TableGen'd implementation files
 #include <zklang/Dialect/ZML/IR/Dialect.cpp.inc>
+
+template <> struct mlir::FieldParser<zhl::TypeBinding> {
+  static FailureOr<zhl::TypeBinding> parse(AsmParser &parser) { return mlir::failure(); }
+};
 
 // Need a complete declaration of storage classes
 #define GET_TYPEDEF_CLASSES
@@ -71,56 +77,67 @@ auto ZMLDialect::initialize() -> void {
 }
 
 //===----------------------------------------------------------------------===//
-// FixedTypeBindingAttr
+// TypeBindingAttr
 //===----------------------------------------------------------------------===//
 
-FixedTypeBindingAttr FixedTypeBindingAttr::get(
-    MLIRContext *ctx, const zhl::TypeBinding &binding, const zhl::TypeBindings &bindings
-) {
-  Builder builder(ctx);
-
-  auto Type = materializeTypeBinding(ctx, binding);
-  auto Name = builder.getStringAttr(binding.getName());
-  auto GenericParams =
-      llvm::map_to_vector(binding.getGenericParamsMapping().zipped(), [ctx, &bindings](auto param) {
-    Builder builder(ctx);
-    auto [ParamBinding, ParamName, IsInjected] = param;
-    return GenericParamAttr::get(
-        ctx, builder.getStringAttr(ParamName),
-        FixedTypeBindingAttr::get(ctx, ParamBinding, bindings), IsInjected
-    );
-  });
-  auto Members = llvm::map_to_vector(binding.getMembers(), [ctx, &bindings](auto &member) {
-    Builder builder(ctx);
-
-    return ComponentMemberAttr::get(
-        ctx, builder.getStringAttr(member.getKey()),
-        FixedTypeBindingAttr::get(ctx, *member.getValue(), bindings),
-        true // TODO: Add detection of public or private according to the new model
-    );
-  });
-  auto CtorType = materializeTypeBindingConstructor(builder, binding, bindings);
-  auto ParamLocs =
-      llvm::map_to_vector(binding.getConstructorParamLocations(), [](Location loc) -> LocationAttr {
-    return loc;
-  });
-  FixedTypeBindingAttr SuperType = nullptr;
-  if (binding.hasSuperType()) {
-    SuperType = FixedTypeBindingAttr::get(ctx, binding.getSuperType(), bindings);
-  }
-  Attribute ConstExpr = nullptr;
-  if (auto expr = binding.getConstExpr()) {
-    ConstExpr = expr->convertIntoAttribute(builder);
-  }
-
-  return Base::get(
-      ctx, Type, Name, GenericParams, Members, CtorType, ParamLocs, SuperType, ConstExpr,
-      binding.isBuiltin(), binding.isExtern()
-  );
+Type TypeBindingAttr::materializeType() const {
+  return materializeTypeBinding(getContext(), *getTypeBinding());
 }
 
-SmallVector<StringRef> FixedTypeBindingAttr::getGenericParamNames() const {
-  return llvm::map_to_vector(getGenericParams(), [](auto param) {
-    return param.getName().getValue();
-  });
+Type TypeBindingAttr::materializeType(const mlir::TypeConverter *tc) const {
+  assert(tc);
+  return materializeType(*tc);
+}
+
+Type TypeBindingAttr::materializeType(const mlir::TypeConverter &tc) const {
+  return tc.convertType(materializeType());
+}
+
+FunctionType TypeBindingAttr::materializeCtorType() const {
+  Builder b(getContext());
+  return materializeTypeBindingConstructor(b, *getTypeBinding(), getTypeBinding()->getContext());
+}
+
+TypeBindingAttr TypeBindingAttr::getSuperTypeAttr() const {
+  if (!getTypeBinding()->hasSuperType()) {
+    return nullptr;
+  }
+
+  return TypeBindingAttr::get(getContext(), getTypeBinding()->getSuperType());
+}
+
+TypeBindingAttr TypeBindingAttr::get(Operation *op, StringRef key) {
+  return op->getAttrOfType<zml::TypeBindingAttr>(key);
+}
+
+void TypeBindingAttr::bind(Operation *op, StringRef key, bool overwrite) const {
+  if (!overwrite) {
+    assert(!get(op, key) && "overwriting type binding");
+  }
+
+  op->setDiscardableAttr(key, *this);
+}
+
+static StringRef argKey(BlockArgument &arg, SmallVectorImpl<char> &sto) {
+  sto.clear();
+  ("zml.arg_binding." + Twine(arg.getArgNumber())).toVector(sto);
+  return StringRef(sto.data(), sto.size());
+}
+
+TypeBindingAttr TypeBindingAttr::get(Value val) {
+  return TypeSwitch<Value, TypeBindingAttr>(val)
+      .Case([](OpResult res) { return get(res.getDefiningOp()); })
+      .Case([](BlockArgument arg) {
+    SmallString<30> key;
+    return get(arg.getParentBlock()->getParentOp(), argKey(arg, key));
+  }).Default([](auto) { return nullptr; });
+}
+
+void TypeBindingAttr::bind(Value val, bool overwrite) const {
+  return TypeSwitch<Value>(val)
+      .Case([this, overwrite](OpResult res) { bind(res.getDefiningOp(), overwrite); })
+      .Case([this, overwrite](BlockArgument arg) {
+    SmallString<30> key;
+    bind(arg.getParentBlock()->getParentOp(), argKey(arg, key), overwrite);
+  }).Default([](auto) {});
 }

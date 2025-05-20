@@ -9,8 +9,10 @@
 
 #include <cassert>
 #include <iterator>
+#include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVectorExtras.h>
+#include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Debug.h>
 #include <mlir/IR/Types.h>
 #include <mlir/Support/LogicalResult.h>
@@ -21,6 +23,7 @@
 #include <zklang/Dialect/ZHL/Typing/Params.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
+#include <zklang/Dialect/ZHL/Typing/TypeBindingRef.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBindings.h>
 
 #define DEBUG_TYPE "zhl-type-bindings"
@@ -157,7 +160,7 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
         return copy;
       }
       LLVM_DEBUG(logLine(1) << "Defaulting to Component\n");
-      return TypeBinding(loc);
+      return TypeBinding(getContext(), loc);
     }
     // If this is an Array and the other has an Array supertype get the Array super type and go from
     // there.
@@ -182,7 +185,7 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
     return other.commonSupertypeWith(*superType);
   }
   LLVM_DEBUG(logLine(1) << "Defaulting to Component\n");
-  return TypeBinding(loc);
+  return TypeBinding(getContext(), loc);
 }
 
 bool TypeBinding::isTransitivelyVal() const {
@@ -237,6 +240,17 @@ FailureOr<TypeBinding> TypeBinding::getMember(StringRef memberName, EmitErrorFn 
                        << memberName;
   }
   return **memberLookupRes;
+}
+
+bool TypeBinding::definesMember(StringRef memberName, bool recurse) const {
+  if (members.contains(memberName)) {
+    return true;
+  }
+
+  if (recurse && hasSuperType()) {
+    return getSuperType().definesMember(memberName, recurse);
+  }
+  return false;
 }
 
 FailureOr<TypeBinding> TypeBinding::map(Params params, EmitErrorFn emitError) const {
@@ -303,50 +317,56 @@ FailureOr<TypeBinding> TypeBinding::getConcreteArrayType() const {
   return superType->getConcreteArrayType();
 }
 
-TypeBinding::TypeBinding(mlir::Location Loc)
-    : flags(Flags::MkBuiltin(true)), name("Component"), loc(Loc), superType(nullptr) {}
+TypeBinding::TypeBinding(const TypeBindings &Bindings, mlir::Location Loc)
+    : flags(Flags::MkBuiltin(true)), name("Component"), loc(Loc), superType(nullptr),
+      ctx(&Bindings) {}
 
 TypeBinding::TypeBinding(
-    llvm::StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType, Frame Frame,
-    bool isBuiltin
-)
-    : TypeBinding(BindingName, Loc, SuperType, {}, {}, {}, Flags::MkBuiltin(isBuiltin), Frame) {}
-
-TypeBinding::TypeBinding(
-    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType, Flags BindingFlags,
-    Frame Frame
-)
-    : TypeBinding(BindingName, Loc, SuperType, {}, {}, {}, BindingFlags, Frame) {}
-
-TypeBinding::TypeBinding(
-    llvm::StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
-    ParamsMap GenericParams, Frame Frame, bool isBuiltin
-)
-    : TypeBinding(BindingName, Loc, SuperType, GenericParams, {}, {}, Frame, isBuiltin) {}
-
-TypeBinding::TypeBinding(
-    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
-    ParamsMap GenericParams, Flags BindingFlags, Frame Frame
-)
-    : TypeBinding(BindingName, Loc, SuperType, GenericParams, {}, {}, BindingFlags, Frame) {}
-
-TypeBinding::TypeBinding(
-    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
-    ParamsMap GenericParams, ParamsMap ConstructorParams, MembersMap Members, Frame Frame,
-    bool IsBuiltin
+    const TypeBindings &Bindings, llvm::StringRef BindingName, mlir::Location Loc,
+    const TypeBinding &SuperType, Frame Frame, bool isBuiltin
 )
     : TypeBinding(
-          BindingName, Loc, SuperType, GenericParams, ConstructorParams, Members,
+          Bindings, BindingName, Loc, SuperType, {}, {}, {}, Flags::MkBuiltin(isBuiltin), Frame
+      ) {}
+
+TypeBinding::TypeBinding(
+    const TypeBindings &Bindings, StringRef BindingName, mlir::Location Loc,
+    const TypeBinding &SuperType, Flags BindingFlags, Frame Frame
+)
+    : TypeBinding(Bindings, BindingName, Loc, SuperType, {}, {}, {}, BindingFlags, Frame) {}
+
+TypeBinding::TypeBinding(
+    const TypeBindings &Bindings, llvm::StringRef BindingName, mlir::Location Loc,
+    const TypeBinding &SuperType, ParamsMap GenericParams, Frame Frame, bool isBuiltin
+)
+    : TypeBinding(Bindings, BindingName, Loc, SuperType, GenericParams, {}, {}, Frame, isBuiltin) {}
+
+TypeBinding::TypeBinding(
+    const TypeBindings &Bindings, StringRef BindingName, mlir::Location Loc,
+    const TypeBinding &SuperType, ParamsMap GenericParams, Flags BindingFlags, Frame Frame
+)
+    : TypeBinding(
+          Bindings, BindingName, Loc, SuperType, GenericParams, {}, {}, BindingFlags, Frame
+      ) {}
+
+TypeBinding::TypeBinding(
+    const TypeBindings &Bindings, StringRef BindingName, mlir::Location Loc,
+    const TypeBinding &SuperType, ParamsMap GenericParams, ParamsMap ConstructorParams,
+    MembersMap Members, Frame Frame, bool IsBuiltin
+)
+    : TypeBinding(
+          Bindings, BindingName, Loc, SuperType, GenericParams, ConstructorParams, Members,
           Flags::MkBuiltin(IsBuiltin), Frame
       ) {}
 
 TypeBinding::TypeBinding(
-    StringRef BindingName, mlir::Location Loc, const TypeBinding &SuperType,
-    ParamsMap GenericParams, ParamsMap ConstructorParams, MembersMap Members, Flags BindingFlags,
-    Frame Frame
+    const TypeBindings &Bindings, StringRef BindingName, mlir::Location Loc,
+    const TypeBinding &SuperType, ParamsMap GenericParams, ParamsMap ConstructorParams,
+    MembersMap Members, Flags BindingFlags, Frame Frame
 )
     : flags(BindingFlags), name(BindingName), loc(Loc), superType(&SuperType), members(Members),
-      genericParams(GenericParams), constructorParams(ConstructorParams), frame(Frame) {}
+      genericParams(GenericParams), constructorParams(ConstructorParams), frame(Frame),
+      ctx(&Bindings) {}
 
 TypeBinding::TypeBinding(
     uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, bool IsBuiltin
@@ -357,7 +377,7 @@ TypeBinding::TypeBinding(
     uint64_t Value, mlir::Location Loc, const TypeBindings &Bindings, Flags BindingFlags
 )
     : flags(BindingFlags), name(CONST), loc(Loc), constExpr(expr::ConstExpr::Val(Value)),
-      superType(&Bindings.Get("Val")) {}
+      superType(&Bindings.Get("Val")), ctx(&Bindings) {}
 
 void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
   auto printType = [&]() {
@@ -463,6 +483,11 @@ void TypeBinding::selfConstructs() {
   constructorParams = ParamsMap().declare("x", *this);
 }
 
+const TypeBindings &TypeBinding::getContext() const {
+  assert(ctx);
+  return *ctx;
+}
+
 bool TypeBinding::operator==(const TypeBinding &other) const {
   bool superTypeIsEqual;
   if (superType == nullptr && other.superType == nullptr) {
@@ -488,6 +513,35 @@ FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef member
     return superType->locateMember(memberName);
   }
   return failure();
+}
+
+llvm::hash_code zhl::hash_value(const TypeBinding &ref) {
+  auto part1 = llvm::hash_combine(
+      "TypeBinding", ref.getName(), ref.flags, ref.loc, ref.constExpr, ref.genericParamName
+  );
+  llvm::hash_code part2 = ref.hasSuperType() ? llvm::hash_combine("superType", ref.getSuperType())
+                                             : llvm::hash_combine("superType", 0);
+  auto part3 = llvm::hash_combine(
+      ref.members, ref.getGenericParamsMapping(), ref.getConstructorParams(), ref.frame
+  );
+  llvm::hash_code part4 =
+      ref.slot ? llvm::hash_combine("slot", *ref.slot) : llvm::hash_combine("slot", 0);
+
+  return llvm::hash_combine(part1, part2, part3, part4);
+}
+
+//==-----------------------------------------------------------------------==//
+// TypeBinding::Flags
+//==-----------------------------------------------------------------------==//
+
+llvm::hash_code zhl::hash_value(const TypeBinding::Flags &ref) {
+  SmallVector<bool> vec;
+  auto size = ref.flags.size();
+  vec.reserve(size);
+  for (unsigned i = 0; i < size; i++) {
+    vec.push_back(ref.flags[i]);
+  }
+  return llvm::hash_combine("TypeBinding::Flags", llvm::hash_combine_range(vec.begin(), vec.end()));
 }
 
 //==-----------------------------------------------------------------------==//
@@ -517,6 +571,11 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, const TypeBinding &ty
   return os;
 }
 
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, const TypeBindingRef &type) {
+  type->print(os);
+  return os;
+}
+
 llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, const TypeBinding::Name &name) {
   os << name.ref();
   return os;
@@ -530,7 +589,31 @@ mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const TypeBinding &typ
   return diag;
 }
 
+mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const TypeBindingRef &type) {
+  diag << *type;
+  return diag;
+}
+
 mlir::Diagnostic &zhl::operator<<(mlir::Diagnostic &diag, const TypeBinding::Name &name) {
   diag << Twine(name.ref());
   return diag;
+}
+
+//==-----------------------------------------------------------------------==//
+// TypeBindingRef
+//==-----------------------------------------------------------------------==//
+
+bool TypeBindingRef::operator==(const TypeBindingRef &other) const { return ref() == other.ref(); }
+
+llvm::hash_code zhl::hash_value(const TypeBindingRef &ref) { return hash_value(*ref); }
+
+//==-----------------------------------------------------------------------==//
+// MembersMap
+//==-----------------------------------------------------------------------==//
+
+llvm::hash_code zhl::hash_value(const MembersMap &map) {
+  auto vec = llvm::map_to_vector(map, [](auto &pair) {
+    return llvm::hash_combine(pair.getKey(), pair.getValue());
+  });
+  return llvm::hash_combine("MembersMap", llvm::hash_value(ArrayRef(vec)));
 }

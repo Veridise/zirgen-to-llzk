@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/simple_ilist.h>
@@ -81,6 +82,9 @@ public:
   /// if that is not the case this method returns nullptr.
   virtual ExprBase *remap(Params, EmitErrorFn) const = 0;
 
+  /// Computes a llvm compatible hash value
+  virtual llvm::hash_code hash() const = 0;
+
   /// Wrap the expression into a simple view without lifetime considerations.
   operator SimpleExprView() const;
 
@@ -90,6 +94,8 @@ private:
 protected:
   explicit ExprBase(ExprKind Kind) : kind(Kind) {}
 };
+
+llvm::hash_code hash_value(const ExprBase &);
 
 } // namespace detail
 
@@ -248,6 +254,8 @@ public:
 
   ExprBase *remap(Params, EmitErrorFn) const override;
 
+  llvm::hash_code hash() const override;
+
   uint64_t getValue() const { return value; }
 
 private:
@@ -269,6 +277,8 @@ public:
   void collectFreeSymbols(llvm::StringSet<> &symbols) const override { symbols.insert(name); }
 
   ExprBase *remap(Params, EmitErrorFn) const override;
+
+  llvm::hash_code hash() const override;
 
   mlir::StringRef getName() const { return name; }
 
@@ -328,6 +338,8 @@ public:
   void collectFreeSymbols(llvm::StringSet<> &) const override;
 
   ExprBase *remap(Params, EmitErrorFn) const override;
+
+  llvm::hash_code hash() const override;
 
   Arguments &arguments() { return args; }
   const Arguments &arguments() const { return args; }
@@ -448,6 +460,8 @@ using SymExpr = TypedExprAdaptor<detail::Symbol>;
 
 /// Convenience adaptor for ConstExpr that holds a detail::Ctor
 using CtorExpr = TypedExprAdaptor<detail::Ctor>;
+
+llvm::hash_code hash_value(const ConstExpr &);
 
 } // namespace zhl::expr
 
