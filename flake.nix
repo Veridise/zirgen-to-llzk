@@ -28,7 +28,7 @@
   # Custom colored bash prompt
   nixConfig.bash-prompt = ''\[\e[0;32m\][LLZK]\[\e[m\] \[\e[38;5;244m\]\w\[\e[m\] % '';
 
-  outputs = { self, nixpkgs, flake-utils, llzk-pkgs, release-helpers, llzk, samply }:
+  outputs = { self, nixpkgs, flake-utils, llzk-pkgs, release-helpers, llzk }:
     {
       # First, we define the packages used in this repository/flake
       overlays.default = final: prev: {
