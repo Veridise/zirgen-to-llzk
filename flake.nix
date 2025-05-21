@@ -13,18 +13,16 @@
       follows = "llzk-pkgs/flake-utils";
     };
 
-    release-helpers = {
-      url = "github:Veridise/open-source-release-helpers?ref=main";
+    llzk = {
+      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
       inputs = {
         nixpkgs.follows = "llzk-pkgs/nixpkgs";
         flake-utils.follows = "llzk-pkgs/flake-utils";
+        llzk-pkgs.follows = "llzk-pkgs";
       };
     };
 
-    llzk = {
-      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
-      inputs.nixpkgs.follows = "llzk-pkgs/nixpkgs";
-    };
+    release-helpers.follows = "llzk/release-helpers";
   };
 
   # Custom colored bash prompt
@@ -37,12 +35,15 @@
 
         # Default zklang build uses the default compiler for the system (usually gcc for Linux and clang for Macos)
         zklang = final.callPackage ./nix/zklang.nix { clang = final.clang_18; llzk = final.llzk; };
-        # Build in release with symbols mode with a particular compiler. Mostly useful for development and CI
+        # Build in release with symbols mode with a particular compiler and sanitizers enabled.
+        # Mostly useful for development and CI
         zklangClang = (final.zklang.override { stdenv = final.clangStdenv; }).overrideAttrs(attrs: {
           cmakeBuildType = "RelWithDebInfo";
+          cmakeFlags = attrs.cmakeFlags ++ [ "-DZKLANG_ENABLE_SANITIZERS=ON" ];
         });
         zklangGCC = (final.zklang.override { stdenv = final.gccStdenv; }).overrideAttrs(attrs: {
           cmakeBuildType = "RelWithDebInfo";
+          cmakeFlags = attrs.cmakeFlags ++ [ "-DZKLANG_ENABLE_SANITIZERS=ON" ];
         });
       };
     } //
@@ -99,6 +100,9 @@
 
               # Add release helpers to the PATH for convenience
               export PATH="${pkgs.changelogCreator.out}/bin":"$PATH"
+
+              # Add samply to the PATH for profiling during development
+              export PATH="${pkgs.samply.out}/bin":"$PATH"
 
               # For using mlir-tblgen inside the dev environment
               export LD_LIBRARY_PATH=${pkgs.z3.lib}/lib:$LD_LIBRARY_PATH

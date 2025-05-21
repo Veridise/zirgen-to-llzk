@@ -1,0 +1,2 @@
+changed:
+  - Changed default build to be without sanitizers enabled
