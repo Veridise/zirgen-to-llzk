@@ -1,5 +1,36 @@
 {
   "nodes": {
+    "advisory-db": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1732530460,
+        "narHash": "sha256-1SceEHyFdHnoWE/AnoDZRu/9+Ift3Oc1+iQzmbP7OBU=",
+        "owner": "rustsec",
+        "repo": "advisory-db",
+        "rev": "4676c5529dd5319b9962e42bf984797f0dd57f5b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rustsec",
+        "repo": "advisory-db",
+        "type": "github"
+      }
+    },
+    "crane": {
+      "locked": {
+        "lastModified": 1732407143,
+        "narHash": "sha256-qJOGDT6PACoX+GbNH2PPx2ievlmtT1NVeTB80EkRLys=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "f2b4b472983817021d9ffb60838b2b36b9376b20",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "locked": {
         "lastModified": 1652776076,

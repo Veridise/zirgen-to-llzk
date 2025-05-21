@@ -102,10 +102,10 @@ mlir::LogicalResult TypeBinding::subtypeOf(const TypeBinding &other) const {
   }
   // Special case for arrays
   if (name == "Array" && other.name == "Array") {
-    auto &arrElt = getGenericParamsMapping().getParam(0);
-    auto &otherArrElt = other.getGenericParamsMapping().getParam(0);
-    auto &arrSize = getGenericParamsMapping().getParam(1);
-    auto &otherArrSize = other.getGenericParamsMapping().getParam(1);
+    auto arrElt = getGenericParamsMapping().getParam(0);
+    auto otherArrElt = other.getGenericParamsMapping().getParam(0);
+    auto arrSize = getGenericParamsMapping().getParam(1);
+    auto otherArrSize = other.getGenericParamsMapping().getParam(1);
     if (arrSize == otherArrSize) {
       return arrElt.subtypeOf(otherArrElt);
     }
@@ -140,13 +140,13 @@ TypeBinding TypeBinding::commonSupertypeWith(const TypeBinding &other) const {
     // If they are the same size the common super type is another array
     // whose element is the least common type of the two element types
     if (other.name == "Array") {
-      auto &arrElt = getGenericParamsMapping().getParam(0);
+      auto arrElt = getGenericParamsMapping().getParam(0);
       LLVM_DEBUG(arrElt.print(logLine(1) << "This array element:  ", true); nl());
-      auto &otherArrElt = other.getGenericParamsMapping().getParam(0);
+      auto otherArrElt = other.getGenericParamsMapping().getParam(0);
       LLVM_DEBUG(otherArrElt.print(logLine(1) << "Other array element: ", true); nl());
-      auto &arrSize = getGenericParamsMapping().getParam(1);
+      auto arrSize = getGenericParamsMapping().getParam(1);
       LLVM_DEBUG(arrSize.print(logLine(1) << "This array size:     ", true); nl());
-      auto &otherArrSize = other.getGenericParamsMapping().getParam(1);
+      auto otherArrSize = other.getGenericParamsMapping().getParam(1);
       LLVM_DEBUG(otherArrSize.print(logLine(1) << "Other array size:    ", true); nl());
       if (arrSize == otherArrSize) {
         auto commonInner = arrElt.commonSupertypeWith(otherArrElt);
@@ -199,7 +199,7 @@ bool TypeBinding::isGenericParam() const {
   if (superType == nullptr) {
     return false;
   }
-  return genericParamName.has_value() &&
+  return flags.isGenericParamName() &&
          (superType->isTypeMarker() || superType->isVal() || superType->isTransitivelyVal());
 }
 
@@ -393,7 +393,7 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
       printType();
     }
   } else if (isGenericParam()) {
-    os << *genericParamName;
+    os << name;
     if (fullPrintout) {
       os << " : ";
       printType();
@@ -424,8 +424,8 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     if (hasConstValue(constExpr)) {
       os << "const(" << getConstValue(constExpr) << ") ";
     }
-    if (genericParamName.has_value()) {
-      os << "genericParam(" << *genericParamName << ") ";
+    if (flags.isGenericParamName()) {
+      os << "genericParam(" << name << ") ";
     }
     os << "constExpr(";
     if (constExpr) {
@@ -435,9 +435,9 @@ void TypeBinding::print(llvm::raw_ostream &os, bool fullPrintout) const {
     }
     os << ") ";
     os << "}";
-    if (!members.empty()) {
+    if (!getMembers().empty()) {
       os << " members { ";
-      llvm::interleaveComma(members, os, [&](auto &member) {
+      llvm::interleaveComma(getMembers(), os, [&](auto &member) {
         os << member.getKey() << ": ";
         auto &type = member.getValue();
         if (type.has_value()) {
@@ -474,14 +474,15 @@ bool TypeBinding::operator==(const TypeBinding &other) const {
   }
 
   return superTypeIsEqual && flags == other.flags && name == other.name &&
-         constExpr == other.constExpr && genericParamName == other.genericParamName &&
-         members == other.members && getGenericParamsMapping() == other.getGenericParamsMapping() &&
+         constExpr == other.constExpr && getMembers() == other.getMembers() &&
+         getGenericParamsMapping() == other.getGenericParamsMapping() &&
          getConstructorParams() == other.getConstructorParams();
 }
 
 FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef memberName) const {
-  auto it = members.find(memberName);
-  if (it != members.end()) {
+  const auto &membersMap = getMembers();
+  auto it = membersMap.find(memberName);
+  if (it != membersMap.end()) {
     return it->second;
   }
   if (superType != nullptr) {
@@ -494,19 +495,35 @@ FailureOr<std::optional<TypeBinding>> TypeBinding::locateMember(StringRef member
 // TypeBinding::ParamsStoragePtr
 //==-----------------------------------------------------------------------==//
 
-ParamsStorage *TypeBinding::ParamsStorageFactory::init() { return new ParamsStorage(); }
+std::shared_ptr<ParamsStorage> TypeBinding::ParamsStorageFactory::init() {
+  return ParamsStorage::Shared();
+}
 
 TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(const ParamsMap &map) {
-  set(new ParamsStorage(map));
+  set(ParamsStorage(map));
   return *this;
 }
 TypeBinding::ParamsStoragePtr &TypeBinding::ParamsStoragePtr::operator=(ParamsMap &&map) {
-  set(new ParamsStorage(map));
+  set(ParamsStorage(map));
   return *this;
 }
 
-TypeBinding::ParamsStoragePtr::ParamsStoragePtr(const ParamsMap &map)
-    : zklang::CopyablePointer<ParamsStorage, ParamsStorageFactory>(new ParamsStorage(map)) {}
+//==-----------------------------------------------------------------------==//
+// TypeBinding::MembersMapFactory
+//==-----------------------------------------------------------------------==//
+
+std::shared_ptr<MembersMap> TypeBinding::MembersMapFactory::init() {
+  return std::make_shared<MembersMap>();
+}
+
+TypeBinding::MembersMapPtr &TypeBinding::MembersMapPtr::operator=(const MembersMap &map) {
+  set(map);
+  return *this;
+}
+TypeBinding::MembersMapPtr &TypeBinding::MembersMapPtr::operator=(MembersMap &&map) {
+  set(map);
+  return *this;
+}
 
 //==-----------------------------------------------------------------------==//
 // operator<< overloads

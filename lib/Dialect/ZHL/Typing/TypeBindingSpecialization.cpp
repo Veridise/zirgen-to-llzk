@@ -218,8 +218,7 @@ static LogicalResult specializeTypeBinding_genericTypeCase(
     }
   }
   // Specialize the types of the members
-  auto &members = dst->getMembers();
-  for (auto &member : members) {
+  for (auto &member : dst->getMembersMut()) {
     auto name = member.getKey();
     auto &type = member.getValue();
     if (type.has_value()) {
@@ -404,7 +403,8 @@ constantFoldExpr(const ExprView &expr, ParamsScopeStack &scopes, size_t indent) 
   return failure();
 }
 
-static Params getConstantParams(const TypeBinding &binding, ParamsStorage &storage) {
+static Params
+getConstantParams(const TypeBinding &binding, std::shared_ptr<ParamsStorage> &storage) {
   ParamsMap constants;
   Params params = binding.getGenericParamsMapping();
   for (auto [pos, param, name] : llvm::enumerate(params, params.getNames())) {
@@ -412,7 +412,7 @@ static Params getConstantParams(const TypeBinding &binding, ParamsStorage &stora
       constants.declare(name, param, pos);
     }
   }
-  storage = ParamsStorage(constants, params.size(), TypeBinding(binding.getLocation()));
+  storage = ParamsStorage::Shared(constants, params.size(), TypeBinding(binding.getLocation()));
   return Params(storage);
 }
 
@@ -423,7 +423,7 @@ static LogicalResult propagateConstants(
 
   MutableParams params = dst->getGenericParamsMapping();
 
-  ParamsStorage sto;
+  std::shared_ptr<ParamsStorage> sto;
   Params constParams = getConstantParams(*dst, sto);
   ScopeGuard guard(scopes, constParams);
   LLVM_DEBUG(spaces(indent); scopes.print(llvm::dbgs()));
@@ -463,7 +463,7 @@ static LogicalResult propagateConstants(
   }
 
   if (dst->hasSuperType()) {
-    ParamsStorage superTypeSto;
+    std::shared_ptr<ParamsStorage> superTypeSto;
     Params superTypeScope = getConstantParams(dst->getSuperType(), superTypeSto);
     LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in super type "
                                             << dst->getSuperType() << "\n");
@@ -491,12 +491,11 @@ static LogicalResult propagateConstants(
     }
   }
   // Specialize the types of the members
-  auto &members = dst->getMembers();
-  for (auto &member : members) {
+  for (auto &member : dst->getMembersMut()) {
     auto name = member.getKey();
     auto &type = member.getValue();
     if (type.has_value()) {
-      ParamsStorage memberSto;
+      std::shared_ptr<ParamsStorage> memberSto;
       Params memberScope = getConstantParams(*type, memberSto);
       LLVM_DEBUG(spaces(indent); llvm::dbgs() << "Propagating constants in member " << name
                                               << " of type " << *type << "\n");
@@ -535,7 +534,7 @@ static LogicalResult specializeTypeBindingImpl(
     if (failed(specializeTypeBinding_genericTypeCase(dst, scopes, FV, bindings, indent))) {
       return failure();
     }
-    ParamsStorage sto;
+    auto sto = ParamsStorage::Shared();
     Params consts(sto);
     ParamsScopeStack constsScope(consts);
     return propagateConstants(dst, constsScope, bindings, indent);
@@ -626,7 +625,7 @@ mlir::FailureOr<zhl::TypeBinding> zhl::TypeBinding::specialize(
 
   TypeBinding specializedBinding(*this); // Make a copy to create the specialization
 
-  ParamsStorage sto(generics);
+  auto sto = ParamsStorage::Shared(generics);
   Params initialScope(sto);
   ParamsScopeStack scopeStack(initialScope);
   WrapLog w(*this);
