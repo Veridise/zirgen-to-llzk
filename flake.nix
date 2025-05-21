@@ -13,24 +13,16 @@
       follows = "llzk-pkgs/flake-utils";
     };
 
-    release-helpers = {
-      url = "github:Veridise/open-source-release-helpers?ref=main";
+    llzk = {
+      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
       inputs = {
         nixpkgs.follows = "llzk-pkgs/nixpkgs";
         flake-utils.follows = "llzk-pkgs/flake-utils";
+        llzk-pkgs.follows = "llzk-pkgs";
       };
     };
 
-    llzk = {
-      url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
-      inputs.nixpkgs.follows = "llzk-pkgs/nixpkgs";
-    };
-
-    samply = {
-      url = "github:mstange/samply/samply-v0.13.1";
-      inputs.nixpkgs.follows = "llzk-pkgs/nixpkgs";
-      inputs.flake-utils.follows = "llzk-pkgs/flake-utils";
-    };
+    release-helpers.follows = "llzk/release-helpers";
   };
 
   # Custom colored bash prompt
@@ -43,12 +35,15 @@
 
         # Default zklang build uses the default compiler for the system (usually gcc for Linux and clang for Macos)
         zklang = final.callPackage ./nix/zklang.nix { clang = final.clang_18; llzk = final.llzk; };
-        # Build in release with symbols mode with a particular compiler. Mostly useful for development and CI
+        # Build in release with symbols mode with a particular compiler and sanitizers enabled.
+        # Mostly useful for development and CI
         zklangClang = (final.zklang.override { stdenv = final.clangStdenv; }).overrideAttrs(attrs: {
           cmakeBuildType = "RelWithDebInfo";
+          cmakeFlags = attrs.cmakeFlags ++ [ "-DZKLANG_ENABLE_SANITIZERS=ON" ];
         });
         zklangGCC = (final.zklang.override { stdenv = final.gccStdenv; }).overrideAttrs(attrs: {
           cmakeBuildType = "RelWithDebInfo";
+          cmakeFlags = attrs.cmakeFlags ++ [ "-DZKLANG_ENABLE_SANITIZERS=ON" ];
         });
       };
     } //
@@ -86,6 +81,7 @@
           default =  pkgs.zklang.overrideAttrs (old: {
             nativeBuildInputs = (with pkgs; [
               doxygen
+              git
 
               # clang-tidy and clang-format
               clang-tools_18
