@@ -16,30 +16,15 @@
         "type": "github"
       }
     },
-    "flake-utils_2": {
-      "locked": {
-        "lastModified": 1652776076,
-        "narHash": "sha256-gzTw/v1vj4dOVbpBSJX4J0DwUR6LIyXo7/SuuTJp1kM=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "04c1b180862888302ddfb2e3ad9eaa63afc60cf8",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "ref": "v1.0.0",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
     "llzk": {
       "inputs": {
         "flake-utils": [
-          "llzk",
           "llzk-pkgs",
           "flake-utils"
         ],
-        "llzk-pkgs": "llzk-pkgs",
+        "llzk-pkgs": [
+          "llzk-pkgs"
+        ],
         "nixpkgs": [
           "llzk-pkgs",
           "nixpkgs"
@@ -81,42 +66,7 @@
         "type": "github"
       }
     },
-    "llzk-pkgs_2": {
-      "inputs": {
-        "flake-utils": "flake-utils_2",
-        "nixpkgs": "nixpkgs_2"
-      },
-      "locked": {
-        "lastModified": 1743619909,
-        "narHash": "sha256-jLuVyK9v+QMkJ7/ZG5o3miZYZ6GrhV+R4TeeYESkJFg=",
-        "owner": "Veridise",
-        "repo": "llzk-nix-pkgs",
-        "rev": "d40e7f02ac779f385a5eec74549d9149b7bf02f8",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Veridise",
-        "ref": "main",
-        "repo": "llzk-nix-pkgs",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
-      "locked": {
-        "lastModified": 1743613625,
-        "narHash": "sha256-N4hv3YDFs2yA/NBYNQK1o4AaNzLdBKqeePquk+t+QiA=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "b19d7721ae9325afb9ba3729a09a18d203ccd6e6",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
       "locked": {
         "lastModified": 1743613625,
         "narHash": "sha256-N4hv3YDFs2yA/NBYNQK1o4AaNzLdBKqeePquk+t+QiA=",
@@ -159,32 +109,6 @@
         "type": "github"
       }
     },
-    "release-helpers_2": {
-      "inputs": {
-        "flake-utils": [
-          "llzk-pkgs",
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "llzk-pkgs",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1745292187,
-        "narHash": "sha256-emE+IXMiPw5IqKZzyJLwukQ6Cn6WOI9zjUpIgASwCZw=",
-        "owner": "Veridise",
-        "repo": "open-source-release-helpers",
-        "rev": "bed5c10dc058138a3b20d1c3340ead212836a0b0",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Veridise",
-        "ref": "main",
-        "repo": "open-source-release-helpers",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
         "flake-utils": [
@@ -192,12 +116,15 @@
           "flake-utils"
         ],
         "llzk": "llzk",
-        "llzk-pkgs": "llzk-pkgs_2",
+        "llzk-pkgs": "llzk-pkgs",
         "nixpkgs": [
           "llzk-pkgs",
           "nixpkgs"
         ],
-        "release-helpers": "release-helpers_2"
+        "release-helpers": [
+          "llzk",
+          "release-helpers"
+        ]
       }
     }
   },

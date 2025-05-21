@@ -19,6 +19,7 @@ endmacro()
 
 macro(zklang_setup_options)
   option(ZKLANG_ENABLE_HARDENING "Enable hardening" ON)
+  option(ZKLANG_ENABLE_SANITIZERS "Enable sanitizers" OFF)
   option(ZKLANG_ENABLE_COVERAGE "Enable coverage reporting" OFF)
   option(ZKLANG_ENABLE_COLOR_DIAGNOSTICS "Enable colored diagnostics" ON)
   cmake_dependent_option(
@@ -31,11 +32,11 @@ macro(zklang_setup_options)
   zklang_supports_sanitizers()
 
   option(ZKLANG_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
-  option(ZKLANG_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${SUPPORTS_ASAN})
-  option(ZKLANG_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
-  option(ZKLANG_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${SUPPORTS_UBSAN})
-  option(ZKLANG_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
-  option(ZKLANG_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
+  cmake_dependent_option(ZKLANG_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${SUPPORTS_ASAN} ZKLANG_ENABLE_SANITIZERS OFF)
+  cmake_dependent_option(ZKLANG_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF ZKLANG_ENABLE_SANITIZERS OFF)
+  cmake_dependent_option(ZKLANG_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${SUPPORTS_UBSAN} ZKLANG_ENABLE_SANITIZERS OFF)
+  cmake_dependent_option(ZKLANG_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF ZKLANG_ENABLE_SANITIZERS OFF)
+  cmake_dependent_option(ZKLANG_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF ZKLANG_ENABLE_SANITIZERS OFF)
 endmacro()
 
 macro(zklang_global_options)
@@ -43,7 +44,8 @@ macro(zklang_global_options)
 
   if(ZKLANG_ENABLE_HARDENING AND ZKLANG_ENABLE_GLOBAL_HARDENING)
     include(cmake/Hardening.cmake)
-    if(NOT SUPPORTS_UBSAN
+    if(NOT ZKLANG_ENABLE_SANITIZER_UNDEFINED
+       OR NOT SUPPORTS_UBSAN
        OR ZKLANG_ENABLE_SANITIZER_UNDEFINED
        OR ZKLANG_ENABLE_SANITIZER_ADDRESS
        OR ZKLANG_ENABLE_SANITIZER_THREAD
@@ -72,14 +74,16 @@ macro(zklang_local_options)
     ""
     "")
 
-  include(cmake/Sanitizers.cmake)
-  zklang_enable_sanitizers(
-    zklang_options
-    ${ZKLANG_ENABLE_SANITIZER_ADDRESS}
-    ${ZKLANG_ENABLE_SANITIZER_LEAK}
-    ${ZKLANG_ENABLE_SANITIZER_UNDEFINED}
-    ${ZKLANG_ENABLE_SANITIZER_THREAD}
-    ${ZKLANG_ENABLE_SANITIZER_MEMORY})
+  if(ZKLANG_ENABLE_SANITIZERS)
+    include(cmake/Sanitizers.cmake)
+    zklang_enable_sanitizers(
+      zklang_options
+      ${ZKLANG_ENABLE_SANITIZER_ADDRESS}
+      ${ZKLANG_ENABLE_SANITIZER_LEAK}
+      ${ZKLANG_ENABLE_SANITIZER_UNDEFINED}
+      ${ZKLANG_ENABLE_SANITIZER_THREAD}
+      ${ZKLANG_ENABLE_SANITIZER_MEMORY})
+  endif()
 
   if(ZKLANG_ENABLE_COVERAGE)
     include(cmake/Tests.cmake)
