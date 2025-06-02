@@ -22,8 +22,21 @@ class RewritePatternSet;
 
 namespace zklang {
 
+/// Populates the pattern set with all the patterns that can convert a zhl operation into a llzk's
+/// felt dialect operation.
 void populateZhlToLlzkFeltConversionPatterns(const mlir::TypeConverter &, mlir::RewritePatternSet &);
+
+/// Populates the conversion target with all the dialects and ops related to converting a zhl
+/// operation into a llzk's felt dialect operation.
 void populateZhlToLlzkFeltConversionTarget(mlir::ConversionTarget &);
-void populateZhlToLlzkFeltConversionPatternsAndLegality(const mlir::TypeConverter &, mlir::RewritePatternSet &, mlir::ConversionTarget &);
+
+/// Populates the pattern set with all the patterns that can convert a zhl operation into a llzk's
+/// felt dialect operation and the conversion targetwith all the dialects and ops related to
+inline void populateZhlToLlzkFeltConversionPatternsAndLegality(
+    const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns, mlir::ConversionTarget &target
+) {
+  populateZhlToLlzkFeltConversionPatterns(tc, patterns);
+  populateZhlToLlzkFeltConversionTarget(target);
+}
 
 } // namespace zklang

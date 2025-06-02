@@ -255,10 +255,3 @@ void zklang::populateZhlToLlzkFeltConversionTarget(ConversionTarget &target) {
     return !isTargetConstructOp(op, {"BitAnd", "Add", "Sub", "Mul", "Mod", "Inv", "Neg"});
   });
 }
-
-void zklang::populateZhlToLlzkFeltConversionPatternsAndLegality(
-    const TypeConverter &tc, RewritePatternSet &patterns, ConversionTarget &target
-) {
-  populateZhlToLlzkFeltConversionPatterns(tc, patterns);
-  populateZhlToLlzkFeltConversionTarget(target);
-}

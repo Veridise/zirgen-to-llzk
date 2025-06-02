@@ -113,6 +113,9 @@ def TypeBinding : ZMLAttr<"TypeBinding", "binding", []> {
     mlir::Type materializeType(const mlir::TypeConverter &) const;
     mlir::FunctionType materializeCtorType() const;
     zml::TypeBindingAttr getSuperTypeAttr() const;
+    mlir::FailureOr<zml::TypeBindingAttr> getArrayElementAttr(llvm::function_ref<mlir::InFlightDiagnostic()>) const;
+    mlir::FailureOr<zml::TypeBindingAttr> getArraySizeAttr(llvm::function_ref<mlir::InFlightDiagnostic()>) const;
+
     void bind(mlir::Operation *op, mlir::StringRef key = "zml.binding", bool overwrite = false) const;
     void bind(mlir::Operation *op,  bool overwrite = false) const { bind(op, "zml.binding", overwrite); }
     void bind(mlir::Value val, bool overwrite = false) const;

@@ -168,7 +168,7 @@ mlir::FailureOr<mlir::Value> coerceToArray(mlir::TypedValue<ComponentLike> v, ml
 /// knowns it will succeed. This makes safe to create operations and other conversion modifications
 /// for obtaining the value of the super type.
 mlir::FailureOr<mlir::Value>
-constructPODComponent(mlir::Operation *op, zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self, llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &, const mlir::TypeConverter &);
+constructPODComponent(mlir::Operation *op, const zhl::TypeBinding &binding, mlir::OpBuilder &builder, mlir::Value self, llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &, const mlir::TypeConverter &);
 
 /// Creates a component used to represent a closure. This component will have a constructor that
 /// takes as input the values for all fields including the super type's value.

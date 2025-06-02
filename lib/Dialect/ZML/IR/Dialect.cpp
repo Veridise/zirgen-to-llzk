@@ -23,6 +23,7 @@
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/Value.h>
 #include <mlir/Support/LLVM.h>
+#include <mlir/Support/LogicalResult.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <zklang/Dialect/ZHL/Typing/ParamsStorage.h>
 #include <zklang/Dialect/ZHL/Typing/TypeBinding.h>
@@ -104,6 +105,27 @@ TypeBindingAttr TypeBindingAttr::getSuperTypeAttr() const {
   }
 
   return TypeBindingAttr::get(getContext(), getTypeBinding()->getSuperType());
+}
+
+FailureOr<TypeBindingAttr>
+TypeBindingAttr::getArrayElementAttr(llvm::function_ref<mlir::InFlightDiagnostic()> emitError
+) const {
+  auto elt = getTypeBinding()->getArrayElement(emitError);
+  if (failed(elt)) {
+    return mlir::failure();
+  }
+
+  return TypeBindingAttr::get(getContext(), *elt);
+}
+
+FailureOr<TypeBindingAttr>
+TypeBindingAttr::getArraySizeAttr(llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+  auto size = getTypeBinding()->getArraySize(emitError);
+  if (failed(size)) {
+    return mlir::failure();
+  }
+
+  return TypeBindingAttr::get(getContext(), *size);
 }
 
 TypeBindingAttr TypeBindingAttr::get(Operation *op, StringRef key) {

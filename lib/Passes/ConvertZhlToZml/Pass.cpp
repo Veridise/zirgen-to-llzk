@@ -87,10 +87,10 @@ void ConvertZhlToZmlPass::runOnOperation() {
       /*ZhlExternLowering,*/ /*ZhlLiteralLowering,*/
       ZhlDeclarationRemoval, /*ZhlSuperLoweringInFunc,*/
       ZhlConstrainLowering, /*ZhlLookupLowering,*/ ZhlArrayLowering, ZhlSubscriptLowering,
-      ZhlRangeOpLowering, ZhlMapLowering, ZhlSuperLoweringInMap, ZhlLiteralStrLowering,
-      ZhlSuperLoweringInBlock, ZhlBlockLowering, ZhlGenericRemoval, ZhlSpecializeRemoval,
-      ZhlReduceLowering, ZhlSwitchLowering, ZhlSuperLoweringInSwitch, ZhlDirectiveRemoval,
-      ZhlBackLowering>(typeAnalysis, typeConverter, ctx);
+      ZhlRangeOpLowering, /*ZhlMapLowering, */ /*ZhlSuperLoweringInMap,*/ ZhlLiteralStrLowering,
+      /*ZhlSuperLoweringInBlock,*/ /*ZhlBlockLowering,*/ ZhlGenericRemoval, ZhlSpecializeRemoval,
+      /*ZhlReduceLowering,*/ /*ZhlSwitchLowering,*/ /*ZhlSuperLoweringInSwitch,*/
+      ZhlDirectiveRemoval, ZhlBackLowering>(typeAnalysis, typeConverter, ctx);
   patterns.add<ZhlConstructGlobalLowering, ZhlGetGlobalLowering>(
       globalsModule, typeAnalysis, typeConverter, ctx
   );

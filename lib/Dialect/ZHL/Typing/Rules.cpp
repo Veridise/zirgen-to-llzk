@@ -702,6 +702,11 @@ mlir::FailureOr<TypeBinding> ReduceTypeRule::
   if (operands[2].needsBackVariables()) {
     scope.setNeedsBackVariablesSupport();
   }
+  /// const_cast reason: We have to edit the binding of the operand since we need to allocate memory
+  /// for it.
+  scope.getCurrentFrame().allocateSlot<ComponentSlot>(
+      getBindings(), const_cast<TypeBinding &>(operands[2])
+  );
   return interpretOp(op, output);
 }
 

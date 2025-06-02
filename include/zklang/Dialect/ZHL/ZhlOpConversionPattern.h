@@ -20,6 +20,18 @@
 
 namespace zhl {
 
+template <typename Op>
+mlir::FailureOr<typename Op::template GenericAdaptor<mlir::ArrayRef<zml::TypeBindingAttr>>>
+bindingsAdaptor(Op op) {
+  auto bindings = llvm::map_to_vector(op->getOperands(), [](mlir::Value v) {
+    return zml::TypeBindingAttr::get(v);
+  });
+  if (llvm::any_of(bindings, [](auto t) { return t == nullptr; })) {
+    return mlir::failure();
+  }
+  return typename Op::template GenericAdaptor<mlir::ArrayRef<zml::TypeBindingAttr>>(bindings, op);
+}
+
 /// A modified version of OpConversionPattern that automatically extracts the TypeBinding attribute
 /// of the operation and it's operand values. It's meant to only work with operations in the ZHL
 /// dialect and these operations have to be annotated with the type binding beforehand.
@@ -44,12 +56,12 @@ public:
     if (!binding) {
       return mlir::failure();
     }
-    auto operandBindings = getOperandBindings(op);
-    if (llvm::any_of(operandBindings, [](auto t) { return t == nullptr; })) {
+    auto sourceOp = mlir::cast<SourceOp>(op);
+    auto operandBindings = bindingsAdaptor(sourceOp);
+    if (failed(operandBindings)) {
       return mlir::failure();
     }
-    auto sourceOp = mlir::cast<SourceOp>(op);
-    return match(sourceOp, binding, BindingsAdaptor(operandBindings, sourceOp));
+    return match(sourceOp, binding, *operandBindings);
   }
 
   void rewrite(
@@ -57,11 +69,8 @@ public:
       mlir::ConversionPatternRewriter &rewriter
   ) const final {
     auto sourceOp = mlir::cast<SourceOp>(op);
-    auto operandBindings = getOperandBindings(op);
-    rewrite(
-        sourceOp, Binding::get(op), OpAdaptor(operands, sourceOp),
-        BindingsAdaptor(operandBindings, sourceOp), rewriter
-    );
+    auto operandBindings = bindingsAdaptor(sourceOp);
+    rewrite(sourceOp, Binding::get(op), OpAdaptor(operands, sourceOp), *operandBindings, rewriter);
   }
 
   mlir::LogicalResult matchAndRewrite(
@@ -69,10 +78,9 @@ public:
       mlir::ConversionPatternRewriter &rewriter
   ) const final {
     auto sourceOp = mlir::cast<SourceOp>(op);
-    auto operandBindings = getOperandBindings(op);
+    auto operandBindings = bindingsAdaptor(sourceOp);
     return matchAndRewrite(
-        sourceOp, Binding::get(op), OpAdaptor(operands, sourceOp),
-        BindingsAdaptor(operandBindings, sourceOp), rewriter
+        sourceOp, Binding::get(op), OpAdaptor(operands, sourceOp), *operandBindings, rewriter
     );
   }
 
@@ -100,10 +108,6 @@ public:
 
 private:
   using mlir::ConversionPattern::matchAndRewrite;
-
-  mlir::SmallVector<Binding> getOperandBindings(mlir::Operation *op) const {
-    return llvm::map_to_vector(op->getOperands(), [](mlir::Value v) { return Binding::get(v); });
-  }
 };
 
 } // namespace zhl

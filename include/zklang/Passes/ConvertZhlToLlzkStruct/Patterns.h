@@ -33,7 +33,12 @@ void populateZhlToLlzkStructConversionTarget(mlir::ConversionTarget &);
 /// Populates the pattern set with all the patterns that can convert a zhl operation into a llzk's
 /// struct dialect operation and the conversion targetwith all the dialects and ops related to
 /// converting a zhl operation into a llzk's struct dialect operation.
-void populateZhlToLlzkStructConversionPatternsAndLegality(const mlir::TypeConverter &, mlir::RewritePatternSet &, mlir::ConversionTarget &);
+inline void populateZhlToLlzkStructConversionPatternsAndLegality(
+    const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns, mlir::ConversionTarget &target
+) {
+  populateZhlToLlzkStructConversionPatterns(tc, patterns);
+  populateZhlToLlzkStructConversionTarget(target);
+}
 
 /// Populates the pattern set with all the patterns that can convert a zhl ComponentOp operation
 /// into a llzk's struct dialect operation.
@@ -46,6 +51,11 @@ void populateZhlComponentToLlzkStructConversionTarget(mlir::ConversionTarget &);
 /// Populates the pattern set with all the patterns that can convert a zhl ComponentOp operation
 /// into a llzk's struct dialect operation and the conversion target with all the dialects and ops
 /// related to converting a zhl ComponentOp operation into a llzk's struct dialect operation.
-void populateZhlComponentToLlzkStructConversionPatternsAndLegality(const mlir::TypeConverter &, mlir::RewritePatternSet &, mlir::ConversionTarget &);
+inline void populateZhlComponentToLlzkStructConversionPatternsAndLegality(
+    const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns, mlir::ConversionTarget &target
+) {
+  populateZhlComponentToLlzkStructConversionPatterns(tc, patterns);
+  populateZhlComponentToLlzkStructConversionTarget(target);
+}
 
 } // namespace zklang

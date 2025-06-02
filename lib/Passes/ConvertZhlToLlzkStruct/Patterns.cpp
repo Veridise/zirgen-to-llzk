@@ -416,13 +416,6 @@ void zklang::populateZhlToLlzkStructConversionTarget(mlir::ConversionTarget &tar
   target.addDynamicallyLegalOp<SuperOp>([](SuperOp op) { return !parentIsSelf(op); });
 }
 
-void zklang::populateZhlToLlzkStructConversionPatternsAndLegality(
-    const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns, mlir::ConversionTarget &target
-) {
-  populateZhlToLlzkStructConversionPatterns(tc, patterns);
-  populateZhlToLlzkStructConversionTarget(target);
-}
-
 void zklang::populateZhlComponentToLlzkStructConversionPatterns(
     const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns
 ) {
@@ -438,11 +431,4 @@ void zklang::populateZhlComponentToLlzkStructConversionTarget(mlir::ConversionTa
   target.addLegalDialect<ZhlDialect, StructDialect, FunctionDialect, zml::ZMLDialect>();
   target.addIllegalOp<ComponentOp>();
   target.addLegalDialect<BuiltinDialect>();
-}
-
-void zklang::populateZhlComponentToLlzkStructConversionPatternsAndLegality(
-    const mlir::TypeConverter &tc, mlir::RewritePatternSet &patterns, mlir::ConversionTarget &target
-) {
-  populateZhlComponentToLlzkStructConversionPatterns(tc, patterns);
-  populateZhlComponentToLlzkStructConversionTarget(target);
 }

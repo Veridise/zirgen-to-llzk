@@ -238,7 +238,7 @@ void zml::storeSlot(
 #undef DEBUG_TYPE
 
 static void materializeFieldTypes(
-    zhl::TypeBinding &binding, MLIRContext *ctx, SmallVectorImpl<Type> &types,
+    const zhl::TypeBinding &binding, MLIRContext *ctx, SmallVectorImpl<Type> &types,
     SmallVectorImpl<StringRef> &fields, SmallVectorImpl<bool> *columns = nullptr
 ) {
   llvm::StringMap<std::pair<Type, bool>> map;
@@ -268,7 +268,7 @@ static void materializeFieldTypes(
 
 static void constructFieldReads(
     TypeRange types, ArrayRef<StringRef> fieldNames, SmallVectorImpl<Value> &results,
-    OpBuilder &builder, Value self, Location loc, zhl::TypeBinding &binding
+    OpBuilder &builder, Value self, Location loc, const zhl::TypeBinding &binding
 ) {
   for (auto [type, field] : llvm::zip_equal(types, fieldNames)) {
     auto memberBinding = binding.getMembers().at(field);
@@ -282,7 +282,7 @@ static void constructFieldReads(
 }
 
 FailureOr<Value> zml::constructPODComponent(
-    Operation *op, zhl::TypeBinding &binding, OpBuilder &builder, Value self,
+    Operation *op, const zhl::TypeBinding &binding, OpBuilder &builder, Value self,
     llvm::function_ref<mlir::Value()> superTypeValueCb, const zhl::TypeBindings &bindings,
     const TypeConverter &tc
 ) {
