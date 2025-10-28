@@ -31,3 +31,5 @@
 .venv/
 
 .cache/
+
+.DS_Store
