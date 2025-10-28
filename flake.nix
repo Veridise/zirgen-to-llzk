@@ -3,15 +3,8 @@
   inputs = {
     llzk-pkgs.url = "github:Veridise/llzk-nix-pkgs?ref=main";
 
-    nixpkgs = {
-      url = "github:NixOS/nixpkgs";
-      follows = "llzk-pkgs/nixpkgs";
-    };
-
-    flake-utils = {
-      url = "github:numtide/flake-utils/v1.0.0";
-      follows = "llzk-pkgs/flake-utils";
-    };
+    nixpkgs.follows = "llzk-pkgs/nixpkgs";
+    flake-utils.follows = "llzk-pkgs/flake-utils";
 
     llzk = {
       url = "git+ssh://git@github.com/Veridise/llzk-lib.git?ref=main";
